@@ -1,78 +1,59 @@
-# Zyra - Web3 Automation SaaS
+# 🗂️ Documentation Index for AI-Driven Web3 Task Automation Platform
 
-A modern web application for building Web3 automation workflows with a visual canvas.
+Welcome! This directory contains all essential documentation for building, maintaining, and using the AI-powered Web3 Task Automation Platform. Each document is referenced below.
 
-## Features
+## Product & Vision
 
-- Supabase authentication with magic links and wallet sign-in
-- Visual workflow builder using React Flow
-- Natural language command bar for generating workflows
-- Pluggable AI provider system (currently using Ollama)
-- Dark mode support
-- Modern UI with consistent 12px border radius
+- [product-overview.md](./docs/product-overview.md)
+- [feature-roadmap.md](./docs/feature-roadmap.md)
 
-## Tech Stack
+## User Experience & UI/UX
 
-- Next.js
-- TypeScript
-- TailwindCSS
-- Supabase for authentication and storage
-- React Flow for the visual workflow canvas
-- Styled Components for custom React Flow nodes
+- [user-personas.md](./docs/user-personas.md)
+- [user-journeys.md](./docs/user-journeys.md)
+- [ui-wireframes.md](./docs/ui-wireframes.md)
+- [workflow-block-catalog.md](./docs/workflow-block-catalog.md)
 
-## Getting Started
+## Technical Architecture
 
-### Prerequisites
+- [system-architecture.md](./docs/system-architecture.md)
+- [component-design.md](./docs/component-design.md)
+- [data-models.md](./docs/data-models.md)
+- [api-specs.md](./docs/api-specs.md)
+- [security-plan.md](./docs/security-plan.md)
 
-- Node.js 18+ and npm
-- Supabase account
-- (Optional) Ollama running locally or accessible API
+## AI & Automation
 
-### Installation
+- [ai-integration-guide.md](./docs/ai-integration-guide.md)
+- [recommendation-algorithms.md](./docs/recommendation-algorithms.md)
+- [error-handling.md](./docs/error-handling.md)
+- [predictive-models.md](./docs/predictive-models.md)
 
-1. Clone the repository
-2. Install dependencies:
+## Blockchain Interactions
 
-\`\`\`bash
-npm install
-\`\`\`
+- [supported-chains.md](./docs/supported-chains.md)
+- [abi-discovery.md](./docs/abi-discovery.md)
+- [chain-defaults.md](./docs/chain-defaults.md)
 
-3. Copy the environment variables:
+## Developer & Contributor Docs
 
-\`\`\`bash
-cp .env.example .env.local
-\`\`\`
+- [getting-started.md](./docs/getting-started.md)
+- [block-development.md](./docs/block-development.md)
+- [testing-strategy.md](./docs/testing-strategy.md)
 
-4. Update the environment variables in `.env.local` with your Supabase credentials
+## User Documentation
 
-### Development
+- [user-manual.md](./docs/user-manual.md)
+- [ai-copilot-usage.md](./docs/ai-copilot-usage.md)
+- [workflow-doc-template.md](./docs/workflow-doc-template.md)
+- [faq.md](./docs/faq.md)
 
-Run the development server:
+## Legal & Compliance
 
-\`\`\`bash
-npm run dev
-\`\`\`
+- [terms-of-service.md](./docs/terms-of-service.md)
+- [privacy-policy.md](./docs/privacy-policy.md)
+- [open-source-licenses.md](./docs/open-source-licenses.md)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-### Deployment
-
-The easiest way to deploy the application is using Vercel:
-
-1. Push your code to a GitHub repository
-2. Import the project in Vercel
-3. Add your environment variables
-4. Deploy
-
-## Project Structure
-
-- `app/` - Next.js App Router pages and layouts
-- `components/` - React components
-- `lib/` - Utility functions and API clients
-  - `ai-providers/` - Pluggable AI provider implementations
-  - `supabase/` - Supabase client configuration
-- `public/` - Static assets
-
-## License
-
-MIT
+> Start with `product-overview.md` to get a sense of the platform vision and roadmap. Each document can be expanded as the project evolves.
