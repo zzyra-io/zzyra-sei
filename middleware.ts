@@ -20,7 +20,7 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Static assets (no capturing groups, just extension match)
-    "/:path*\.(jpg|jpeg|png|webp|svg|ico|css|js)$",
+    "/:path*.(jpg|jpeg|png|webp|svg|ico|css|js)$",
     // API routes
     "/api/:path*",
   ],

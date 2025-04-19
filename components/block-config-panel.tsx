@@ -1,13 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X } from "lucide-react"
+import { X, Palette, Info, Sliders } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Slider } from "@/components/ui/slider"
 import type { Node } from "@/components/flow-canvas"
 
 interface BlockConfigPanelProps {
@@ -22,6 +25,24 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
   const [description, setDescription] = useState(node.data.description || "")
   const [isEnabled, setIsEnabled] = useState(node.data.isEnabled !== false)
   const [isMounted, setIsMounted] = useState(false)
+  const [activeTab, setActiveTab] = useState("general")
+
+  // Appearance settings
+  const [style, setStyle] = useState<any>(
+    node.data.style || {
+      backgroundColor: "bg-card",
+      borderColor: "border-border",
+      textColor: "text-foreground",
+      accentColor: "primary",
+      width: 220,
+    },
+  )
+
+  // Input/Output settings
+  const [inputCount, setInputCount] = useState(node.data.inputCount || 1)
+  const [outputCount, setOutputCount] = useState(node.data.outputCount || 1)
+  const [hasInputs, setHasInputs] = useState(node.data.inputs !== false)
+  const [hasOutputs, setHasOutputs] = useState(node.data.outputs !== false)
 
   useEffect(() => {
     setIsMounted(true)
@@ -29,6 +50,19 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
     setLabel(node.data.label || "")
     setDescription(node.data.description || "")
     setIsEnabled(node.data.isEnabled !== false)
+    setStyle(
+      node.data.style || {
+        backgroundColor: "bg-card",
+        borderColor: "border-border",
+        textColor: "text-foreground",
+        accentColor: "primary",
+        width: 220,
+      },
+    )
+    setInputCount(node.data.inputCount || 1)
+    setOutputCount(node.data.outputCount || 1)
+    setHasInputs(node.data.inputs !== false)
+    setHasOutputs(node.data.outputs !== false)
   }, [node])
 
   if (!isMounted) {
@@ -37,6 +71,13 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
 
   const handleConfigChange = (key: string, value: any) => {
     setConfig((prev: any) => ({
+      ...prev,
+      [key]: value,
+    }))
+  }
+
+  const handleStyleChange = (key: string, value: any) => {
+    setStyle((prev: any) => ({
       ...prev,
       [key]: value,
     }))
@@ -51,6 +92,11 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
         description,
         isEnabled,
         config,
+        style,
+        inputCount,
+        outputCount,
+        inputs: hasInputs,
+        outputs: hasOutputs,
       },
     }
     onUpdate(updatedNode)
@@ -277,8 +323,139 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
     }
   }
 
+  const renderAppearanceSettings = () => {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="backgroundColor">Background Color</Label>
+          <select
+            id="backgroundColor"
+            value={style.backgroundColor}
+            onChange={(e) => handleStyleChange("backgroundColor", e.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="bg-card">Default</option>
+            <option value="bg-primary/10">Primary (Light)</option>
+            <option value="bg-secondary/10">Secondary (Light)</option>
+            <option value="bg-accent/10">Accent (Light)</option>
+            <option value="bg-destructive/10">Destructive (Light)</option>
+            <option value="bg-muted">Muted</option>
+            <option value="bg-background">Background</option>
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="borderColor">Border Color</Label>
+          <select
+            id="borderColor"
+            value={style.borderColor}
+            onChange={(e) => handleStyleChange("borderColor", e.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="border-border">Default</option>
+            <option value="border-primary">Primary</option>
+            <option value="border-secondary">Secondary</option>
+            <option value="border-accent">Accent</option>
+            <option value="border-destructive">Destructive</option>
+            <option value="border-muted">Muted</option>
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="textColor">Text Color</Label>
+          <select
+            id="textColor"
+            value={style.textColor}
+            onChange={(e) => handleStyleChange("textColor", e.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="text-foreground">Default</option>
+            <option value="text-primary">Primary</option>
+            <option value="text-secondary">Secondary</option>
+            <option value="text-accent">Accent</option>
+            <option value="text-destructive">Destructive</option>
+            <option value="text-muted-foreground">Muted</option>
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="accentColor">Accent Color</Label>
+          <select
+            id="accentColor"
+            value={style.accentColor}
+            onChange={(e) => handleStyleChange("accentColor", e.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="primary">Primary</option>
+            <option value="secondary">Secondary</option>
+            <option value="accent">Accent</option>
+            <option value="destructive">Destructive</option>
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="width">Width ({style.width}px)</Label>
+          <Slider
+            id="width"
+            min={180}
+            max={400}
+            step={10}
+            value={[style.width]}
+            onValueChange={(value) => handleStyleChange("width", value[0])}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  const renderConnectionSettings = () => {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="hasInputs">Enable Input Connections</Label>
+          <Switch id="hasInputs" checked={hasInputs} onCheckedChange={setHasInputs} />
+        </div>
+
+        {hasInputs && (
+          <div className="space-y-2">
+            <Label htmlFor="inputCount">Number of Input Handles ({inputCount})</Label>
+            <Slider
+              id="inputCount"
+              min={1}
+              max={5}
+              step={1}
+              value={[inputCount]}
+              onValueChange={(value) => setInputCount(value[0])}
+              disabled={!hasInputs}
+            />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <Label htmlFor="hasOutputs">Enable Output Connections</Label>
+          <Switch id="hasOutputs" checked={hasOutputs} onCheckedChange={setHasOutputs} />
+        </div>
+
+        {hasOutputs && (
+          <div className="space-y-2">
+            <Label htmlFor="outputCount">Number of Output Handles ({outputCount})</Label>
+            <Slider
+              id="outputCount"
+              min={1}
+              max={5}
+              step={1}
+              value={[outputCount]}
+              onValueChange={(value) => setOutputCount(value[0])}
+              disabled={!hasOutputs}
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className="w-80 border-l bg-card p-4 overflow-y-auto">
+    <div className="w-80 border-l bg-card p-4 overflow-y-auto h-full">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">Block Configuration</h3>
         <Button variant="ghost" size="icon" onClick={onClose}>
@@ -286,29 +463,60 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
         </Button>
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="label">Label</Label>
-          <Input id="label" value={label} onChange={(e) => setLabel(e.target.value)} />
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-3 mb-4">
+          <TabsTrigger value="general" className="flex items-center">
+            <Info className="h-4 w-4 mr-1" />
+            <span>General</span>
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="flex items-center">
+            <Palette className="h-4 w-4 mr-1" />
+            <span>Style</span>
+          </TabsTrigger>
+          <TabsTrigger value="connections" className="flex items-center">
+            <Sliders className="h-4 w-4 mr-1" />
+            <span>Connections</span>
+          </TabsTrigger>
+        </TabsList>
 
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-        </div>
+        <TabsContent value="general" className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="label">Label</Label>
+            <Input id="label" value={label} onChange={(e) => setLabel(e.target.value)} />
+          </div>
 
-        <div className="flex items-center justify-between">
-          <Label htmlFor="enabled">Enabled</Label>
-          <Switch id="enabled" checked={isEnabled} onCheckedChange={setIsEnabled} />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          </div>
 
-        <Separator />
+          <div className="flex items-center justify-between">
+            <Label htmlFor="enabled">Enabled</Label>
+            <Switch id="enabled" checked={isEnabled} onCheckedChange={setIsEnabled} />
+          </div>
 
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium">Block-specific Configuration</h4>
-          {renderConfigFields()}
-        </div>
+          <Separator />
 
+          <Accordion type="single" collapsible defaultValue="config">
+            <AccordionItem value="config">
+              <AccordionTrigger className="text-sm font-medium">Block-specific Configuration</AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 pt-2">{renderConfigFields()}</div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </TabsContent>
+
+        <TabsContent value="appearance" className="space-y-4">
+          {renderAppearanceSettings()}
+        </TabsContent>
+
+        <TabsContent value="connections" className="space-y-4">
+          {renderConnectionSettings()}
+        </TabsContent>
+      </Tabs>
+
+      <div className="mt-6">
         <Button className="w-full" onClick={handleSave}>
           Apply Changes
         </Button>

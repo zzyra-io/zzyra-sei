@@ -9,11 +9,7 @@ const nextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    domains: [
-      "raw.githubusercontent.com",
-      "assets.coingecko.com",
-      "ethereum.org",
-    ],
+    domains: ["raw.githubusercontent.com", "assets.coingecko.com", "ethereum.org"],
     unoptimized: true,
   },
   // experimental: {
@@ -56,6 +52,6 @@ const nextConfig = {
   //   }
   //   return config;
   // },
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig

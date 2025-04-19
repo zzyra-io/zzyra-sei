@@ -35,12 +35,25 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
     const fetchData = async () => {
       try {
         setIsLoading(true)
-        const [workflowData, logsData] = await Promise.all([
-          workflowService.getWorkflow(params.id),
-          executionService.getExecutionLogs(params.id),
-        ])
+        // First fetch the workflow data
+        const workflowData = await workflowService.getWorkflow(params.id)
         setWorkflow(workflowData)
-        setExecutionLogs(logsData)
+
+        // Then try to fetch execution logs, but don't fail if they can't be fetched
+        try {
+          const logsData = await executionService.getExecutionLogs(params.id)
+          setExecutionLogs(logsData)
+        } catch (logsError) {
+          console.error("Error fetching execution logs:", logsError)
+          // Set empty logs array if there's an error
+          setExecutionLogs([])
+          // Show a toast notification about the logs error
+          toast({
+            title: "Warning",
+            description: "Could not load execution history. Some features may be limited.",
+            variant: "warning",
+          })
+        }
       } catch (error) {
         toast({
           title: "Error fetching workflow",

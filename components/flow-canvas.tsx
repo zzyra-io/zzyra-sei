@@ -73,6 +73,7 @@ interface FlowCanvasProps {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>
   onNodeSelect?: (node: Node | null) => void
+  readOnly?: boolean
 }
 
 export function FlowCanvas(props: FlowCanvasProps) {

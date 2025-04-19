@@ -1,95 +1,27 @@
-# Dependency directories
-/node_modules/
-.pnp/
-.pnp.js
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Build output
+# dependencies
+/node_modules
+
+# next.js
 /.next/
 /out/
-/build/
-/dist/
 
-# Production
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# production
+/build
 
-# Debug logs
+# debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+.pnpm-debug.log*
 
-# Supabase
-.supabase/
-supabase/.temp
-supabase/.env
-supabase/migrations/.snapshots
-supabase/docker
-supabase/db
-supabase/volumes
-supabase/service-key.json
-supabase/anon-key.json
-supabase/private-key.json
+# env files
+.env*
 
-# OS files
-.DS_Store
-Thumbs.db
-.AppleDouble
-.LSOverride
-ehthumbs.db
-Desktop.ini
+# vercel
+.vercel
 
-# IDEs and editors
-.vscode/
-.idea/
-*.sublime-workspace
-*.sublime-project
-
-# Misc
-coverage/
-*.lcov
-*.tgz
-*.log
-
-# Optional npm cache directory
-.npm/
-
-# Optional eslint cache
-.eslintcache
-
-# Optional REPL history
-.node_repl_history
-
-# Optional dotenv environment variables file
-.envrc
-
-# Mac system files
-.AppleDouble
-.LSOverride
-
-# Windows system files
-ehthumbs.db
-Desktop.ini
-
-# Test coverage
-coverage/
-*.lcov
-
-# Next.js build output
-.next/
-out/
-
-# Storybook build outputs
-.out/
-.storybook-out/
-
-# VSCode settings
-.vscode/
-
-# Other
-*.swp
-*.swo
+# typescript
+*.tsbuildinfo
+next-env.d.ts
