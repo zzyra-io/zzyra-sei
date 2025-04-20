@@ -152,7 +152,7 @@ export function BuilderSidebar({
                       <ChevronRight className='h-3 w-3 mr-1' />
                       <span>Your custom workflow blocks</span>
                     </div>
-                    <CustomBlockCatalog onAddBlock={onAddCustomBlock} />
+                    <CustomBlockCatalog onAddBlock={block => onAddCustomBlock?.(block)} />
                   </div>
                 </ScrollArea>
               )}

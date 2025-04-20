@@ -24,6 +24,8 @@ interface SaveWorkflowDialogProps {
   onSave: (name: string, description: string, tags: string[]) => Promise<void>
   initialName?: string
   initialDescription?: string
+  initialTags?: string[]
+  isEdit?: boolean
 }
 
 export function SaveWorkflowDialog({
@@ -32,10 +34,12 @@ export function SaveWorkflowDialog({
   onSave,
   initialName = "",
   initialDescription = "",
+  initialTags = [],
+  isEdit = false,
 }: SaveWorkflowDialogProps) {
   const [name, setName] = useState(initialName || "Untitled Workflow")
   const [description, setDescription] = useState(initialDescription || "")
-  const [tags, setTags] = useState<string[]>([])
+  const [tags, setTags] = useState<string[]>(initialTags)
   const [tagInput, setTagInput] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<{ name?: string; description?: string }>({})
@@ -82,8 +86,12 @@ export function SaveWorkflowDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Save Workflow</DialogTitle>
-          <DialogDescription>Save your workflow to access it later from your dashboard.</DialogDescription>
+          <DialogTitle>{isEdit ? "Update Workflow" : "Save Workflow"}</DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? "Update your workflow details."
+              : "Save your workflow to access it later from your dashboard."}
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
@@ -157,10 +165,10 @@ export function SaveWorkflowDialog({
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
+                {isEdit ? "Updating..." : "Saving..."}
               </>
             ) : (
-              "Save Workflow"
+              isEdit ? "Update Workflow" : "Save Workflow"
             )}
           </Button>
         </DialogFooter>

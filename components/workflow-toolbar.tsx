@@ -20,11 +20,13 @@ import {
   AlignStartVertical,
   AlignCenterVertical,
   AlignEndVertical,
+  Info,
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { useState, useEffect } from "react";
 
 interface WorkflowToolbarProps {
   onUndo: () => void
@@ -40,10 +42,26 @@ interface WorkflowToolbarProps {
   onAlignHorizontal: (alignment: "left" | "center" | "right") => void
   onAlignVertical: (alignment: "top" | "center" | "bottom") => void
   onReset: () => void
+  onHelp: () => void
   canUndo: boolean
   canRedo: boolean
   isGridVisible: boolean
   isExecuting: boolean
+}
+
+// Wrapper to add inline help icon linking to user manual anchors
+function Helpable({ anchor, children }: { anchor: string; children: React.ReactNode }) {
+  return (
+    <div className="relative inline-block group">
+      {children}
+      <button
+        onClick={() => window.open(`/user-manual.md#${anchor}`, "_blank")}
+        className="opacity-0 group-hover:opacity-100 absolute top-0 right-0 p-1 text-muted-foreground hover:text-primary"
+        aria-label="Help">
+        <Info className="h-3 w-3" />
+      </button>
+    </div>
+  )
 }
 
 export function WorkflowToolbar({
@@ -60,11 +78,20 @@ export function WorkflowToolbar({
   onAlignHorizontal,
   onAlignVertical,
   onReset,
+  onHelp,
   canUndo,
   canRedo,
   isGridVisible,
   isExecuting,
 }: WorkflowToolbarProps) {
+  // Determine modifier key based on platform
+  const [modKey, setModKey] = useState("Ctrl");
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform)) {
+      setModKey("⌘");
+    }
+  }, []);
+
   return (
     <TooltipProvider>
       <div className="bg-background/80 backdrop-blur-sm border rounded-lg shadow-md p-1 flex items-center space-x-1">
@@ -72,20 +99,24 @@ export function WorkflowToolbar({
         <div className="flex items-center">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onUndo} disabled={!canUndo} className="h-8 w-8">
-                <Undo2 className="h-4 w-4" />
-              </Button>
+              <Helpable anchor="undo">
+                <Button variant="ghost" size="icon" onClick={onUndo} disabled={!canUndo} className="h-8 w-8">
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+              </Helpable>
             </TooltipTrigger>
-            <TooltipContent>Undo (Ctrl+Z)</TooltipContent>
+            <TooltipContent>Undo ({modKey}+Z)</TooltipContent>
           </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onRedo} disabled={!canRedo} className="h-8 w-8">
-                <Redo2 className="h-4 w-4" />
-              </Button>
+              <Helpable anchor="redo">
+                <Button variant="ghost" size="icon" onClick={onRedo} disabled={!canRedo} className="h-8 w-8">
+                  <Redo2 className="h-4 w-4" />
+                </Button>
+              </Helpable>
             </TooltipTrigger>
-            <TooltipContent>Redo (Ctrl+Y)</TooltipContent>
+            <TooltipContent>Redo ({modKey}+Y)</TooltipContent>
           </Tooltip>
         </div>
 
@@ -220,20 +251,20 @@ export function WorkflowToolbar({
         <div className="flex items-center">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onSave} className="h-8 w-8">
+              <Button variant="ghost" size="icon" onClick={onSave} className="h-8 w-8" aria-label="Save Workflow">
                 <Save className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Save Workflow</TooltipContent>
+            <TooltipContent>Save Workflow ({modKey}+S)</TooltipContent>
           </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onExecute} disabled={isExecuting} className="h-8 w-8">
+              <Button variant="ghost" size="icon" onClick={onExecute} disabled={isExecuting} className="h-8 w-8" aria-label="Execute Workflow">
                 <Play className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Execute Workflow</TooltipContent>
+            <TooltipContent>Execute Workflow ({modKey}+E)</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -244,7 +275,21 @@ export function WorkflowToolbar({
             </TooltipTrigger>
             <TooltipContent>Reset Canvas</TooltipContent>
           </Tooltip>
+
+          {/* Help/Tour */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={onHelp} className="h-8 w-8">
+                <Info className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Show Tour</TooltipContent>
+          </Tooltip>
         </div>
+      </div>
+      {/* Keyboard shortcuts legend */}
+      <div className="mt-1 text-xs text-muted-foreground text-center">
+        Shortcuts: Save ({modKey}+S) | Execute ({modKey}+E) | Undo ({modKey}+Z) | Redo ({modKey}+Y)
       </div>
     </TooltipProvider>
   )

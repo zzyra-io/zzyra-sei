@@ -25,6 +25,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { redirect } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
+import { useHotkeys } from "react-hotkeys-hook";
 
 // Import types from flow-canvas
 import type { Node, Edge } from "@/components/flow-canvas";
@@ -33,7 +34,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { type BlockType, getBlockMetadata } from "@/types/workflow";
+import { BlockType, getBlockMetadata } from "@/types/workflow";
 import type { CustomBlockDefinition } from "@/types/custom-block";
 import { BuilderSidebar } from "@/components/builder-sidebar";
 import { WorkflowToolbar } from "@/components/workflow-toolbar";
@@ -138,23 +139,21 @@ export default function BuilderPage() {
   const handleSaveWorkflow = async (
     name: string,
     description: string,
-    tags: string[]
+    tags: string[],
+    replaceUrl: boolean = true
   ) => {
     try {
       setIsLoading(true);
 
       if (workflowId) {
-        const updatedWorkflow = await workflowService.updateWorkflow(
-          workflowId,
-          {
-            name,
-            description,
-            nodes,
-            edges,
-            is_public: false,
-            tags,
-          }
-        );
+        await workflowService.updateWorkflow(workflowId, {
+          name,
+          description,
+          nodes,
+          edges,
+          is_public: false,
+          tags,
+        });
 
         toast({
           title: "Workflow updated",
@@ -172,7 +171,7 @@ export default function BuilderPage() {
 
         if (savedWorkflow && savedWorkflow.id) {
           setWorkflowId(savedWorkflow.id);
-          router.replace(`/builder?id=${savedWorkflow.id}`);
+          if (replaceUrl) router.replace(`/builder?id=${savedWorkflow.id}`);
         }
 
         toast({
@@ -311,32 +310,9 @@ export default function BuilderPage() {
     []
   );
 
-  const handleExecuteWorkflow = async () => {
-    if (nodes.length === 0) {
-      toast({
-        title: "Cannot execute",
-        description: "Your workflow is empty. Please add some blocks first.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const performExecution = async (execWorkflowId: string) => {
     setIsExecuting(true);
     try {
-      let execWorkflowId = workflowId;
-      if (!execWorkflowId) {
-        const saved = await workflowService.createWorkflow({
-          name: workflowName,
-          description: workflowDescription,
-          nodes,
-          edges,
-          is_public: false,
-          tags: [],
-        });
-        execWorkflowId = saved.id;
-        setWorkflowId(execWorkflowId);
-      }
-
       const response = await fetch("/api/execute-workflow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -352,6 +328,75 @@ export default function BuilderPage() {
       toast({
         title: "Execution failed",
         description: "Failed to execute workflow. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handleExecuteWorkflow = async () => {
+    if (nodes.length === 0) {
+      toast({
+        title: "Cannot execute",
+        description: "Your workflow is empty. Please add some blocks first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let execId = workflowId;
+    if (!execId) {
+      const name = window.prompt("Enter name for new workflow:", workflowName);
+      if (!name || !name.trim()) {
+        toast({
+          title: "Execution cancelled",
+          description: "Workflow name is required",
+          variant: "destructive",
+        });
+        return;
+      }
+      try {
+        setIsLoading(true);
+        const saved = await workflowService.createWorkflow({
+          name: name.trim(),
+          description: workflowDescription,
+          nodes,
+          edges,
+          is_public: false,
+          tags: [],
+        });
+        execId = saved.id;
+        setWorkflowId(execId);
+        toast({ title: "Workflow created", description: `ID: ${execId}` });
+      } catch (error) {
+        toast({
+          title: "Save failed",
+          description: "Could not create workflow.",
+          variant: "destructive",
+        });
+        return;
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    setIsExecuting(true);
+    try {
+      const resp = await fetch("/api/execute-workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflowId: execId }),
+      });
+      if (!resp.ok) throw new Error("Failed to enqueue execution");
+      const { executionId } = await resp.json();
+      toast({
+        title: "Execution started",
+        description: `Execution ID: ${executionId}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Execution failed",
+        description: "Failed to execute workflow.",
         variant: "destructive",
       });
     } finally {
@@ -454,7 +499,13 @@ export default function BuilderPage() {
       }
     },
     save: () => {
-      setIsSaveDialogOpen(true);
+      if (workflowId) {
+        // Directly update without modal
+        handleSaveWorkflow(workflowName, workflowDescription, [], false);
+      } else {
+        // Open modal to create new workflow
+        setIsSaveDialogOpen(true);
+      }
     },
     execute: handleExecuteWorkflow,
     delete: () => {
@@ -484,11 +535,158 @@ export default function BuilderPage() {
     },
   };
 
+  // Execution Preview & Step-Through
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [previewLogs, setPreviewLogs] = useState<Array<{ nodeId: string; message: string }>>([]);
+  const [previewStep, setPreviewStep] = useState(0);
+  const handlePreview = () => {
+    // simulate dry-run logs
+    const logs = nodes.map((n) => ({ nodeId: n.id, message: `Mock output for block ${n.type} (${n.id})` }));
+    setPreviewLogs(logs);
+    setPreviewStep(0);
+    setIsPreviewing(true);
+  };
+
+  // Keyboard shortcuts: ensure form tags also capture shortcuts
+  // Use 'mod' for cross-platform (Cmd on Mac, Ctrl on others)
+  useHotkeys(
+    "mod+s",
+    (e) => {
+      e.preventDefault();
+      handleToolbarAction.save();
+    },
+    { enableOnFormTags: true }
+  );
+  useHotkeys(
+    "mod+e",
+    (e) => {
+      e.preventDefault();
+      handleToolbarAction.execute();
+    },
+    { enableOnFormTags: true }
+  );
+  useHotkeys("mod+z", (e) => {
+    e.preventDefault();
+    handleToolbarAction.undo();
+  });
+  useHotkeys("mod+y", (e) => {
+    e.preventDefault();
+    handleToolbarAction.redo();
+  });
+
+  // Live validation: disable execute if any required config missing
+  const hasInvalidConfig = nodes.some(
+    (n) => n.type === BlockType.WEBHOOK && !n.data?.url?.trim()
+  );
+  const [configWarned, setConfigWarned] = useState(false);
+  useEffect(() => setConfigWarned(false), [nodes]);
+  const warnInvalidConfig = () => {
+    if (hasInvalidConfig && !configWarned) {
+      toast({
+        title: "Cannot execute",
+        description: "Please configure all blocks before executing.",
+        variant: "destructive",
+      });
+      setConfigWarned(true);
+    }
+  };
+
+  // Guided tour state for first-time users (phase one)
+  const [showTour, setShowTour] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const tourMessages = [
+    "Drag blocks from the left sidebar to the canvas to start building your workflow.",
+    "Connect blocks by dragging from the circle handles to link your steps.",
+    "Click the Play ▶️ button in the toolbar to execute your workflow.",
+  ];
+  useEffect(() => {
+    const done = localStorage.getItem("builderTourComplete");
+    if (!done) setShowTour(true);
+  }, []);
+  const endTour = () => {
+    setShowTour(false);
+    localStorage.setItem("builderTourComplete", "true");
+  };
+  const nextStep = () => {
+    if (tourStep < tourMessages.length - 1) setTourStep((s) => s + 1);
+    else endTour();
+  };
+
+  // Autosave drafts locally and persist to Supabase
+  const DRAFT_KEY = "builder_draft";
+  // Restore draft on mount
+  useEffect(() => {
+    const json = localStorage.getItem(DRAFT_KEY);
+    if (json) {
+      try {
+        const {
+          nodes: dn,
+          edges: de,
+          name: dnName,
+          description: dnDesc,
+        } = JSON.parse(json);
+        setNodes(dn);
+        setEdges(de);
+        setWorkflowName(dnName);
+        setWorkflowDescription(dnDesc);
+        toast({
+          title: "Draft restored",
+          description: "Loaded your previous changes.",
+        });
+      } catch (e) {
+        console.error("Failed to parse draft:", e);
+      }
+    }
+  }, []);
+  // Periodic autosave
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const draft = {
+        nodes,
+        edges,
+        name: workflowName,
+        description: workflowDescription,
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      // Persist to supabase if we have an id
+      if (workflowId) {
+        try {
+          await workflowService.updateWorkflow(workflowId, {
+            name: workflowName,
+            description: workflowDescription,
+            nodes,
+            edges,
+            is_public: false,
+            tags: [],
+          });
+        } catch (e) {
+          console.error("Autosave to supabase failed:", e);
+        }
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [nodes, edges, workflowName, workflowDescription, workflowId]);
+
   return (
     <AuthGate>
+      {showTour && (
+        <div className='fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center'>
+          <div className='bg-white rounded shadow-lg p-4 max-w-xs'>
+            <p className='text-sm text-gray-800'>{tourMessages[tourStep]}</p>
+            <div className='mt-4 flex justify-end space-x-2'>
+              <Button size='sm' variant='ghost' onClick={endTour}>
+                Skip
+              </Button>
+              <Button size='sm' onClick={nextStep}>
+                {tourStep < tourMessages.length - 1 ? "Next" : "Done"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {isLoading ? (
-        <div className="flex min-h-screen items-center justify-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <div className='flex min-h-screen items-center justify-center'>
+          <Loader2 className='h-12 w-12 animate-spin text-primary' />
         </div>
       ) : (
         <div className='flex flex-col h-screen'>
@@ -521,9 +719,18 @@ export default function BuilderPage() {
                 Save
               </Button>
               <Button
-                onClick={handleExecuteWorkflow}
+                onClick={handlePreview}
                 className='flex items-center gap-1'
                 disabled={isExecuting || nodes.length === 0}>
+                Preview
+              </Button>
+              <Button
+                onClick={handleExecuteWorkflow}
+                onMouseEnter={warnInvalidConfig}
+                className='flex items-center gap-1'
+                disabled={
+                  isExecuting || nodes.length === 0 || hasInvalidConfig
+                }>
                 {isExecuting ? (
                   <>
                     <Loader2 className='h-4 w-4 mr-1 animate-spin' />
@@ -555,6 +762,10 @@ export default function BuilderPage() {
                 onAlignHorizontal={handleToolbarAction.alignHorizontal}
                 onAlignVertical={handleToolbarAction.alignVertical}
                 onReset={handleToolbarAction.reset}
+                onHelp={() => {
+                  setTourStep(0);
+                  setShowTour(true);
+                }}
                 canUndo={toolbarRef.current?.canUndo || false}
                 canRedo={toolbarRef.current?.canRedo || false}
                 isGridVisible={isGridVisible}
@@ -583,6 +794,19 @@ export default function BuilderPage() {
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
+          </div>
+        </div>
+      )}
+      {/* Preview panel */}
+      {isPreviewing && (
+        <div className="fixed bottom-0 left-0 right-0 h-1/2 bg-background border-t shadow-lg p-4 overflow-auto">
+          <h3 className="text-lg font-semibold mb-2">Execution Preview</h3>
+          <pre className="bg-muted p-2 rounded mb-4">{previewLogs[previewStep]?.message}</pre>
+          <div className="flex justify-between">
+            <Button size="sm" onClick={() => setPreviewStep((s) => Math.max(s - 1, 0))} disabled={previewStep === 0}>Previous</Button>
+            <span>{previewStep + 1} / {previewLogs.length}</span>
+            <Button size="sm" onClick={() => setPreviewStep((s) => Math.min(s + 1, previewLogs.length - 1))} disabled={previewStep === previewLogs.length - 1}>Next</Button>
+            <Button size="sm" variant="ghost" onClick={() => setIsPreviewing(false)}>Close</Button>
           </div>
         </div>
       )}

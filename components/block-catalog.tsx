@@ -1,7 +1,6 @@
 "use client";
 
-import type React from "react";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Clock,
@@ -18,6 +17,7 @@ import {
   Filter,
   BarChart3,
   GripHorizontal,
+  Star,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,8 +43,21 @@ interface BlockCatalogProps {
 }
 
 export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
+  const FAVORITES_KEY = 'block_favorites';
+  const RECENT_KEY = 'block_recent';
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
+  const [favorites, setFavorites] = useState<BlockType[]>(() => {
+    const stored = localStorage.getItem(FAVORITES_KEY);
+    return stored ? JSON.parse(stored) : [];
+  });
+  const [recents, setRecents] = useState<BlockType[]>(() => {
+    const stored = localStorage.getItem(RECENT_KEY);
+    return stored ? JSON.parse(stored) : [];
+  });
+  useEffect(() => { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites)); }, [favorites]);
+  useEffect(() => { localStorage.setItem(RECENT_KEY, JSON.stringify(recents)); }, [recents]);
+  const toggleFavorite = (type: BlockType) => setFavorites(f => f.includes(type) ? f.filter(t=>t!==type) : [type, ...f]);
 
   // Define block categories
   const categories = [
@@ -77,6 +90,7 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
     event: React.DragEvent,
     block: (typeof blocks)[0]
   ) => {
+    setRecents(r => [block.type, ...r.filter(t => t !== block.type)].slice(0, 10));
     // Create a serializable version of the block data
     const blockData = {
       blockType: block.type, // Use the enum value
@@ -111,6 +125,7 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
 
   // Handle block click for direct addition
   const handleBlockClick = (block: (typeof blocks)[0]) => {
+    setRecents(r => [block.type, ...r.filter(t => t !== block.type)].slice(0, 10));
     if (typeof onAddBlock === "function") {
       onAddBlock(block.type);
     }
@@ -118,6 +133,42 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
 
   return (
     <div className='flex flex-col h-full'>
+      {/* Favorites & Recent */}
+      <div className='px-4 py-2 space-y-2'>
+        {favorites.length > 0 && (
+          <div>
+            <div className='text-xs font-medium mb-1'>Favorites</div>
+            <div className='flex gap-2 overflow-x-auto'>
+              {favorites.map(ft => {
+                const blk = BLOCK_CATALOG[ft]; if(!blk) return null;
+                return (
+                  <div key={ft} draggable onDragStart={e=>handleDragStart(e,blk)} onClick={()=>handleBlockClick(blk)} className='flex items-center gap-1 p-2 bg-card rounded shadow'>
+                    {getBlockIcon(blk.icon)}
+                    <span className='text-xs'>{blk.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {recents.length > 0 && (
+          <div>
+            <div className='text-xs font-medium mb-1'>Recent</div>
+            <div className='flex gap-2 overflow-x-auto'>
+              {recents.map(rt => {
+                const blk = BLOCK_CATALOG[rt]; if(!blk) return null;
+                return (
+                  <div key={rt} draggable onDragStart={e=>handleDragStart(e,blk)} onClick={()=>handleBlockClick(blk)} className='flex items-center gap-1 p-2 bg-card rounded shadow'>
+                    {getBlockIcon(blk.icon)}
+                    <span className='text-xs'>{blk.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className='px-4 pt-4 pb-3'>
         <div className='relative'>
           <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
@@ -160,7 +211,8 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
                 onDragStart={(e) => handleDragStart(e, block)}
                 onClick={() => handleBlockClick(block)}
                 className={cn(
-                  "group relative flex items-center gap-3 rounded-lg border bg-card p-3",
+                  "group relative flex",
+                  "items-center gap-3 rounded-lg border bg-card p-3",
                   "shadow-sm hover:shadow-md transition-all duration-200 cursor-grab",
                   "hover:border-muted-foreground/20 hover:bg-accent/40",
                   block.category === NodeCategory.TRIGGER &&
@@ -194,6 +246,9 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
                   <div className='text-xs text-muted-foreground line-clamp-2'>
                     {block.description}
                   </div>
+                </div>
+                <div className='absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity'>
+                  <Star className={`h-4 w-4 cursor-pointer ${favorites.includes(block.type)?'text-yellow-400':'text-muted-foreground'}`} onClick={e=>{ e.stopPropagation(); toggleFavorite(block.type); }} />
                 </div>
                 <div className='absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-70 transition-opacity'>
                   <GripHorizontal className='h-4 w-4 text-muted-foreground' />

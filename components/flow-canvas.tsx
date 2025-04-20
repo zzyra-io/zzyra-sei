@@ -841,10 +841,25 @@ function FlowContent({
   )
 
   // Handle drag over event
-  const onDragOver = useCallback((event: React.DragEvent) => {
+  const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
     event.dataTransfer.dropEffect = "move"
   }, [])
+
+  // Drag highlighting: show dashed outline on valid drop
+  const [isDragActive, setIsDragActive] = useState(false)
+  const handleDragOverCanvas = useCallback((event: React.DragEvent) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setIsDragActive(true)
+  }, [])
+  const handleDragLeaveCanvas = useCallback(() => {
+    setIsDragActive(false)
+  }, [])
+  const handleDropCanvas = useCallback((event: React.DragEvent) => {
+    onDrop(event)
+    setIsDragActive(false)
+  }, [onDrop])
 
   // Expose methods for the toolbar
   const flowActions = {
@@ -905,10 +920,38 @@ function FlowContent({
     if (onEdgesChange) onEdgesChange(edges)
   }, [edges, onEdgesChange])
 
+  // Highlight disconnected nodes
+  useEffect(() => {
+    // Only update styles if needed
+    const updatedNodes = nodes.map((node) => {
+      const connected = edges.some(
+        (e) => e.source === node.id || e.target === node.id
+      );
+      const borderStyle = connected ? undefined : '2px solid red';
+      if ((node.style?.border || undefined) !== borderStyle) {
+        return { ...node, style: { ...node.style, border: borderStyle } };
+      }
+      return node;
+    });
+    // Check if any styles changed
+    const hasChanges = updatedNodes.some((u, i) => u !== nodes[i]);
+    if (hasChanges) setNodes(updatedNodes);
+  }, [nodes, edges, setNodes]);
+
   return (
     <div className="flex h-full">
-      <div ref={reactFlowWrapper} className="flex-1 h-full" onDrop={onDrop} onDragOver={onDragOver}>
+      <div
+        ref={reactFlowWrapper}
+        className={`flex-1 h-full ${isDragActive ? 'border-2 border-dashed border-blue-400' : ''}`}
+        onDragOver={handleDragOverCanvas}
+        onDragLeave={handleDragLeaveCanvas}
+        onDrop={handleDropCanvas}
+      >
         <ReactFlow
+          // Animated connection and smooth grid snap
+          snapToGrid
+          snapGrid={[16, 16]}
+          connectionLineStyle={{ stroke: "#3b82f6", strokeWidth: 2, transition: "stroke 0.2s ease-in-out" }}
           nodes={nodes}
           edges={edges}
           onNodesChange={(changes) => {
@@ -955,8 +998,6 @@ function FlowContent({
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
-          snapToGrid
-          snapGrid={[16, 16]}
           defaultEdgeOptions={{ type: "custom" }}
         >
           {isGridVisible && <Background />}
