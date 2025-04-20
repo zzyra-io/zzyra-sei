@@ -13,10 +13,14 @@ import { createServiceClient } from "@/lib/supabase/serviceClient";
 import { v4 as uuidv4 } from "uuid";
 import { ethers, parseEther } from "ethers";
 import { Node, Edge } from "reactflow";
-import { validateAcyclic, topologicalSort, validateOrphans, validateTerminals } from "@/lib/utils/graph";
+import {
+  validateAcyclic,
+  topologicalSort,
+  validateOrphans,
+  validateTerminals,
+} from "@/lib/utils/graph";
 import { NodeVM } from "vm2";
 import { workflowService } from "@/lib/services/workflow-service";
-import { executeWorkflow } from "@/lib/workers/executionWorker";
 
 // Metrics for node execution
 const nodeExecutionDuration = new Histogram({
@@ -49,7 +53,11 @@ async function startWorker() {
         const wf = await workflowService.getWorkflow(workflowId);
         const results = await executeWorkflow(wf.nodes, wf.edges);
         // Mark workflow completed with outputs
-        await executionService.updateExecutionStatus(executionId, "completed", results);
+        await executionService.updateExecutionStatus(
+          executionId,
+          "completed",
+          results
+        );
         console.log(`[Worker] Completed job: ${executionId}`);
         channel.ack(msg);
       } catch (error) {
@@ -72,7 +80,7 @@ async function executeNode(node: any): Promise<any> {
   const supabase = createServiceClient();
   // common validation wrapper
   const blockType = getBlockType(cfg);
-  const config = cfg;
+  const { config } = cfg;
 
   switch (blockType) {
     case BlockType.EMAIL: {
@@ -172,7 +180,7 @@ async function executeNode(node: any): Promise<any> {
       const receipt = await tx.wait();
       // Guard: ensure receipt is present
       if (!receipt) {
-        throw new Error('Transaction failed: no receipt');
+        throw new Error("Transaction failed: no receipt");
       }
       // Ethers receipt.hash contains the transaction hash
       const hash = (receipt as any).transactionHash ?? receipt.hash;
@@ -198,11 +206,15 @@ async function executeNode(node: any): Promise<any> {
     }
     case BlockType.PRICE_MONITOR: {
       // Crypto price trigger
+      console.log("config", config);
       const assetId = config.asset?.toLowerCase();
       const target = Number(config.targetPrice);
       const condition = config.condition;
       if (!assetId || isNaN(target) || !condition) {
-        throw new Error("Price monitor missing asset, targetPrice or condition");
+        console.log("config", config);
+        throw new Error(
+          "Price monitor missing asset, targetPrice or condition"
+        );
       }
       let res;
       try {
@@ -239,9 +251,9 @@ async function executeNode(node: any): Promise<any> {
     case BlockType.DELAY: {
       // Pause execution
       const duration = Number(config.duration);
-      const unit = config.unit === 'minutes' ? 60000 : 1000;
+      const unit = config.unit === "minutes" ? 60000 : 1000;
       if (isNaN(duration) || duration < 0) {
-        throw new Error('Delay block invalid duration');
+        throw new Error("Delay block invalid duration");
       }
       await new Promise((res) => setTimeout(res, duration * unit));
       return {};
@@ -249,8 +261,8 @@ async function executeNode(node: any): Promise<any> {
     case BlockType.TRANSFORM: {
       // Data transform via JS code
       const { transformType, code } = config;
-      if (transformType !== 'javascript' || !code) {
-        throw new Error('Transform block missing code or unsupported type');
+      if (transformType !== "javascript" || !code) {
+        throw new Error("Transform block missing code or unsupported type");
       }
       // sandbox JS to prevent infinite loops
       const vm = new NodeVM({ timeout: 500, sandbox: {} });
@@ -262,7 +274,7 @@ async function executeNode(node: any): Promise<any> {
       // Conditional branching
       const cond = config.condition;
       if (!cond) {
-        throw new Error('Condition block missing expression');
+        throw new Error("Condition block missing expression");
       }
       // sandbox condition
       const vm = new NodeVM({ timeout: 200, sandbox: {} });
@@ -274,13 +286,50 @@ async function executeNode(node: any): Promise<any> {
       // Execute custom block logic
       const cbId = config.customBlockId;
       if (!cbId) {
-        throw new Error('Custom block missing ID');
+        throw new Error("Custom block missing ID");
       }
       const blockDef = await customBlockService.getCustomBlockById(cbId);
       if (!blockDef) {
         throw new Error(`Custom block not found: ${cbId}`);
       }
       return await executeCustomBlockLogic(blockDef, config.inputs || {});
+    }
+    case BlockType.LLM_PROMPT: {
+      // LLM prompt execution via HTTP API
+      const { promptTemplate, model, temperature, maxTokens, stream } = config;
+      if (!promptTemplate) throw new Error("LLM Prompt missing promptTemplate");
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) throw new Error("OpenAI API key not set");
+      const url = "https://api.openai.com/v1/chat/completions";
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      };
+      const body = JSON.stringify({
+        model,
+        messages: [{ role: "user", content: promptTemplate }],
+        temperature,
+        max_tokens: maxTokens,
+        stream,
+      });
+      const res = await fetch(url, { method: "POST", headers, body });
+      if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
+      let fullText = "";
+      if (stream) {
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          fullText += chunk;
+          // TODO: emit SSE chunk event
+        }
+      } else {
+        const json = await res.json();
+        fullText = json.choices?.[0]?.message?.content || "";
+      }
+      return { text: fullText };
     }
     default:
       // Other block types or logic only: return data as-is
@@ -289,7 +338,10 @@ async function executeNode(node: any): Promise<any> {
 }
 
 // Orchestrate full workflow execution
-export async function executeWorkflow(nodes: Node[], edges: Edge[]): Promise<Record<string, any>> {
+export async function executeWorkflow(
+  nodes: Node[],
+  edges: Edge[]
+): Promise<Record<string, any>> {
   // Graph validations
   validateAcyclic(nodes, edges);
   validateOrphans(nodes, edges);

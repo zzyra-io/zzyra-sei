@@ -21,5 +21,12 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
   [BlockType.CONDITION]: z.object({ condition: z.string() }),
   [BlockType.GOAT_FINANCE]: z.object({ operation: z.literal("balance"), blockchain: z.string(), tokenAddress: z.string(), address: z.string() }),
   [BlockType.CUSTOM]: z.object({ customBlockId: z.string(), inputs: z.record(z.string(), z.any()).optional() }),
+  [BlockType.LLM_PROMPT]: z.object({
+    promptTemplate: z.string(),
+    model: z.string(),
+    temperature: z.number(),
+    maxTokens: z.number(),
+    stream: z.boolean(),
+  }),
   [BlockType.UNKNOWN]: z.any(),
 };

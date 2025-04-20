@@ -22,6 +22,7 @@ export enum BlockType {
 
   // Custom blocks
   CUSTOM = "custom",
+  LLM_PROMPT = "llm-prompt",
 
   // Default/unknown
   UNKNOWN = "unknown",
@@ -191,6 +192,20 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
     icon: "custom-block",
     defaultConfig: {},
   },
+  [BlockType.LLM_PROMPT]: {
+    type: BlockType.LLM_PROMPT,
+    label: "LLM Prompt",
+    description: "Generate text via LLM",
+    category: NodeCategory.ACTION,
+    icon: "ai",
+    defaultConfig: {
+      promptTemplate: "",
+      model: "gpt-3.5-turbo",
+      temperature: 0.7,
+      maxTokens: 256,
+      stream: false,
+    },
+  },
   [BlockType.UNKNOWN]: {
     type: BlockType.UNKNOWN,
     label: "Unknown Block",
@@ -243,8 +258,8 @@ export const getBlockType = (data: any): BlockType => {
     return BlockType.CUSTOM
   }
 
-  // Check all possible properties where type information might be stored
-  const possibleTypes = [data?.blockType, data?.type, data?.id].filter(Boolean)
+  // Gather possible type fields
+  const possibleTypes = [data?.blockType, data?.type, data?.nodeType, data?.id].filter(Boolean)
 
   // Try to match each possible type to a BlockType enum
   for (const typeValue of possibleTypes) {
