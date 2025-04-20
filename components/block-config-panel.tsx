@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -83,69 +83,34 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
     }
   }, [isCustomBlock, node.data?.customBlockId, toast])
 
-  // Update local node when the selected node changes
+  // Initialize localNode when switching to a new node
+  const prevNodeId = useRef(node.id)
   useEffect(() => {
-    setLocalNode(node)
-  }, [node])
+    if (node.id !== prevNodeId.current) {
+      setLocalNode(node)
+      prevNodeId.current = node.id
+    }
+  }, [node.id])
 
   // Handle basic field changes
   const handleChange = (field: string, value: any) => {
-    setLocalNode((prev: any) => {
-      const updatedNode = {
-        ...prev,
-        data: {
-          ...prev.data,
-          [field]: value,
-        },
-      }
-
-      // Apply changes immediately
-      onUpdate(updatedNode)
-
-      return updatedNode
-    })
+    const updatedNode = { ...localNode, data: { ...localNode.data, [field]: value } };
+    onUpdate(updatedNode);
+    setLocalNode(updatedNode);
   }
 
   // Handle config changes
   const handleConfigChange = (config: any) => {
-    setLocalNode((prev: any) => {
-      const updatedNode = {
-        ...prev,
-        data: {
-          ...prev.data,
-          config: {
-            ...prev.data.config,
-            ...config,
-          },
-        },
-      }
-
-      // Apply changes immediately
-      onUpdate(updatedNode)
-
-      return updatedNode
-    })
+    const updatedNode = { ...localNode, data: { ...localNode.data, config } };
+    onUpdate(updatedNode);
+    setLocalNode(updatedNode);
   }
 
   // Handle style changes
   const handleStyleChange = (style: any) => {
-    setLocalNode((prev: any) => {
-      const updatedNode = {
-        ...prev,
-        data: {
-          ...prev.data,
-          style: {
-            ...prev.data.style,
-            ...style,
-          },
-        },
-      }
-
-      // Apply changes immediately
-      onUpdate(updatedNode)
-
-      return updatedNode
-    })
+    const updatedNode = { ...localNode, data: { ...localNode.data, style: { ...localNode.data.style, ...style } } };
+    onUpdate(updatedNode);
+    setLocalNode(updatedNode);
   }
 
   // If this is a custom block and we have the definition, render the custom block config panel

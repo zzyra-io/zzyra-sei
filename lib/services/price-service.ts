@@ -1,30 +1,38 @@
 // Price service to fetch cryptocurrency prices
 export async function fetchCryptoPrice(asset: string): Promise<{ price: number; timestamp: string }> {
-  try {
-    // Use CoinGecko API for demonstration
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${asset.toLowerCase()}&vs_currencies=usd`,
-    )
-
-    if (!response.ok) {
-      throw new Error(`API responded with status: ${response.status}`)
+  // RPC failover: try multiple endpoints
+  const assetId = asset.toLowerCase()
+  const defaultEndpoints = [
+    `https://api.coingecko.com/api/v3/simple/price?ids=${assetId}&vs_currencies=usd`,
+    `https://api.coincap.io/v2/assets/${assetId}`,
+  ]
+  const endpoints = (process.env.PRICE_RPC_ENDPOINTS?.split(",") || defaultEndpoints).map((url) => url.trim())
+  let lastError: any
+  for (const url of endpoints) {
+    try {
+      const resp = await fetch(url)
+      if (!resp.ok) throw new Error(`Status ${resp.status}`)
+      const data = await resp.json()
+      let price: number | undefined
+      // CoinGecko format
+      if (data[assetId]?.usd != null) {
+        price = data[assetId].usd
+      // CoinCap format
+      } else if (data.data?.priceUsd) {
+        price = Number.parseFloat(data.data.priceUsd)
+      }
+      if (price == null || Number.isNaN(price)) {
+        throw new Error(`Invalid price data from ${url}`)
+      }
+      return { price, timestamp: new Date().toISOString() }
+    } catch (err: any) {
+      console.warn(`fetchCryptoPrice endpoint failed (${url}):`, err)
+      lastError = err
+      continue
     }
-
-    const data = await response.json()
-    const assetId = asset.toLowerCase()
-
-    if (!data[assetId] || !data[assetId].usd) {
-      throw new Error(`Price data not available for ${asset}`)
-    }
-
-    return {
-      price: data[assetId].usd,
-      timestamp: new Date().toISOString(),
-    }
-  } catch (error: any) {
-    console.error(`Error fetching price for ${asset}:`, error)
-    throw new Error(`Failed to fetch price for ${asset}: ${error.message}`)
   }
+  console.error(`All RPC endpoints failed for ${asset}:`, lastError)
+  throw new Error(`All RPC endpoints failed for ${asset}: ${lastError?.message}`)
 }
 
 // Mock function for development/testing
