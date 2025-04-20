@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AuthGate } from "@/components/auth-gate"
 import { BuilderSidebar } from "@/components/builder-sidebar"
 import { CommandInput } from "@/components/command-input"
@@ -25,6 +25,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { createClient } from "@/lib/supabase/client"
+import { redirect } from "next/navigation"
+import { v4 as uuidv4 } from "uuid"
 
 // Import types from flow-canvas
 import type { Node, Edge } from "@/components/flow-canvas"
@@ -47,6 +50,10 @@ export default function BuilderPage() {
   const { toast } = useToast()
   const router = useRouter()
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  // Remove the hardcoded workflow ID
+  const [workflowId, setWorkflowId] = useState<string | undefined>(undefined)
+  const supabase = createClient()
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
@@ -94,29 +101,116 @@ export default function BuilderPage() {
 
   const handleSaveWorkflow = async (name: string, description: string, tags: string[]) => {
     try {
-      await workflowService.createWorkflow({
-        name,
-        description,
-        nodes,
-        edges,
-        is_public: false,
-        tags,
-      })
+      setIsLoading(true)
 
-      toast({
-        title: "Workflow saved",
-        description: "Your workflow has been saved successfully.",
-      })
+      // If we have a workflowId, update the existing workflow
+      if (workflowId) {
+        const updatedWorkflow = await workflowService.updateWorkflow(workflowId, {
+          name,
+          description,
+          nodes,
+          edges,
+          is_public: false,
+          tags,
+        })
+
+        toast({
+          title: "Workflow updated",
+          description: "Your workflow has been updated successfully.",
+        })
+      } else {
+        // Create a new workflow
+        const savedWorkflow = await workflowService.createWorkflow({
+          name,
+          description,
+          nodes,
+          edges,
+          is_public: false,
+          tags,
+        })
+
+        // Set the workflow ID after saving
+        if (savedWorkflow && savedWorkflow.id) {
+          setWorkflowId(savedWorkflow.id)
+          // Update the URL to include the workflow ID
+          router.replace(`/builder?id=${savedWorkflow.id}`)
+        }
+
+        toast({
+          title: "Workflow saved",
+          description: "Your workflow has been saved successfully.",
+        })
+      }
 
       setHasUnsavedChanges(false)
       setIsSaveDialogOpen(false)
-      router.push("/dashboard")
     } catch (error) {
+      console.error("Error saving workflow:", error)
       toast({
         title: "Save failed",
         description: "Failed to save workflow. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Add a function to load an existing workflow
+  const loadWorkflow = async (id: string) => {
+    try {
+      setIsLoading(true)
+      const workflow = await workflowService.getWorkflow(id)
+
+      if (workflow) {
+        setWorkflowId(workflow.id)
+        setWorkflowName(workflow.name)
+        setWorkflowDescription(workflow.description || "")
+        setNodes(workflow.nodes || [])
+        setEdges(workflow.edges || [])
+
+        toast({
+          title: "Workflow loaded",
+          description: "Your workflow has been loaded successfully.",
+        })
+
+        setHasUnsavedChanges(false)
+      }
+    } catch (error) {
+      console.error("Error loading workflow:", error)
+      toast({
+        title: "Load failed",
+        description: "Failed to load workflow. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Add a function to delete a workflow
+  const handleDeleteWorkflow = async () => {
+    if (!workflowId) return
+
+    try {
+      setIsLoading(true)
+      await workflowService.deleteWorkflow(workflowId)
+
+      toast({
+        title: "Workflow deleted",
+        description: "Your workflow has been deleted successfully.",
+      })
+
+      router.push("/workflows")
+    } catch (error) {
+      console.error("Error deleting workflow:", error)
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete workflow. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -129,24 +223,37 @@ export default function BuilderPage() {
     setHasUnsavedChanges(true)
   }, [])
 
-  const handleAddNode = useCallback((block: any) => {
-    const position = { x: 100, y: 100 }
-    const newNode = {
-      id: `${block.id}-${Date.now()}`,
-      type: "custom",
-      position,
-      data: {
-        label: block.name,
-        icon: block.id,
-        blockType: block.id,
-        description: block.description,
-        isEnabled: true,
-        config: {},
-      },
-    }
-    setNodes((nds) => [...nds, newNode])
-    setHasUnsavedChanges(true)
-  }, [])
+  const handleAddNode = useCallback(
+    (block: any, position?: { x: number; y: number }) => {
+      const defaultPosition = { x: 100, y: 100 }
+      const nodePosition = position || defaultPosition
+
+      const newNode = {
+        id: `${block.id}-${Date.now()}`,
+        type: "custom",
+        position: nodePosition,
+        data: {
+          label: block.name,
+          icon: block.id,
+          blockType: block.id,
+          description: block.description,
+          isEnabled: true,
+          config: {},
+        },
+      }
+
+      setNodes((nds) => [...nds, newNode])
+      setHasUnsavedChanges(true)
+
+      // Show a success toast
+      toast({
+        title: "Block Added",
+        description: `Added ${block.name} block to your workflow`,
+        duration: 2000,
+      })
+    },
+    [toast],
+  )
 
   const handleWorkflowDetailsChange = useCallback((details: { name?: string; description?: string }) => {
     if (details.name !== undefined) setWorkflowName(details.name)
@@ -191,6 +298,47 @@ export default function BuilderPage() {
     }
   }
 
+  // Check for workflow ID in URL params and load the workflow if it exists
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const id = searchParams.get("id")
+    if (id) {
+      setWorkflowId(id)
+      loadWorkflow(id)
+    }
+  }, [searchParams])
+
+  // Add a useEffect to handle auto-saving
+  useEffect(() => {
+    if (!workflowId || !hasUnsavedChanges || nodes.length === 0) return
+
+    const autoSaveTimeout = setTimeout(async () => {
+      try {
+        await workflowService.updateWorkflow(workflowId, {
+          name: workflowName,
+          description: workflowDescription,
+          nodes,
+          edges,
+          is_public: false,
+          tags: [],
+        })
+
+        setHasUnsavedChanges(false)
+
+        toast({
+          title: "Auto-saved",
+          description: "Your workflow has been automatically saved.",
+          duration: 2000,
+        })
+      } catch (error) {
+        console.error("Auto-save error:", error)
+      }
+    }, 30000) // Auto-save after 30 seconds of inactivity
+
+    return () => clearTimeout(autoSaveTimeout)
+  }, [workflowId, hasUnsavedChanges, nodes, edges, workflowName, workflowDescription, toast])
+
   if (!isMounted || isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -229,6 +377,7 @@ export default function BuilderPage() {
           workflowName={workflowName}
           workflowDescription={workflowDescription}
           onWorkflowDetailsChange={handleWorkflowDetailsChange}
+          nodes={nodes}
         />
         <motion.main
           className="relative flex flex-1 flex-col overflow-hidden"
@@ -385,6 +534,32 @@ export default function BuilderPage() {
                 </Tooltip>
               </TooltipProvider>
 
+              {workflowId && (
+                <TooltipProvider>
+                  <Tooltip
+                    open={showTooltip === "delete-workflow"}
+                    onOpenChange={(open) => setShowTooltip(open ? "delete-workflow" : null)}
+                  >
+                    <TooltipTrigger asChild>
+                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsDeleteDialogOpen(true)}
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onMouseEnter={() => setShowTooltip("delete-workflow")}
+                          onMouseLeave={() => setShowTooltip(null)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </Button>
+                      </motion.div>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete this workflow</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -392,9 +567,23 @@ export default function BuilderPage() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.5 }}
               >
-                <Button size="sm" onClick={() => setIsSaveDialogOpen(true)} className="bg-primary hover:bg-primary/90">
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Workflow
+                <Button
+                  size="sm"
+                  onClick={() => setIsSaveDialogOpen(true)}
+                  className="bg-primary hover:bg-primary/90"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      {workflowId ? "Update Workflow" : "Save Workflow"}
+                    </>
+                  )}
                 </Button>
               </motion.div>
             </div>
@@ -407,6 +596,7 @@ export default function BuilderPage() {
                 setNodes={setNodes}
                 setEdges={setEdges}
                 onNodeSelect={handleNodeSelect}
+                workflowId={workflowId} // Pass the workflow ID (which might be undefined for new workflows)
               />
             </div>
             <AnimatePresence>
@@ -450,6 +640,30 @@ export default function BuilderPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Workflow</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this workflow? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteWorkflow}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AuthGate>
   )
+}
+
+export function BuilderRedirectPage() {
+  const uuid = uuidv4()
+  redirect(`/builder/${uuid}`)
 }

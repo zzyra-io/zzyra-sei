@@ -1,15 +1,136 @@
 "use client"
 
-import { cn } from "@/lib/utils"
-
 import type React from "react"
 
 import { useState } from "react"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { motion, AnimatePresence } from "framer-motion"
-import { Search, Wallet, Bell, Code, Zap, Coins, BarChart } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Search } from "lucide-react"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+// Block definitions
+const blocks = {
+  triggers: [
+    {
+      id: "ethereum_price_trigger",
+      name: "Ethereum Price Trigger",
+      description: "Triggers when ETH price crosses a threshold",
+      nodeType: "trigger",
+      icon: "ethereum",
+      config: {
+        threshold: 2000,
+        condition: "above",
+      },
+    },
+    {
+      id: "time_trigger",
+      name: "Time Trigger",
+      description: "Triggers at specified intervals",
+      nodeType: "trigger",
+      icon: "clock",
+      config: {
+        interval: "daily",
+        time: "09:00",
+      },
+    },
+    {
+      id: "webhook_trigger",
+      name: "Webhook Trigger",
+      description: "Triggers when a webhook is received",
+      nodeType: "trigger",
+      icon: "webhook",
+      config: {
+        endpoint: "",
+      },
+    },
+  ],
+  actions: [
+    {
+      id: "send_email",
+      name: "Send Email",
+      description: "Sends an email notification",
+      nodeType: "action",
+      icon: "mail",
+      config: {
+        to: "",
+        subject: "",
+        body: "",
+      },
+    },
+    {
+      id: "send_slack",
+      name: "Send Slack Message",
+      description: "Sends a message to a Slack channel",
+      nodeType: "action",
+      icon: "message-square",
+      config: {
+        channel: "",
+        message: "",
+      },
+    },
+    {
+      id: "execute_trade",
+      name: "Execute Trade",
+      description: "Executes a cryptocurrency trade",
+      nodeType: "action",
+      icon: "trending-up",
+      config: {
+        pair: "ETH/USDT",
+        amount: 0.1,
+        type: "market",
+      },
+    },
+  ],
+  conditions: [
+    {
+      id: "condition",
+      name: "Condition",
+      description: "Evaluates a condition to determine flow",
+      nodeType: "condition",
+      icon: "git-branch",
+      config: {
+        condition: "",
+      },
+    },
+    {
+      id: "delay",
+      name: "Delay",
+      description: "Adds a delay before continuing",
+      nodeType: "condition",
+      icon: "clock",
+      config: {
+        duration: 5,
+        unit: "minutes",
+      },
+    },
+  ],
+  data: [
+    {
+      id: "transform",
+      name: "Transform Data",
+      description: "Transforms data between steps",
+      nodeType: "data",
+      icon: "edit-3",
+      config: {
+        transformation: "",
+      },
+    },
+    {
+      id: "api_request",
+      name: "API Request",
+      description: "Makes an HTTP request to an API",
+      nodeType: "data",
+      icon: "globe",
+      config: {
+        url: "",
+        method: "GET",
+        headers: {},
+        body: "",
+      },
+    },
+  ],
+}
 
 interface BlockCatalogProps {
   onAddNode: (block: any) => void
@@ -17,179 +138,85 @@ interface BlockCatalogProps {
 
 export function BlockCatalog({ onAddNode }: BlockCatalogProps) {
   const [searchQuery, setSearchQuery] = useState("")
-  const [activeCategory, setActiveCategory] = useState("web3")
-  const [draggedBlock, setDraggedBlock] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("all")
 
-  const blockCategories = [
-    {
-      id: "web3",
-      name: "Web3",
-      blocks: [
-        {
-          id: "wallet",
-          name: "Wallet Monitor",
-          description: "Monitor wallet balance and transactions",
-          icon: Wallet,
-        },
-        {
-          id: "transaction",
-          name: "Transaction",
-          description: "Send tokens or interact with contracts",
-          icon: Zap,
-        },
-        {
-          id: "goat-finance",
-          name: "GOAT Finance",
-          description: "AI-powered financial operations",
-          icon: Coins,
-        },
-      ],
-    },
-    {
-      id: "notification",
-      name: "Notifications",
-      blocks: [
-        {
-          id: "notification",
-          name: "Notification",
-          description: "Send notifications via email or in-app",
-          icon: Bell,
-        },
-      ],
-    },
-    {
-      id: "code",
-      name: "Code",
-      blocks: [
-        {
-          id: "code",
-          name: "Custom Code",
-          description: "Execute custom JavaScript code",
-          icon: Code,
-        },
-      ],
-    },
-    {
-      id: "analytics",
-      name: "Analytics",
-      blocks: [
-        {
-          id: "analytics",
-          name: "Analytics",
-          description: "Track and analyze metrics",
-          icon: BarChart,
-        },
-      ],
-    },
-  ]
+  // Filter blocks based on search query and active tab
+  const filteredBlocks = Object.entries(blocks).reduce(
+    (acc, [category, categoryBlocks]) => {
+      if (activeTab !== "all" && activeTab !== category) return acc
 
-  const filteredCategories = blockCategories
-    .map((category) => ({
-      ...category,
-      blocks: category.blocks.filter(
-        (block) =>
-          block.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          block.description.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
-    }))
-    .filter((category) => category.blocks.length > 0)
+      const filtered = categoryBlocks.filter((block) => {
+        const searchString = `${block.name} ${block.description}`.toLowerCase()
+        return searchString.includes(searchQuery.toLowerCase())
+      })
 
+      if (filtered.length > 0) {
+        acc[category] = filtered
+      }
+
+      return acc
+    },
+    {} as Record<string, typeof blocks.triggers>,
+  )
+
+  // Handle drag start
   const handleDragStart = (e: React.DragEvent, block: any) => {
     e.dataTransfer.setData("application/reactflow", JSON.stringify(block))
     e.dataTransfer.effectAllowed = "move"
-    setDraggedBlock(block.id)
-  }
-
-  const handleDragEnd = () => {
-    setDraggedBlock(null)
   }
 
   return (
     <div className="flex flex-col h-full">
-      <motion.div
-        className="p-4"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
+      <div className="p-4 border-b">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            type="search"
             placeholder="Search blocks..."
             className="pl-8"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-      </motion.div>
-      <Tabs
-        defaultValue="web3"
-        className="flex-1 flex flex-col"
-        value={activeCategory}
-        onValueChange={setActiveCategory}
-      >
-        <TabsList className="grid grid-cols-4 mx-4">
-          {blockCategories.map((category, index) => (
-            <TabsTrigger key={category.id} value={category.id}>
-              <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 * index }}>
-                {category.name}
-              </motion.span>
-            </TabsTrigger>
-          ))}
+      </div>
+
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <TabsList className="grid grid-cols-5 mx-4 mt-2">
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="triggers">Triggers</TabsTrigger>
+          <TabsTrigger value="actions">Actions</TabsTrigger>
+          <TabsTrigger value="conditions">Logic</TabsTrigger>
+          <TabsTrigger value="data">Data</TabsTrigger>
         </TabsList>
-        <div className="flex-1 overflow-hidden">
-          <AnimatePresence mode="wait">
-            {filteredCategories.map((category) => (
-              <TabsContent key={category.id} value={category.id} className="h-full data-[state=active]:flex flex-col">
-                <ScrollArea className="flex-1">
-                  <motion.div
-                    className="grid grid-cols-1 gap-2 p-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
+
+        <ScrollArea className="flex-1 p-4">
+          {Object.entries(filteredBlocks).map(([category, categoryBlocks]) => (
+            <div key={category} className="mb-6">
+              <h3 className="text-sm font-medium mb-2 capitalize">{category}</h3>
+              <div className="space-y-2">
+                {categoryBlocks.map((block) => (
+                  <Card
+                    key={block.id}
+                    className="cursor-grab hover:bg-accent/50 transition-colors"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, block)}
+                    onClick={() => onAddNode(block)}
                   >
-                    {category.blocks.map((block, index) => (
-                      <motion.div
-                        key={block.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.05 * index }}
-                        whileHover={{ scale: 1.02, y: -2 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="cursor-grab"
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, block)}
-                        onDragEnd={handleDragEnd}
-                        onClick={() => onAddNode(block)}
-                      >
-                        <div
-                          className={cn(
-                            "flex items-start gap-3 rounded-lg border bg-card p-3 text-card-foreground shadow-sm transition-all duration-200",
-                            "hover:bg-accent hover:text-accent-foreground",
-                            draggedBlock === block.id && "ring-2 ring-primary opacity-50",
-                          )}
-                        >
-                          <motion.div
-                            whileHover={{ rotate: 10 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                          >
-                            <block.icon className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                          </motion.div>
-                          <div>
-                            <h3 className="font-medium leading-none">{block.name}</h3>
-                            <p className="text-xs text-muted-foreground mt-1">{block.description}</p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                </ScrollArea>
-              </TabsContent>
-            ))}
-          </AnimatePresence>
-        </div>
+                    <CardHeader className="p-3">
+                      <CardTitle className="text-sm">{block.name}</CardTitle>
+                      <CardDescription className="text-xs">{block.description}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {Object.keys(filteredBlocks).length === 0 && (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No blocks found</p>
+            </div>
+          )}
+        </ScrollArea>
       </Tabs>
     </div>
   )

@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import { workflowService } from "@/lib/services/workflow-service"
 import { executionService } from "@/lib/services/execution-service"
-import { subscriptionService } from "@/lib/services/subscription-service"
 import type { Workflow } from "@/lib/supabase/schema"
 import type { ExecutionLog } from "@/lib/services/execution-service"
 import { ArrowLeft, Play, Settings, Loader2 } from "lucide-react"
@@ -71,25 +70,11 @@ export default function WorkflowDetailPage({ params }: WorkflowDetailPageProps) 
 
   const handleExecute = async () => {
     try {
-      // Check if user has available executions
-      const canExecute = await subscriptionService.canExecuteWorkflow()
-      if (!canExecute) {
-        toast({
-          title: "Execution limit reached",
-          description: "You've reached your monthly execution limit. Please upgrade your plan to continue.",
-          variant: "destructive",
-        })
-        return
-      }
-
       setIsExecuting(true)
       const executionLog = await executionService.executeWorkflow(params.id)
 
       // Update the execution logs list
       setExecutionLogs([executionLog, ...executionLogs])
-
-      // Increment execution count
-      await subscriptionService.incrementExecutionCount()
 
       toast({
         title: "Workflow executed",

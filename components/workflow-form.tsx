@@ -1,56 +1,76 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import type { Workflow } from "@/app/actions/workflow-actions"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
+import { useState } from "react"
+import { createWorkflow, updateWorkflow } from "@/app/actions/workflow-actions"
+import { useRouter } from "next/navigation"
 
 interface WorkflowFormProps {
-  workflow?: Workflow
-  action: (formData: FormData) => Promise<{ success?: boolean; error?: string }>
+  workflow?: {
+    id: string
+    name: string
+    description: string
+    is_public: boolean
+    tags: string[]
+  }
+  mode: "create" | "edit"
 }
 
-export function WorkflowForm({ workflow, action }: WorkflowFormProps) {
+export function WorkflowForm({ workflow, mode }: WorkflowFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  async function handleSubmit(formData: FormData) {
     setIsSubmitting(true)
     setError(null)
 
     try {
-      const formData = new FormData(event.currentTarget)
-      const result = await action(formData)
-
-      if (result.error) {
-        setError(result.error)
-      } else {
-        router.push("/workflows")
+      if (mode === "create") {
+        const result = await createWorkflow(formData)
+        if (result?.error) {
+          setError(result.error)
+        }
+      } else if (workflow) {
+        const result = await updateWorkflow(workflow.id, formData)
+        if (result?.error) {
+          setError(result.error)
+        }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred")
+      setError("An unexpected error occurred")
+      console.error(err)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <Card>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4 pt-6">
+    <Card className="max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle>{mode === "create" ? "Create New Workflow" : "Edit Workflow"}</CardTitle>
+        <CardDescription>
+          {mode === "create" ? "Create a new workflow to automate your tasks" : "Update your workflow details"}
+        </CardDescription>
+      </CardHeader>
+      <form action={handleSubmit}>
+        <CardContent className="space-y-4">
+          {error && <div className="bg-red-50 text-red-500 p-3 rounded-md text-sm">{error}</div>}
+
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
-            <Input id="name" name="name" placeholder="My Workflow" required defaultValue={workflow?.name || ""} />
+            <Input
+              id="name"
+              name="name"
+              placeholder="My Awesome Workflow"
+              defaultValue={workflow?.name || ""}
+              required
+            />
           </div>
 
           <div className="space-y-2">
@@ -58,9 +78,9 @@ export function WorkflowForm({ workflow, action }: WorkflowFormProps) {
             <Textarea
               id="description"
               name="description"
-              placeholder="Describe your workflow..."
-              rows={3}
+              placeholder="Describe what this workflow does"
               defaultValue={workflow?.description || ""}
+              rows={3}
             />
           </div>
 
@@ -69,22 +89,15 @@ export function WorkflowForm({ workflow, action }: WorkflowFormProps) {
             <Input
               id="tags"
               name="tags"
-              placeholder="finance, automation, monitoring"
-              defaultValue={workflow?.tags.join(", ") || ""}
+              placeholder="automation, finance, monitoring"
+              defaultValue={workflow?.tags?.join(", ") || ""}
             />
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox id="is_public" name="is_public" defaultChecked={workflow?.is_public || false} />
-            <Label htmlFor="is_public">Make this workflow public</Label>
+            <Switch id="isPublic" name="isPublic" defaultChecked={workflow?.is_public || false} value="true" />
+            <Label htmlFor="isPublic">Make this workflow public</Label>
           </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded flex items-center">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              {error}
-            </div>
-          )}
         </CardContent>
 
         <CardFooter className="flex justify-between">
@@ -92,16 +105,7 @@ export function WorkflowForm({ workflow, action }: WorkflowFormProps) {
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {workflow ? "Updating..." : "Creating..."}
-              </>
-            ) : workflow ? (
-              "Update Workflow"
-            ) : (
-              "Create Workflow"
-            )}
+            {isSubmitting ? "Saving..." : mode === "create" ? "Create Workflow" : "Update Workflow"}
           </Button>
         </CardFooter>
       </form>

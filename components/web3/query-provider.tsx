@@ -1,12 +1,12 @@
-"use client";
+"use client"
 
-import React, { FC, PropsWithChildren } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider } from "wagmi";
-import { config } from "@/components/web3/web3-provider";
-import { ConnectKitProvider } from "connectkit";
+import type { FC, PropsWithChildren } from "react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { WagmiProvider } from "wagmi"
+import { config } from "@/components/web3/web3-provider"
+import { ConnectKitProvider } from "connectkit"
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient()
 
 const QueryProvider: FC<PropsWithChildren> = ({ children }) => {
   return (
@@ -15,7 +15,7 @@ const QueryProvider: FC<PropsWithChildren> = ({ children }) => {
         <ConnectKitProvider>{children}</ConnectKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
-  );
-};
+  )
+}
 
-export default QueryProvider;
+export default QueryProvider

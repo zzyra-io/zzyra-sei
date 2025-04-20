@@ -1,32 +1,25 @@
-import { getWorkflows } from "@/app/actions/workflow-actions"
 import { WorkflowList } from "@/components/workflow-list"
 import { Button } from "@/components/ui/button"
-import { PlusCircle } from "lucide-react"
 import Link from "next/link"
-import { DatabaseSetupButton } from "@/components/database-setup-button"
+import { PlusIcon } from "lucide-react"
 
-export default async function WorkflowsPage() {
-  const { workflows, error } = await getWorkflows()
-
+export default function WorkflowsPage() {
   return (
-    <div className="container py-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="container py-10 max-w-7xl">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Workflows</h1>
-          <p className="text-muted-foreground">Create and manage your automated workflows</p>
+          <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
+          <p className="text-muted-foreground mt-1">Manage and create automated workflows</p>
         </div>
-        <div className="flex gap-4">
-          <DatabaseSetupButton />
+        <Button asChild>
           <Link href="/workflows/new">
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              New Workflow
-            </Button>
+            <PlusIcon className="h-4 w-4 mr-2" />
+            New Workflow
           </Link>
-        </div>
+        </Button>
       </div>
 
-      <WorkflowList workflows={workflows} />
+      <WorkflowList />
     </div>
   )
 }

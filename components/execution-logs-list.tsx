@@ -1,152 +1,270 @@
 "use client"
 
 import { useState } from "react"
-import { Badge } from "@/components/ui/badge"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import type { ExecutionLog } from "@/lib/services/execution-service"
-import { ChevronDown, ChevronRight, CheckCircle, XCircle, Clock } from "lucide-react"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Loader2, RefreshCw, CheckCircle, XCircle, AlertCircle, Clock } from "lucide-react"
+import { formatDistanceToNow } from "date-fns"
 
 interface ExecutionLogsListProps {
-  logs: ExecutionLog[]
+  logs: any[]
+  workflowId: string
 }
 
-export function ExecutionLogsList({ logs }: ExecutionLogsListProps) {
-  const [expandedLogs, setExpandedLogs] = useState<Record<string, boolean>>({})
+export function ExecutionLogsList({ logs: initialLogs, workflowId }: ExecutionLogsListProps) {
+  const supabase = createClient()
+  const [logs, setLogs] = useState<any[]>(initialLogs || [])
+  const [isLoading, setIsLoading] = useState(false)
+  const [expandedLog, setExpandedLog] = useState<string | null>(null)
+  const [nodeExecutions, setNodeExecutions] = useState<Record<string, any[]>>({})
 
-  const toggleExpand = (id: string) => {
-    setExpandedLogs((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }))
+  const fetchLogs = async () => {
+    try {
+      setIsLoading(true)
+
+      const { data, error } = await supabase
+        .from("workflow_executions")
+        .select("*")
+        .eq("workflow_id", workflowId)
+        .order("started_at", { ascending: false })
+
+      if (error) {
+        throw new Error(`Failed to fetch execution logs: ${error.message}`)
+      }
+
+      setLogs(data || [])
+
+      // If there's a currently expanded log, fetch its node executions
+      if (expandedLog) {
+        fetchNodeExecutions(expandedLog)
+      }
+    } catch (error) {
+      console.error("Error fetching logs:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchNodeExecutions = async (executionId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("node_executions")
+        .select("*")
+        .eq("execution_id", executionId)
+        .order("started_at", { ascending: true })
+
+      if (error) {
+        throw new Error(`Failed to fetch node executions: ${error.message}`)
+      }
+
+      setNodeExecutions((prev) => ({
+        ...prev,
+        [executionId]: data || [],
+      }))
+    } catch (error) {
+      console.error("Error fetching node executions:", error)
+    }
+  }
+
+  const handleAccordionChange = (value: string) => {
+    setExpandedLog(value === expandedLog ? null : value)
+
+    if (value !== expandedLog && !nodeExecutions[value]) {
+      fetchNodeExecutions(value)
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "completed":
+        return <CheckCircle className="h-4 w-4 text-green-500" />
+      case "failed":
+        return <XCircle className="h-4 w-4 text-red-500" />
+      case "running":
+        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+      default:
+        return <Clock className="h-4 w-4 text-gray-500" />
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+        return (
+          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            Completed
+          </Badge>
+        )
+      case "failed":
+        return (
+          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+            Failed
+          </Badge>
+        )
+      case "running":
+        return (
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            Running
+          </Badge>
+        )
+      default:
+        return <Badge variant="outline">Unknown</Badge>
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return `${date.toLocaleString()} (${formatDistanceToNow(date, { addSuffix: true })})`
+    } catch (e) {
+      return dateString
+    }
   }
 
   if (logs.length === 0) {
     return (
-      <div className="flex min-h-[200px] flex-col items-center justify-center rounded-md border border-dashed p-8 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <Clock className="h-6 w-6 text-primary" />
-        </div>
-        <h3 className="mt-4 text-lg font-semibold">No execution history</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          This workflow hasn't been executed yet. Click the Execute button to run it.
-        </p>
+      <div className="flex flex-col items-center justify-center h-full p-8">
+        <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium mb-2">No execution logs yet</h3>
+        <p className="text-muted-foreground text-center mb-6">Execute your workflow to see logs appear here.</p>
+        <Button onClick={fetchLogs} variant="outline" size="sm">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[50px]"></TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Started</TableHead>
-            <TableHead>Duration</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {logs.map((log) => {
-            const isExpanded = expandedLogs[log.id] || false
-            const startDate = new Date(log.started_at)
-            const endDate = log.completed_at ? new Date(log.completed_at) : null
-            const duration = endDate ? Math.round((endDate.getTime() - startDate.getTime()) / 1000) : null
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold">Execution History</h2>
+        <Button onClick={fetchLogs} variant="outline" size="sm" disabled={isLoading}>
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          Refresh
+        </Button>
+      </div>
 
-            return (
-              <Collapsible
-                key={log.id}
-                open={isExpanded}
-                onOpenChange={() => toggleExpand(log.id)}
-                className="border-b"
-              >
-                <TableRow className="group cursor-pointer hover:bg-muted/50">
-                  <TableCell className="py-2">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
-                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      </Button>
-                    </CollapsibleTrigger>
-                  </TableCell>
-                  <TableCell className="py-2">
-                    <div className="flex items-center">
-                      {log.status === "completed" ? (
-                        <Badge className="bg-green-500 hover:bg-green-600">
-                          <CheckCircle className="mr-1 h-3 w-3" />
-                          Completed
-                        </Badge>
-                      ) : log.status === "failed" ? (
-                        <Badge variant="destructive">
-                          <XCircle className="mr-1 h-3 w-3" />
-                          Failed
-                        </Badge>
-                      ) : log.status === "running" ? (
-                        <Badge variant="outline" className="bg-blue-500 text-white hover:bg-blue-600">
-                          <Clock className="mr-1 h-3 w-3 animate-spin" />
-                          Running
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">
-                          <Clock className="mr-1 h-3 w-3" />
-                          Pending
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-2">{startDate.toLocaleString()}</TableCell>
-                  <TableCell className="py-2">{duration !== null ? `${duration}s` : "In progress"}</TableCell>
-                  <TableCell className="py-2 text-right">
-                    <Button variant="ghost" size="sm" className="h-7">
-                      View Details
-                    </Button>
-                  </TableCell>
-                </TableRow>
-                <CollapsibleContent>
-                  <div className="space-y-4 p-4">
-                    <div>
-                      <h4 className="text-sm font-medium">Execution Logs</h4>
-                      <div className="mt-2 max-h-60 overflow-auto rounded-md border bg-muted/50 p-2 font-mono text-xs">
-                        {log.logs.map((entry, index) => (
-                          <div
-                            key={index}
-                            className={`mb-1 ${
-                              entry.level === "error"
-                                ? "text-red-500"
-                                : entry.level === "warning"
-                                  ? "text-amber-500"
-                                  : ""
-                            }`}
-                          >
-                            [{new Date(entry.timestamp).toLocaleTimeString()}] [{entry.node_id}] {entry.message}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {log.error && (
-                      <div>
-                        <h4 className="text-sm font-medium text-red-500">Error</h4>
-                        <div className="mt-1 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
-                          {log.error}
+      <div className="space-y-4">
+        {logs.map((log) => (
+          <Card key={log.id}>
+            <CardHeader className="pb-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    {getStatusIcon(log.status)}
+                    Execution {log.id.substring(0, 8)}
+                  </CardTitle>
+                  <CardDescription>Started: {formatDate(log.started_at)}</CardDescription>
+                </div>
+                {getStatusBadge(log.status)}
+              </div>
+            </CardHeader>
+
+            <Accordion
+              type="single"
+              collapsible
+              value={expandedLog === log.id ? log.id : ""}
+              onValueChange={handleAccordionChange}
+            >
+              <AccordionItem value={log.id} className="border-0">
+                <AccordionTrigger className="py-2 px-6">View Details</AccordionTrigger>
+                <AccordionContent>
+                  <CardContent className="pt-0">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium">Started</p>
+                          <p className="text-sm text-muted-foreground">{formatDate(log.started_at)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Completed</p>
+                          <p className="text-sm text-muted-foreground">
+                            {log.completed_at ? formatDate(log.completed_at) : "Not completed"}
+                          </p>
                         </div>
                       </div>
-                    )}
-                    {Object.keys(log.results).length > 0 && (
+
+                      {log.error && (
+                        <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                          <p className="text-sm font-medium text-red-800">Error</p>
+                          <p className="text-sm text-red-700">{log.error}</p>
+                        </div>
+                      )}
+
                       <div>
-                        <h4 className="text-sm font-medium">Results</h4>
-                        <pre className="mt-1 max-h-40 overflow-auto rounded-md border bg-muted/50 p-2 text-xs">
-                          {JSON.stringify(log.results, null, 2)}
-                        </pre>
+                        <p className="text-sm font-medium mb-2">Node Executions</p>
+                        {!nodeExecutions[log.id] ? (
+                          <div className="flex items-center justify-center p-4">
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            <span className="text-sm text-muted-foreground">Loading node executions...</span>
+                          </div>
+                        ) : nodeExecutions[log.id].length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No node executions found</p>
+                        ) : (
+                          <div className="border rounded-md divide-y">
+                            {nodeExecutions[log.id].map((nodeExec) => (
+                              <div key={nodeExec.id} className="p-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    {getStatusIcon(nodeExec.status)}
+                                    <span className="text-sm font-medium">Node: {nodeExec.node_id}</span>
+                                  </div>
+                                  {getStatusBadge(nodeExec.status)}
+                                </div>
+
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {formatDate(nodeExec.completed_at || nodeExec.started_at)}
+                                </p>
+
+                                {nodeExec.output_data && (
+                                  <div className="mt-2">
+                                    <Accordion type="single" collapsible>
+                                      <AccordionItem value="output">
+                                        <AccordionTrigger className="text-xs py-1">Output Data</AccordionTrigger>
+                                        <AccordionContent>
+                                          <pre className="text-xs bg-muted p-2 rounded-md overflow-auto max-h-40">
+                                            {JSON.stringify(nodeExec.output_data, null, 2)}
+                                          </pre>
+                                        </AccordionContent>
+                                      </AccordionItem>
+                                    </Accordion>
+                                  </div>
+                                )}
+
+                                {nodeExec.error && (
+                                  <div className="mt-2 bg-red-50 border border-red-200 rounded-md p-2">
+                                    <p className="text-xs text-red-700">{nodeExec.error}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )
-          })}
-        </TableBody>
-      </Table>
+                    </div>
+                  </CardContent>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <CardFooter className="pt-0">
+              <div className="w-full flex justify-between text-xs text-muted-foreground">
+                <span>
+                  Duration:{" "}
+                  {log.completed_at
+                    ? formatDistanceToNow(new Date(log.started_at), { end: new Date(log.completed_at) })
+                    : "In progress"}
+                </span>
+                <span>ID: {log.id}</span>
+              </div>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
     </div>
   )
 }
