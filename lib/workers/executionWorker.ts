@@ -1,4 +1,4 @@
-import { initExecutionQueue } from "@/lib/queue/executionQueue";
+import { initExecutionQueue } from "@/lib/queue/executionQueue.server";
 import { executionService } from "@/lib/services/execution-service";
 import { createClient } from "@/lib/supabase/client";
 import { BlockType, getBlockType } from "@/types/workflow";
@@ -12,6 +12,11 @@ import "dotenv/config";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
 import { v4 as uuidv4 } from "uuid";
 import { ethers, parseEther } from "ethers";
+import { Node, Edge } from "reactflow";
+import { validateAcyclic, topologicalSort, validateOrphans, validateTerminals } from "@/lib/utils/graph";
+import { NodeVM } from "vm2";
+import { workflowService } from "@/lib/services/workflow-service";
+import { executeWorkflow } from "@/lib/workers/executionWorker";
 
 // Metrics for node execution
 const nodeExecutionDuration = new Histogram({
@@ -31,7 +36,7 @@ async function startWorker() {
 
   channel.consume(
     "execution_queue",
-    async (msg) => {
+    async (msg: any) => {
       if (!msg) return;
       const { executionId, workflowId } = JSON.parse(msg.content.toString());
       console.log(`[Worker] Processing job: ${executionId}`);
@@ -40,86 +45,11 @@ async function startWorker() {
         // Update status to running
         await executionService.updateExecutionStatus(executionId, "running");
 
-        // Retrieve workflow definition
-        const workflow = await import("@/lib/services/workflow-service").then(
-          (mod) => mod.workflowService.getWorkflow(workflowId)
-        );
-        const supabaseNode = createServiceClient();
-
-        // Execute each node sequentially
-        for (const node of workflow.nodes) {
-          // Create node execution record
-          const nodeExecId = uuidv4();
-          await supabaseNode.from("node_executions").insert({
-            id: nodeExecId,
-            execution_id: executionId,
-            node_id: node.id,
-            status: "running",
-            started_at: new Date().toISOString(),
-          });
-
-          const blockType = getBlockType(node.data);
-          const endTimer = nodeExecutionDuration.startTimer({ blockType });
-          try {
-            // Log node start
-            await executionService.logExecutionEvent(
-              executionId,
-              node.id,
-              "info",
-              `Node ${node.id} execution started`
-            );
-
-            // Execute with retries
-            const output = await pRetry(() => executeNode(node), {
-              retries: config.retry.attempts,
-              factor: config.retry.factor,
-              minTimeout: config.retry.minTimeout,
-            });
-            endTimer();
-
-            // Update node execution success
-            await supabaseNode
-              .from("node_executions")
-              .update({
-                status: "completed",
-                completed_at: new Date().toISOString(),
-                output_data: output,
-              })
-              .eq("id", nodeExecId);
-            // Log success
-            await executionService.logExecutionEvent(
-              executionId,
-              node.id,
-              "info",
-              `Node ${node.id} execution completed`,
-              output
-            );
-          } catch (nodeError) {
-            endTimer();
-            nodeExecutionFailures.inc({ blockType });
-            // Update node execution failure
-            await supabaseNode
-              .from("node_executions")
-              .update({
-                status: "failed",
-                completed_at: new Date().toISOString(),
-                error_data: (nodeError as Error).message,
-              })
-              .eq("id", nodeExecId);
-            // Log node error and stop execution
-            await executionService.logExecutionEvent(
-              executionId,
-              node.id,
-              "error",
-              `Node ${node.id} execution failed`,
-              nodeError
-            );
-            throw nodeError;
-          }
-        }
-
-        // Mark execution completed
-        await executionService.updateExecutionStatus(executionId, "completed");
+        // Retrieve full workflow and orchestrate via DAG
+        const wf = await workflowService.getWorkflow(workflowId);
+        const results = await executeWorkflow(wf.nodes, wf.edges);
+        // Mark workflow completed with outputs
+        await executionService.updateExecutionStatus(executionId, "completed", results);
         console.log(`[Worker] Completed job: ${executionId}`);
         channel.ack(msg);
       } catch (error) {
@@ -137,12 +67,19 @@ async function startWorker() {
 }
 
 async function executeNode(node: any): Promise<any> {
+  const cfg = node.data as Record<string, any>;
+  // Initialize Supabase client for DB operations
   const supabase = createServiceClient();
-  const blockType = getBlockType(node.data);
-  const config = node.data;
+  // common validation wrapper
+  const blockType = getBlockType(cfg);
+  const config = cfg;
 
   switch (blockType) {
     case BlockType.EMAIL: {
+      // Validate email config
+      if (!config.to || !config.subject || !config.body) {
+        throw new Error("Email block missing to/subject/body");
+      }
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: Number(process.env.SMTP_PORT),
@@ -157,6 +94,10 @@ async function executeNode(node: any): Promise<any> {
       return { messageId: info.messageId };
     }
     case BlockType.DATABASE: {
+      // Validate DB config
+      if (!config.table || !config.operation) {
+        throw new Error("Database block missing table or operation");
+      }
       let result;
       if (config.operation === "select") {
         result = await supabase
@@ -171,58 +112,36 @@ async function executeNode(node: any): Promise<any> {
       return { data: result.data };
     }
     case BlockType.WEBHOOK: {
+      // HTTP webhook trigger
       if (!config.url) {
-        throw new Error(`Webhook URL is undefined for node ${node.id}`);
+        throw new Error(`Webhook block missing URL for node ${node.id}`);
       }
-      const res = await globalThis.fetch(config.url, {
-        method: config.method,
-        headers: config.headers,
-        body: config.body,
-      });
-      const data = await res.json();
-      return { data };
-    }
-    case BlockType.DELAY: {
-      const ms =
-        Number(config.duration) * (config.unit === "minutes" ? 60000 : 1000);
-      await new Promise((r) => globalThis.setTimeout(r, ms));
-      return {};
-    }
-    case BlockType.CUSTOM: {
-      const blockDef = await customBlockService.getCustomBlockById(
-        config.customBlockId
-      );
-      if (!blockDef) throw new Error("Custom block not found");
-      return await executeCustomBlockLogic(blockDef, config.inputs);
-    }
-    case BlockType.TRANSFORM: {
-      if (config.transformType === "javascript" && config.code) {
-        try {
-          const fn = new Function("data", config.code);
-          const result = fn(node.data);
-          return { result };
-        } catch (err) {
-          throw new Error(`Transform error: ${(err as Error).message}`);
-        }
+      const method = (config.method || "GET").toUpperCase();
+      let res;
+      try {
+        res = await globalThis.fetch(config.url, {
+          method,
+          headers: config.headers,
+          body: config.body,
+        });
+      } catch (err) {
+        throw new Error(`Webhook request failed: ${(err as Error).message}`);
       }
-      throw new Error("Unsupported transform configuration");
-    }
-    case BlockType.CONDITION: {
-      if (config.condition) {
-        try {
-          const fn = new Function("data", `return (${config.condition});`);
-          const outcome = fn(node.data);
-          return { outcome: Boolean(outcome) };
-        } catch (err) {
-          throw new Error(`Condition error: ${(err as Error).message}`);
-        }
+      if (!res.ok) {
+        throw new Error(`Webhook returned HTTP ${res.status}`);
       }
-      throw new Error("No condition specified");
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : await res.text();
+      return { status: res.status, data };
     }
     case BlockType.WALLET: {
+      // Wallet connect or address retrieval
       const { blockchain, operation, privateKey } = config;
-      if (!privateKey)
-        throw new Error("Private key required for wallet operations");
+      if (!privateKey) {
+        throw new Error("Wallet block missing privateKey");
+      }
       const provider = ethers.getDefaultProvider(blockchain);
       const wallet = new ethers.Wallet(privateKey, provider);
       if (operation === "connect" || operation === "getAddress") {
@@ -231,49 +150,76 @@ async function executeNode(node: any): Promise<any> {
       throw new Error(`Unsupported wallet operation: ${operation}`);
     }
     case BlockType.TRANSACTION: {
+      // On-chain transaction
       const { blockchain, type, to, amount, privateKey } = config;
-      if (type === "transfer") {
-        if (!privateKey || !to || !amount)
-          throw new Error("Missing transaction parameters");
-        const provider = ethers.getDefaultProvider(blockchain);
-        const wallet = new ethers.Wallet(privateKey, provider);
-        const tx = await wallet.sendTransaction({
-          to,
-          value: parseEther(amount),
-        });
-        const receipt = await tx.wait();
-        return { txHash: receipt.transactionHash };
+      if (type !== "transfer") {
+        throw new Error(`Unsupported transaction type: ${type}`);
       }
-      throw new Error(`Unsupported transaction type: ${type}`);
+      if (!privateKey || !to || !amount) {
+        throw new Error("Transaction block missing to/amount/privateKey");
+      }
+      let value;
+      try {
+        value = parseEther(amount);
+      } catch (err) {
+        throw new Error(`Invalid amount: ${amount}`);
+      }
+      const provider = ethers.getDefaultProvider(blockchain);
+      const wallet = new ethers.Wallet(privateKey, provider);
+      // Optional gas estimation
+      await wallet.estimateGas({ to, value });
+      const tx = await wallet.sendTransaction({ to, value });
+      const receipt = await tx.wait();
+      // Guard: ensure receipt is present
+      if (!receipt) {
+        throw new Error('Transaction failed: no receipt');
+      }
+      // Ethers receipt.hash contains the transaction hash
+      const hash = (receipt as any).transactionHash ?? receipt.hash;
+      if (!hash) {
+        throw new Error("Transaction failed: no receipt hash");
+      }
+      return { txHash: hash, blockNumber: receipt.blockNumber };
     }
     case BlockType.GOAT_FINANCE: {
-      const { operation, blockchain, tokenAddress } = config;
+      // ERC20 token operations
+      const { operation, blockchain, tokenAddress, address } = config;
+      if (!tokenAddress || !address) {
+        throw new Error("Finance block missing tokenAddress or address");
+      }
       const provider = ethers.getDefaultProvider(blockchain);
       if (operation === "balance") {
-        if (!tokenAddress) throw new Error("Token address required");
-        // ERC20 balance
         const abi = ["function balanceOf(address) view returns (uint256)"];
         const contract = new ethers.Contract(tokenAddress, abi, provider);
-        const balance = await contract.balanceOf(config.address);
-        return { balance: balance.toString() };
+        const bal = await contract.balanceOf(address);
+        return { balance: bal.toString() };
       }
       throw new Error(`Unsupported finance operation: ${operation}`);
     }
     case BlockType.PRICE_MONITOR: {
-      // Fetch crypto price and evaluate condition
+      // Crypto price trigger
       const assetId = config.asset?.toLowerCase();
       const target = Number(config.targetPrice);
       const condition = config.condition;
       if (!assetId || isNaN(target) || !condition) {
-        throw new Error("Invalid price monitor configuration");
+        throw new Error("Price monitor missing asset, targetPrice or condition");
       }
-      const res = await fetch(
-        `https://api.coingecko.com/api/v3/simple/price?ids=${assetId}&vs_currencies=usd`
-      );
+      let res;
+      try {
+        res = await fetch(
+          `https://api.coingecko.com/api/v3/simple/price?ids=${assetId}&vs_currencies=usd`
+        );
+      } catch (err) {
+        throw new Error(`Price fetch failed: ${(err as Error).message}`);
+      }
+      if (!res.ok) {
+        throw new Error(`CoinGecko HTTP ${res.status}`);
+      }
       const data = await res.json();
       const price = data[assetId]?.usd;
-      if (price == null)
-        throw new Error(`Failed to fetch price for ${assetId}`);
+      if (price == null) {
+        throw new Error(`No price data for ${assetId}`);
+      }
       const met = condition === "above" ? price > target : price < target;
       return { price, conditionMet: met };
     }
@@ -290,10 +236,73 @@ async function executeNode(node: any): Promise<any> {
       );
       return {};
     }
+    case BlockType.DELAY: {
+      // Pause execution
+      const duration = Number(config.duration);
+      const unit = config.unit === 'minutes' ? 60000 : 1000;
+      if (isNaN(duration) || duration < 0) {
+        throw new Error('Delay block invalid duration');
+      }
+      await new Promise((res) => setTimeout(res, duration * unit));
+      return {};
+    }
+    case BlockType.TRANSFORM: {
+      // Data transform via JS code
+      const { transformType, code } = config;
+      if (transformType !== 'javascript' || !code) {
+        throw new Error('Transform block missing code or unsupported type');
+      }
+      // sandbox JS to prevent infinite loops
+      const vm = new NodeVM({ timeout: 500, sandbox: {} });
+      const fn = vm.run(`module.exports = function(data){ ${code} }`);
+      const result = fn(node.data);
+      return { result };
+    }
+    case BlockType.CONDITION: {
+      // Conditional branching
+      const cond = config.condition;
+      if (!cond) {
+        throw new Error('Condition block missing expression');
+      }
+      // sandbox condition
+      const vm = new NodeVM({ timeout: 200, sandbox: {} });
+      const fn = vm.run(`module.exports = function(data){ return (${cond}); }`);
+      const outcome = fn(node.data);
+      return { outcome: Boolean(outcome) };
+    }
+    case BlockType.CUSTOM: {
+      // Execute custom block logic
+      const cbId = config.customBlockId;
+      if (!cbId) {
+        throw new Error('Custom block missing ID');
+      }
+      const blockDef = await customBlockService.getCustomBlockById(cbId);
+      if (!blockDef) {
+        throw new Error(`Custom block not found: ${cbId}`);
+      }
+      return await executeCustomBlockLogic(blockDef, config.inputs || {});
+    }
     default:
       // Other block types or logic only: return data as-is
       return { data: node.data };
   }
+}
+
+// Orchestrate full workflow execution
+export async function executeWorkflow(nodes: Node[], edges: Edge[]): Promise<Record<string, any>> {
+  // Graph validations
+  validateAcyclic(nodes, edges);
+  validateOrphans(nodes, edges);
+  validateTerminals(nodes, edges);
+  // Topologically sorted run
+  const sorted = topologicalSort(nodes, edges);
+  const outputs: Record<string, any> = {};
+  for (const node of sorted) {
+    // attach previous outputs if needed
+    const inputNode = { ...node, data: { ...node.data, previous: outputs } };
+    outputs[node.id] = await executeNode(inputNode);
+  }
+  return outputs;
 }
 
 startWorker().catch((err) => console.error(err));

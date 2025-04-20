@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 import { v4 as uuidv4 } from "uuid";
+import { workflowService } from "./workflow-service";
+import { blockSchemas } from "@/lib/schemas/blockSchemas";
+import { getBlockType, BlockType } from "@/types/workflow";
+import { addExecutionJob } from "@/lib/queue/executionQueue";
 
 export type ExecutionStatus = "pending" | "running" | "completed" | "failed";
 
@@ -55,6 +59,19 @@ export class ExecutionService {
         "Execution started"
       );
 
+      // Validate node configs against schemas
+      const workflow = await workflowService.getWorkflow(workflowId);
+      for (const node of workflow.nodes) {
+        const schema = blockSchemas[getBlockType(node.data) as BlockType];
+        try {
+          schema.parse(node.data);
+        } catch (err) {
+          throw new Error(`Node ${node.id} config validation failed: ${(err as Error).message}`);
+        }
+      }
+
+      // Enqueue execution job after validation
+      await addExecutionJob(executionId, workflowId);
       return executionId;
     } catch (error) {
       console.error("Error starting execution:", error);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addExecutionJob } from "@/lib/queue/executionQueue";
+import { addExecutionJob } from "@/lib/queue/executionQueue.server";
 import { v4 as uuidv4 } from "uuid";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
 
