@@ -1,147 +1,187 @@
 import { createClient } from "@/lib/supabase/server"
 import { v4 as uuidv4 } from "uuid"
 
-class ExecutionService {
-  async executeWorkflow(workflowId: string) {
-    try {
-      const supabase = createClient()
+export type ExecutionStatus = "pending" | "running" | "completed" | "failed"
 
-      // Get the workflow
-      const { data: workflow, error: workflowError } = await supabase
-        .from("workflows")
+export interface ExecutionLog {
+  id: string
+  execution_id: string
+  node_id: string
+  level: "info" | "warning" | "error"
+  message: string
+  data?: any
+  timestamp: string
+}
+
+export interface ExecutionResult {
+  id: string
+  workflow_id: string
+  status: ExecutionStatus
+  started_at: string
+  completed_at?: string
+  result?: any
+  logs: ExecutionLog[]
+}
+
+export class ExecutionService {
+  private supabase = createClient()
+
+  async startExecution(workflowId: string): Promise<string> {
+    try {
+      const user = (await this.supabase.auth.getUser()).data.user
+
+      if (!user) {
+        throw new Error("User not authenticated")
+      }
+
+      // Create a new execution record
+      const executionId = uuidv4()
+      const { error } = await this.supabase.from("workflow_executions").insert({
+        id: executionId,
+        workflow_id: workflowId,
+        status: "pending",
+        triggered_by: user.id,
+      })
+
+      if (error) {
+        throw error
+      }
+
+      // Log the start of execution
+      await this.logExecutionEvent(executionId, "start", "info", "Execution started")
+
+      return executionId
+    } catch (error) {
+      console.error("Error starting execution:", error)
+      throw error
+    }
+  }
+
+  async updateExecutionStatus(executionId: string, status: ExecutionStatus, result?: any): Promise<void> {
+    try {
+      const updates: any = { status }
+
+      if (status === "completed" || status === "failed") {
+        updates.completed_at = new Date().toISOString()
+      }
+
+      if (result) {
+        updates.result = result
+      }
+
+      const { error } = await this.supabase.from("workflow_executions").update(updates).eq("id", executionId)
+
+      if (error) {
+        throw error
+      }
+
+      // Log the status change
+      await this.logExecutionEvent(
+        executionId,
+        "status-change",
+        status === "failed" ? "error" : "info",
+        `Execution ${status}`,
+      )
+    } catch (error) {
+      console.error("Error updating execution status:", error)
+      throw error
+    }
+  }
+
+  async logExecutionEvent(
+    executionId: string,
+    nodeId: string,
+    level: "info" | "warning" | "error",
+    message: string,
+    data?: any,
+  ): Promise<void> {
+    try {
+      const { error } = await this.supabase.from("execution_logs").insert({
+        execution_id: executionId,
+        node_id: nodeId,
+        level,
+        message,
+        data,
+        timestamp: new Date().toISOString(),
+      })
+
+      if (error) {
+        console.error("Error logging execution event:", error)
+      }
+    } catch (error) {
+      console.error("Error logging execution event:", error)
+    }
+  }
+
+  async getExecution(executionId: string): Promise<ExecutionResult | null> {
+    try {
+      // Get execution details
+      const { data: execution, error: executionError } = await this.supabase
+        .from("workflow_executions")
         .select("*")
-        .eq("id", workflowId)
+        .eq("id", executionId)
         .single()
 
-      if (workflowError) {
-        throw new Error(`Error fetching workflow: ${workflowError.message}`)
+      if (executionError) {
+        throw executionError
       }
 
-      // Generate execution ID
-      const executionId = uuidv4()
+      // Get execution logs
+      const { data: logs, error: logsError } = await this.supabase
+        .from("execution_logs")
+        .select("*")
+        .eq("execution_id", executionId)
+        .order("timestamp", { ascending: true })
 
-      try {
-        // Try to log the execution to the database
-        const { error: insertError } = await supabase.from("workflow_executions").insert({
-          id: executionId,
-          workflow_id: workflowId,
-          status: "completed",
-          started_at: new Date().toISOString(),
-          completed_at: new Date().toISOString(),
-          result: { success: true, message: "Workflow executed successfully" },
-          logs: this.generateExecutionLogs(workflow),
-        })
-
-        if (insertError) {
-          console.warn("Could not log execution to database:", insertError.message)
-          // If the table doesn't exist, simulate execution without DB logging
-          return this.simulateWorkflowExecutionWithoutDB(workflow)
-        }
-      } catch (error) {
-        console.warn("Error logging execution:", error)
-        // If there's an error (like table doesn't exist), simulate execution without DB logging
-        return this.simulateWorkflowExecutionWithoutDB(workflow)
+      if (logsError) {
+        throw logsError
       }
 
-      return { id: executionId, success: true }
-    } catch (error: any) {
-      console.error("Error executing workflow:", error)
-      return { id: null, success: false, error: error.message }
+      return {
+        ...execution,
+        logs,
+      }
+    } catch (error) {
+      console.error("Error fetching execution:", error)
+      return null
     }
   }
 
-  // Simulate execution without database logging
-  simulateWorkflowExecutionWithoutDB(workflow: any) {
-    const executionId = uuidv4()
-    console.log(`Simulating execution of workflow ${workflow.id} without database logging`)
-
-    // Return a simulated execution result
-    return {
-      id: executionId,
-      success: true,
-      simulated: true,
-      logs: this.generateExecutionLogs(workflow),
-    }
-  }
-
-  // Generate simulated execution logs
-  generateExecutionLogs(workflow: any) {
-    const logs = []
-    const nodes = workflow.nodes || []
-    const startTime = Date.now()
-
-    // Add workflow start log
-    logs.push({
-      timestamp: new Date(startTime).toISOString(),
-      level: "info",
-      message: `Started execution of workflow "${workflow.name}"`,
-    })
-
-    // Add node execution logs
-    let currentTime = startTime
-    for (const node of nodes) {
-      currentTime += Math.floor(Math.random() * 1000) + 200 // Random execution time between 200-1200ms
-
-      logs.push({
-        timestamp: new Date(currentTime).toISOString(),
-        level: "info",
-        message: `Executing node "${node.data.label}" (${node.id})`,
-        node_id: node.id,
-      })
-
-      // Simulate success for most nodes, but occasional warnings
-      if (Math.random() > 0.8) {
-        logs.push({
-          timestamp: new Date(currentTime + 50).toISOString(),
-          level: "warning",
-          message: `Warning in node "${node.data.label}": Non-critical issue detected`,
-          node_id: node.id,
-        })
-      }
-
-      logs.push({
-        timestamp: new Date(currentTime + 100).toISOString(),
-        level: "info",
-        message: `Completed execution of node "${node.data.label}" (${node.id})`,
-        node_id: node.id,
-      })
-    }
-
-    // Add workflow completion log
-    logs.push({
-      timestamp: new Date(currentTime + 200).toISOString(),
-      level: "info",
-      message: `Completed execution of workflow "${workflow.name}"`,
-    })
-
-    return logs
-  }
-
-  async getExecutionLogs(workflowId: string) {
+  async getWorkflowExecutions(workflowId: string, limit = 10): Promise<ExecutionResult[]> {
     try {
-      const supabase = createClient()
+      // Get recent executions
+      const { data: executions, error: executionsError } = await this.supabase
+        .from("workflow_executions")
+        .select("*")
+        .eq("workflow_id", workflowId)
+        .order("started_at", { ascending: false })
+        .limit(limit)
 
-      // Try to fetch execution logs from the database
-      try {
-        const { data, error } = await supabase
-          .from("workflow_executions")
-          .select("*")
-          .eq("workflow_id", workflowId)
-          .order("started_at", { ascending: false })
-
-        if (error) {
-          // If the table doesn't exist or there's another error, return empty array
-          console.warn("Error fetching execution logs:", error.message)
-          return []
-        }
-
-        return data || []
-      } catch (error) {
-        console.warn("Error fetching execution logs:", error)
-        return []
+      if (executionsError) {
+        throw executionsError
       }
-    } catch (error: any) {
-      console.error("Error fetching execution logs:", error)
+
+      // For each execution, get its logs
+      const executionsWithLogs = await Promise.all(
+        executions.map(async (execution) => {
+          const { data: logs, error: logsError } = await this.supabase
+            .from("execution_logs")
+            .select("*")
+            .eq("execution_id", execution.id)
+            .order("timestamp", { ascending: true })
+
+          if (logsError) {
+            console.error("Error fetching logs for execution:", execution.id, logsError)
+            return { ...execution, logs: [] }
+          }
+
+          return { ...execution, logs }
+        }),
+      )
+
+      return executionsWithLogs
+    } catch (error) {
+      console.error("Error fetching workflow executions:", error)
       return []
     }
   }

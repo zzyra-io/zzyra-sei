@@ -1,251 +1,148 @@
-"use client"
-
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { AuthGate } from "@/components/auth-gate"
-import { DashboardHeader } from "@/components/dashboard-header"
+import { notFound, redirect } from "next/navigation"
+import Link from "next/link"
+import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useToast } from "@/components/ui/use-toast"
-import { teamService } from "@/lib/services/team-service"
-import type { Team } from "@/lib/services/team-service"
-import { Loader2 } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { ArrowLeft, Trash2 } from "lucide-react"
+import { deleteTeam } from "@/app/actions/team-actions"
 
-export default function TeamSettingsPage() {
-  const params = useParams()
-  const teamId = params.id as string
-  const router = useRouter()
-  const { toast } = useToast()
+export const dynamic = "force-dynamic"
 
-  const [team, setTeam] = useState<Team | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [name, setName] = useState("")
-  const [slug, setSlug] = useState("")
-  const [logoUrl, setLogoUrl] = useState("")
+async function getTeamAndCheckPermission(teamId: string) {
+  const supabase = createClient()
 
-  const fetchTeam = async () => {
-    setIsLoading(true)
-    try {
-      const teamData = await teamService.getTeam(teamId)
-      setTeam(teamData)
-      setName(teamData.name)
-      setSlug(teamData.slug)
-      setLogoUrl(teamData.logo_url || "")
-    } catch (error) {
-      console.error("Error fetching team:", error)
-      toast({
-        title: "Error fetching team",
-        description: "Failed to load team information. Please try again.",
-        variant: "destructive",
-      })
-      router.push("/teams")
-    } finally {
-      setIsLoading(false)
-    }
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    redirect("/login")
   }
 
-  useEffect(() => {
-    if (teamId) {
-      fetchTeam()
-    }
-  }, [teamId, toast, router])
+  // Get team details
+  const { data: team, error: teamError } = await supabase.from("teams").select("*").eq("id", teamId).single()
 
-  const handleSaveGeneral = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSaving(true)
-    try {
-      const updatedTeam = await teamService.updateTeam(teamId, {
-        name,
-        slug,
-        logo_url: logoUrl || null,
-      })
-      setTeam(updatedTeam)
-      toast({
-        title: "Team updated",
-        description: "Team settings have been updated successfully.",
-      })
-    } catch (error) {
-      toast({
-        title: "Error updating team",
-        description: "Failed to update team settings. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSaving(false)
-    }
+  if (teamError) {
+    return { team: null, isOwner: false, error: teamError.message }
   }
 
-  if (isLoading) {
-    return (
-      <AuthGate>
-        <div className="flex min-h-screen flex-col">
-          <DashboardHeader />
-          <main className="flex-1 bg-muted/30 px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-4xl">
-              <Skeleton className="h-10 w-1/3 mb-6" />
-              <Skeleton className="h-64 rounded-md" />
-            </div>
-          </main>
-        </div>
-      </AuthGate>
-    )
+  // Check if user is owner
+  const { data: membership, error: membershipError } = await supabase
+    .from("team_members")
+    .select("role")
+    .eq("team_id", teamId)
+    .eq("user_id", user.id)
+    .single()
+
+  if (membershipError || !membership) {
+    return { team, isOwner: false, error: "You don't have permission to access this team" }
   }
 
-  if (!team) {
-    return (
-      <AuthGate>
-        <div className="flex min-h-screen flex-col">
-          <DashboardHeader />
-          <main className="flex-1 bg-muted/30 px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-4xl">
-              <div className="rounded-lg border bg-card p-6 shadow-sm">
-                <h2 className="text-xl font-semibold">Team not found</h2>
-                <p className="mt-2 text-muted-foreground">
-                  The team you're looking for doesn't exist or you don't have access to it.
-                </p>
-                <Button className="mt-4" onClick={() => router.push("/teams")}>
-                  Back to Teams
-                </Button>
-              </div>
-            </div>
-          </main>
-        </div>
-      </AuthGate>
-    )
+  const isOwner = membership.role === "owner"
+
+  return { team, isOwner, error: null }
+}
+
+export default async function TeamSettingsPage({ params }: { params: { id: string } }) {
+  const { team, isOwner, error } = await getTeamAndCheckPermission(params.id)
+
+  if (error || !team) {
+    notFound()
+  }
+
+  if (!isOwner) {
+    redirect(`/teams/${params.id}`)
+  }
+
+  async function updateTeam(formData: FormData) {
+    "use server"
+
+    const supabase = createClient()
+    const name = formData.get("name") as string
+    const description = formData.get("description") as string
+
+    if (!name) {
+      return { error: "Team name is required" }
+    }
+
+    const { error } = await supabase.from("teams").update({ name, description }).eq("id", params.id)
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    redirect(`/teams/${params.id}`)
   }
 
   return (
-    <AuthGate>
-      <div className="flex min-h-screen flex-col">
-        <DashboardHeader />
-        <main className="flex-1 bg-muted/30 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-4xl space-y-6">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-bold tracking-tight">Team Settings</h1>
-              <p className="text-muted-foreground">Manage your team settings and preferences.</p>
-            </div>
+    <div className="container py-10">
+      <div className="mb-8">
+        <Link
+          href={`/teams/${params.id}`}
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to Team
+        </Link>
 
-            <Tabs defaultValue="general" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="danger">Danger Zone</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="general" className="space-y-4">
-                <Card>
-                  <form onSubmit={handleSaveGeneral}>
-                    <CardHeader>
-                      <CardTitle>General Information</CardTitle>
-                      <CardDescription>Update your team's basic information.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Team Name</Label>
-                        <Input
-                          id="name"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder="My Team"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="slug">Team Slug</Label>
-                        <Input
-                          id="slug"
-                          value={slug}
-                          onChange={(e) => setSlug(e.target.value)}
-                          placeholder="my-team"
-                          required
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Used in URLs. Only lowercase letters, numbers, and hyphens.
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="logo">Logo URL</Label>
-                        <Input
-                          id="logo"
-                          value={logoUrl}
-                          onChange={(e) => setLogoUrl(e.target.value)}
-                          placeholder="https://example.com/logo.png"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          URL to your team's logo image. Leave blank to use the default icon.
-                        </p>
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <Button type="submit" disabled={isSaving}>
-                        {isSaving ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          "Save Changes"
-                        )}
-                      </Button>
-                    </CardFooter>
-                  </form>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="danger" className="space-y-4">
-                <Card className="border-destructive/50">
-                  <CardHeader>
-                    <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                    <CardDescription>
-                      Actions here can't be undone. Be careful when making changes in this section.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="rounded-md border border-destructive/50 p-4">
-                      <h3 className="font-medium">Delete Team</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Permanently delete this team and all of its data. This action cannot be undone.
-                      </p>
-                      <Button
-                        variant="destructive"
-                        className="mt-4"
-                        onClick={() => {
-                          if (confirm("Are you sure you want to delete this team? This action cannot be undone.")) {
-                            teamService
-                              .deleteTeam(teamId)
-                              .then(() => {
-                                toast({
-                                  title: "Team deleted",
-                                  description: "The team has been deleted successfully.",
-                                })
-                                router.push("/teams")
-                              })
-                              .catch((error) => {
-                                toast({
-                                  title: "Error deleting team",
-                                  description: "Failed to delete team. Please try again.",
-                                  variant: "destructive",
-                                })
-                              })
-                          }
-                        }}
-                      >
-                        Delete Team
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </main>
+        <h1 className="text-3xl font-bold">Team Settings</h1>
+        <p className="text-muted-foreground">Manage settings for {team.name}</p>
       </div>
-    </AuthGate>
+
+      <div className="grid gap-8 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Team Information</CardTitle>
+            <CardDescription>Update your team's basic information</CardDescription>
+          </CardHeader>
+          <form action={updateTeam}>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="name" className="text-sm font-medium">
+                  Team Name <span className="text-destructive">*</span>
+                </label>
+                <Input id="name" name="name" defaultValue={team.name} required />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="description" className="text-sm font-medium">
+                  Description
+                </label>
+                <Textarea id="description" name="description" defaultValue={team.description || ""} rows={3} />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button type="submit">Save Changes</Button>
+            </CardFooter>
+          </form>
+        </Card>
+
+        <Card className="border-destructive/50">
+          <CardHeader>
+            <CardTitle className="text-destructive">Danger Zone</CardTitle>
+            <CardDescription>Actions here cannot be undone. Be careful.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Deleting this team will remove all associated data, including workflows and custom blocks. All team
+              members will lose access.
+            </p>
+            <form
+              action={async () => {
+                "use server"
+                await deleteTeam(params.id)
+                redirect("/teams")
+              }}
+            >
+              <Button type="submit" variant="destructive" className="w-full">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Team
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   )
 }

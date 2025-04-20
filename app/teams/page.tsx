@@ -1,207 +1,76 @@
-"use client"
+import { Suspense } from "react"
+import { getTeams } from "@/app/actions/team-actions"
+import { TeamCard } from "@/components/team-card"
+import { CreateTeamForm } from "@/components/create-team-form"
+import { Users } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-import type React from "react"
+export const dynamic = "force-dynamic"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { AuthGate } from "@/components/auth-gate"
-import { DashboardHeader } from "@/components/dashboard-header"
-import { EmptyState } from "@/components/empty-state"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useToast } from "@/components/ui/use-toast"
-import { teamService } from "@/lib/services/team-service"
-import type { Team } from "@/lib/services/team-service"
-import { Users, PlusCircle, ArrowRight } from "lucide-react"
+async function TeamsList() {
+  const { teams, error } = await getTeams()
 
-export default function TeamsPage() {
-  const [teams, setTeams] = useState<Team[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isCreating, setIsCreating] = useState(false)
-  const [newTeamName, setNewTeamName] = useState("")
-  const [newTeamSlug, setNewTeamSlug] = useState("")
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const { toast } = useToast()
-  const router = useRouter()
-
-  const fetchTeams = async () => {
-    setIsLoading(true)
-    try {
-      const data = await teamService.getUserTeams()
-      setTeams(data)
-    } catch (error) {
-      console.error("Error fetching teams:", error)
-      toast({
-        title: "Error fetching teams",
-        description: "Failed to load your teams. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-center">
+        <p className="text-destructive">Error loading teams: {error}</p>
+      </div>
+    )
   }
 
-  useEffect(() => {
-    fetchTeams()
-  }, [toast])
-
-  const handleCreateTeam = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsCreating(true)
-    try {
-      const team = await teamService.createTeam({
-        name: newTeamName,
-        slug: newTeamSlug || undefined,
-      })
-      setTeams([team, ...teams])
-      setNewTeamName("")
-      setNewTeamSlug("")
-      setCreateDialogOpen(false)
-      toast({
-        title: "Team created",
-        description: `Team "${team.name}" has been created successfully.`,
-      })
-    } catch (error) {
-      toast({
-        title: "Error creating team",
-        description: "Failed to create team. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsCreating(false)
-    }
-  }
-
-  const handleTeamClick = (teamId: string) => {
-    router.push(`/teams/${teamId}`)
+  if (!teams.length) {
+    return (
+      <div className="rounded-lg border border-dashed p-8 text-center">
+        <Users className="mx-auto h-10 w-10 text-muted-foreground" />
+        <h3 className="mt-4 text-lg font-semibold">No teams yet</h3>
+        <p className="mt-2 text-sm text-muted-foreground">Create your first team to start collaborating with others.</p>
+      </div>
+    )
   }
 
   return (
-    <AuthGate>
-      <div className="flex min-h-screen flex-col">
-        <DashboardHeader />
-        <main className="flex-1 bg-muted/30 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">
-            <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-              <h1 className="text-2xl font-bold tracking-tight">Teams</h1>
-              <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Create Team
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <form onSubmit={handleCreateTeam}>
-                    <DialogHeader>
-                      <DialogTitle>Create a new team</DialogTitle>
-                      <DialogDescription>Create a team to collaborate on workflows with other users.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="name">Team Name</Label>
-                        <Input
-                          id="name"
-                          value={newTeamName}
-                          onChange={(e) => setNewTeamName(e.target.value)}
-                          placeholder="My Awesome Team"
-                          required
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="slug">
-                          Team Slug <span className="text-muted-foreground">(optional)</span>
-                        </Label>
-                        <Input
-                          id="slug"
-                          value={newTeamSlug}
-                          onChange={(e) => setNewTeamSlug(e.target.value)}
-                          placeholder="my-awesome-team"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Used in URLs. Leave blank to generate automatically.
-                        </p>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit" disabled={isCreating || !newTeamName}>
-                        {isCreating ? "Creating..." : "Create Team"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {teams.map((team) => (
+        <TeamCard
+          key={team.id}
+          id={team.id}
+          name={team.name}
+          description={team.description}
+          memberCount={1} // This would need to be calculated from team_members
+          role={team.role}
+          createdAt={team.created_at}
+        />
+      ))}
+    </div>
+  )
+}
 
-            {isLoading ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {[...Array(3)].map((_, i) => (
-                  <Skeleton key={i} className="h-48 rounded-md" />
-                ))}
-              </div>
-            ) : teams.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {teams.map((team) => (
-                  <Card
-                    key={team.id}
-                    className="cursor-pointer transition-all hover:shadow-md"
-                    onClick={() => handleTeamClick(team.id)}
-                  >
-                    <CardHeader>
-                      <CardTitle className="flex items-center">
-                        {team.logo_url ? (
-                          <img
-                            src={team.logo_url || "/placeholder.svg"}
-                            alt={team.name}
-                            className="mr-2 h-6 w-6 rounded-full object-cover"
-                          />
-                        ) : (
-                          <Users className="mr-2 h-5 w-5 text-primary" />
-                        )}
-                        {team.name}
-                      </CardTitle>
-                      <CardDescription>@{team.slug}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        Created on {new Date(team.created_at).toLocaleDateString()}
-                      </p>
-                    </CardContent>
-                    <CardFooter>
-                      <Button variant="ghost" size="sm" className="ml-auto">
-                        View Team <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="No teams found"
-                description="You haven't created or joined any teams yet. Teams allow you to collaborate on workflows with other users."
-                action={
-                  <Button onClick={() => setCreateDialogOpen(true)}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Create Your First Team
-                  </Button>
-                }
-              />
-            )}
-          </div>
-        </main>
+export default function TeamsPage() {
+  return (
+    <div className="container py-10">
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Teams</h1>
+          <p className="text-muted-foreground">Manage your teams and collaborations</p>
+        </div>
       </div>
-    </AuthGate>
+
+      <Tabs defaultValue="my-teams">
+        <TabsList className="mb-8">
+          <TabsTrigger value="my-teams">My Teams</TabsTrigger>
+          <TabsTrigger value="create">Create Team</TabsTrigger>
+        </TabsList>
+        <TabsContent value="my-teams">
+          <Suspense fallback={<div className="text-center p-8">Loading teams...</div>}>
+            <TeamsList />
+          </Suspense>
+        </TabsContent>
+        <TabsContent value="create">
+          <div className="max-w-2xl mx-auto">
+            <CreateTeamForm />
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }

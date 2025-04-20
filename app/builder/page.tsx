@@ -1,20 +1,18 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useCallback, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AuthGate } from "@/components/auth-gate"
-import { BuilderSidebar } from "@/components/builder-sidebar"
-import { CommandInput } from "@/components/command-input"
 import { FlowCanvas } from "@/components/flow-canvas"
 import { SaveWorkflowDialog } from "@/components/save-workflow-dialog"
-import { BlockConfigPanel } from "@/components/block-config-panel"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { generateFlow } from "@/lib/api"
 import { workflowService } from "@/lib/services/workflow-service"
-import { Save, ArrowLeft, Play, Undo, Redo, Copy, Trash2, Loader2 } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { motion, AnimatePresence } from "framer-motion"
+import { Loader2, Save, Play, ArrowLeft } from "lucide-react"
+import { motion } from "framer-motion"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +29,11 @@ import { v4 as uuidv4 } from "uuid"
 
 // Import types from flow-canvas
 import type { Node, Edge } from "@/components/flow-canvas"
-import { cn } from "@/lib/utils"
+import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { type BlockType, getBlockMetadata } from "@/types/workflow"
+import type { CustomBlockDefinition } from "@/types/custom-block"
+import { BuilderSidebar } from "@/components/builder-sidebar"
+import { WorkflowToolbar } from "@/components/workflow-toolbar"
 
 export default function BuilderPage() {
   const [nodes, setNodes] = useState<Node[]>([])
@@ -45,15 +47,22 @@ export default function BuilderPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isExecuting, setIsExecuting] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
-  const [showTooltip, setShowTooltip] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [catalogTab, setCatalogTab] = useState("blocks")
+  const [isGridVisible, setIsGridVisible] = useState(true)
   const { toast } = useToast()
   const router = useRouter()
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  // Remove the hardcoded workflow ID
   const [workflowId, setWorkflowId] = useState<string | undefined>(undefined)
   const supabase = createClient()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const flowRef = useRef<any>(null)
+  const toolbarRef = useRef<any>({
+    canUndo: false,
+    canRedo: false,
+    undo: () => {},
+    redo: () => {},
+  })
 
   useEffect(() => {
     setIsMounted(true)
@@ -223,20 +232,59 @@ export default function BuilderPage() {
     setHasUnsavedChanges(true)
   }, [])
 
-  const handleAddNode = useCallback(
-    (block: any, position?: { x: number; y: number }) => {
+  const handleAddBlock = useCallback(
+    (blockType: BlockType, position?: { x: number; y: number }) => {
+      const defaultPosition = { x: 100, y: 100 }
+      const nodePosition = position || defaultPosition
+
+      // Get block metadata
+      const blockMetadata = getBlockMetadata(blockType)
+
+      const newNode = {
+        id: `${blockType}-${Date.now()}`,
+        type: "custom",
+        position: nodePosition,
+        data: {
+          label: blockMetadata.label,
+          description: blockMetadata.description,
+          blockType: blockType,
+          nodeType: blockMetadata.category,
+          iconName: blockMetadata.icon,
+          isEnabled: true,
+          config: { ...blockMetadata.defaultConfig },
+        },
+      }
+
+      setNodes((nds) => [...nds, newNode])
+      setHasUnsavedChanges(true)
+
+      // Show a success toast
+      toast({
+        title: "Block Added",
+        description: `Added ${blockMetadata.label} block to your workflow`,
+        duration: 2000,
+      })
+    },
+    [toast],
+  )
+
+  // Handle adding a custom block
+  const handleAddCustomBlock = useCallback(
+    (customBlock: CustomBlockDefinition, position?: { x: number; y: number }) => {
       const defaultPosition = { x: 100, y: 100 }
       const nodePosition = position || defaultPosition
 
       const newNode = {
-        id: `${block.id}-${Date.now()}`,
+        id: `custom-${Date.now()}`,
         type: "custom",
         position: nodePosition,
         data: {
-          label: block.name,
-          icon: block.id,
-          blockType: block.id,
-          description: block.description,
+          label: customBlock.name,
+          description: customBlock.description,
+          blockType: BlockType.CUSTOM,
+          customBlockId: customBlock.id,
+          nodeType: customBlock.category,
+          iconName: "custom-block",
           isEnabled: true,
           config: {},
         },
@@ -247,8 +295,8 @@ export default function BuilderPage() {
 
       // Show a success toast
       toast({
-        title: "Block Added",
-        description: `Added ${block.name} block to your workflow`,
+        title: "Custom Block Added",
+        description: `Added ${customBlock.name} to your workflow`,
         duration: 2000,
       })
     },
@@ -339,6 +387,77 @@ export default function BuilderPage() {
     return () => clearTimeout(autoSaveTimeout)
   }, [workflowId, hasUnsavedChanges, nodes, edges, workflowName, workflowDescription, toast])
 
+  // Handle drag start from the catalog
+  const handleDragStart = (event: React.DragEvent, blockType: BlockType, blockData: any) => {
+    // This function is passed to BlockCatalog but the actual drag handling
+    // is done within the BlockCatalog component itself
+    console.log("Drag started:", blockType, blockData)
+  }
+
+  // Toolbar action handlers
+  const handleToolbarAction = {
+    undo: () => {
+      if (toolbarRef.current && toolbarRef.current.undo) {
+        toolbarRef.current.undo()
+      }
+    },
+    redo: () => {
+      if (toolbarRef.current && toolbarRef.current.redo) {
+        toolbarRef.current.redo()
+      }
+    },
+    zoomIn: () => {
+      if (toolbarRef.current && toolbarRef.current.zoomIn) {
+        toolbarRef.current.zoomIn()
+      }
+    },
+    zoomOut: () => {
+      if (toolbarRef.current && toolbarRef.current.zoomOut) {
+        toolbarRef.current.zoomOut()
+      }
+    },
+    fitView: () => {
+      if (toolbarRef.current && toolbarRef.current.fitView) {
+        toolbarRef.current.fitView()
+      }
+    },
+    toggleGrid: () => {
+      if (toolbarRef.current && toolbarRef.current.toggleGrid) {
+        toolbarRef.current.toggleGrid()
+        setIsGridVisible(!isGridVisible)
+      }
+    },
+    save: () => {
+      setIsSaveDialogOpen(true)
+    },
+    execute: handleExecuteWorkflow,
+    delete: () => {
+      if (toolbarRef.current && toolbarRef.current.deleteSelected) {
+        toolbarRef.current.deleteSelected()
+      }
+    },
+    copy: () => {
+      if (toolbarRef.current && toolbarRef.current.duplicateSelected) {
+        toolbarRef.current.duplicateSelected()
+      }
+    },
+    alignHorizontal: (alignment: "left" | "center" | "right") => {
+      if (toolbarRef.current && toolbarRef.current.alignHorizontal) {
+        toolbarRef.current.alignHorizontal(alignment)
+      }
+    },
+    alignVertical: (alignment: "top" | "center" | "bottom") => {
+      if (toolbarRef.current && toolbarRef.current.alignVertical) {
+        toolbarRef.current.alignVertical(alignment)
+      }
+    },
+    reset: () => {
+      if (toolbarRef.current && toolbarRef.current.resetCanvas) {
+        toolbarRef.current.resetCanvas()
+      }
+    },
+  }
+
   if (!isMounted || isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -371,253 +490,91 @@ export default function BuilderPage() {
 
   return (
     <AuthGate>
-      <div className="flex h-screen overflow-hidden">
-        <BuilderSidebar
-          onAddNode={handleAddNode}
-          workflowName={workflowName}
-          workflowDescription={workflowDescription}
-          onWorkflowDetailsChange={handleWorkflowDetailsChange}
-          nodes={nodes}
-        />
-        <motion.main
-          className="relative flex flex-1 flex-col overflow-hidden"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
-        >
-          <motion.div
-            className="flex h-14 items-center justify-between border-b bg-card px-4"
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-          >
-            <div className="flex items-center">
-              <motion.div whileHover={{ x: -2 }} whileTap={{ scale: 0.95 }}>
-                <Button variant="ghost" size="sm" onClick={handleExit}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
-              </motion.div>
-              <motion.div
-                className="ml-4 text-sm font-medium"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-              >
-                {workflowName || "Untitled Workflow"}
-              </motion.div>
-              {hasUnsavedChanges && (
-                <motion.div
-                  className="ml-2 text-xs text-muted-foreground"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                >
-                  (Unsaved changes)
-                </motion.div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <TooltipProvider>
-                <Tooltip open={showTooltip === "undo"} onOpenChange={(open) => setShowTooltip(open ? "undo" : null)}>
-                  <TooltipTrigger asChild>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onMouseEnter={() => setShowTooltip("undo")}
-                        onMouseLeave={() => setShowTooltip(null)}
-                      >
-                        <Undo className="h-4 w-4" />
-                      </Button>
-                    </motion.div>
-                  </TooltipTrigger>
-                  <TooltipContent>Undo (Ctrl+Z)</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <Tooltip open={showTooltip === "redo"} onOpenChange={(open) => setShowTooltip(open ? "redo" : null)}>
-                  <TooltipTrigger asChild>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onMouseEnter={() => setShowTooltip("redo")}
-                        onMouseLeave={() => setShowTooltip(null)}
-                      >
-                        <Redo className="h-4 w-4" />
-                      </Button>
-                    </motion.div>
-                  </TooltipTrigger>
-                  <TooltipContent>Redo (Ctrl+Shift+Z)</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <Tooltip open={showTooltip === "copy"} onOpenChange={(open) => setShowTooltip(open ? "copy" : null)}>
-                  <TooltipTrigger asChild>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onMouseEnter={() => setShowTooltip("copy")}
-                        onMouseLeave={() => setShowTooltip(null)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </motion.div>
-                  </TooltipTrigger>
-                  <TooltipContent>Copy Selected (Ctrl+C)</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <Tooltip
-                  open={showTooltip === "delete"}
-                  onOpenChange={(open) => setShowTooltip(open ? "delete" : null)}
-                >
-                  <TooltipTrigger asChild>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onMouseEnter={() => setShowTooltip("delete")}
-                        onMouseLeave={() => setShowTooltip(null)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </motion.div>
-                  </TooltipTrigger>
-                  <TooltipContent>Delete Selected (Delete)</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <Tooltip
-                  open={showTooltip === "execute"}
-                  onOpenChange={(open) => setShowTooltip(open ? "execute" : null)}
-                >
-                  <TooltipTrigger asChild>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleExecuteWorkflow}
-                        disabled={isExecuting || nodes.length === 0}
-                        className={cn(
-                          "transition-all duration-200",
-                          nodes.length > 0 && !isExecuting && "hover:bg-primary/10 hover:text-primary",
-                        )}
-                        onMouseEnter={() => setShowTooltip("execute")}
-                        onMouseLeave={() => setShowTooltip(null)}
-                      >
-                        {isExecuting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Executing...
-                          </>
-                        ) : (
-                          <>
-                            <Play className="mr-2 h-4 w-4" />
-                            Execute
-                          </>
-                        )}
-                      </Button>
-                    </motion.div>
-                  </TooltipTrigger>
-                  <TooltipContent>Run this workflow</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              {workflowId && (
-                <TooltipProvider>
-                  <Tooltip
-                    open={showTooltip === "delete-workflow"}
-                    onOpenChange={(open) => setShowTooltip(open ? "delete-workflow" : null)}
-                  >
-                    <TooltipTrigger asChild>
-                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsDeleteDialogOpen(true)}
-                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          onMouseEnter={() => setShowTooltip("delete-workflow")}
-                          onMouseLeave={() => setShowTooltip(null)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </Button>
-                      </motion.div>
-                    </TooltipTrigger>
-                    <TooltipContent>Delete this workflow</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <Button
-                  size="sm"
-                  onClick={() => setIsSaveDialogOpen(true)}
-                  className="bg-primary hover:bg-primary/90"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      {workflowId ? "Update Workflow" : "Save Workflow"}
-                    </>
-                  )}
-                </Button>
-              </motion.div>
-            </div>
-          </motion.div>
-          <div className="relative flex flex-1 overflow-hidden">
-            <div className="flex-1 overflow-hidden">
-              <FlowCanvas
-                nodes={nodes}
-                edges={edges}
-                setNodes={setNodes}
-                setEdges={setEdges}
-                onNodeSelect={handleNodeSelect}
-                workflowId={workflowId} // Pass the workflow ID (which might be undefined for new workflows)
-              />
-            </div>
-            <AnimatePresence>
-              {selectedNode && (
-                <motion.div
-                  initial={{ opacity: 0, x: 300 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 300 }}
-                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                >
-                  <BlockConfigPanel
-                    node={selectedNode}
-                    onUpdate={handleNodeUpdate}
-                    onClose={() => setSelectedNode(null)}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
+      <div className="flex flex-col h-screen">
+        <div className="border-b p-4 flex justify-between items-center bg-background">
+          <div className="flex items-center">
+            <Button variant="ghost" size="sm" onClick={handleExit} className="mr-4">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <h1 className="text-xl font-semibold">{workflowName || "Untitled Workflow"}</h1>
+            {hasUnsavedChanges && <span className="ml-2 text-xs text-muted-foreground">(Unsaved changes)</span>}
           </div>
-          <CommandInput onGenerate={handleGenerate} isGenerating={isGenerating} />
-        </motion.main>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsSaveDialogOpen(true)}
+              className="flex items-center gap-1"
+              disabled={isLoading}
+            >
+              <Save className="h-4 w-4 mr-1" />
+              Save
+            </Button>
+            <Button
+              onClick={handleExecuteWorkflow}
+              className="flex items-center gap-1"
+              disabled={isExecuting || nodes.length === 0}
+            >
+              {isExecuting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Executing...
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-1" />
+                  Execute
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        <div className="relative flex-1 overflow-hidden">
+          {/* Toolbar positioned at the top of the canvas */}
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+            <WorkflowToolbar
+              onUndo={handleToolbarAction.undo}
+              onRedo={handleToolbarAction.redo}
+              onZoomIn={handleToolbarAction.zoomIn}
+              onZoomOut={handleToolbarAction.zoomOut}
+              onFitView={handleToolbarAction.fitView}
+              onToggleGrid={handleToolbarAction.toggleGrid}
+              onSave={handleToolbarAction.save}
+              onExecute={handleToolbarAction.execute}
+              onDelete={handleToolbarAction.delete}
+              onCopy={handleToolbarAction.copy}
+              onAlignHorizontal={handleToolbarAction.alignHorizontal}
+              onAlignVertical={handleToolbarAction.alignVertical}
+              onReset={handleToolbarAction.reset}
+              canUndo={toolbarRef.current?.canUndo || false}
+              canRedo={toolbarRef.current?.canRedo || false}
+              isGridVisible={isGridVisible}
+              isExecuting={isExecuting}
+            />
+          </div>
+
+          <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
+              <BuilderSidebar
+                onAddNode={handleAddBlock}
+                workflowName={workflowName}
+                workflowDescription={workflowDescription}
+                onWorkflowDetailsChange={handleWorkflowDetailsChange}
+                nodes={nodes}
+              />
+            </ResizablePanel>
+            <ResizablePanel defaultSize={80}>
+              <FlowCanvas
+                initialNodes={nodes}
+                initialEdges={edges}
+                onNodesChange={setNodes}
+                onEdgesChange={setEdges}
+                toolbarRef={toolbarRef}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
       </div>
       <SaveWorkflowDialog
         open={isSaveDialogOpen}
