@@ -331,6 +331,7 @@ export default function BuilderPage() {
   );
 
   const handleExecuteWorkflow = async () => {
+    // Prevent executing an empty workflow
     if (nodes.length === 0) {
       toast({
         title: "Cannot execute",
@@ -342,8 +343,29 @@ export default function BuilderPage() {
 
     setIsExecuting(true);
     try {
-      if (!workflowId) throw new Error("Workflow ID not set");
-      const execId = await executionService.startExecution(workflowId);
+      // Auto-save workflow if not yet persisted
+      let execWorkflowId = workflowId;
+      if (!execWorkflowId) {
+        const saved = await workflowService.createWorkflow({
+          name: workflowName,
+          description: workflowDescription,
+          nodes,
+          edges,
+          is_public: false,
+          tags: [],
+        });
+        execWorkflowId = saved.id;
+        setWorkflowId(execWorkflowId);
+      }
+
+      // Enqueue execution via API for background processing
+      const response = await fetch("/api/execute-workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflowId: execWorkflowId }),
+      });
+      if (!response.ok) throw new Error("Failed to enqueue execution");
+      const { executionId: execId } = await response.json();
       toast({
         title: "Execution started",
         description: `Execution ID: ${execId}`,

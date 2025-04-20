@@ -1,4 +1,5 @@
 import amqp from "amqplib";
+import { config } from "@/lib/config";
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL || "amqp://guest:guest@localhost:5672";
 const QUEUE_NAME = "execution_queue";
@@ -10,7 +11,7 @@ export async function initExecutionQueue(): Promise<amqp.Channel> {
   const conn = await amqp.connect(RABBITMQ_URL);
   channel = await conn.createChannel();
   await channel.assertQueue(QUEUE_NAME, { durable: true });
-  channel.prefetch(1);
+  channel.prefetch(config.concurrency.prefetch);
   return channel;
 }
 

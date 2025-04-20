@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,6 +20,36 @@ export function ExecutionLogsList({ logs: initialLogs, workflowId }: ExecutionLo
   const [isLoading, setIsLoading] = useState(false)
   const [expandedLog, setExpandedLog] = useState<string | null>(null)
   const [nodeExecutions, setNodeExecutions] = useState<Record<string, any[]>>({})
+
+  // Real-time subscription for workflow_executions
+  useEffect(() => {
+    const execSub = supabase
+      .channel('realtime-workflow-execs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workflow_executions', filter: `workflow_id=eq.${workflowId}` }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setLogs((prev) => [payload.new, ...prev])
+        } else if (payload.eventType === 'UPDATE') {
+          setLogs((prev) => prev.map((l) => (l.id === payload.new.id ? payload.new : l)))
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(execSub) }
+  }, [workflowId])
+
+  // Real-time subscription for node_executions of expanded log
+  useEffect(() => {
+    if (!expandedLog) return
+    const nodeSub = supabase
+      .channel('realtime-node-execs')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'node_executions', filter: `execution_id=eq.${expandedLog}` }, (payload) => {
+        setNodeExecutions((prev) => ({
+          ...prev,
+          [payload.new.execution_id]: [...(prev[payload.new.execution_id] || []), payload.new],
+        }))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(nodeSub) }
+  }, [expandedLog])
 
   const fetchLogs = async () => {
     try {

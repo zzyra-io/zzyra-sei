@@ -74,9 +74,7 @@ export class ExecutionService {
         updates.completed_at = new Date().toISOString();
       }
 
-      if (result) {
-        updates.result = result;
-      }
+      // Omit 'result' to avoid schema mismatch
 
       const { error } = await this.supabase
         .from("workflow_executions")

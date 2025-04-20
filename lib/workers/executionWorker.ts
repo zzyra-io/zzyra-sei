@@ -5,6 +5,24 @@ import { BlockType, getBlockType } from "@/types/workflow";
 import { customBlockService } from "@/lib/services/custom-block-service";
 import { executeCustomBlockLogic } from "@/types/custom-block";
 import nodemailer from "nodemailer";
+import pRetry from "p-retry";
+import { config } from "@/lib/config";
+import { Counter, Histogram } from "prom-client";
+import 'dotenv/config';
+import { createServiceClient } from "@/lib/supabase/serviceClient";
+import { v4 as uuidv4 } from "uuid";
+
+// Metrics for node execution
+const nodeExecutionDuration = new Histogram({
+  name: "node_execution_duration_seconds",
+  help: "Duration of node execution in seconds",
+  labelNames: ["blockType"],
+});
+const nodeExecutionFailures = new Counter({
+  name: "node_execution_failures_total",
+  help: "Total number of failed node executions",
+  labelNames: ["blockType"],
+});
 
 async function startWorker() {
   const channel = await initExecutionQueue();
@@ -25,9 +43,22 @@ async function startWorker() {
         const workflow = await import("@/lib/services/workflow-service").then(
           (mod) => mod.workflowService.getWorkflow(workflowId)
         );
+        const supabaseNode = createServiceClient();
 
         // Execute each node sequentially
         for (const node of workflow.nodes) {
+          // Create node execution record
+          const nodeExecId = uuidv4();
+          await supabaseNode.from("node_executions").insert({
+            id: nodeExecId,
+            execution_id: executionId,
+            node_id: node.id,
+            status: "running",
+            started_at: new Date().toISOString(),
+          });
+
+          const blockType = getBlockType(node.data);
+          const endTimer = nodeExecutionDuration.startTimer({ blockType });
           try {
             // Log node start
             await executionService.logExecutionEvent(
@@ -37,9 +68,19 @@ async function startWorker() {
               `Node ${node.id} execution started`
             );
 
-            // Execute node
-            const output = await executeNode(node);
+            // Execute with retries
+            const output = await pRetry(
+              () => executeNode(node),
+              {
+                retries: config.retry.attempts,
+                factor: config.retry.factor,
+                minTimeout: config.retry.minTimeout,
+              }
+            );
+            endTimer();
 
+            // Update node execution success
+            await supabaseNode.from("node_executions").update({ status: "completed", completed_at: new Date().toISOString(), output_data: output }).eq("id", nodeExecId);
             // Log success
             await executionService.logExecutionEvent(
               executionId,
@@ -49,6 +90,10 @@ async function startWorker() {
               output
             );
           } catch (nodeError) {
+            endTimer();
+            nodeExecutionFailures.inc({ blockType });
+            // Update node execution failure
+            await supabaseNode.from("node_executions").update({ status: "failed", completed_at: new Date().toISOString(), error_data: (nodeError as Error).message }).eq("id", nodeExecId);
             // Log node error and stop execution
             await executionService.logExecutionEvent(
               executionId,
@@ -80,7 +125,7 @@ async function startWorker() {
 }
 
 async function executeNode(node: any): Promise<any> {
-  const supabase = createClient();
+  const supabase = createServiceClient();
   const blockType = getBlockType(node.data);
   const config = node.data;
 
@@ -112,6 +157,9 @@ async function executeNode(node: any): Promise<any> {
       return { data: result.data };
     }
     case BlockType.WEBHOOK: {
+      if (!config.url) {
+        throw new Error(`Webhook URL is undefined for node ${node.id}`);
+      }
       const res = await globalThis.fetch(config.url, { method: config.method, headers: config.headers, body: config.body });
       const data = await res.json();
       return { data };
