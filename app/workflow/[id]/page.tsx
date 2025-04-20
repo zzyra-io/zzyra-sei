@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { use, useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { AuthGate } from "@/components/auth-gate";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ExecutionLogsList } from "@/components/execution-logs-list";
@@ -18,20 +18,21 @@ import { useToast } from "@/components/ui/use-toast";
 import { workflowService } from "@/lib/services/workflow-service";
 import { executionService } from "@/lib/services/execution-service";
 import type { Workflow } from "@/lib/supabase/schema";
-import type { ExecutionLog } from "@/lib/services/execution-service";
+import type { ExecutionResult } from "@/lib/services/execution-service";
 import { ArrowLeft, Play, Settings, Loader2 } from "lucide-react";
 
-interface WorkflowDetailPageProps {
-  params: {
-    id: string;
-  };
-}
+export default function WorkflowDetailPage() {
+  // Grab route params client-side
+  const paramsClient = useParams();
+  const id = Array.isArray(paramsClient?.id)
+    ? paramsClient.id[0]
+    : paramsClient?.id;
+  if (!id) {
+    return null; // or show a loader
+  }
 
-export default function WorkflowDetailPage({
-  params,
-}: WorkflowDetailPageProps) {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
-  const [executionLogs, setExecutionLogs] = useState<ExecutionLog[]>([]);
+  const [executionLogs, setExecutionLogs] = useState<ExecutionResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExecuting, setIsExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -43,12 +44,12 @@ export default function WorkflowDetailPage({
       try {
         setIsLoading(true);
         // First fetch the workflow data
-        const workflowData = await workflowService.getWorkflow(params.id);
+        const workflowData = await workflowService.getWorkflow(id);
         setWorkflow(workflowData);
 
         // Then try to fetch execution logs, but don't fail if they can't be fetched
         try {
-          const logsData = await executionService.getExecutionLogs(params.id);
+          const logsData = await executionService.getWorkflowExecutions(id);
           setExecutionLogs(logsData);
         } catch (logsError) {
           console.error("Error fetching execution logs:", logsError);
@@ -75,12 +76,12 @@ export default function WorkflowDetailPage({
     };
 
     fetchData();
-  }, [params.id, toast, router]);
+  }, [id, toast, router]);
 
   const handleExecute = async () => {
     try {
       setIsExecuting(true);
-      const executionLog = await executionService.executeWorkflow(params.id);
+      const executionLog = await executionService.executeWorkflow(id);
 
       // Update the execution logs list
       setExecutionLogs([executionLog, ...executionLogs]);
@@ -107,7 +108,7 @@ export default function WorkflowDetailPage({
   };
 
   const handleEdit = () => {
-    router.push(`/builder?id=${params.id}`);
+    router.push(`/builder?id=${id}`);
   };
 
   if (isLoading) {
@@ -306,7 +307,7 @@ export default function WorkflowDetailPage({
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ExecutionLogsList logs={executionLogs} />
+                    <ExecutionLogsList logs={executionLogs} workflowId={id} />
                   </CardContent>
                 </Card>
               </TabsContent>

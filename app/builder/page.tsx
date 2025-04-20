@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { generateFlow } from "@/lib/api";
 import { workflowService } from "@/lib/services/workflow-service";
+import { executionService } from "@/lib/services/execution-service";
 import { Loader2, Save, Play, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -341,11 +342,11 @@ export default function BuilderPage() {
 
     setIsExecuting(true);
     try {
-      // Mock execution for demo
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (!workflowId) throw new Error("Workflow ID not set");
+      const execId = await executionService.startExecution(workflowId);
       toast({
-        title: "Workflow executed",
-        description: "Your workflow has been executed successfully.",
+        title: "Execution started",
+        description: `Execution ID: ${execId}`,
       });
     } catch (error) {
       toast({
