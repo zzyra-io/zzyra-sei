@@ -11,9 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { generateFlow } from "@/lib/api";
 import { workflowService } from "@/lib/services/workflow-service";
-import { executionService } from "@/lib/services/execution-service";
 import { Loader2, Save, Play, ArrowLeft } from "lucide-react";
-import { motion } from "framer-motion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,39 +49,63 @@ export default function BuilderPage() {
   const [workflowDescription, setWorkflowDescription] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [catalogTab, setCatalogTab] = useState("blocks");
   const [isGridVisible, setIsGridVisible] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const { toast } = useToast();
   const router = useRouter();
-  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [workflowId, setWorkflowId] = useState<string | undefined>(undefined);
-  const supabase = createClient();
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const flowRef = useRef<any>(null);
-  const toolbarRef = useRef<any>({
-    canUndo: false,
-    canRedo: false,
-    undo: () => {},
-    redo: () => {},
-  });
+  const searchParams = useSearchParams();
+
+  if (!searchParams) {
+    router.replace("/builder");
+    return (
+      <AuthGate>
+        <div className='flex min-h-screen items-center justify-center'>
+          Redirecting...
+        </div>
+      </AuthGate>
+    );
+  }
+
+  const initialId = searchParams.get("id") || undefined;
+  const [workflowId, setWorkflowId] = useState<string | undefined>(initialId);
 
   useEffect(() => {
-    setIsMounted(true);
-    // Simulate loading for a smoother experience
-    loadingTimeoutRef.current = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+    if (initialId) {
+      (async () => {
+        setIsLoading(true);
+        try {
+          const workflow = await workflowService.getWorkflow(initialId);
+          if (workflow) {
+            setWorkflowId(workflow.id);
+            setWorkflowName(workflow.name);
+            setWorkflowDescription(workflow.description || "");
+            setNodes(workflow.nodes || []);
+            setEdges(workflow.edges || []);
+            setHasUnsavedChanges(false);
+            toast({
+              title: "Workflow loaded",
+              description: "Your workflow has been loaded successfully.",
+            });
+          }
+        } catch (error) {
+          console.error("Error loading workflow:", error);
+          toast({
+            title: "Load failed",
+            description: "Failed to load workflow. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+    }
+  }, [initialId]);
 
-    return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
-    };
-  }, []);
+  useEffect(() => {
+    // No-op: initial load handled above
+  }, [workflowId]);
 
-  // Track changes to set unsaved changes flag
   useEffect(() => {
     if (nodes.length > 0 || edges.length > 0) {
       setHasUnsavedChanges(true);
@@ -121,7 +143,6 @@ export default function BuilderPage() {
     try {
       setIsLoading(true);
 
-      // If we have a workflowId, update the existing workflow
       if (workflowId) {
         const updatedWorkflow = await workflowService.updateWorkflow(
           workflowId,
@@ -140,7 +161,6 @@ export default function BuilderPage() {
           description: "Your workflow has been updated successfully.",
         });
       } else {
-        // Create a new workflow
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
@@ -150,10 +170,8 @@ export default function BuilderPage() {
           tags,
         });
 
-        // Set the workflow ID after saving
         if (savedWorkflow && savedWorkflow.id) {
           setWorkflowId(savedWorkflow.id);
-          // Update the URL to include the workflow ID
           router.replace(`/builder?id=${savedWorkflow.id}`);
         }
 
@@ -177,39 +195,6 @@ export default function BuilderPage() {
     }
   };
 
-  // Add a function to load an existing workflow
-  const loadWorkflow = async (id: string) => {
-    try {
-      setIsLoading(true);
-      const workflow = await workflowService.getWorkflow(id);
-
-      if (workflow) {
-        setWorkflowId(workflow.id);
-        setWorkflowName(workflow.name);
-        setWorkflowDescription(workflow.description || "");
-        setNodes(workflow.nodes || []);
-        setEdges(workflow.edges || []);
-
-        toast({
-          title: "Workflow loaded",
-          description: "Your workflow has been loaded successfully.",
-        });
-
-        setHasUnsavedChanges(false);
-      }
-    } catch (error) {
-      console.error("Error loading workflow:", error);
-      toast({
-        title: "Load failed",
-        description: "Failed to load workflow. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Add a function to delete a workflow
   const handleDeleteWorkflow = async () => {
     if (!workflowId) return;
 
@@ -251,7 +236,6 @@ export default function BuilderPage() {
       const defaultPosition = { x: 100, y: 100 };
       const nodePosition = position || defaultPosition;
 
-      // Get block metadata
       const blockMetadata = getBlockMetadata(blockType);
 
       const newNode = {
@@ -272,7 +256,6 @@ export default function BuilderPage() {
       setNodes((nds) => [...nds, newNode]);
       setHasUnsavedChanges(true);
 
-      // Show a success toast
       toast({
         title: "Block Added",
         description: `Added ${blockMetadata.label} block to your workflow`,
@@ -282,7 +265,6 @@ export default function BuilderPage() {
     [toast]
   );
 
-  // Handle adding a custom block
   const handleAddCustomBlock = useCallback(
     (
       customBlock: CustomBlockDefinition,
@@ -310,7 +292,6 @@ export default function BuilderPage() {
       setNodes((nds) => [...nds, newNode]);
       setHasUnsavedChanges(true);
 
-      // Show a success toast
       toast({
         title: "Custom Block Added",
         description: `Added ${customBlock.name} to your workflow`,
@@ -331,7 +312,6 @@ export default function BuilderPage() {
   );
 
   const handleExecuteWorkflow = async () => {
-    // Prevent executing an empty workflow
     if (nodes.length === 0) {
       toast({
         title: "Cannot execute",
@@ -343,7 +323,6 @@ export default function BuilderPage() {
 
     setIsExecuting(true);
     try {
-      // Auto-save workflow if not yet persisted
       let execWorkflowId = workflowId;
       if (!execWorkflowId) {
         const saved = await workflowService.createWorkflow({
@@ -358,7 +337,6 @@ export default function BuilderPage() {
         setWorkflowId(execWorkflowId);
       }
 
-      // Enqueue execution via API for background processing
       const response = await fetch("/api/execute-workflow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -389,18 +367,15 @@ export default function BuilderPage() {
     }
   };
 
-  // Check for workflow ID in URL params and load the workflow if it exists
-  const searchParams = useSearchParams();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const flowRef = useRef<any>(null);
+  const toolbarRef = useRef<any>({
+    canUndo: false,
+    canRedo: false,
+    undo: () => {},
+    redo: () => {},
+  });
 
-  useEffect(() => {
-    const id = searchParams.get("id");
-    if (id) {
-      setWorkflowId(id);
-      loadWorkflow(id);
-    }
-  }, [searchParams]);
-
-  // Add a useEffect to handle auto-saving
   useEffect(() => {
     if (!workflowId || !hasUnsavedChanges || nodes.length === 0) return;
 
@@ -425,7 +400,7 @@ export default function BuilderPage() {
       } catch (error) {
         console.error("Auto-save error:", error);
       }
-    }, 30000); // Auto-save after 30 seconds of inactivity
+    }, 30000);
 
     return () => clearTimeout(autoSaveTimeout);
   }, [
@@ -438,18 +413,14 @@ export default function BuilderPage() {
     toast,
   ]);
 
-  // Handle drag start from the catalog
   const handleDragStart = (
     event: React.DragEvent,
     blockType: BlockType,
     blockData: any
   ) => {
-    // This function is passed to BlockCatalog but the actual drag handling
-    // is done within the BlockCatalog component itself
     console.log("Drag started:", blockType, blockData);
   };
 
-  // Toolbar action handlers
   const handleToolbarAction = {
     undo: () => {
       if (toolbarRef.current && toolbarRef.current.undo) {
@@ -513,135 +484,108 @@ export default function BuilderPage() {
     },
   };
 
-  if (!isMounted || isLoading) {
-    return (
-      <div className='flex h-screen items-center justify-center bg-background'>
-        <motion.div
-          className='text-center'
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}>
-          <motion.div
-            animate={{
-              scale: [1, 1.05, 1],
-              rotate: [0, 2, -2, 0],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Number.POSITIVE_INFINITY,
-              repeatType: "reverse",
-            }}
-            className='mb-6 flex justify-center'>
-            <Loader2 className='h-12 w-12 text-primary animate-spin' />
-          </motion.div>
-          <h2 className='text-2xl font-semibold mb-2'>
-            Loading Workflow Builder
-          </h2>
-          <p className='text-muted-foreground'>
-            Please wait while we initialize your canvas
-          </p>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <AuthGate>
-      <div className='flex flex-col h-screen'>
-        <div className='border-b p-4 flex justify-between items-center bg-background'>
-          <div className='flex items-center'>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={handleExit}
-              className='mr-4'>
-              <ArrowLeft className='mr-2 h-4 w-4' />
-              Back
-            </Button>
-            <h1 className='text-xl font-semibold'>
-              {workflowName || "Untitled Workflow"}
-            </h1>
-            {hasUnsavedChanges && (
-              <span className='ml-2 text-xs text-muted-foreground'>
-                (Unsaved changes)
-              </span>
-            )}
-          </div>
-          <div className='flex gap-2'>
-            <Button
-              variant='outline'
-              onClick={() => setIsSaveDialogOpen(true)}
-              className='flex items-center gap-1'
-              disabled={isLoading}>
-              <Save className='h-4 w-4 mr-1' />
-              Save
-            </Button>
-            <Button
-              onClick={handleExecuteWorkflow}
-              className='flex items-center gap-1'
-              disabled={isExecuting || nodes.length === 0}>
-              {isExecuting ? (
-                <>
-                  <Loader2 className='h-4 w-4 mr-1 animate-spin' />
-                  Executing...
-                </>
-              ) : (
-                <>
-                  <Play className='h-4 w-4 mr-1' />
-                  Execute
-                </>
+      {isLoading ? (
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+      ) : (
+        <div className='flex flex-col h-screen'>
+          <div className='border-b p-4 flex justify-between items-center bg-background'>
+            <div className='flex items-center'>
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={handleExit}
+                className='mr-4'>
+                <ArrowLeft className='mr-2 h-4 w-4' />
+                Back
+              </Button>
+              <h1 className='text-xl font-semibold'>
+                {workflowName || "Untitled Workflow"}
+              </h1>
+              {hasUnsavedChanges && (
+                <span className='ml-2 text-xs text-muted-foreground'>
+                  (Unsaved changes)
+                </span>
               )}
-            </Button>
+            </div>
+            <div className='flex gap-2'>
+              <Button
+                variant='outline'
+                onClick={() => setIsSaveDialogOpen(true)}
+                className='flex items-center gap-1'
+                disabled={isLoading}>
+                <Save className='h-4 w-4 mr-1' />
+                Save
+              </Button>
+              <Button
+                onClick={handleExecuteWorkflow}
+                className='flex items-center gap-1'
+                disabled={isExecuting || nodes.length === 0}>
+                {isExecuting ? (
+                  <>
+                    <Loader2 className='h-4 w-4 mr-1 animate-spin' />
+                    Executing...
+                  </>
+                ) : (
+                  <>
+                    <Play className='h-4 w-4 mr-1' />
+                    Execute
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <div className='relative flex-1 overflow-hidden'>
+            <div className='absolute top-4 left-1/2 transform -translate-x-1/2 z-10'>
+              <WorkflowToolbar
+                onUndo={handleToolbarAction.undo}
+                onRedo={handleToolbarAction.redo}
+                onZoomIn={handleToolbarAction.zoomIn}
+                onZoomOut={handleToolbarAction.zoomOut}
+                onFitView={handleToolbarAction.fitView}
+                onToggleGrid={handleToolbarAction.toggleGrid}
+                onSave={handleToolbarAction.save}
+                onExecute={handleToolbarAction.execute}
+                onDelete={handleToolbarAction.delete}
+                onCopy={handleToolbarAction.copy}
+                onAlignHorizontal={handleToolbarAction.alignHorizontal}
+                onAlignVertical={handleToolbarAction.alignVertical}
+                onReset={handleToolbarAction.reset}
+                canUndo={toolbarRef.current?.canUndo || false}
+                canRedo={toolbarRef.current?.canRedo || false}
+                isGridVisible={isGridVisible}
+                isExecuting={isExecuting}
+              />
+            </div>
+
+            <ResizablePanelGroup direction='horizontal'>
+              <ResizablePanel defaultSize={25} minSize={15} maxSize={30}>
+                <BuilderSidebar
+                  onAddNode={handleAddBlock}
+                  workflowName={workflowName}
+                  workflowDescription={workflowDescription}
+                  onWorkflowDetailsChange={handleWorkflowDetailsChange}
+                  nodes={nodes}
+                />
+              </ResizablePanel>
+              <ResizableHandle />
+              <ResizablePanel defaultSize={80}>
+                <FlowCanvas
+                  initialNodes={nodes}
+                  initialEdges={edges}
+                  onNodesChange={setNodes}
+                  onEdgesChange={setEdges}
+                  toolbarRef={toolbarRef}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
           </div>
         </div>
-
-        <div className='relative flex-1 overflow-hidden'>
-          {/* Toolbar positioned at the top of the canvas */}
-          <div className='absolute top-4 left-1/2 transform -translate-x-1/2 z-10'>
-            <WorkflowToolbar
-              onUndo={handleToolbarAction.undo}
-              onRedo={handleToolbarAction.redo}
-              onZoomIn={handleToolbarAction.zoomIn}
-              onZoomOut={handleToolbarAction.zoomOut}
-              onFitView={handleToolbarAction.fitView}
-              onToggleGrid={handleToolbarAction.toggleGrid}
-              onSave={handleToolbarAction.save}
-              onExecute={handleToolbarAction.execute}
-              onDelete={handleToolbarAction.delete}
-              onCopy={handleToolbarAction.copy}
-              onAlignHorizontal={handleToolbarAction.alignHorizontal}
-              onAlignVertical={handleToolbarAction.alignVertical}
-              onReset={handleToolbarAction.reset}
-              canUndo={toolbarRef.current?.canUndo || false}
-              canRedo={toolbarRef.current?.canRedo || false}
-              isGridVisible={isGridVisible}
-              isExecuting={isExecuting}
-            />
-          </div>
-
-          <ResizablePanelGroup direction='horizontal'>
-            <ResizablePanel defaultSize={25} minSize={15} maxSize={30}>
-              <BuilderSidebar
-                onAddNode={handleAddBlock}
-                workflowName={workflowName}
-                workflowDescription={workflowDescription}
-                onWorkflowDetailsChange={handleWorkflowDetailsChange}
-                nodes={nodes}
-              />
-            </ResizablePanel>
-            <ResizableHandle />
-            <ResizablePanel defaultSize={80}>
-              <FlowCanvas
-                initialNodes={nodes}
-                initialEdges={edges}
-                onNodesChange={setNodes}
-                onEdgesChange={setEdges}
-                toolbarRef={toolbarRef}
-              />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </div>
-      </div>
+      )}
       <SaveWorkflowDialog
         open={isSaveDialogOpen}
         onOpenChange={setIsSaveDialogOpen}

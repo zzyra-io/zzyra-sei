@@ -144,17 +144,13 @@ function FlowContent({
       setSelectedNode(null)
       setShowConfigPanel(false)
 
-      if (onNodesChange) {
-        onNodesChange(nodes.filter((node) => node.id !== selectedNode.id))
-      }
-
       toast({
         title: "Node Deleted",
         description: "Selected node has been removed",
         duration: 1500,
       })
     }
-  }, [selectedNode, nodes, edges, onNodesChange, setNodes, addToHistory, toast])
+  }, [selectedNode, nodes, edges, setNodes, addToHistory, toast])
 
   // Handle node duplication
   const handleDuplicateSelectedNode = useCallback(() => {
@@ -174,17 +170,13 @@ function FlowContent({
         return newNodes
       })
 
-      if (onNodesChange) {
-        onNodesChange([...nodes, newNode])
-      }
-
       toast({
         title: "Node Duplicated",
         description: "Selected node has been duplicated",
         duration: 1500,
       })
     }
-  }, [selectedNode, nodes, edges, onNodesChange, setNodes, addToHistory, toast])
+  }, [selectedNode, nodes, edges, setNodes, addToHistory, toast])
 
   // Handle node alignment
   const handleAlignHorizontal = useCallback(
@@ -905,6 +897,14 @@ function FlowContent({
     flowActions.resetCanvas,
   ])
 
+  // Sync to parent after render to avoid setState during render
+  useEffect(() => {
+    if (onNodesChange) onNodesChange(nodes)
+  }, [nodes, onNodesChange])
+  useEffect(() => {
+    if (onEdgesChange) onEdgesChange(edges)
+  }, [edges, onEdgesChange])
+
   return (
     <div className="flex h-full">
       <div ref={reactFlowWrapper} className="flex-1 h-full" onDrop={onDrop} onDragOver={onDragOver}>
@@ -925,7 +925,6 @@ function FlowContent({
                 addToHistory(updatedNodes, edges)
               }
 
-              if (onNodesChange) onNodesChange(updatedNodes)
               return updatedNodes
             })
           }}
@@ -940,7 +939,6 @@ function FlowContent({
                 addToHistory(nodes, updatedEdges)
               }
 
-              if (onEdgesChange) onEdgesChange(updatedEdges)
               return updatedEdges
             })
           }}
