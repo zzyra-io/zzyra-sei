@@ -548,7 +548,7 @@ export default function BuilderPage() {
           <div className='flex gap-2'>
             <Button
               variant='outline'
-              onClick={() => setIsSaveDialogOpen(Boolean(!workflowId))}
+              onClick={() => setIsSaveDialogOpen(true)}
               className='flex items-center gap-1'
               disabled={isLoading}>
               <Save className='h-4 w-4 mr-1' />
