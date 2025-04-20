@@ -29,7 +29,11 @@ import { v4 as uuidv4 } from "uuid";
 
 // Import types from flow-canvas
 import type { Node, Edge } from "@/components/flow-canvas";
-import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { type BlockType, getBlockMetadata } from "@/types/workflow";
 import type { CustomBlockDefinition } from "@/types/custom-block";
 import { BuilderSidebar } from "@/components/builder-sidebar";
@@ -602,6 +606,7 @@ export default function BuilderPage() {
                 nodes={nodes}
               />
             </ResizablePanel>
+            <ResizableHandle />
             <ResizablePanel defaultSize={80}>
               <FlowCanvas
                 initialNodes={nodes}

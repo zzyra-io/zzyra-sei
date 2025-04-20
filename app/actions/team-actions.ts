@@ -1,23 +1,23 @@
-"use server"
+"use server";
 
-import { createClient } from "@/lib/supabase/server"
-import { revalidatePath } from "next/cache"
+import { createClient } from "@/lib/supabase/client";
+import { revalidatePath } from "next/cache";
 
 export async function createTeam(formData: FormData) {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser();
   if (!user) {
-    return { error: "Not authenticated" }
+    return { error: "Not authenticated" };
   }
 
-  const name = formData.get("name") as string
-  const description = formData.get("description") as string
+  const name = formData.get("name") as string;
+  const description = formData.get("description") as string;
 
   if (!name) {
-    return { error: "Team name is required" }
+    return { error: "Team name is required" };
   }
 
   try {
@@ -30,10 +30,10 @@ export async function createTeam(formData: FormData) {
         created_by: user.id,
       })
       .select()
-      .single()
+      .single();
 
     if (teamError) {
-      return { error: teamError.message }
+      return { error: teamError.message };
     }
 
     // Add the creator as an owner
@@ -41,80 +41,82 @@ export async function createTeam(formData: FormData) {
       team_id: team.id,
       user_id: user.id,
       role: "owner",
-    })
+    });
 
     if (memberError) {
       // Rollback by deleting the team
-      await supabase.from("teams").delete().eq("id", team.id)
-      return { error: memberError.message }
+      await supabase.from("teams").delete().eq("id", team.id);
+      return { error: memberError.message };
     }
 
-    revalidatePath("/teams")
-    return { success: true, team }
+    revalidatePath("/teams");
+    return { success: true, team };
   } catch (error: any) {
-    return { error: error.message }
+    return { error: error.message };
   }
 }
 
 export async function getTeams() {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser();
   if (!user) {
-    return { teams: [], error: "Not authenticated" }
+    return { teams: [], error: "Not authenticated" };
   }
 
   try {
     const { data: teamMembers, error: memberError } = await supabase
       .from("team_members")
       .select("team_id, role")
-      .eq("user_id", user.id)
+      .eq("user_id", user.id);
 
     if (memberError) {
-      return { teams: [], error: memberError.message }
+      return { teams: [], error: memberError.message };
     }
 
     if (!teamMembers.length) {
-      return { teams: [], error: null }
+      return { teams: [], error: null };
     }
 
-    const teamIds = teamMembers.map((member) => member.team_id)
+    const teamIds = teamMembers.map((member) => member.team_id);
 
     const { data: teams, error: teamsError } = await supabase
       .from("teams")
       .select("*")
       .in("id", teamIds)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: false });
 
     if (teamsError) {
-      return { teams: [], error: teamsError.message }
+      return { teams: [], error: teamsError.message };
     }
 
     // Combine teams with role information
     const teamsWithRoles = teams.map((team) => {
-      const membership = teamMembers.find((member) => member.team_id === team.id)
+      const membership = teamMembers.find(
+        (member) => member.team_id === team.id
+      );
       return {
         ...team,
         role: membership?.role || "member",
-      }
-    })
+      };
+    });
 
-    return { teams: teamsWithRoles, error: null }
+    return { teams: teamsWithRoles, error: null };
   } catch (error: any) {
-    return { teams: [], error: error.message }
+    return { teams: [], error: error.message };
   }
 }
 
 export async function deleteTeam(teamId: string) {
-  const supabase = createClient()
+  const supabase = createClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser();
   if (!user) {
-    return { error: "Not authenticated" }
+    return { error: "Not authenticated" };
   }
 
   try {
@@ -124,26 +126,26 @@ export async function deleteTeam(teamId: string) {
       .select("role")
       .eq("team_id", teamId)
       .eq("user_id", user.id)
-      .single()
+      .single();
 
     if (membershipError || !membership) {
-      return { error: "You don't have permission to delete this team" }
+      return { error: "You don't have permission to delete this team" };
     }
 
     if (membership.role !== "owner") {
-      return { error: "Only team owners can delete teams" }
+      return { error: "Only team owners can delete teams" };
     }
 
     // Delete the team (cascade will handle team_members)
-    const { error } = await supabase.from("teams").delete().eq("id", teamId)
+    const { error } = await supabase.from("teams").delete().eq("id", teamId);
 
     if (error) {
-      return { error: error.message }
+      return { error: error.message };
     }
 
-    revalidatePath("/teams")
-    return { success: true }
+    revalidatePath("/teams");
+    return { success: true };
   } catch (error: any) {
-    return { error: error.message }
+    return { error: error.message };
   }
 }
