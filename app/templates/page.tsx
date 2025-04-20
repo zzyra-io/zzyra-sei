@@ -20,7 +20,6 @@ export default function TemplatesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [databaseError, setDatabaseError] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -34,20 +33,11 @@ export default function TemplatesPage() {
         ]);
         setTemplates(templatesData);
         setCategories(categoriesData);
-
-        // If both arrays are empty, it might indicate the table doesn't exist
-        if (templatesData.length === 0 && categoriesData.length === 0) {
-          setDatabaseError(true);
-        } else {
-          setDatabaseError(false);
-        }
       } catch (error) {
         console.error("Error fetching templates:", error);
-        setDatabaseError(true);
         toast({
           title: "Error fetching templates",
-          description:
-            "Failed to load workflow templates. The database might not be set up correctly.",
+          description: "Failed to load workflow templates.",
           variant: "destructive",
         });
       } finally {
@@ -83,7 +73,7 @@ export default function TemplatesPage() {
         title: "Template applied",
         description: "Workflow created successfully from template.",
       });
-      router.push(`/builder/${workflow.id}`);
+      router.push(`/builder?id=${workflow.id}`);
     } catch (error) {
       toast({
         title: "Error applying template",
@@ -119,19 +109,6 @@ export default function TemplatesPage() {
                 </div>
               </div>
             </div>
-
-            {databaseError && (
-              <div className='mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400'>
-                <div className='flex items-center'>
-                  <AlertTriangle className='mr-2 h-5 w-5' />
-                  <h3 className='font-medium'>Database Setup Required</h3>
-                </div>
-                <p className='mt-2 text-sm'>
-                  The workflow templates table doesn't exist yet. Please set up
-                  the database using the "Database Setup" button above.
-                </p>
-              </div>
-            )}
 
             <Tabs
               defaultValue='all'
