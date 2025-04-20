@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { workflowService } from "@/lib/services/workflow-service";
 import type { WorkflowSummary } from "@/lib/supabase/schema";
+import { Workflow } from "@/lib/supabase/schema";
 import {
   PlusCircle,
   Search,
@@ -48,7 +49,7 @@ export default function DashboardPage() {
   const fetchWorkflows = async () => {
     setIsLoading(true);
     try {
-      const data = await workflowService.getUserWorkflows();
+      const data = await workflowService.getWorkflows();
       setWorkflows(data);
       setTableExists(true);
     } catch (error) {
