@@ -1,14 +1,22 @@
 import { createClient } from "@/lib/supabase/client"
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/supabase";
 import type { CustomBlockDefinition } from "@/types/custom-block"
 import { DataType, LogicType } from "@/types/custom-block"
 import { NodeCategory } from "@/types/workflow"
 
 class CustomBlockService {
-  private supabase = createClient()
+  private supabase: SupabaseClient<Database> = createClient()
 
   async getCustomBlocks(): Promise<CustomBlockDefinition[]> {
     try {
-      const { data, error } = await this.supabase.from("custom_blocks").select("*")
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+      // Only public blocks or those created by user
+      const { data, error } = await this.supabase
+        .from("custom_blocks")
+        .select("*")
+        .or(`created_by.eq.${user.id},is_public.eq.true`)
 
       if (error) {
         throw error
@@ -23,7 +31,14 @@ class CustomBlockService {
 
   async getCustomBlockById(id: string): Promise<CustomBlockDefinition | null> {
     try {
-      const { data, error } = await this.supabase.from("custom_blocks").select("*").eq("id", id).single()
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+      const { data, error } = await this.supabase
+        .from("custom_blocks")
+        .select("*")
+        .eq("id", id)
+        .eq("created_by", user.id)
+        .single()
 
       if (error) {
         throw error
@@ -48,7 +63,13 @@ class CustomBlockService {
     }
 
     try {
-      const { data, error } = await this.supabase.from("custom_blocks").insert(newBlock).select().single()
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+      const { data, error } = await this.supabase
+        .from("custom_blocks")
+        .insert({ ...newBlock, created_by: user.id })
+        .select()
+        .single()
 
       if (error) {
         throw error
@@ -68,7 +89,15 @@ class CustomBlockService {
     }
 
     try {
-      const { data, error } = await this.supabase.from("custom_blocks").update(updates).eq("id", id).select().single()
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+      const { data, error } = await this.supabase
+        .from("custom_blocks")
+        .update(updates)
+        .eq("id", id)
+        .eq("created_by", user.id)
+        .select()
+        .single()
 
       if (error) {
         throw error
@@ -83,7 +112,13 @@ class CustomBlockService {
 
   async deleteCustomBlock(id: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase.from("custom_blocks").delete().eq("id", id)
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+      const { error } = await this.supabase
+        .from("custom_blocks")
+        .delete()
+        .eq("id", id)
+        .eq("created_by", user.id)
 
       if (error) {
         throw error

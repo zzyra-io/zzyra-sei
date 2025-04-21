@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/supabase";
 import { v4 as uuidv4 } from "uuid";
 import { workflowService } from "./workflow-service";
 import { blockSchemas } from "@/lib/schemas/blockSchemas";
@@ -28,23 +30,20 @@ export interface ExecutionResult {
 }
 
 export class ExecutionService {
-  private supabase = createClient();
+  private supabase: SupabaseClient<Database> = createClient();
 
   async startExecution(workflowId: string): Promise<string> {
     try {
-      const user = (await this.supabase.auth.getUser()).data.user;
-
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError || !user) throw new Error("User not authenticated");
 
       // Create a new execution record
       const executionId = uuidv4();
       const { error } = await this.supabase.from("workflow_executions").insert({
         id: executionId,
         workflow_id: workflowId,
+        user_id: user.id,
         status: "pending",
-        triggered_by: user.id,
       });
 
       if (error) {
@@ -85,6 +84,9 @@ export class ExecutionService {
     result?: any
   ): Promise<void> {
     try {
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError || !user) throw new Error("User not authenticated");
+
       const updates: any = { status };
 
       if (status === "completed" || status === "failed") {
@@ -96,6 +98,7 @@ export class ExecutionService {
       const { error } = await this.supabase
         .from("workflow_executions")
         .update(updates)
+        .eq("user_id", user.id)
         .eq("id", executionId);
 
       if (error) {
@@ -123,6 +126,9 @@ export class ExecutionService {
     data?: any
   ): Promise<void> {
     try {
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError || !user) throw new Error("User not authenticated");
+
       const { error } = await this.supabase.from("execution_logs").insert({
         execution_id: executionId,
         node_id: nodeId,
@@ -142,10 +148,14 @@ export class ExecutionService {
 
   async getExecution(executionId: string): Promise<ExecutionResult | null> {
     try {
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError || !user) throw new Error("User not authenticated");
+
       // Get execution details
       const { data: execution, error: executionError } = await this.supabase
         .from("workflow_executions")
         .select("*")
+        .eq("user_id", user.id)
         .eq("id", executionId)
         .single();
 
@@ -179,10 +189,14 @@ export class ExecutionService {
     limit = 10
   ): Promise<ExecutionResult[]> {
     try {
+      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
+      if (authError || !user) throw new Error("User not authenticated");
+
       // Get recent executions
       const { data: executions, error: executionsError } = await this.supabase
         .from("workflow_executions")
         .select("*")
+        .eq("user_id", user.id)
         .eq("workflow_id", workflowId)
         .order("started_at", { ascending: false })
         .limit(limit);
