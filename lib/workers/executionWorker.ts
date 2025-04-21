@@ -1,6 +1,5 @@
 import { initExecutionQueue } from "@/lib/queue/executionQueue.server";
 import { executionService } from "@/lib/services/execution-service";
-import { createClient } from "@/lib/supabase/client";
 import { BlockType, getBlockType } from "@/types/workflow";
 import { customBlockService } from "@/lib/services/custom-block-service";
 import { executeCustomBlockLogic } from "@/types/custom-block";

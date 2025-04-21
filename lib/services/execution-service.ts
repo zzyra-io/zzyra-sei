@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { createServiceClient } from '@/lib/supabase/serviceClient';
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { v4 as uuidv4 } from "uuid";
@@ -30,7 +30,8 @@ export interface ExecutionResult {
 }
 
 export class ExecutionService {
-  private supabase: SupabaseClient<Database> = createClient();
+  // Use service role client to bypass RLS in worker context
+  private supabase: SupabaseClient<Database> = createServiceClient();
 
   async startExecution(workflowId: string): Promise<string> {
     try {
@@ -79,9 +80,6 @@ export class ExecutionService {
     result?: any
   ): Promise<void> {
     try {
-      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-      if (authError || !user) throw new Error("User not authenticated");
-
       const updates: any = { status };
 
       if (status === "completed" || status === "failed") {
@@ -93,7 +91,6 @@ export class ExecutionService {
       const { error } = await this.supabase
         .from("workflow_executions")
         .update(updates)
-        .eq("user_id", user.id)
         .eq("id", executionId);
 
       if (error) {
@@ -121,9 +118,7 @@ export class ExecutionService {
     data?: any
   ): Promise<void> {
     try {
-      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-      if (authError || !user) throw new Error("User not authenticated");
-
+      // Bypass authentication; using service role
       const { error } = await this.supabase.from("execution_logs").insert({
         execution_id: executionId,
         node_id: nodeId,
@@ -143,14 +138,10 @@ export class ExecutionService {
 
   async getExecution(executionId: string): Promise<ExecutionResult | null> {
     try {
-      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-      if (authError || !user) throw new Error("User not authenticated");
-
       // Get execution details
       const { data: execution, error: executionError } = await this.supabase
         .from("workflow_executions")
         .select("*")
-        .eq("user_id", user.id)
         .eq("id", executionId)
         .single();
 
@@ -184,14 +175,10 @@ export class ExecutionService {
     limit = 10
   ): Promise<ExecutionResult[]> {
     try {
-      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-      if (authError || !user) throw new Error("User not authenticated");
-
       // Get recent executions
       const { data: executions, error: executionsError } = await this.supabase
         .from("workflow_executions")
         .select("*")
-        .eq("user_id", user.id)
         .eq("workflow_id", workflowId)
         .order("started_at", { ascending: false })
         .limit(limit);

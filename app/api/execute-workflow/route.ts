@@ -1,31 +1,53 @@
 import { NextResponse } from "next/server";
-import { addExecutionJob } from "@/lib/queue/executionQueue.server";
-import { v4 as uuidv4 } from "uuid";
-import { createServiceClient } from "@/lib/supabase/serviceClient";
+import type { Database } from "@/types/supabase";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies as getCookies } from "next/headers";
+
+export const runtime = "nodejs";
+// Default edge runtime; queue logic is dynamically loaded
 
 export async function POST(request: Request) {
   try {
-    const supabase = createServiceClient();
-    const { workflowId } = await request.json();
+    const supabase = createRouteHandlerClient<Database>({
+      cookies: getCookies,
+    });
 
-    const executionId = uuidv4();
-    const { error } = await supabase
-      .from("workflow_executions")
-      .insert({
-        id: executionId,
-        workflow_id: workflowId,
-        status: "pending",
-        triggered_by: null,
-      });
-    if (error) {
-      console.error("Error creating execution:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { workflowId } = await request.json();
+
+    const { data, error: execError } = await supabase
+      .rpc("start_workflow_execution", { wf_id: workflowId })
+      .single();
+
+    if (execError || !data) {
+      console.error("Error starting execution:", execError);
+      return NextResponse.json(
+        { error: "Failed to start workflow execution" },
+        { status: 500 }
+      );
+    }
+
+    const executionId = (data as any).id;
+
+    const { addExecutionJob } = await import(
+      "@/lib/queue/executionQueue.server"
+    );
     await addExecutionJob(executionId, workflowId);
+
     return NextResponse.json({ executionId });
-  } catch (err: any) {
-    console.error("Error enqueuing execution:", err);
-    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+  } catch (error) {
+    console.error("Unexpected error in execute-workflow route:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

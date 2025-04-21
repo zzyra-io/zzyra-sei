@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS public.workflow_executions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   workflow_id UUID NOT NULL REFERENCES public.workflows(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  triggered_by UUID REFERENCES auth.users(id),
   status VARCHAR(20) NOT NULL,
   started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   completed_at TIMESTAMP WITH TIME ZONE,
