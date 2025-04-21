@@ -9,24 +9,28 @@ CREATE INDEX IF NOT EXISTS workflows_user_id_idx ON public.workflows(user_id);
 ALTER TABLE public.workflows ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can view their own or public workflows
+DROP POLICY IF EXISTS "Users can view their own workflows or public ones" ON public.workflows;
 CREATE POLICY "Users can view their own workflows or public ones"
   ON public.workflows
   FOR SELECT
   USING (auth.uid() = user_id OR is_public = true);
 
 -- Policy: Users can insert their own workflows
+DROP POLICY IF EXISTS "Users can insert their own workflows" ON public.workflows;
 CREATE POLICY "Users can insert their own workflows"
   ON public.workflows
   FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
 -- Policy: Users can update their own workflows
+DROP POLICY IF EXISTS "Users can update their own workflows" ON public.workflows;
 CREATE POLICY "Users can update their own workflows"
   ON public.workflows
   FOR UPDATE
   USING (auth.uid() = user_id);
 
 -- Policy: Users can delete their own workflows
+DROP POLICY IF EXISTS "Users can delete their own workflows" ON public.workflows;
 CREATE POLICY "Users can delete their own workflows"
   ON public.workflows
   FOR DELETE

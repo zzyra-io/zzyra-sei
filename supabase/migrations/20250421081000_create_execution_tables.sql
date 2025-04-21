@@ -25,18 +25,24 @@ ALTER TABLE public.workflow_executions
   ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
 
 -- Create policies for row level security
+-- Ensure idempotency for RLS policies
+DROP POLICY IF EXISTS "Users can view their own execution logs" ON public.workflow_executions;
 -- Users can view their own execution logs
 CREATE POLICY "Users can view their own execution logs" 
   ON public.workflow_executions 
   FOR SELECT 
   USING (auth.uid() = user_id);
 
+-- Ensure idempotency for RLS policies
+DROP POLICY IF EXISTS "Users can insert their own execution logs" ON public.workflow_executions;
 -- Users can insert their own execution logs
 CREATE POLICY "Users can insert their own execution logs" 
   ON public.workflow_executions 
   FOR INSERT 
   WITH CHECK (auth.uid() = user_id);
 
+-- Ensure idempotency for RLS policies
+DROP POLICY IF EXISTS "Users can update their own execution logs" ON public.workflow_executions;
 -- Users can update their own execution logs
 CREATE POLICY "Users can update their own execution logs" 
   ON public.workflow_executions 
@@ -66,13 +72,16 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Create policies for row level security
+-- Ensure idempotency for profile RLS policies
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 -- Users can view their own profile
 CREATE POLICY "Users can view their own profile" 
   ON public.profiles 
   FOR SELECT 
   USING (auth.uid() = id);
 
+-- Ensure idempotency for profile RLS policies
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 -- Users can update their own profile
 CREATE POLICY "Users can update their own profile" 
   ON public.profiles 
@@ -134,11 +143,17 @@ CREATE INDEX IF NOT EXISTS workflow_templates_category_idx ON public.workflow_te
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.workflow_templates ENABLE ROW LEVEL SECURITY;
 
+-- Ensure idempotency for workflow_templates RLS policies
+DROP POLICY IF EXISTS "Everyone can view templates" ON public.workflow_templates;
+
 -- Create policies for row level security
 -- Everyone can view templates
+DROP POLICY IF EXISTS "Everyone can view templates" ON public.workflow_templates;
 CREATE POLICY "Everyone can view templates" 
   ON public.workflow_templates 
   FOR SELECT 
   USING (true);
 
 -- Only admins can insert/update/delete templates (we'll handle this in the application)
+-- Ensure idempotency for admin schema change policies
+DROP POLICY IF EXISTS "Only admins can insert/update/delete templates" ON public.workflow_templates;

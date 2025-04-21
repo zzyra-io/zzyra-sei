@@ -28,6 +28,7 @@ ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for teams
+DROP POLICY IF EXISTS "Users can view teams they are members of" ON public.teams;
 CREATE POLICY "Users can view teams they are members of" 
   ON public.teams 
   FOR SELECT 
@@ -39,6 +40,7 @@ CREATE POLICY "Users can view teams they are members of"
     )
   );
 
+DROP POLICY IF EXISTS "Team owners and admins can update teams" ON public.teams;
 CREATE POLICY "Team owners and admins can update teams" 
   ON public.teams 
   FOR UPDATE 
@@ -51,6 +53,7 @@ CREATE POLICY "Team owners and admins can update teams"
     )
   );
 
+DROP POLICY IF EXISTS "Team owners can delete teams" ON public.teams;
 CREATE POLICY "Team owners can delete teams" 
   ON public.teams 
   FOR DELETE 
@@ -64,6 +67,7 @@ CREATE POLICY "Team owners can delete teams"
   );
 
 -- Create policies for team_members
+DROP POLICY IF EXISTS "Users can view team members for their teams" ON public.team_members;
 CREATE POLICY "Users can view team members for their teams" 
   ON public.team_members 
   FOR SELECT 
@@ -75,6 +79,7 @@ CREATE POLICY "Users can view team members for their teams"
     )
   );
 
+DROP POLICY IF EXISTS "Team owners and admins can insert team members" ON public.team_members;
 CREATE POLICY "Team owners and admins can insert team members" 
   ON public.team_members 
   FOR INSERT 
@@ -87,6 +92,7 @@ CREATE POLICY "Team owners and admins can insert team members"
     )
   );
 
+DROP POLICY IF EXISTS "Team owners and admins can update team members" ON public.team_members;
 CREATE POLICY "Team owners and admins can update team members" 
   ON public.team_members 
   FOR UPDATE 
@@ -99,6 +105,7 @@ CREATE POLICY "Team owners and admins can update team members"
     )
   );
 
+DROP POLICY IF EXISTS "Team owners can delete team members" ON public.team_members;
 CREATE POLICY "Team owners can delete team members" 
   ON public.team_members 
   FOR DELETE 
@@ -117,6 +124,7 @@ CREATE INDEX IF NOT EXISTS workflows_team_id_idx ON public.workflows(team_id);
 
 -- Update workflow RLS policies to include team access
 DROP POLICY IF EXISTS "Users can view their own workflows or public ones" ON public.workflows;
+DROP POLICY IF EXISTS "Users can view their own workflows, team workflows, or public ones" ON public.workflows;
 CREATE POLICY "Users can view their own workflows, team workflows, or public ones" 
   ON public.workflows 
   FOR SELECT 
@@ -133,6 +141,7 @@ CREATE POLICY "Users can view their own workflows, team workflows, or public one
   );
 
 DROP POLICY IF EXISTS "Users can update their own workflows" ON public.workflows;
+DROP POLICY IF EXISTS "Users can update their own workflows or team workflows" ON public.workflows;
 CREATE POLICY "Users can update their own workflows or team workflows" 
   ON public.workflows 
   FOR UPDATE 
@@ -148,6 +157,7 @@ CREATE POLICY "Users can update their own workflows or team workflows"
   );
 
 DROP POLICY IF EXISTS "Users can delete their own workflows" ON public.workflows;
+DROP POLICY IF EXISTS "Users can delete their own workflows or team workflows as admin/owner" ON public.workflows;
 CREATE POLICY "Users can delete their own workflows or team workflows as admin/owner" 
   ON public.workflows 
   FOR DELETE 

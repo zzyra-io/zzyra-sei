@@ -29,6 +29,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { NotificationBell } from "./NotificationBell";
 
 export function DashboardHeader() {
   const pathname = usePathname();
@@ -120,10 +121,7 @@ export function DashboardHeader() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end' className='w-80'>
-              <div className='p-4 font-medium'>Notifications</div>
-              <div className='p-4 text-sm text-muted-foreground'>
-                You have no unread notifications.
-              </div>
+              <NotificationBell />
             </DropdownMenuContent>
           </DropdownMenu>
 

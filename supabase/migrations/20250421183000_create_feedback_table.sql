@@ -18,15 +18,16 @@ CREATE TABLE public.feedback (
 -- Enable row-level security
 ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
 
--- Policy: users can insert their own feedback
+-- Ensure idempotency for feedback RLS policies
+DROP POLICY IF EXISTS "Users can insert feedback" ON public.feedback;
 CREATE POLICY "Users can insert feedback" ON public.feedback
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Policy: users can view their own feedback
+DROP POLICY IF EXISTS "Users can view own feedback" ON public.feedback;
 CREATE POLICY "Users can view own feedback" ON public.feedback
   FOR SELECT USING (auth.uid() = user_id);
 
--- Policy: users can modify their own feedback
+DROP POLICY IF EXISTS "Users can update own feedback status" ON public.feedback;
 CREATE POLICY "Users can update own feedback status" ON public.feedback
   FOR UPDATE USING (auth.uid() = user_id);
 

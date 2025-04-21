@@ -25,24 +25,28 @@ CREATE INDEX IF NOT EXISTS idx_custom_blocks_created_by ON custom_blocks(created
 ALTER TABLE custom_blocks ENABLE ROW LEVEL SECURITY;
 
 -- Policy for selecting blocks (users can see their own blocks)
+DROP POLICY IF EXISTS select_custom_blocks ON custom_blocks;
 CREATE POLICY select_custom_blocks ON custom_blocks
   FOR SELECT USING (
     created_by = auth.uid()
   );
 
 -- Policy for inserting blocks (users can only insert their own blocks)
+DROP POLICY IF EXISTS insert_custom_blocks ON custom_blocks;
 CREATE POLICY insert_custom_blocks ON custom_blocks
   FOR INSERT WITH CHECK (
     created_by = auth.uid()
   );
 
 -- Policy for updating blocks (users can only update their own blocks)
+DROP POLICY IF EXISTS update_custom_blocks ON custom_blocks;
 CREATE POLICY update_custom_blocks ON custom_blocks
   FOR UPDATE USING (
     created_by = auth.uid()
   );
 
 -- Policy for deleting blocks (users can only delete their own blocks)
+DROP POLICY IF EXISTS delete_custom_blocks ON custom_blocks;
 CREATE POLICY delete_custom_blocks ON custom_blocks
   FOR DELETE USING (
     created_by = auth.uid()

@@ -15,6 +15,8 @@ CREATE INDEX IF NOT EXISTS execution_logs_execution_id_idx ON public.execution_l
 -- Enable Row Level Security
 ALTER TABLE public.execution_logs ENABLE ROW LEVEL SECURITY;
 
+-- Ensure idempotency for execution_logs RLS policies
+DROP POLICY IF EXISTS select_execution_logs ON public.execution_logs;
 -- Policy for selecting logs: only owner of execution can view
 CREATE POLICY select_execution_logs ON public.execution_logs
   FOR SELECT
@@ -26,6 +28,8 @@ CREATE POLICY select_execution_logs ON public.execution_logs
     )
   );
 
+-- Ensure idempotency for execution_logs RLS policies
+DROP POLICY IF EXISTS insert_execution_logs ON public.execution_logs;
 -- Policy for inserting logs: only owner of execution can insert logs
 CREATE POLICY insert_execution_logs ON public.execution_logs
   FOR INSERT
@@ -37,6 +41,8 @@ CREATE POLICY insert_execution_logs ON public.execution_logs
     )
   );
 
+-- Ensure idempotency for execution_logs RLS policies
+DROP POLICY IF EXISTS update_execution_logs ON public.execution_logs;
 -- Policy for updating logs: only owner of execution can update
 CREATE POLICY update_execution_logs ON public.execution_logs
   FOR UPDATE
@@ -48,6 +54,8 @@ CREATE POLICY update_execution_logs ON public.execution_logs
     )
   );
 
+-- Ensure idempotency for execution_logs RLS policies
+DROP POLICY IF EXISTS delete_execution_logs ON public.execution_logs;
 -- Policy for deleting logs: only owner of execution can delete
 CREATE POLICY delete_execution_logs ON public.execution_logs
   FOR DELETE

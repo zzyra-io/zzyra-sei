@@ -139,16 +139,15 @@ CREATE TABLE IF NOT EXISTS public.workflow_templates (
 
 -- Create index for faster queries
 CREATE INDEX IF NOT EXISTS workflow_templates_category_idx ON public.workflow_templates(category);
-CREATE INDEX IF NOT EXISTS workflow_templates_is_premium_idx ON public.workflow_templates(is_premium);
 
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.workflow_templates ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for row level security
--- Everyone can view templates
-CREATE POLICY IF NOT EXISTS "Everyone can view templates" 
-  ON public.workflow_templates 
-  FOR SELECT 
+DROP POLICY IF EXISTS "Everyone can view templates" ON public.workflow_templates;
+CREATE POLICY "Everyone can view templates"
+  ON public.workflow_templates
+  FOR SELECT
   USING (true);
 
 -- Only admins can insert/update/delete templates (we'll handle this in the application)
