@@ -34,28 +34,23 @@ export class ExecutionService {
 
   async startExecution(workflowId: string): Promise<string> {
     try {
-      const { data: { user }, error: authError } = await this.supabase.auth.getUser();
-      if (authError || !user) throw new Error("User not authenticated");
-
-      // Create a new execution record
-      const executionId = uuidv4();
-      const { error } = await this.supabase.from("workflow_executions").insert({
-        id: executionId,
-        workflow_id: workflowId,
-        user_id: user.id,
-        status: "pending",
-      });
-
+      // Use RLS-protected RPC to enforce quota and start execution atomically
+      const { data: executionId, error } = await this.supabase.rpc(
+        'start_workflow_execution',
+        { wf_id: workflowId }
+      );
       if (error) {
+        console.error('Quota check or execution creation failed:', error);
         throw error;
       }
+      if (!executionId) throw new Error('Failed to obtain execution ID');
 
       // Log the start of execution
       await this.logExecutionEvent(
-        executionId,
-        "start",
-        "info",
-        "Execution started"
+        executionId as string,
+        'start',
+        'info',
+        'Execution started'
       );
 
       // Validate node configs against schemas

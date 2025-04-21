@@ -5,8 +5,20 @@ CREATE TABLE IF NOT EXISTS public.teams (
   slug TEXT NOT NULL UNIQUE,
   logo_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  created_by UUID REFERENCES auth.users(id)
 );
+
+-- Conditionally create index on created_by if column exists
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='teams' AND column_name='created_by'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_teams_created_by ON public.teams(created_by);
+  END IF;
+END$$;
 
 -- Create team_members table for team membership
 CREATE TABLE IF NOT EXISTS public.team_members (
@@ -26,6 +38,26 @@ CREATE INDEX IF NOT EXISTS team_members_team_id_idx ON public.team_members(team_
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
+
+-- Conditionally create insert_teams policy if `created_by` column exists
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='teams' AND column_name='created_by'
+  ) THEN
+    DROP POLICY IF EXISTS insert_teams ON public.teams;
+    CREATE POLICY insert_teams ON public.teams
+      FOR INSERT WITH CHECK (
+        created_by = auth.uid()
+      );
+  END IF;
+END$$;
+
+-- Drop existing team policies to avoid duplicates
+DROP POLICY IF EXISTS "Users can view teams they are members of" ON public.teams;
+DROP POLICY IF EXISTS "Team owners and admins can update teams" ON public.teams;
+DROP POLICY IF EXISTS "Team owners can delete teams" ON public.teams;
 
 -- Create policies for teams
 CREATE POLICY "Users can view teams they are members of" 
@@ -64,6 +96,11 @@ CREATE POLICY "Team owners can delete teams"
   );
 
 -- Create policies for team_members
+-- Drop existing team_members policies to avoid duplicates
+DROP POLICY IF EXISTS "Users can view team members for their teams" ON public.team_members;
+DROP POLICY IF EXISTS "Team owners and admins can insert team members" ON public.team_members;
+DROP POLICY IF EXISTS "Team owners and admins can update team members" ON public.team_members;
+DROP POLICY IF EXISTS "Team owners can delete team members" ON public.team_members;
 CREATE POLICY "Users can view team members for their teams" 
   ON public.team_members 
   FOR SELECT 
@@ -116,6 +153,10 @@ ALTER TABLE public.workflows ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES pu
 CREATE INDEX IF NOT EXISTS workflows_team_id_idx ON public.workflows(team_id);
 
 -- Update workflow RLS policies to include team access
+-- Drop existing extended workflows policies to avoid duplicates
+DROP POLICY IF EXISTS "Users can view their own workflows, team workflows, or public ones" ON public.workflows;
+DROP POLICY IF EXISTS "Users can update their own workflows or team workflows" ON public.workflows;
+DROP POLICY IF EXISTS "Users can delete their own workflows or team workflows as admin/owner" ON public.workflows;
 DROP POLICY IF EXISTS "Users can view their own workflows or public ones" ON public.workflows;
 CREATE POLICY "Users can view their own workflows, team workflows, or public ones" 
   ON public.workflows 
@@ -164,11 +205,15 @@ CREATE POLICY "Users can delete their own workflows or team workflows as admin/o
   );
 
 -- Add triggers for updated_at
+-- Drop triggers to avoid duplicates
+DROP TRIGGER IF EXISTS update_teams_updated_at ON public.teams;
 CREATE TRIGGER update_teams_updated_at
 BEFORE UPDATE ON public.teams
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+-- Drop triggers to avoid duplicates
+DROP TRIGGER IF EXISTS update_team_members_updated_at ON public.team_members;
 CREATE TRIGGER update_team_members_updated_at
 BEFORE UPDATE ON public.team_members
 FOR EACH ROW

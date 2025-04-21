@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.workflow_executions (
   id UUID PRIMARY KEY,
   workflow_id UUID NOT NULL REFERENCES public.workflows(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'completed', 'failed')),
   started_at TIMESTAMP WITH TIME ZONE NOT NULL,
   completed_at TIMESTAMP WITH TIME ZONE,
@@ -13,28 +13,32 @@ CREATE TABLE IF NOT EXISTS public.workflow_executions (
 );
 
 -- Create indexes for faster queries
-CREATE INDEX IF NOT EXISTS workflow_executions_workflow_id_idx ON public.workflow_executions(workflow_id);
-CREATE INDEX IF NOT EXISTS workflow_executions_user_id_idx ON public.workflow_executions(user_id);
-CREATE INDEX IF NOT EXISTS workflow_executions_status_idx ON public.workflow_executions(status);
+-- CREATE INDEX IF NOT EXISTS workflow_executions_workflow_id_idx ON public.workflow_executions(workflow_id);
+-- CREATE INDEX IF NOT EXISTS workflow_executions_user_id_idx ON public.workflow_executions(user_id);
+-- CREATE INDEX IF NOT EXISTS workflow_executions_status_idx ON public.workflow_executions(status);
 
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.workflow_executions ENABLE ROW LEVEL SECURITY;
 
+-- Add user_id column if missing (nullable to avoid constraint issues)
+ALTER TABLE public.workflow_executions
+  ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+
 -- Create policies for row level security
 -- Users can view their own execution logs
-CREATE POLICY IF NOT EXISTS "Users can view their own execution logs" 
+CREATE POLICY "Users can view their own execution logs" 
   ON public.workflow_executions 
   FOR SELECT 
   USING (auth.uid() = user_id);
 
 -- Users can insert their own execution logs
-CREATE POLICY IF NOT EXISTS "Users can insert their own execution logs" 
+CREATE POLICY "Users can insert their own execution logs" 
   ON public.workflow_executions 
   FOR INSERT 
   WITH CHECK (auth.uid() = user_id);
 
 -- Users can update their own execution logs
-CREATE POLICY IF NOT EXISTS "Users can update their own execution logs" 
+CREATE POLICY "Users can update their own execution logs" 
   ON public.workflow_executions 
   FOR UPDATE 
   USING (auth.uid() = user_id);
@@ -57,20 +61,20 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 -- Create index for faster queries
-CREATE INDEX IF NOT EXISTS profiles_subscription_status_idx ON public.profiles(subscription_status);
+-- Removed index on subscription_status to avoid errors when column is missing
 
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for row level security
 -- Users can view their own profile
-CREATE POLICY IF NOT EXISTS "Users can view their own profile" 
+CREATE POLICY "Users can view their own profile" 
   ON public.profiles 
   FOR SELECT 
   USING (auth.uid() = id);
 
 -- Users can update their own profile
-CREATE POLICY IF NOT EXISTS "Users can update their own profile" 
+CREATE POLICY "Users can update their own profile" 
   ON public.profiles 
   FOR UPDATE 
   USING (auth.uid() = id);
@@ -123,15 +127,16 @@ CREATE TABLE IF NOT EXISTS public.workflow_templates (
 );
 
 -- Create index for faster queries
+-- Removed index on workflow_templates.is_premium due to missing column
 CREATE INDEX IF NOT EXISTS workflow_templates_category_idx ON public.workflow_templates(category);
-CREATE INDEX IF NOT EXISTS workflow_templates_is_premium_idx ON public.workflow_templates(is_premium);
+-- CREATE INDEX IF NOT EXISTS workflow_templates_is_premium_idx ON public.workflow_templates(is_premium);
 
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.workflow_templates ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for row level security
 -- Everyone can view templates
-CREATE POLICY IF NOT EXISTS "Everyone can view templates" 
+CREATE POLICY "Everyone can view templates" 
   ON public.workflow_templates 
   FOR SELECT 
   USING (true);

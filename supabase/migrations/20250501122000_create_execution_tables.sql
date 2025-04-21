@@ -20,21 +20,26 @@ CREATE INDEX IF NOT EXISTS workflow_executions_status_idx ON public.workflow_exe
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.workflow_executions ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing RLS policies to avoid duplicates
+DROP POLICY IF EXISTS "Users can view their own execution logs" ON public.workflow_executions;
+DROP POLICY IF EXISTS "Users can insert their own execution logs" ON public.workflow_executions;
+DROP POLICY IF EXISTS "Users can update their own execution logs" ON public.workflow_executions;
+
 -- Create policies for row level security
 -- Users can view their own execution logs
-CREATE POLICY IF NOT EXISTS "Users can view their own execution logs" 
+CREATE POLICY "Users can view their own execution logs" 
   ON public.workflow_executions 
   FOR SELECT 
   USING (auth.uid() = user_id);
 
 -- Users can insert their own execution logs
-CREATE POLICY IF NOT EXISTS "Users can insert their own execution logs" 
+CREATE POLICY "Users can insert their own execution logs" 
   ON public.workflow_executions 
   FOR INSERT 
   WITH CHECK (auth.uid() = user_id);
 
 -- Users can update their own execution logs
-CREATE POLICY IF NOT EXISTS "Users can update their own execution logs" 
+CREATE POLICY "Users can update their own execution logs" 
   ON public.workflow_executions 
   FOR UPDATE 
   USING (auth.uid() = user_id);
@@ -57,20 +62,30 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 -- Create index for faster queries
-CREATE INDEX IF NOT EXISTS profiles_subscription_status_idx ON public.profiles(subscription_status);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='profiles' AND column_name='subscription_status'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS profiles_subscription_status_idx ON public.profiles(subscription_status);
+  END IF;
+END$$;
 
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for row level security
 -- Users can view their own profile
-CREATE POLICY IF NOT EXISTS "Users can view their own profile" 
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
+CREATE POLICY "Users can view their own profile" 
   ON public.profiles 
   FOR SELECT 
   USING (auth.uid() = id);
 
 -- Users can update their own profile
-CREATE POLICY IF NOT EXISTS "Users can update their own profile" 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
+CREATE POLICY "Users can update their own profile" 
   ON public.profiles 
   FOR UPDATE 
   USING (auth.uid() = id);

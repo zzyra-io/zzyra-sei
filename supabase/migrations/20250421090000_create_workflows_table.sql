@@ -18,6 +18,12 @@ CREATE INDEX IF NOT EXISTS workflows_user_id_idx ON public.workflows(user_id);
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.workflows ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies to avoid duplicates
+DROP POLICY IF EXISTS "Users can view their own workflows or public ones" ON public.workflows;
+DROP POLICY IF EXISTS "Users can insert their own workflows" ON public.workflows;
+DROP POLICY IF EXISTS "Users can update their own workflows" ON public.workflows;
+DROP POLICY IF EXISTS "Users can delete their own workflows" ON public.workflows;
+
 -- Create policies for row level security
 -- Users can view their own workflows or public workflows
 CREATE POLICY "Users can view their own workflows or public ones" 

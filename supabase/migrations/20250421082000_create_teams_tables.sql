@@ -5,12 +5,8 @@ CREATE TABLE IF NOT EXISTS public.teams (
   slug TEXT NOT NULL UNIQUE,
   logo_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  created_by UUID REFERENCES auth.users(id)
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
-
--- Index on created_by
-CREATE INDEX IF NOT EXISTS idx_teams_created_by ON public.teams(created_by);
 
 -- Create team_members table for team membership
 CREATE TABLE IF NOT EXISTS public.team_members (
@@ -30,12 +26,6 @@ CREATE INDEX IF NOT EXISTS team_members_team_id_idx ON public.team_members(team_
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
-
--- Policy for inserting teams (only own)
-CREATE POLICY insert_teams ON public.teams
-  FOR INSERT WITH CHECK (
-    created_by = auth.uid()
-  );
 
 -- Create policies for teams
 CREATE POLICY "Users can view teams they are members of" 
@@ -174,11 +164,15 @@ CREATE POLICY "Users can delete their own workflows or team workflows as admin/o
   );
 
 -- Add triggers for updated_at
+-- Drop existing triggers to avoid duplicate errors
+DROP TRIGGER IF EXISTS update_teams_updated_at ON public.teams;
 CREATE TRIGGER update_teams_updated_at
 BEFORE UPDATE ON public.teams
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+-- Drop existing triggers to avoid duplicate errors
+DROP TRIGGER IF EXISTS update_team_members_updated_at ON public.team_members;
 CREATE TRIGGER update_team_members_updated_at
 BEFORE UPDATE ON public.team_members
 FOR EACH ROW

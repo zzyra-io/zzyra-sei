@@ -19,15 +19,14 @@ CREATE TABLE IF NOT EXISTS custom_blocks (
 -- Add index for faster searches
 CREATE INDEX IF NOT EXISTS idx_custom_blocks_category ON custom_blocks(category);
 CREATE INDEX IF NOT EXISTS idx_custom_blocks_created_by ON custom_blocks(created_by);
-CREATE INDEX IF NOT EXISTS idx_custom_blocks_is_public ON custom_blocks(is_public);
+-- Removed index on is_public to prevent errors during migration
 
 -- Add RLS policies
 ALTER TABLE custom_blocks ENABLE ROW LEVEL SECURITY;
 
--- Policy for selecting blocks (users can see their own blocks and public blocks)
+-- Policy for selecting blocks (users can see their own blocks)
 CREATE POLICY select_custom_blocks ON custom_blocks
   FOR SELECT USING (
-    is_public = true OR 
     created_by = auth.uid()
   );
 
