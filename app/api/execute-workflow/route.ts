@@ -23,19 +23,21 @@ export async function POST(request: Request) {
 
     const { workflowId } = await request.json();
 
-    const { data, error: execError } = await supabase
-      .rpc("start_workflow_execution", { wf_id: workflowId })
+    const { data, error: insertError } = await supabase
+      .from("workflow_executions")
+      .insert({ workflow_id: workflowId, status: 'pending', triggered_by: user.id })
+      .select("id")
       .single();
 
-    if (execError || !data) {
-      console.error("Error starting execution:", execError);
+    if (insertError || !data) {
+      console.error("Error starting execution:", insertError);
       return NextResponse.json(
         { error: "Failed to start workflow execution" },
         { status: 500 }
       );
     }
 
-    const executionId = (data as any).id;
+    const executionId = data.id;
 
     const { addExecutionJob } = await import(
       "@/lib/queue/executionQueue.server"

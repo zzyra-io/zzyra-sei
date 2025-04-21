@@ -81,25 +81,26 @@ export default function WorkflowDetailPage() {
   const handleExecute = async () => {
     try {
       setIsExecuting(true);
-      const executionLog = await executionService.executeWorkflow(id);
-
-      // Update the execution logs list
-      setExecutionLogs([executionLog, ...executionLogs]);
-
-      toast({
-        title: "Workflow executed",
-        description: "Your workflow has been executed successfully.",
+      // Start execution via API
+      const res = await fetch("/api/execute-workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflowId: id }),
       });
-
-      // Switch to the history tab to show the execution result
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to start execution");
+      // Refresh execution history
+      const logs = await executionService.getWorkflowExecutions(id);
+      setExecutionLogs(logs);
+      toast({
+        title: "Workflow started",
+        description: "Your workflow execution has been queued.",
+      });
       setActiveTab("history");
     } catch (error) {
       toast({
         title: "Execution failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to execute workflow. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to execute workflow.",
         variant: "destructive",
       });
     } finally {

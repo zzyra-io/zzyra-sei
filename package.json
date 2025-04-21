@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "migrate": "supabase db push",
+    "migrate:debug": "supabase db push --debug",
+    "generate-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID --schema public > types/supabase.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.0.0",

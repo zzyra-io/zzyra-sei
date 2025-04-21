@@ -35,24 +35,20 @@ export class ExecutionService {
 
   async startExecution(workflowId: string): Promise<string> {
     try {
-      // Use RLS-protected RPC to enforce quota and start execution atomically
-      const { data: executionId, error } = await this.supabase.rpc(
-        'start_workflow_execution',
-        { wf_id: workflowId }
-      );
-      if (error) {
-        console.error('Quota check or execution creation failed:', error);
-        throw error;
+      // Insert new execution record
+      const { data: record, error } = await this.supabase
+        .from('workflow_executions')
+        .insert({ workflow_id: workflowId, status: 'pending', triggered_by: null })
+        .select('id')
+        .single();
+      if (error || !record) {
+        console.error('Error creating workflow execution:', error);
+        throw new Error(error?.message || 'Failed to create execution');
       }
-      if (!executionId) throw new Error('Failed to obtain execution ID');
+      const executionId = record.id;
 
       // Log the start of execution
-      await this.logExecutionEvent(
-        executionId as string,
-        'start',
-        'info',
-        'Execution started'
-      );
+      await this.logExecutionEvent(executionId, 'start', 'info', 'Execution started');
 
       // Validate node configs against schemas
       const workflow = await workflowService.getWorkflow(workflowId);
@@ -69,7 +65,7 @@ export class ExecutionService {
       await addExecutionJob(executionId, workflowId);
       return executionId;
     } catch (error) {
-      console.error("Error starting execution:", error);
+      console.error('Error starting execution:', error);
       throw error;
     }
   }
@@ -81,12 +77,18 @@ export class ExecutionService {
   ): Promise<void> {
     try {
       const updates: any = { status };
-
+      // Set started_at when execution begins
+      if (status === "running") {
+        updates.started_at = new Date().toISOString();
+      }
+      // Set completed_at when execution finishes or fails
       if (status === "completed" || status === "failed") {
         updates.completed_at = new Date().toISOString();
       }
-
-      // Omit 'result' to avoid schema mismatch
+      // Include result payload if provided
+      if (result !== undefined) {
+        updates.result = result;
+      }
 
       const { error } = await this.supabase
         .from("workflow_executions")
