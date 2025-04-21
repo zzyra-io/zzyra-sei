@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/supabase";
 import { v4 as uuidv4 } from "uuid";
 
 export interface Workflow {
@@ -43,10 +45,14 @@ function detectCycle(nodes: any[], edges: any[]): boolean {
 class WorkflowService {
   async getWorkflows(): Promise<Workflow[]> {
     try {
-      const supabase = createClient();
+      const supabase: SupabaseClient<Database> = createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+      const userId = user.id;
       const { data, error } = await supabase
         .from("workflows")
         .select("*")
+        .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -62,10 +68,14 @@ class WorkflowService {
 
   async getWorkflow(id: string): Promise<Workflow> {
     try {
-      const supabase = createClient();
+      const supabase: SupabaseClient<Database> = createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+      const userId = user.id;
       const { data, error } = await supabase
         .from("workflows")
         .select("*")
+        .eq("user_id", userId)
         .eq("id", id)
         .single();
 
@@ -82,8 +92,12 @@ class WorkflowService {
 
   async createWorkflow(workflow: Partial<Workflow>): Promise<Workflow> {
     try {
-      const supabase = createClient();
+      const supabase: SupabaseClient<Database> = createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+      const userId = user.id;
       const newWorkflow = {
+        user_id: userId,
         ...workflow,
         id: uuidv4(),
         nodes: workflow.nodes || [],
@@ -121,12 +135,16 @@ class WorkflowService {
     workflow: Partial<Workflow>
   ): Promise<Workflow> {
     try {
-      const supabase = createClient();
+      const supabase: SupabaseClient<Database> = createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+      const userId = user.id;
       const { data, error } = await supabase
         .from("workflows")
         .update(workflow)
+        .eq("user_id", userId)
         .eq("id", id)
-        .select()
+        .select("*")
         .single();
 
       // cycle detection for updated graph
@@ -149,8 +167,15 @@ class WorkflowService {
 
   async deleteWorkflow(id: string): Promise<void> {
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from("workflows").delete().eq("id", id);
+      const supabase: SupabaseClient<Database> = createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error("Not authenticated");
+      const userId = user.id;
+      const { error } = await supabase
+        .from("workflows")
+        .delete()
+        .eq("user_id", userId)
+        .eq("id", id);
 
       if (error) {
         throw new Error(`Error deleting workflow: ${error.message}`);

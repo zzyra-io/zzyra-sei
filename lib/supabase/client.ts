@@ -1,8 +1,9 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient, SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/supabase"
 
-let client: ReturnType<typeof createSupabaseClient> | null = null
+let client: SupabaseClient<Database> | null = null
 
-export function createClient() {
+export function createClient(): SupabaseClient<Database> {
   if (client) return client
 
   // Determine URL and key: prefer service role for server, anon for client
@@ -11,7 +12,7 @@ export function createClient() {
   if (!url || !key) {
     throw new Error("Missing Supabase environment variables: SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL and corresponding key")
   }
-  client = createSupabaseClient(url, key)
+  client = createSupabaseClient<Database>(url, key)
 
   return client
 }
