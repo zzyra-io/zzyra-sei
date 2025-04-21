@@ -8,6 +8,7 @@ import { Web3Provider } from "@/components/web3/web3-provider";
 import { FinanceProvider } from "@/lib/finance/finance-context";
 import { SkipLink } from "@/components/a11y/skip-link";
 import QueryProvider from "@/components/web3/query-provider";
+import { PostHogProvider } from "@/components/PostHogProvider";
 
 // Removed ReactQueryProvider; QueryProvider now handles React Query and Wagmi/ConnectKit
 
@@ -27,29 +28,29 @@ export const metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang='en' suppressHydrationWarning className={inter.variable}>
       <body className='min-h-screen bg-background font-sans antialiased'>
-        <QueryProvider>
-          <SkipLink />
-          <AuthProvider>
-            <ThemeProvider
-              attribute='class'
-              defaultTheme='system'
-              enableSystem
-              disableTransitionOnChange>
-              <Web3Provider>
-                <FinanceProvider>
-                  <main id='main-content'>{children}</main>
-                  <Toaster />
-                </FinanceProvider>
-              </Web3Provider>
-            </ThemeProvider>
-          </AuthProvider>
-        </QueryProvider>
+        <PostHogProvider>
+          <QueryProvider>
+            <SkipLink />
+            <AuthProvider>
+              <ThemeProvider
+                attribute='class'
+                defaultTheme='system'
+                enableSystem
+                disableTransitionOnChange>
+                <Web3Provider>
+                  <FinanceProvider>
+                    <main id='main-content'>{children}</main>
+                    <Toaster />
+                  </FinanceProvider>
+                </Web3Provider>
+              </ThemeProvider>
+            </AuthProvider>
+          </QueryProvider>
+        </PostHogProvider>
       </body>
     </html>
   );
