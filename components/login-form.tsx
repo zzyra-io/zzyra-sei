@@ -93,7 +93,7 @@ export function LoginForm() {
       });
       if (error) throw error;
       if (data?.url) {
-        window.location.href = data.url;
+        router.push(data.url);
       }
     } catch (error: any) {
       toast({
