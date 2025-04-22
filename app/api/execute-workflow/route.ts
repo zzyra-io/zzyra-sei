@@ -1,21 +1,19 @@
 import { NextResponse } from "next/server";
-import type { Database } from "@/types/supabase";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies as getCookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 // Default edge runtime; queue logic is dynamically loaded
 
 export async function POST(request: Request) {
   try {
-    const supabase = createRouteHandlerClient<Database>({
-      cookies: getCookies,
-    });
-
+    const supabase = await createClient();
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
+    console.log("request.headers", request.headers);
+    const session = await supabase.auth.getSession();
+    console.log("Session:", session);
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,7 +23,11 @@ export async function POST(request: Request) {
 
     const { data, error: insertError } = await supabase
       .from("workflow_executions")
-      .insert({ workflow_id: workflowId, status: 'pending', triggered_by: user.id })
+      .insert({
+        workflow_id: workflowId,
+        status: "pending",
+        triggered_by: user.id,
+      })
       .select("id")
       .single();
 

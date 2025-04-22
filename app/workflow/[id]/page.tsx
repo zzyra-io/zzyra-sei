@@ -60,7 +60,6 @@ export default function WorkflowDetailPage() {
             title: "Warning",
             description:
               "Could not load execution history. Some features may be limited.",
-            variant: "warning",
           });
         }
       } catch (error) {
@@ -86,6 +85,7 @@ export default function WorkflowDetailPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workflowId: id }),
+        credentials: "include",
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to start execution");
@@ -100,7 +100,10 @@ export default function WorkflowDetailPage() {
     } catch (error) {
       toast({
         title: "Execution failed",
-        description: error instanceof Error ? error.message : "Failed to execute workflow.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to execute workflow.",
         variant: "destructive",
       });
     } finally {
