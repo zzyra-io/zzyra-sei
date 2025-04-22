@@ -22,6 +22,7 @@ import { BlockCatalog } from "@/components/block-catalog"
 import { BlockConfigPanel } from "@/components/block-config-panel"
 import { FlowCanvas } from "@/components/flow-canvas"
 import { ExecutionLogsList } from "@/components/execution-logs-list"
+import { ExecutionNodeExecutions } from "@/components/execution/execution-node-executions"
 import { workflowExecutionEngine } from "@/lib/workflow/execution-engine"
 
 export default function BuilderPage() {
@@ -47,6 +48,7 @@ export default function BuilderPage() {
   const [activeTab, setActiveTab] = useState("builder")
   const [executionLogs, setExecutionLogs] = useState<any[]>([])
   const [nodes, setNodes] = useState<any[]>([])
+  const [executionId, setExecutionId] = useState<string | null>(null)
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const canvasRef = useRef<any>(null)
@@ -204,43 +206,32 @@ export default function BuilderPage() {
     }
   }, [autoSaveWorkflow])
 
-  // Execute workflow
+  // Execute workflow via API
   const executeWorkflow = async () => {
+    console.log('executeWorkflow triggered for workflow:', uuid)
     try {
-      // Save workflow before execution
       await saveWorkflow()
-
       setIsExecuting(true)
-
-      // Get user ID
       const {
         data: { user },
       } = await supabase.auth.getUser()
-
-      if (!user) {
-        throw new Error("You must be logged in to execute a workflow")
-      }
-
-      // Execute workflow
-      await workflowExecutionEngine.executeWorkflow(uuid, user.id)
-
-      // Refresh execution logs
-      await fetchExecutionLogs()
-
-      // Switch to logs tab
-      setActiveTab("logs")
-
-      toast({
-        title: "Workflow Executed",
-        description: "Your workflow has been executed successfully.",
+      if (!user) throw new Error("You must be logged in to execute a workflow")
+      console.log('Calling /api/executions', { workflowId: uuid })
+      const res = await fetch('/api/executions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflowId: uuid }),
       })
+      const json = await res.json()
+      console.log('POST /api/executions response:', res.status, json)
+
+      if (!res.ok) throw new Error(json.error || 'Failed to start execution')
+      setExecutionId(json.executionId)
+      setActiveTab('logs')
+      toast({ title: 'Execution Started', description: `ID: ${json.executionId}` })
     } catch (error: any) {
-      console.error("Error executing workflow:", error)
-      toast({
-        title: "Execution Error",
-        description: error.message,
-        variant: "destructive",
-      })
+      console.error('Error starting execution:', error)
+      toast({ title: 'Execution Error', description: error.message, variant: 'destructive' })
     } finally {
       setIsExecuting(false)
     }
@@ -421,7 +412,11 @@ export default function BuilderPage() {
             </TabsContent>
 
             <TabsContent value="logs" className="flex-1 p-4 m-0 overflow-auto">
-              <ExecutionLogsList logs={executionLogs} workflowId={uuid} />
+              {executionId ? (
+                <ExecutionNodeExecutions executionId={executionId} />
+              ) : (
+                <ExecutionLogsList logs={executionLogs} workflowId={uuid} />
+              )}
             </TabsContent>
           </Tabs>
         </div>

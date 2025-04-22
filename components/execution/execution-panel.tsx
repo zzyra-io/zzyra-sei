@@ -8,9 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Play, AlertCircle, CheckCircle, Clock, Loader2 } from "lucide-react"
-import { startExecution } from "@/app/actions/execution-actions"
+import { startExecution, resumeExecution } from "@/app/actions/execution-actions"
 import { ExecutionHistory } from "@/components/execution/execution-history"
 import { ExecutionLogs } from "@/components/execution/execution-logs"
+import { ExecutionNodeExecutions } from "@/components/execution/execution-node-executions"
 import { toast } from "@/components/ui/use-toast"
 
 interface ExecutionPanelProps {
@@ -21,6 +22,7 @@ interface ExecutionPanelProps {
 
 export function ExecutionPanel({ workflowId, executions, activeExecutionId }: ExecutionPanelProps) {
   const [isExecuting, setIsExecuting] = useState(false)
+  const [isResuming, setIsResuming] = useState(false)
   const [currentExecutionId, setCurrentExecutionId] = useState<string | undefined>(activeExecutionId)
   const router = useRouter()
 
@@ -87,6 +89,12 @@ export function ExecutionPanel({ workflowId, executions, activeExecutionId }: Ex
             <AlertCircle className="h-3 w-3 mr-1" /> Failed
           </Badge>
         )
+      case "paused":
+        return (
+          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+            <AlertCircle className="h-3 w-3 mr-1" /> Paused
+          </Badge>
+        )
       default:
         return <Badge variant="outline">{status}</Badge>
     }
@@ -123,11 +131,28 @@ export function ExecutionPanel({ workflowId, executions, activeExecutionId }: Ex
             {activeExecution ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div>
+                  <div className="flex items-center space-x-2">
                     <p className="text-sm font-medium">Execution ID</p>
                     <p className="text-xs text-muted-foreground">{activeExecution.id}</p>
                   </div>
-                  <div>{getStatusBadge(activeExecution.status)}</div>
+                  <div className="flex items-center space-x-2">
+                    {getStatusBadge(activeExecution.status)}
+                    {activeExecution.status === 'paused' && (
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        setIsResuming(true)
+                        try {
+                          const res = await resumeExecution(activeExecution.id)
+                          if (res.error) throw new Error(res.error)
+                          toast({ title: 'Execution resumed' })
+                          router.refresh()
+                        } catch (err: any) {
+                          toast({ title: 'Resume failed', description: err.message, variant: 'destructive' })
+                        } finally { setIsResuming(false) }
+                      }} disabled={isResuming}>
+                        {isResuming ? 'Resuming...' : 'Resume'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -155,9 +180,15 @@ export function ExecutionPanel({ workflowId, executions, activeExecutionId }: Ex
                   </Alert>
                 )}
 
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium mb-2">Execution Logs</h4>
-                  <ExecutionLogs executionId={activeExecution.id} />
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Node Executions</h4>
+                    <ExecutionNodeExecutions executionId={activeExecution.id} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Execution Logs</h4>
+                    <ExecutionLogs executionId={activeExecution.id} />
+                  </div>
                 </div>
               </div>
             ) : (

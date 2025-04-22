@@ -1,0 +1,36 @@
+ustom_blocks
+• Add created_by & updated_by FKs to your users table so you know who owns each custom block.
+• Enforce name uniqueness per user (UNIQUE(user_id, name)).
+• Index on (user_id, is_public) to quickly fetch public vs private blocks.
+execution_logs
+• Make timestamp default to now() and NOT NULL.
+• Index on (execution_id, timestamp) for fast log retrieval per run.
+• Consider partitioning by date (e.g. monthly) if you’ll log tens of millions of rows.
+node_executions
+• Add started_at TIMESTAMP WITH TIME ZONE DEFAULT now() alongside completed_at.
+• Composite index on (execution_id, node_id) to lookup results.
+• Store a small duration_ms column (compute completed_at - started_at) for metrics without re‑calculating.
+notifications
+• Add user_id FK (if notifications are user‑scoped) and index (user_id, read, created_at) to page unread vs read.
+• Default read to false.
+• TTL policy or “soft delete” flag so you can auto‑purge old alerts.
+profiles
+• Ensure user_id is both PK and FK to your auth table.
+• Add last_seen_at TIMESTAMP for activity tracking.
+• Index on (subscription_status, subscription_expires_at) if you gate features by tier.
+workflows (if you have this table)
+• Columns: definition JSONB, version INT, created_by, created_at, updated_at.
+• Enforce versioning (UNIQUE(workflow_id, version)).
+• Index on (created_by, updated_at) for dashboard listing.
+users/auth
+• Don’t roll your own—use Supabase Auth. But if you extend, store profile metadata in a separate table and index on email/username unique.
+audit/history tables (optional)
+• For compliance, consider an audit_logs table capturing user_id, action, table_name, row_id, changed_data JSONB, timestamp.
+RLS & Policies
+• Globally apply RLS so users only see their own rows for all tables with a user_id column.
+• For public resources (e.g. published custom blocks), add a policy that allows select on rows where is_public = true OR created_by = auth.uid().
+JSONB & Full‑Text indexes
+• If you need to query inside definition JSONB (workflows) or data JSONB (logs), add GIN indexes on those columns.
+• For any searchable text fields (e.g. block code, notification message), consider full‑text search indexes.
+
+do these operations

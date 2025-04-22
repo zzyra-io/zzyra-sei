@@ -17,12 +17,15 @@ export async function initExecutionQueue(): Promise<any> {
 
 export async function addExecutionJob(
   executionId: string,
-  workflowId: string
+  workflowId: string,
+  userId: string
 ): Promise<void> {
   const ch = await initExecutionQueue();
+  const payload = { executionId, workflowId, userId };
+  console.log('[Queue] Enqueue job:', payload);
   ch.sendToQueue(
     QUEUE_NAME,
-    Buffer.from(JSON.stringify({ executionId, workflowId })),
+    Buffer.from(JSON.stringify(payload)),
     { persistent: true }
   );
 }

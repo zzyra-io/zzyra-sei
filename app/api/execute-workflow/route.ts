@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     const { addExecutionJob } = await import(
       "@/lib/queue/executionQueue.server"
     );
-    await addExecutionJob(executionId, workflowId);
+    await addExecutionJob(executionId, workflowId, user.id);
 
     return NextResponse.json({ executionId });
   } catch (error) {

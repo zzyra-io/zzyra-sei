@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Loader2, RefreshCw, CheckCircle, XCircle, AlertCircle, Clock } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+import { formatDistanceToNow, formatDistance } from "date-fns"
 
 interface ExecutionLogsListProps {
   logs: any[]
@@ -19,7 +19,6 @@ export function ExecutionLogsList({ logs: initialLogs, workflowId }: ExecutionLo
   const [logs, setLogs] = useState<any[]>(initialLogs || [])
   const [isLoading, setIsLoading] = useState(false)
   const [expandedLog, setExpandedLog] = useState<string | null>(null)
-  const [nodeExecutions, setNodeExecutions] = useState<Record<string, any[]>>({})
 
   // Real-time subscription for workflow_executions
   useEffect(() => {
@@ -36,28 +35,13 @@ export function ExecutionLogsList({ logs: initialLogs, workflowId }: ExecutionLo
     return () => { supabase.removeChannel(execSub) }
   }, [workflowId])
 
-  // Real-time subscription for node_executions of expanded log
-  useEffect(() => {
-    if (!expandedLog) return
-    const nodeSub = supabase
-      .channel('realtime-node-execs')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'node_executions', filter: `execution_id=eq.${expandedLog}` }, (payload) => {
-        setNodeExecutions((prev) => ({
-          ...prev,
-          [payload.new.execution_id]: [...(prev[payload.new.execution_id] || []), payload.new],
-        }))
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(nodeSub) }
-  }, [expandedLog])
-
   const fetchLogs = async () => {
     try {
       setIsLoading(true)
 
       const { data, error } = await supabase
         .from("workflow_executions")
-        .select("*")
+        .select("*, node_executions(*)")
         .eq("workflow_id", workflowId)
         .order("started_at", { ascending: false })
 
@@ -66,11 +50,6 @@ export function ExecutionLogsList({ logs: initialLogs, workflowId }: ExecutionLo
       }
 
       setLogs(data || [])
-
-      // If there's a currently expanded log, fetch its node executions
-      if (expandedLog) {
-        fetchNodeExecutions(expandedLog)
-      }
     } catch (error) {
       console.error("Error fetching logs:", error)
     } finally {
@@ -78,33 +57,13 @@ export function ExecutionLogsList({ logs: initialLogs, workflowId }: ExecutionLo
     }
   }
 
-  const fetchNodeExecutions = async (executionId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("node_executions")
-        .select("*")
-        .eq("execution_id", executionId)
-        .order("started_at", { ascending: true })
-
-      if (error) {
-        throw new Error(`Failed to fetch node executions: ${error.message}`)
-      }
-
-      setNodeExecutions((prev) => ({
-        ...prev,
-        [executionId]: data || [],
-      }))
-    } catch (error) {
-      console.error("Error fetching node executions:", error)
-    }
-  }
+  // Initial load of logs with node_executions
+  useEffect(() => {
+    fetchLogs()
+  }, [workflowId])
 
   const handleAccordionChange = (value: string) => {
     setExpandedLog(value === expandedLog ? null : value)
-
-    if (value !== expandedLog && !nodeExecutions[value]) {
-      fetchNodeExecutions(value)
-    }
   }
 
   const getStatusIcon = (status: string) => {
@@ -179,7 +138,7 @@ export function ExecutionLogsList({ logs: initialLogs, workflowId }: ExecutionLo
       </div>
 
       <div className="space-y-4">
-        {logs.map((log) => (
+        {logs.map((log: any) => (
           <Card key={log.id}>
             <CardHeader className="pb-2">
               <div className="flex justify-between items-start">
@@ -227,16 +186,16 @@ export function ExecutionLogsList({ logs: initialLogs, workflowId }: ExecutionLo
 
                       <div>
                         <p className="text-sm font-medium mb-2">Node Executions</p>
-                        {!nodeExecutions[log.id] ? (
+                        {!log.node_executions ? (
                           <div className="flex items-center justify-center p-4">
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             <span className="text-sm text-muted-foreground">Loading node executions...</span>
                           </div>
-                        ) : nodeExecutions[log.id].length === 0 ? (
+                        ) : log.node_executions.length === 0 ? (
                           <p className="text-sm text-muted-foreground">No node executions found</p>
                         ) : (
                           <div className="border rounded-md divide-y">
-                            {nodeExecutions[log.id].map((nodeExec) => (
+                            {log.node_executions.map((nodeExec: any) => (
                               <div key={nodeExec.id} className="p-3">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
@@ -286,7 +245,7 @@ export function ExecutionLogsList({ logs: initialLogs, workflowId }: ExecutionLo
                 <span>
                   Duration:{" "}
                   {log.completed_at
-                    ? formatDistanceToNow(new Date(log.started_at), { end: new Date(log.completed_at) })
+                    ? formatDistance(new Date(log.started_at), new Date(log.completed_at))
                     : "In progress"}
                 </span>
                 <span>ID: {log.id}</span>

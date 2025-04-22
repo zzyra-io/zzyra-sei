@@ -196,6 +196,9 @@ export class WorkflowExecutionEngine {
       };
     }
 
+    // Log this node execution for all nodes
+    await this.logNodeExecution(context.executionId, node.id, result);
+
     // Continue to next nodes on success
     let nextNodeIds: string[] = [];
     if (result.success && result.conditionMet !== false) {
@@ -225,16 +228,16 @@ export class WorkflowExecutionEngine {
   ) {
     const supabase = await createClient();
 
-    // Log node execution into execution_logs table
+    // Log node execution into node_executions table
     await supabase
-      .from("execution_logs")
+      .from("node_executions")
       .insert({
         execution_id: executionId,
         node_id: nodeId,
-        level: result.success ? "info" : "error",
-        message: result.success ? "Node executed successfully" : result.error || "",
-        data: result.data || null,
-        timestamp: new Date().toISOString(),
+        status: result.success ? "completed" : "failed",
+        output_data: result.data || null,
+        error: result.error || null,
+        // started_at and completed_at default to now()
       });
   }
 

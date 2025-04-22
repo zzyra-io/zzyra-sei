@@ -222,3 +222,18 @@ export async function getWorkflowExecutions(workflowId: string) {
     return { executions: [], error: error.message };
   }
 }
+
+// Resume a paused workflow execution
+export async function resumeExecution(executionId: string, resumeData: any = {}) {
+  // Call the resume API
+  const res = await fetch(`/api/executions/${executionId}/resume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resumeData }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    return { error: err.error || 'Failed to resume execution' };
+  }
+  return await res.json();
+}
