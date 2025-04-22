@@ -49,7 +49,6 @@ export function ExecutionNodeExecutions({ executionId }: ExecutionNodeExecutions
 
   if (loading) return <div className="text-center py-4">Loading node executions...</div>
   if (error) return <div className="text-center py-4 text-red-500">Error: {error}</div>
-  if (!nodes.length) return <div className="text-center py-4 text-muted-foreground">No node executions found</div>
 
   function getStatusIcon(status: string) {
     switch (status) {
@@ -57,6 +56,12 @@ export function ExecutionNodeExecutions({ executionId }: ExecutionNodeExecutions
         return <CheckCircle className="h-4 w-4 text-green-500" />
       case "failed":
         return <AlertCircle className="h-4 w-4 text-red-500" />
+      case "running":
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Running</Badge>
+      case "pending":
+        return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">Pending</Badge>
+      case "paused":
+        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Paused</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }

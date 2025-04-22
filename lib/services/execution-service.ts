@@ -13,20 +13,31 @@ export interface ExecutionLog {
   id: string;
   execution_id: string;
   node_id: string;
-  level: "info" | "warning" | "error";
+  // level may be any string returned from the backend
+  level: string;
   message: string;
   data?: any;
   timestamp: string;
 }
 
+export interface NodeExecution {
+  id: string;
+  execution_id: string;
+  node_id: string;
+  status: string;
+  started_at: string;
+  completed_at?: string;
+}
+
 export interface ExecutionResult {
   id: string;
   workflow_id: string;
-  status: ExecutionStatus;
+  status: string;
   started_at: string;
   completed_at?: string;
   result?: any;
   logs: ExecutionLog[];
+  nodeExecutions: NodeExecution[];
 }
 
 export class ExecutionService {
@@ -152,7 +163,7 @@ export class ExecutionService {
       }
 
       // Get execution logs
-      const { data: logs, error: logsError } = await this.supabase
+      const { data: rawLogs, error: logsError } = await this.supabase
         .from("execution_logs")
         .select("*")
         .eq("execution_id", executionId)
@@ -161,10 +172,46 @@ export class ExecutionService {
       if (logsError) {
         throw logsError;
       }
+      // Map and cast raw logs to ExecutionLog[]
+      const logs: ExecutionLog[] = (rawLogs || []).map((r) => ({
+        id: r.id,
+        execution_id: r.execution_id,
+        node_id: r.node_id,
+        level: r.level as string,
+        message: r.message,
+        data: r.data,
+        timestamp: r.timestamp,
+      }));
 
+      // Get node execution records
+      const { data: rawNodeExecs, error: nodeExecError } = await this.supabase
+        .from("node_executions")
+        .select("*")
+        .eq("execution_id", executionId)
+        .order("started_at", { ascending: true });
+      if (nodeExecError) {
+        console.error("Error fetching node executions:", nodeExecError);
+      }
+      // Cast to NodeExecution[]
+      const nodeExecutions = (rawNodeExecs || []).map((r) => ({
+        id: r.id,
+        execution_id: r.execution_id,
+        node_id: r.node_id,
+        status: r.status as string,
+        started_at: r.started_at,
+        completed_at: r.completed_at,
+      }));
+
+      // Return typed ExecutionResult object
       return {
-        ...execution,
+        id: execution.id,
+        workflow_id: execution.workflow_id,
+        status: execution.status as string,
+        started_at: execution.started_at || '',
+        completed_at: execution.completed_at || undefined,
+        result: execution.result,
         logs,
+        nodeExecutions,
       };
     } catch (error) {
       console.error("Error fetching execution:", error);
@@ -211,7 +258,19 @@ export class ExecutionService {
         })
       );
 
-      return executionsWithLogs;
+      // Ensure nodeExecutions field exists for type safety
+      return executionsWithLogs.map((e) => ({
+        id: e.id,
+        workflow_id: e.workflow_id,
+        status: e.status as string,
+        // Ensure non-null started_at
+        started_at: e.started_at ?? '',
+        // Use undefined if completed_at is null
+        completed_at: e.completed_at ?? undefined,
+        result: e.result,
+        logs: e.logs,
+        nodeExecutions: [],
+      }));
     } catch (error) {
       console.error("Error fetching workflow executions:", error);
       return [];

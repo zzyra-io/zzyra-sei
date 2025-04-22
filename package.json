@@ -81,6 +81,7 @@
     "react-hotkeys-hook": "^5.0.1",
     "react-resizable-panels": "^2.1.7",
     "reactflow": "^11.10.1",
+    "recharts": "^2.15.3",
     "stripe": "^18.0.0",
     "styled-components": "^6.1.1",
     "tailwind-merge": "^3.2.0",
