@@ -2,15 +2,15 @@
 
 import type React from "react";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2, Mail, Wallet, ArrowRight } from "lucide-react";
+import { useSupabase } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { useSupabase } from "@/components/auth-provider";
 import { ConnectKitButton } from "connectkit";
+import { ArrowRight, Loader2, Mail, Wallet } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export function LoginForm() {
   const { supabase } = useSupabase();
@@ -83,9 +83,33 @@ export function LoginForm() {
     }
   };
 
+  // Google OAuth login
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Google login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      console.error("Google login error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Tabs defaultValue='email' className='w-full'>
-      <TabsList className='grid w-full grid-cols-2'>
+      <TabsList className='grid w-full grid-cols-3'>
         <TabsTrigger value='email' className='flex items-center gap-2'>
           <Mail className='h-4 w-4' />
           <span>Email</span>
@@ -94,6 +118,7 @@ export function LoginForm() {
           <Wallet className='h-4 w-4' />
           <span>Wallet</span>
         </TabsTrigger>
+        <TabsTrigger value='google'>Google</TabsTrigger>
       </TabsList>
 
       <TabsContent value='email'>
@@ -152,6 +177,17 @@ export function LoginForm() {
             blockchain technology.
           </p>
           <ConnectKitButton />
+        </div>
+      </TabsContent>
+
+      <TabsContent value='google'>
+        <div className='space-y-4 p-6'>
+          <Button
+            onClick={handleGoogleLogin}
+            className='w-full'
+            disabled={isLoading}>
+            Continue with Google
+          </Button>
         </div>
       </TabsContent>
     </Tabs>

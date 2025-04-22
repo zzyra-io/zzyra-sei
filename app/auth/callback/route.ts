@@ -1,17 +1,16 @@
-import { createClient } from "@/lib/supabase/server"
-import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server";
+import { NextResponse, type NextRequest } from "next/server";
 
-export async function GET(request: Request) {
-  const requestUrl = new URL(request.url)
-  const code = requestUrl.searchParams.get("code")
+export const runtime = "edge";
 
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code");
   if (code) {
-    const supabase = createClient()
-
-    // Exchange the code for a session
-    await supabase.auth.exchangeCodeForSession(code)
+    const supabase = await createClient();
+    // Exchange the code for a session (sets cookies)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) console.error("Auth exchange error:", error);
   }
-
-  // URL to redirect to after sign in process completes
-  return NextResponse.redirect(new URL("/", requestUrl.origin))
+  return NextResponse.redirect(new URL("/", url.origin));
 }
