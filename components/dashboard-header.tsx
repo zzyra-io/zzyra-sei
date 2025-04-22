@@ -51,7 +51,6 @@ export function DashboardHeader() {
     { name: "Templates", href: "/templates", icon: FileText },
     { name: "Finance", href: "/finance", icon: Zap },
     { name: "Blockchain", href: "/blockchain", icon: Wallet },
-    { name: "Settings", href: "/settings", icon: Settings },
   ];
 
   return (

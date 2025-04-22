@@ -316,6 +316,7 @@ export default function BuilderPage() {
       const response = await fetch("/api/execute-workflow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ workflowId: execWorkflowId }),
       });
       if (!response.ok) throw new Error("Failed to enqueue execution");
@@ -385,6 +386,7 @@ export default function BuilderPage() {
       const resp = await fetch("/api/execute-workflow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ workflowId: execId }),
       });
       if (!resp.ok) throw new Error("Failed to enqueue execution");
