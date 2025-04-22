@@ -14,5 +14,5 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) console.error("Auth exchange error:", error);
   }
-  return NextResponse.redirect(new URL("/", url.origin));
+  return NextResponse.redirect(new URL("/dashboard", url.origin));
 }

@@ -10,6 +10,6 @@ CREATE POLICY select_own_node_executions
   FOR SELECT
   USING (
     execution_id IN (
-      SELECT id FROM public.workflow_executions WHERE created_by = auth.uid()
+      SELECT id FROM public.workflow_executions WHERE triggered_by = auth.uid()
     )
   );

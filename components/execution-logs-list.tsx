@@ -32,7 +32,26 @@ export function ExecutionLogsList({ logs: initialLogs, workflowId }: ExecutionLo
         }
       })
       .subscribe()
-    return () => { supabase.removeChannel(execSub) }
+
+    // Subscribe to node_executions for real-time node data
+    const nodeSub = supabase
+      .channel('realtime-node-execs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'node_executions' }, (payload) => {
+        const newNode = payload.new as any
+        setLogs((prev) =>
+          prev.map((log) =>
+            log.id === newNode.execution_id
+              ? { ...log, node_executions: [...(log.node_executions || []), newNode] }
+              : log
+          )
+        )
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(execSub)
+      supabase.removeChannel(nodeSub)
+    }
   }, [workflowId])
 
   const fetchLogs = async () => {

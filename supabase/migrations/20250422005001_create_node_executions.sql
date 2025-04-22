@@ -7,5 +7,6 @@ create table if not exists node_executions (
   status        text        not null,
   output_data   jsonb,
   error         text,
+  started_at    timestamptz not null default now(),
   completed_at  timestamptz not null default now()
 );

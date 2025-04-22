@@ -9,41 +9,77 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          changed_data: Json | null
+          id: string
+          row_id: string | null
+          table_name: string
+          timestamp: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changed_data?: Json | null
+          id?: string
+          row_id?: string | null
+          table_name: string
+          timestamp?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changed_data?: Json | null
+          id?: string
+          row_id?: string | null
+          table_name?: string
+          timestamp?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       custom_blocks: {
         Row: {
           category: string | null
           code: string
           created_at: string | null
+          created_by: string | null
           description: string | null
           icon: string | null
           id: string
           is_public: boolean | null
           name: string
           updated_at: string | null
+          updated_by: string | null
           user_id: string
         }
         Insert: {
           category?: string | null
           code: string
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           icon?: string | null
           id?: string
           is_public?: boolean | null
           name: string
           updated_at?: string | null
+          updated_by?: string | null
           user_id: string
         }
         Update: {
           category?: string | null
           code?: string
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           icon?: string | null
           id?: string
           is_public?: boolean | null
           name?: string
           updated_at?: string | null
+          updated_by?: string | null
           user_id?: string
         }
         Relationships: []
@@ -56,7 +92,7 @@ export type Database = {
           level: string
           message: string
           node_id: string
-          timestamp: string | null
+          timestamp: string
         }
         Insert: {
           data?: Json | null
@@ -65,7 +101,7 @@ export type Database = {
           level: string
           message: string
           node_id: string
-          timestamp?: string | null
+          timestamp?: string
         }
         Update: {
           data?: Json | null
@@ -74,7 +110,7 @@ export type Database = {
           level?: string
           message?: string
           node_id?: string
-          timestamp?: string | null
+          timestamp?: string
         }
         Relationships: [
           {
@@ -89,29 +125,35 @@ export type Database = {
       node_executions: {
         Row: {
           completed_at: string
+          duration_ms: number | null
           error: string | null
           execution_id: string
           id: string
           node_id: string
           output_data: Json | null
+          started_at: string
           status: string
         }
         Insert: {
           completed_at?: string
+          duration_ms?: number | null
           error?: string | null
           execution_id: string
           id?: string
           node_id: string
           output_data?: Json | null
+          started_at?: string
           status: string
         }
         Update: {
           completed_at?: string
+          duration_ms?: number | null
           error?: string | null
           execution_id?: string
           id?: string
           node_id?: string
           output_data?: Json | null
+          started_at?: string
           status?: string
         }
         Relationships: [
@@ -130,7 +172,7 @@ export type Database = {
           data: Json | null
           id: string
           message: string
-          read: boolean | null
+          read: boolean
           title: string
           type: string
           user_id: string
@@ -140,7 +182,7 @@ export type Database = {
           data?: Json | null
           id?: string
           message: string
-          read?: boolean | null
+          read?: boolean
           title: string
           type: string
           user_id: string
@@ -150,7 +192,7 @@ export type Database = {
           data?: Json | null
           id?: string
           message?: string
-          read?: boolean | null
+          read?: boolean
           title?: string
           type?: string
           user_id?: string
@@ -164,6 +206,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          last_seen_at: string | null
           monthly_execution_count: number | null
           monthly_execution_quota: number | null
           stripe_customer_id: string | null
@@ -179,6 +222,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          last_seen_at?: string | null
           monthly_execution_count?: number | null
           monthly_execution_quota?: number | null
           stripe_customer_id?: string | null
@@ -194,6 +238,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          last_seen_at?: string | null
           monthly_execution_count?: number | null
           monthly_execution_quota?: number | null
           stripe_customer_id?: string | null
@@ -261,6 +306,50 @@ export type Database = {
         }
         Relationships: []
       }
+      transaction_attempts: {
+        Row: {
+          attempt_no: number
+          error: string | null
+          execution_id: string
+          gas_used: number | null
+          id: string
+          node_id: string
+          status: string
+          tried_at: string
+          tx_hash: string | null
+        }
+        Insert: {
+          attempt_no: number
+          error?: string | null
+          execution_id: string
+          gas_used?: number | null
+          id: string
+          node_id: string
+          status: string
+          tried_at?: string
+          tx_hash?: string | null
+        }
+        Update: {
+          attempt_no?: number
+          error?: string | null
+          execution_id?: string
+          gas_used?: number | null
+          id?: string
+          node_id?: string
+          status?: string
+          tried_at?: string
+          tx_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_attempts_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_executions: {
         Row: {
           completed_at: string | null
@@ -305,6 +394,47 @@ export type Database = {
           },
         ]
       }
+      workflow_pauses: {
+        Row: {
+          context: Json
+          created_by: string
+          execution_id: string
+          id: string
+          node_id: string
+          paused_at: string
+          resume_data: Json | null
+          resumed_at: string | null
+        }
+        Insert: {
+          context: Json
+          created_by: string
+          execution_id: string
+          id: string
+          node_id: string
+          paused_at?: string
+          resume_data?: Json | null
+          resumed_at?: string | null
+        }
+        Update: {
+          context?: Json
+          created_by?: string
+          execution_id?: string
+          id?: string
+          node_id?: string
+          paused_at?: string
+          resume_data?: Json | null
+          resumed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_pauses_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_templates: {
         Row: {
           category: string | null
@@ -341,6 +471,8 @@ export type Database = {
       workflows: {
         Row: {
           created_at: string | null
+          created_by: string | null
+          definition: Json
           description: string | null
           edges: Json | null
           id: string
@@ -350,9 +482,12 @@ export type Database = {
           tags: string[] | null
           updated_at: string | null
           user_id: string
+          version: number
         }
         Insert: {
           created_at?: string | null
+          created_by?: string | null
+          definition?: Json
           description?: string | null
           edges?: Json | null
           id?: string
@@ -362,9 +497,12 @@ export type Database = {
           tags?: string[] | null
           updated_at?: string | null
           user_id?: string
+          version?: number
         }
         Update: {
           created_at?: string | null
+          created_by?: string | null
+          definition?: Json
           description?: string | null
           edges?: Json | null
           id?: string
@@ -374,6 +512,7 @@ export type Database = {
           tags?: string[] | null
           updated_at?: string | null
           user_id?: string
+          version?: number
         }
         Relationships: []
       }
