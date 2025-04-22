@@ -225,17 +225,17 @@ export class WorkflowExecutionEngine {
   ) {
     const supabase = await createClient();
 
+    // Log node execution into execution_logs table
     await supabase
-      .from("node_executions")
+      .from("execution_logs")
       .insert({
         execution_id: executionId,
         node_id: nodeId,
-        status: result.success ? "completed" : "failed",
-        output_data: result.data || null,
-        error: result.error || null,
-        completed_at: new Date().toISOString(),
-      })
-      .single();
+        level: result.success ? "info" : "error",
+        message: result.success ? "Node executed successfully" : result.error || "",
+        data: result.data || null,
+        timestamp: new Date().toISOString(),
+      });
   }
 
   // Node-specific executors

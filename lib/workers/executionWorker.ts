@@ -9,7 +9,6 @@ import { config } from "@/lib/config";
 import { Counter, Histogram } from "prom-client";
 import "dotenv/config";
 import { createServiceClient } from "@/lib/supabase/serviceClient";
-import { v4 as uuidv4 } from "uuid";
 import { ethers, parseEther } from "ethers";
 import { Node, Edge } from "reactflow";
 import {

@@ -1,12 +1,13 @@
 import { config } from "@/lib/config";
 
-const RABBITMQ_URL = process.env.RABBITMQ_URL || "amqp://guest:guest@localhost:5672";
+const RABBITMQ_URL =
+  process.env.RABBITMQ_URL || "amqp://guest:guest@localhost:5672";
 let channel: any;
-const QUEUE_NAME = 'execution_queue';
+const QUEUE_NAME = "ZYRA.EXECUTION_QUEUE";
 
 export async function initExecutionQueue(): Promise<any> {
   if (channel) return channel;
-  const amqp = await import('amqplib');
+  const amqp = await import("amqplib");
   const conn = await amqp.connect(RABBITMQ_URL);
   channel = await conn.createChannel();
   await channel.assertQueue(QUEUE_NAME, { durable: true });
@@ -14,7 +15,14 @@ export async function initExecutionQueue(): Promise<any> {
   return channel;
 }
 
-export async function addExecutionJob(executionId: string, workflowId: string): Promise<void> {
+export async function addExecutionJob(
+  executionId: string,
+  workflowId: string
+): Promise<void> {
   const ch = await initExecutionQueue();
-  ch.sendToQueue(QUEUE_NAME, Buffer.from(JSON.stringify({ executionId, workflowId })), { persistent: true });
+  ch.sendToQueue(
+    QUEUE_NAME,
+    Buffer.from(JSON.stringify({ executionId, workflowId })),
+    { persistent: true }
+  );
 }

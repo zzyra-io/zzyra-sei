@@ -86,6 +86,44 @@ export type Database = {
           },
         ]
       }
+      node_executions: {
+        Row: {
+          completed_at: string
+          error: string | null
+          execution_id: string
+          id: string
+          node_id: string
+          output_data: Json | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string
+          error?: string | null
+          execution_id: string
+          id?: string
+          node_id: string
+          output_data?: Json | null
+          status: string
+        }
+        Update: {
+          completed_at?: string
+          error?: string | null
+          execution_id?: string
+          id?: string
+          node_id?: string
+          output_data?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "node_executions_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null
