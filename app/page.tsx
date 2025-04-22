@@ -1,8 +1,11 @@
+"use client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, LucideLayoutDashboard } from "lucide-react";
+import { useSupabase } from "@/components/auth-provider";
 
 export default function HomePage() {
+  const { session } = useSupabase();
   return (
     <div className='flex min-h-screen flex-col'>
       <header className='sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60'>
@@ -13,9 +16,16 @@ export default function HomePage() {
             </Link>
           </div>
           <div className='flex items-center space-x-4'>
-            <Button asChild variant='outline'>
-              <Link href='/login'>Login</Link>
-            </Button>
+            {session ? (
+              <Button variant='outline'>
+                <LucideLayoutDashboard className='mr-2 h-4 w-4' />
+                <Link href='/dashboard'>Dashboard</Link>
+              </Button>
+            ) : (
+              <Button asChild variant='outline'>
+                <Link href='/login'>Login</Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -35,7 +45,7 @@ export default function HomePage() {
                 </div>
                 <div className='flex flex-col gap-2 min-[400px]:flex-row'>
                   <Button asChild size='lg'>
-                    <Link href='/dashboard'>
+                    <Link href='/login'>
                       Get Started <ArrowRight className='ml-2 h-4 w-4' />
                     </Link>
                   </Button>
