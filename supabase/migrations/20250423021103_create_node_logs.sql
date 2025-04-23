@@ -11,5 +11,11 @@ CREATE TABLE IF NOT EXISTS public.node_logs (
 ALTER TABLE node_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow reads" ON node_logs FOR SELECT USING (true);
 
-  USING (auth.uid() IS NOT NULL)
-  WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "Allow insert" ON node_logs
+    FOR INSERT
+    WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Allow update" ON node_logs
+    FOR UPDATE
+    USING (auth.uid() IS NOT NULL)
+    WITH CHECK (auth.uid() IS NOT NULL);
