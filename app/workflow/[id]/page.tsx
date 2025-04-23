@@ -51,6 +51,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getPausedNodeSnapshot } from "@/lib/services/paused-node-service";
 import { useRef } from "react";
+import WorkflowTimeline from "@/components/workflow-execution-timeline";
 
 export default function WorkflowDetailPage() {
   // Grab route params client-side
@@ -553,12 +554,16 @@ export default function WorkflowDetailPage() {
                         <ScatterChart
                           margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                           <CartesianGrid strokeDasharray='3 3' />
-                          <XAxis 
-                            type='category' 
-                            dataKey='date' 
-                            name='Date' 
+                          <XAxis
+                            type='category'
+                            dataKey='date'
+                            name='Date'
                             tick={{ fontSize: 12 }}
-                            label={{ value: 'Date', position: 'insideBottom', offset: -15 }}
+                            label={{
+                              value: "Date",
+                              position: "insideBottom",
+                              offset: -15,
+                            }}
                           />
                           <YAxis
                             type='category'
@@ -566,7 +571,11 @@ export default function WorkflowDetailPage() {
                             name='Node'
                             width={150}
                             tick={{ fontSize: 12 }}
-                            label={{ value: 'Node', angle: -90, position: 'insideLeft' }}
+                            label={{
+                              value: "Node",
+                              angle: -90,
+                              position: "insideLeft",
+                            }}
                           />
                           <ZAxis
                             type='number'
@@ -574,24 +583,41 @@ export default function WorkflowDetailPage() {
                             range={[100, 1500]}
                             name='AvgDuration'
                           />
-                          <Scatter 
-                            data={heatmap} 
-                            fill='#4f46e5' 
+                          <Scatter
+                            data={heatmap}
+                            fill='#4f46e5'
                             shape='circle'
                           />
-                          <Tooltip 
-                            cursor={{ strokeDasharray: '3 3' }}
+                          <Tooltip
+                            cursor={{ strokeDasharray: "3 3" }}
                             content={({ active, payload }) => {
                               if (active && payload && payload.length) {
                                 const data = payload[0].payload;
                                 return (
-                                  <div className="bg-white p-3 border rounded-md shadow-md text-xs">
-                                    <p className="font-medium">{data.nodeLabel}</p>
-                                    <p className="text-gray-500">{data.date}</p>
-                                    <div className="mt-2">
-                                      <p><span className="font-medium">Avg Duration:</span> {data.avgDuration} ms</p>
-                                      <p><span className="font-medium">Failure Rate:</span> {data.failureRate}%</p>
-                                      <p><span className="font-medium">Executions:</span> {data.executionCount}</p>
+                                  <div className='bg-white p-3 border rounded-md shadow-md text-xs'>
+                                    <p className='font-medium'>
+                                      {data.nodeLabel}
+                                    </p>
+                                    <p className='text-gray-500'>{data.date}</p>
+                                    <div className='mt-2'>
+                                      <p>
+                                        <span className='font-medium'>
+                                          Avg Duration:
+                                        </span>{" "}
+                                        {data.avgDuration} ms
+                                      </p>
+                                      <p>
+                                        <span className='font-medium'>
+                                          Failure Rate:
+                                        </span>{" "}
+                                        {data.failureRate}%
+                                      </p>
+                                      <p>
+                                        <span className='font-medium'>
+                                          Executions:
+                                        </span>{" "}
+                                        {data.executionCount}
+                                      </p>
                                     </div>
                                   </div>
                                 );
@@ -599,14 +625,38 @@ export default function WorkflowDetailPage() {
                               return null;
                             }}
                           />
-                          <Legend verticalAlign="top" height={36}/>
+                          <Legend verticalAlign='top' height={36} />
                         </ScatterChart>
                       </ResponsiveContainer>
                     ) : (
-                      <div className="h-full flex items-center justify-center flex-col p-6 text-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 mb-2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><line x1="3" x2="21" y1="9" y2="9"></line><line x1="9" x2="9" y1="21" y2="9"></line></svg>
-                        <p className="text-gray-500 text-sm">No performance data available for this workflow</p>
-                        <p className="text-gray-400 text-xs mt-1">Run more executions to see performance metrics</p>
+                      <div className='h-full flex items-center justify-center flex-col p-6 text-center'>
+                        <svg
+                          xmlns='http://www.w3.org/2000/svg'
+                          width='24'
+                          height='24'
+                          viewBox='0 0 24 24'
+                          fill='none'
+                          stroke='currentColor'
+                          strokeWidth='2'
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          className='text-gray-400 mb-2'>
+                          <rect
+                            width='18'
+                            height='18'
+                            x='3'
+                            y='3'
+                            rx='2'
+                            ry='2'></rect>
+                          <line x1='3' x2='21' y1='9' y2='9'></line>
+                          <line x1='9' x2='9' y1='21' y2='9'></line>
+                        </svg>
+                        <p className='text-gray-500 text-sm'>
+                          No performance data available for this workflow
+                        </p>
+                        <p className='text-gray-400 text-xs mt-1'>
+                          Run more executions to see performance metrics
+                        </p>
                       </div>
                     )}
                   </CardContent>
@@ -614,349 +664,13 @@ export default function WorkflowDetailPage() {
               </TabsContent>
 
               <TabsContent value='timeline' className='space-y-4'>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Timeline</CardTitle>
-                    <div className='flex items-center gap-2'>
-                      <CardDescription>
-                        Select an execution to view node timings
-                      </CardDescription>
-                      <Button
-                        size='sm'
-                        variant='outline'
-                        onClick={() => setReplaying((r) => !r)}>
-                        {replaying ? "Stop Replay" : "Replay"}
-                      </Button>
-                      {replaying && (
-                        <span className='text-sm text-muted-foreground'>
-                          Step {replayIndex + 1}/{timelineData.length}
-                        </span>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <label htmlFor='select-execution' className='sr-only'>
-                      Select Execution
-                    </label>
-                    <select
-                      id='select-execution'
-                      value={selectedExecutionId || ""}
-                      onChange={(e) => setSelectedExecutionId(e.target.value)}
-                      className='mb-4 border rounded px-2 py-1'>
-                      {executionLogs.map((log) => (
-                        <option key={log.id} value={log.id}>
-                          {log.id} – {new Date(log.started_at).toLocaleString()}
-                        </option>
-                      ))}
-                    </select>
-                    {execDetail ? (
-                      <ResponsiveContainer width='100%' height={300}>
-                        <BarChart
-                          data={timelineData}
-                          layout='vertical'
-                          margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray='3 3' />
-                          <XAxis
-                            type='number'
-                            domain={["auto", "auto"]}
-                            tickFormatter={formatTime}
-                          />
-                          <YAxis
-                            dataKey='name'
-                            type='category'
-                            width={150}
-                            tickFormatter={(id) => {
-                              const node = workflow?.nodes.find(
-                                (n) => n.id === id
-                              );
-                              return (
-                                node?.data?.label ||
-                                node?.data?.name ||
-                                node?.type ||
-                                id
-                              );
-                            }}
-                          />
-                          <Tooltip
-                            formatter={formatDuration}
-                            labelFormatter={(time) =>
-                              `Start: ${formatTime(time as number)}`
-                            }
-                          />
-                          <Bar
-                            dataKey='duration'
-                            onClick={(_, idx) =>
-                              setSelectedNodeId(timelineData[idx].name)
-                            }>
-                            {timelineData.map((item, idx) => {
-                              let color = "#4f46e5";
-                              if (item.status === "failed") color = "#dc2626";
-                              else if (item.status === "completed")
-                                color = "#22c55e";
-                              else if (item.status === "running")
-                                color = "#eab308";
-                              else if (item.status === "pending")
-                                color = "#a3a3a3";
-                              if (idx === replayIndex) color = "#dc2626";
-                              return <Cell key={idx} fill={color} />;
-                            })}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <p>No execution selected.</p>
-                    )}
-                  </CardContent>
-                </Card>
-                {selectedNodeId &&
-                  execDetail &&
-                  (() => {
-                    // Find node execution, or fake one for pending nodes
-                    let nodeExec = execDetail.nodeExecutions.find(
-                      (n) => n.node_id === selectedNodeId
-                    );
-                    if (!nodeExec && workflow) {
-                      // Synthesize a pending node execution if not found
-                      const nodeDef = workflow.nodes.find(
-                        (n) => n.id === selectedNodeId
-                      );
-                      if (nodeDef)
-                        nodeExec = {
-                          node_id: selectedNodeId,
-                          status: "pending",
-                        } as NodeExecution;
-                    }
-                    const isPaused = nodeExec && nodeExec.status === "paused";
-                    return (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Node: {selectedNodeId}</CardTitle>
-                          <div className='flex items-center space-x-2'>
-                            <select
-                              aria-label='Filter logs by level'
-                              value={levelFilter}
-                              onChange={(e) =>
-                                setLevelFilter(e.target.value as any)
-                              }
-                              className='border rounded px-2 py-1 text-sm'>
-                              <option value='all'>All Levels</option>
-                              <option value='info'>Info</option>
-                              <option value='warning'>Warn</option>
-                              <option value='error'>Error</option>
-                            </select>
-                            <Button
-                              size='sm'
-                              variant='outline'
-                              onClick={async () => {
-                                await fetch(
-                                  `/api/executions/${selectedExecutionId}/pause`,
-                                  { method: "POST" }
-                                );
-                                toast({ title: "Paused", variant: "default" });
-                              }}>
-                              Pause
-                            </Button>
-                            <Button
-                              size='sm'
-                              variant='outline'
-                              onClick={async () => {
-                                await fetch(
-                                  `/api/executions/${selectedExecutionId}/cancel`,
-                                  { method: "POST" }
-                                );
-                                toast({
-                                  title: "Canceled",
-                                  variant: "default",
-                                });
-                              }}>
-                              Cancel
-                            </Button>
-                            <Button
-                              size='sm'
-                              variant='outline'
-                              onClick={async () => {
-                                await fetch(
-                                  `/api/executions/${selectedExecutionId}/retry`,
-                                  {
-                                    method: "POST",
-                                    body: JSON.stringify({
-                                      nodeId: selectedNodeId,
-                                    }),
-                                  }
-                                );
-                                toast({
-                                  title: "Retry enqueued",
-                                  variant: "default",
-                                });
-                              }}>
-                              Retry
-                            </Button>
-                            {isPaused && (
-                              <Button
-                                size='sm'
-                                variant='default'
-                                disabled={resumeLoading}
-                                onClick={async () => {
-                                  setResumeLoading(true);
-                                  let resumeData;
-                                  try {
-                                    resumeData = JSON.parse(
-                                      pausedInputRef.current?.value || "{}"
-                                    );
-                                  } catch {
-                                    toast({
-                                      title: "Invalid input JSON",
-                                      variant: "destructive",
-                                    });
-                                    setResumeLoading(false);
-                                    return;
-                                  }
-                                  const res = await fetch(
-                                    `/api/executions/${selectedExecutionId}/resume`,
-                                    {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                      },
-                                      body: JSON.stringify({ resumeData }),
-                                    }
-                                  );
-                                  if (res.ok) {
-                                    toast({
-                                      title: "Resumed",
-                                      variant: "default",
-                                    });
-                                    setPausedSnapshot(null);
-                                    // Optionally refetch execution detail
-                                  } else {
-                                    toast({
-                                      title: "Resume failed",
-                                      variant: "destructive",
-                                    });
-                                  }
-                                  setResumeLoading(false);
-                                }}>
-                                {resumeLoading ? (
-                                  <span className='flex items-center'>
-                                    <Loader2 className='animate-spin mr-2 h-4 w-4' />
-                                    Resuming...
-                                  </span>
-                                ) : (
-                                  "Resume"
-                                )}
-                              </Button>
-                            )}
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          {isPaused && (
-                            <div className='mb-4'>
-                              <div className='font-semibold mb-1'>
-                                Paused Node Input Snapshot
-                              </div>
-                              <Button
-                                size='sm'
-                                variant='outline'
-                                className='mb-2'
-                                onClick={async () => {
-                                  const snap = await getPausedNodeSnapshot(
-                                    selectedExecutionId!,
-                                    selectedNodeId
-                                  );
-                                  setPausedSnapshot(snap);
-                                  if (snap && pausedInputRef.current) {
-                                    pausedInputRef.current.value =
-                                      JSON.stringify(snap.inputData, null, 2);
-                                  }
-                                }}>
-                                Load Snapshot
-                              </Button>
-                              <textarea
-                                ref={pausedInputRef}
-                                className='w-full border rounded p-2 font-mono text-xs bg-gray-50'
-                                rows={8}
-                                defaultValue={
-                                  pausedSnapshot
-                                    ? JSON.stringify(
-                                        pausedSnapshot.inputData,
-                                        null,
-                                        2
-                                      )
-                                    : ""
-                                }
-                                placeholder='Input snapshot JSON will appear here...'
-                              />
-                              <div className='text-xs text-muted-foreground mt-1'>
-                                You can edit the input JSON before resuming.
-                              </div>
-                            </div>
-                          )}
-                          <ul className='space-y-1 max-h-64 overflow-y-auto'>
-                            {execDetail.logs
-                              .filter(
-                                (l) =>
-                                  l.node_id === selectedNodeId &&
-                                  (levelFilter === "all" ||
-                                    l.level === levelFilter)
-                              )
-                              .map((log) => (
-                                <li
-                                  key={log.id}
-                                  className='flex justify-between'>
-                                  <span>
-                                    {format(
-                                      new Date(log.timestamp),
-                                      "HH:mm:ss"
-                                    )}{" "}
-                                    [{log.level}] {log.message}
-                                  </span>
-                                  <Button
-                                    size='sm'
-                                    variant='link'
-                                    onClick={() => setModalLog(log)}>
-                                    Details
-                                  </Button>
-                                </li>
-                              ))}
-                          </ul>
-                          {/* Show message for pending nodes with no logs */}
-                          {(!nodeExec || nodeExec.status === "pending") &&
-                            execDetail.logs.filter(
-                              (l) => l.node_id === selectedNodeId
-                            ).length === 0 && (
-                              <div className='text-sm text-muted-foreground mt-4'>
-                                This node has not started yet.
-                              </div>
-                            )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })()}
-
-                <Dialog
-                  open={!!modalLog}
-                  onOpenChange={(open) => !open && setModalLog(null)}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Log Details</DialogTitle>
-                    </DialogHeader>
-                    <pre className='p-4 bg-gray-100 max-h-64 overflow-auto'>
-                      {JSON.stringify(modalLog?.data || modalLog, null, 2)}
-                    </pre>
-                  </DialogContent>
-                </Dialog>
+                <WorkflowTimeline />
               </TabsContent>
 
               <TabsContent value='history'>
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Execution History</CardTitle>
-                    <CardDescription>
-                      View the history of all executions for this workflow
-                    </CardDescription>
-                  </CardHeader>
                   <CardContent>
-                    <ExecutionLogsList logs={executionLogs} workflowId={id} />
+                    <ExecutionLogsList workflowId={id} />
                   </CardContent>
                 </Card>
               </TabsContent>
