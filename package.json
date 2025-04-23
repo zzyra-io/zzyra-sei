@@ -9,7 +9,7 @@
     "lint": "next lint",
     "db:push": "supabase db push && pnpm run generate-types",
     "db:push:debug": "supabase db push --debug && pnpm run generate-types",
-    "generate-types": "supabase gen types typescript --project-id uwdenpccbluoolhuwwuq --schema public > types/supabase.ts",
+    "db:generate-types": "supabase gen types typescript --project-id uwdenpccbluoolhuwwuq --schema public > types/supabase.ts",
     "worker:start": "pnpx tsx -r dotenv/config lib/workers/executionWorker.ts"
   },
   "dependencies": {

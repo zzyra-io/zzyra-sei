@@ -131,8 +131,10 @@ export type Database = {
           id: string
           node_id: string
           output_data: Json | null
+          retry_count: number | null
           started_at: string
           status: string
+          updated_at: string | null
         }
         Insert: {
           completed_at?: string
@@ -142,8 +144,10 @@ export type Database = {
           id?: string
           node_id: string
           output_data?: Json | null
+          retry_count?: number | null
           started_at?: string
           status: string
+          updated_at?: string | null
         }
         Update: {
           completed_at?: string
@@ -153,12 +157,104 @@ export type Database = {
           id?: string
           node_id?: string
           output_data?: Json | null
+          retry_count?: number | null
           started_at?: string
           status?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "node_executions_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      node_inputs: {
+        Row: {
+          data: Json
+          execution_id: string
+          node_id: string
+        }
+        Insert: {
+          data: Json
+          execution_id: string
+          node_id: string
+        }
+        Update: {
+          data?: Json
+          execution_id?: string
+          node_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "node_inputs_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      node_logs: {
+        Row: {
+          data: Json | null
+          execution_id: string | null
+          id: string
+          level: string | null
+          message: string
+          node_id: string
+          timestamp: string
+        }
+        Insert: {
+          data?: Json | null
+          execution_id?: string | null
+          id?: string
+          level?: string | null
+          message: string
+          node_id: string
+          timestamp?: string
+        }
+        Update: {
+          data?: Json | null
+          execution_id?: string | null
+          id?: string
+          level?: string | null
+          message?: string
+          node_id?: string
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "node_logs_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      node_outputs: {
+        Row: {
+          data: Json
+          execution_id: string
+          node_id: string
+        }
+        Insert: {
+          data: Json
+          execution_id: string
+          node_id: string
+        }
+        Update: {
+          data?: Json
+          execution_id?: string
+          node_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "node_outputs_execution_id_fkey"
             columns: ["execution_id"]
             isOneToOne: false
             referencedRelation: "workflow_executions"
@@ -354,34 +450,43 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string | null
+          duration_ms: number | null
+          error: string | null
           id: string
           logs: Json | null
           result: Json | null
           started_at: string | null
           status: string
           triggered_by: string | null
+          updated_at: string | null
           workflow_id: string
         }
         Insert: {
           completed_at?: string | null
           created_at?: string | null
+          duration_ms?: number | null
+          error?: string | null
           id?: string
           logs?: Json | null
           result?: Json | null
           started_at?: string | null
           status: string
           triggered_by?: string | null
+          updated_at?: string | null
           workflow_id: string
         }
         Update: {
           completed_at?: string | null
           created_at?: string | null
+          duration_ms?: number | null
+          error?: string | null
           id?: string
           logs?: Json | null
           result?: Json | null
           started_at?: string | null
           status?: string
           triggered_by?: string | null
+          updated_at?: string | null
           workflow_id?: string
         }
         Relationships: [
@@ -521,6 +626,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_execution_duration_stats: {
+        Args: { workflow_id: string; since_date: string }
+        Returns: {
+          avg: number
+          min: number
+          max: number
+        }[]
+      }
+      get_node_execution_stats: {
+        Args: { workflow_id: string; since_date: string }
+        Returns: {
+          node_id: string
+          execution_count: number
+          avg_duration: number
+          failure_rate: number
+        }[]
+      }
       reset_monthly_execution_count: {
         Args: Record<PropertyKey, never>
         Returns: undefined

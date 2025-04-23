@@ -133,9 +133,11 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
           .from("node_logs")
           .select("*")
           .in("execution_id", execIds);
+        console.log("[ExecutionLogsList] fetched node_logs data:", logsData);
         const logsMap: Record<string, any[]> = {};
         (logsData || []).forEach((l: any) => {
           const k = `${l.execution_id}_${l.node_id}`;
+          console.log(`Mapping log key ${k}`, l);
           if (!logsMap[k]) logsMap[k] = [];
           logsMap[k].push(l);
         });
@@ -528,6 +530,9 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
                   getStatusBadge={getStatusBadge}
                   handleAction={handleAction}
                   viewJsonData={viewJsonData}
+                  nodeInputs={nodeInputs}
+                  nodeOutputs={nodeOutputs}
+                  nodeLogs={nodeLogs}
                 />
               ))}
             </div>
@@ -557,8 +562,7 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
   );
 }
 
-// Extracted ExecutionLogCard component for better organization
-function ExecutionLogCard({
+export const ExecutionLogCard = ({
   log,
   expandedLogs,
   setExpandedLogs,
@@ -567,6 +571,9 @@ function ExecutionLogCard({
   getStatusBadge,
   handleAction,
   viewJsonData,
+  nodeInputs,
+  nodeOutputs,
+  nodeLogs,
 }: {
   log: any;
   expandedLogs: Record<string, boolean>;
@@ -574,15 +581,19 @@ function ExecutionLogCard({
     React.SetStateAction<Record<string, boolean>>
   >;
   formatDate: (dateString: string) => string;
-  getStatusIcon: (status: string) => JSX.Element;
-  getStatusBadge: (status: string) => JSX.Element;
+  getStatusIcon: (status: string) => any;
+  getStatusBadge: (status: string) => any;
   handleAction: (
     action: string,
     logId: string,
     nodeId?: string
   ) => Promise<void>;
   viewJsonData: (data: any) => void;
-}) {
+  nodeInputs: Record<string, any>;
+  nodeOutputs: Record<string, any>;
+  nodeLogs: Record<string, any[]>;
+}) => {
+  console.log("log", log);
   return (
     <Card
       className={`overflow-hidden transition-all duration-200 ${
@@ -794,7 +805,7 @@ function ExecutionLogCard({
       </CardFooter>
     </Card>
   );
-}
+};
 
 // Node execution component
 type NodeExecutionItemProps = {
