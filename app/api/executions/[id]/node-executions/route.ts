@@ -43,7 +43,7 @@ export async function GET(
     // 3. Fetch all node_executions for this execution
     const { data: nodeExecs, error: nodeExecError } = await supabase
       .from('node_executions')
-      .select('id, node_id, status, output, error, started_at, finished_at')
+      .select('id, node_id, status, output, error, started_at, finished_at, logs')
       .eq('execution_id', executionId);
     if (nodeExecError) {
       return NextResponse.json({ error: nodeExecError.message }, { status: 500 });
@@ -64,6 +64,7 @@ export async function GET(
         completed_at: exec?.finished_at || null,
         output_data: exec?.output || null,
         error: exec?.error || null,
+        logs: exec?.logs || [],
       };
     });
 

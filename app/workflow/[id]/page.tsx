@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { AuthGate } from "@/components/auth-gate";
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -27,10 +27,6 @@ import { workflowService } from "@/lib/services/workflow-service";
 import { executionService } from "@/lib/services/execution-service";
 import type { Workflow } from "@/lib/supabase/schema";
 import type { ExecutionResult } from "@/lib/services/execution-service";
-import type {
-  NodeExecution,
-  ExecutionLog,
-} from "@/lib/services/execution-service";
 import { ArrowLeft, Play, Settings, Loader2 } from "lucide-react";
 import {
   CartesianGrid,
@@ -49,23 +45,21 @@ import {
   Cell,
 } from "recharts";
 import { createClient } from "@/lib/supabase/client";
-import { getPausedNodeSnapshot } from "@/lib/services/paused-node-service";
-import { useRef } from "react";
 import WorkflowTimeline from "@/components/workflow-execution-timeline";
+import Link from "next/link";
 
 export default function WorkflowDetailPage() {
-  // Grab route params client-side
   const paramsClient = useParams();
   const id = Array.isArray(paramsClient?.id)
     ? paramsClient.id[0]
     : paramsClient?.id;
-  if (!id) {
-    return null; // or show a loader
-  }
+  if (!id) return null; // or show a loader
 
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [executionLogs, setExecutionLogs] = useState<ExecutionResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isWorkflowLoading, setIsWorkflowLoading] = useState(true);
+  const [isLogsLoading, setIsLogsLoading] = useState(true);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
   const [isExecuting, setIsExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [stats, setStats] = useState<{
@@ -88,99 +82,82 @@ export default function WorkflowDetailPage() {
     null
   );
   const [execDetail, setExecDetail] = useState<ExecutionResult | null>(null);
-  const [replaying, setReplaying] = useState(false);
-  const [replayIndex, setReplayIndex] = useState(0);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [levelFilter, setLevelFilter] = useState<
-    "all" | "info" | "warning" | "error"
-  >("all");
-  const [modalLog, setModalLog] = useState<ExecutionLog | null>(null);
-  const [pausedSnapshot, setPausedSnapshot] = useState<any | null>(null);
-  const [resumeLoading, setResumeLoading] = useState(false);
-  const pausedInputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const router = useRouter();
-
-  // Supabase browser client for realtime
   const supabaseClient = createClient();
 
-  // Prepare timeline data for Gantt
-  // --- PATCH: Always show all nodes, even if not started ---
-  const timelineData =
-    execDetail && workflow
-      ? workflow.nodes.map((node) => {
-          const ne = execDetail.nodeExecutions.find(
-            (n) => n.node_id === node.id
-          );
-          const startMs = ne?.started_at
-            ? new Date(ne.started_at).getTime()
-            : null;
-          const endMs = ne?.completed_at
-            ? new Date(ne.completed_at).getTime()
-            : startMs;
-          return {
-            name: node.id,
-            label: node.data?.label || node.data?.name || node.type || node.id,
-            status: ne?.status || "pending",
-            start: startMs,
-            duration: startMs && endMs ? endMs - startMs : 0,
-          };
-        })
-      : [];
+  // Memoized execution summary
+  const executionSummary = useMemo(
+    () => ({
+      total: executionLogs.length,
+      successful: executionLogs.filter((log) => log.status === "completed")
+        .length,
+      failed: executionLogs.filter((log) => log.status === "failed").length,
+    }),
+    [executionLogs]
+  );
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setIsLoading(true);
-        // First fetch the workflow data
-        const workflowData = await workflowService.getWorkflow(id);
+        setIsWorkflowLoading(true);
+        setIsLogsLoading(true);
+        setIsStatsLoading(true);
+
+        // Parallelize independent API calls
+        const [workflowData, logsData, statsRes, trendsRes, hmRes] =
+          await Promise.all([
+            workflowService.getWorkflow(id),
+            executionService.getWorkflowExecutions(id).catch((err) => {
+              console.error("Error fetching logs:", err);
+              toast({
+                title: "Warning",
+                description:
+                  "Could not load execution logs. Some features may be limited.",
+              });
+              return [];
+            }),
+            fetch(`/api/executions/stats?workflowId=${id}`)
+              .then((res) => (res.ok ? res.json() : null))
+              .catch((err) => {
+                console.error("Error fetching stats:", err);
+                toast({
+                  title: "Error",
+                  description: "Failed to load execution stats.",
+                  variant: "destructive",
+                });
+                return null;
+              }),
+            fetch(`/api/executions/trends?workflowId=${id}`)
+              .then((res) => (res.ok ? res.json() : []))
+              .catch((err) => {
+                console.error("Error fetching trends:", err);
+                toast({
+                  title: "Error",
+                  description: "Failed to load execution trends.",
+                  variant: "destructive",
+                });
+                return [];
+              }),
+            fetch(`/api/executions/heatmap?workflowId=${id}`)
+              .then((res) => (res.ok ? res.json() : []))
+              .catch((err) => {
+                console.error("Error fetching heatmap:", err);
+                toast({
+                  title: "Error",
+                  description: "Failed to load heatmap data.",
+                  variant: "destructive",
+                });
+                return [];
+              }),
+          ]);
+
         setWorkflow(workflowData);
-
-        // Then try to fetch execution logs, but don't fail if they can't be fetched
-        try {
-          const logsData = await executionService.getWorkflowExecutions(id);
-          setExecutionLogs(logsData);
-        } catch (logsError) {
-          console.error("Error fetching execution logs:", logsError);
-          // Set empty logs array if there's an error
-          setExecutionLogs([]);
-          // Show a toast notification about the logs error
-          toast({
-            title: "Warning",
-            description:
-              "Could not load execution history. Some features may be limited.",
-          });
-        }
-
-        // Fetch aggregated stats
-        try {
-          const statsRes = await fetch(
-            `/api/executions/stats?workflowId=${id}`
-          );
-          if (statsRes.ok) setStats(await statsRes.json());
-        } catch (err) {
-          console.error("Error fetching stats:", err);
-        }
-        // Fetch execution trends
-        try {
-          const trendsRes = await fetch(
-            `/api/executions/trends?workflowId=${id}`
-          );
-          if (trendsRes.ok) setTrends(await trendsRes.json());
-        } catch (err) {
-          console.error("Error fetching trends:", err);
-        }
-        // Fetch heatmap data
-        try {
-          const hmRes = await fetch(`/api/executions/heatmap?workflowId=${id}`);
-          if (hmRes.ok) setHeatmap(await hmRes.json());
-        } catch (err) {
-          console.error("Error fetching heatmap:", err);
-        }
-        // Initialize selected exec ID to latest
-        if (executionLogs.length > 0) {
-          setSelectedExecutionId(executionLogs[0].id);
-        }
+        setExecutionLogs(logsData);
+        setStats(statsRes);
+        setTrends(trendsRes);
+        setHeatmap(hmRes);
+        if (logsData.length > 0) setSelectedExecutionId(logsData[0].id);
       } catch (error) {
         toast({
           title: "Error fetching workflow",
@@ -189,7 +166,9 @@ export default function WorkflowDetailPage() {
         });
         router.push("/dashboard");
       } finally {
-        setIsLoading(false);
+        setIsWorkflowLoading(false);
+        setIsLogsLoading(false);
+        setIsStatsLoading(false);
       }
     };
 
@@ -202,8 +181,6 @@ export default function WorkflowDetailPage() {
         .getExecution(selectedExecutionId)
         .then(setExecDetail)
         .catch((err) => console.error("Error fetching execution detail:", err));
-      // reset node selection on exec change
-      setSelectedNodeId(null);
     }
   }, [activeTab, selectedExecutionId]);
 
@@ -226,7 +203,7 @@ export default function WorkflowDetailPage() {
                     ...prev,
                     nodeExecutions: [
                       ...prev.nodeExecutions,
-                      payload.new as NodeExecution,
+                      payload.new as ExecutionResult["nodeExecutions"][0],
                     ],
                   }
                 : prev
@@ -238,30 +215,34 @@ export default function WorkflowDetailPage() {
         supabaseClient.removeChannel(channel);
       };
     }
-  }, [activeTab, selectedExecutionId]);
+  }, [activeTab, selectedExecutionId, supabaseClient]);
 
   useEffect(() => {
-    if (replaying && timelineData.length) {
-      const timer = setInterval(() => {
-        setReplayIndex((i) => {
-          if (i + 1 >= timelineData.length) {
-            setReplaying(false);
-            return i;
+    if (activeTab === "history") {
+      const channel = supabaseClient
+        .channel(`executions_${id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "execution_results",
+            filter: `workflow_id=eq.${id}`,
+          },
+          (payload) => {
+            setExecutionLogs((prev) => [payload.new, ...prev]);
           }
-          return i + 1;
-        });
-      }, 1000);
-      return () => clearInterval(timer);
+        )
+        .subscribe();
+      return () => {
+        supabaseClient.removeChannel(channel);
+      };
     }
-  }, [replaying, timelineData]);
-
-  const formatTime = (ms: number) => new Date(ms).toLocaleTimeString();
-  const formatDuration = (val: number) => `${val} ms`;
+  }, [activeTab, id, supabaseClient]);
 
   const handleExecute = async () => {
     try {
       setIsExecuting(true);
-      // Start execution via API
       const res = await fetch("/api/execute-workflow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -270,7 +251,6 @@ export default function WorkflowDetailPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to start execution");
-      // Refresh execution history
       const logs = await executionService.getWorkflowExecutions(id);
       setExecutionLogs(logs);
       toast({
@@ -296,7 +276,7 @@ export default function WorkflowDetailPage() {
     router.push(`/builder?id=${id}`);
   };
 
-  if (isLoading) {
+  if (isWorkflowLoading) {
     return (
       <AuthGate>
         <div className='flex min-h-screen flex-col'>
@@ -317,19 +297,18 @@ export default function WorkflowDetailPage() {
           <main className='flex-1 bg-muted/30 px-4 py-6 sm:px-6 lg:px-8'>
             <div className='mx-auto max-w-7xl'>
               <div className='mb-6 flex items-center gap-4'>
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  onClick={() => router.push("/dashboard")}>
-                  <ArrowLeft className='mr-2 h-4 w-4' />
-                  Back to Dashboard
+                <Button variant='ghost' size='sm' asChild>
+                  <Link href='/dashboard'>
+                    <ArrowLeft className='mr-2 h-4 w-4' />
+                    Back to Dashboard
+                  </Link>
                 </Button>
               </div>
               <div className='rounded-lg border bg-card p-8 text-center'>
                 <h2 className='text-xl font-semibold'>Workflow not found</h2>
                 <p className='mt-2 text-muted-foreground'>
-                  The workflow you're looking for doesn't exist or you don't
-                  have permission to view it.
+                  The workflow you&apos;re looking for doesn&apos;t exist or you
+                  don&apos;t have permission to view it.
                 </p>
                 <Button
                   className='mt-4'
@@ -352,12 +331,11 @@ export default function WorkflowDetailPage() {
           <div className='mx-auto max-w-7xl'>
             <div className='mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center'>
               <div className='flex items-center gap-4'>
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  onClick={() => router.push("/dashboard")}>
-                  <ArrowLeft className='mr-2 h-4 w-4' />
-                  Back
+                <Button variant='ghost' size='sm' asChild>
+                  <Link href='/dashboard'>
+                    <ArrowLeft className='mr-2 h-4 w-4' />
+                    Back
+                  </Link>
                 </Button>
                 <h1 className='text-2xl font-bold tracking-tight'>
                   {workflow.name}
@@ -389,9 +367,21 @@ export default function WorkflowDetailPage() {
               onValueChange={setActiveTab}
               className='space-y-4'>
               <TabsList>
-                <TabsTrigger value='overview'>Overview</TabsTrigger>
-                <TabsTrigger value='timeline'>Timeline</TabsTrigger>
-                <TabsTrigger value='history'>Execution History</TabsTrigger>
+                <TabsTrigger
+                  value='overview'
+                  aria-label='View workflow overview'>
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger
+                  value='timeline'
+                  aria-label='View execution timeline'>
+                  Timeline
+                </TabsTrigger>
+                <TabsTrigger
+                  value='history'
+                  aria-label='View execution history'>
+                  Execution History
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value='overview' className='space-y-4'>
@@ -446,40 +436,38 @@ export default function WorkflowDetailPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className='grid gap-4 sm:grid-cols-3'>
-                      <div className='rounded-lg border p-4'>
-                        <div className='text-sm font-medium text-muted-foreground'>
-                          Total Executions
+                    {isLogsLoading ? (
+                      <div className='flex justify-center p-4'>
+                        <Loader2 className='h-6 w-6 animate-spin' />
+                      </div>
+                    ) : (
+                      <div className='grid gap-4 sm:grid-cols-3'>
+                        <div className='rounded-lg border p-4'>
+                          <div className='text-sm font-medium text-muted-foreground'>
+                            Total Executions
+                          </div>
+                          <div className='mt-1 text-2xl font-bold'>
+                            {executionSummary.total}
+                          </div>
                         </div>
-                        <div className='mt-1 text-2xl font-bold'>
-                          {executionLogs.length}
+                        <div className='rounded-lg border p-4'>
+                          <div className='text-sm font-medium text-muted-foreground'>
+                            Successful
+                          </div>
+                          <div className='mt-1 text-2xl font-bold text-green-500'>
+                            {executionSummary.successful}
+                          </div>
+                        </div>
+                        <div className='rounded-lg border p-4'>
+                          <div className='text-sm font-medium text-muted-foreground'>
+                            Failed
+                          </div>
+                          <div className='mt-1 text-2xl font-bold text-red-500'>
+                            {executionSummary.failed}
+                          </div>
                         </div>
                       </div>
-                      <div className='rounded-lg border p-4'>
-                        <div className='text-sm font-medium text-muted-foreground'>
-                          Successful
-                        </div>
-                        <div className='mt-1 text-2xl font-bold text-green-500'>
-                          {
-                            executionLogs.filter(
-                              (log) => log.status === "completed"
-                            ).length
-                          }
-                        </div>
-                      </div>
-                      <div className='rounded-lg border p-4'>
-                        <div className='text-sm font-medium text-muted-foreground'>
-                          Failed
-                        </div>
-                        <div className='mt-1 text-2xl font-bold text-red-500'>
-                          {
-                            executionLogs.filter(
-                              (log) => log.status === "failed"
-                            ).length
-                          }
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -491,32 +479,42 @@ export default function WorkflowDetailPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className='grid gap-4 sm:grid-cols-3'>
-                      <div className='rounded-lg border p-4'>
-                        <div className='text-sm font-medium text-muted-foreground'>
-                          Avg Duration
+                    {isStatsLoading ? (
+                      <div className='flex justify-center p-4'>
+                        <Loader2 className='h-6 w-6 animate-spin' />
+                      </div>
+                    ) : stats ? (
+                      <div className='grid gap-4 sm:grid-cols-3'>
+                        <div className='rounded-lg border p-4'>
+                          <div className='text-sm font-medium text-muted-foreground'>
+                            Avg Duration
+                          </div>
+                          <div className='mt-1 text-2xl font-bold'>
+                            {stats.avgDuration}ms
+                          </div>
                         </div>
-                        <div className='mt-1 text-2xl font-bold'>
-                          {stats?.avgDuration ?? "-"}ms
+                        <div className='rounded-lg border p-4'>
+                          <div className='text-sm font-medium text-muted-foreground'>
+                            Median Duration
+                          </div>
+                          <div className='mt-1 text-2xl font-bold'>
+                            {stats.medianDuration}ms
+                          </div>
+                        </div>
+                        <div className='rounded-lg border p-4'>
+                          <div className='text-sm font-medium text-muted-foreground'>
+                            Peak Concurrency
+                          </div>
+                          <div className='mt-1 text-2xl font-bold'>
+                            {stats.peakConcurrency}
+                          </div>
                         </div>
                       </div>
-                      <div className='rounded-lg border p-4'>
-                        <div className='text-sm font-medium text-muted-foreground'>
-                          Median Duration
-                        </div>
-                        <div className='mt-1 text-2xl font-bold'>
-                          {stats?.medianDuration ?? "-"}ms
-                        </div>
-                      </div>
-                      <div className='rounded-lg border p-4'>
-                        <div className='text-sm font-medium text-muted-foreground'>
-                          Peak Concurrency
-                        </div>
-                        <div className='mt-1 text-2xl font-bold'>
-                          {stats?.peakConcurrency ?? "-"}
-                        </div>
-                      </div>
-                    </div>
+                    ) : (
+                      <p className='text-muted-foreground'>
+                        No performance data available
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -526,18 +524,26 @@ export default function WorkflowDetailPage() {
                     <CardDescription>Last 30 days</CardDescription>
                   </CardHeader>
                   <CardContent style={{ height: 200 }}>
-                    <ResponsiveContainer width='100%' height='100%'>
-                      <LineChart data={trends}>
-                        <XAxis dataKey='timestamp' hide />
-                        <Tooltip />
-                        <Line
-                          type='monotone'
-                          dataKey='count'
-                          stroke='#4f46e5'
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    {trends.length > 0 ? (
+                      <ResponsiveContainer width='100%' height='100%'>
+                        <LineChart
+                          data={trends}
+                          aria-label='Executions over time chart'>
+                          <XAxis dataKey='timestamp' hide />
+                          <Tooltip />
+                          <Line
+                            type='monotone'
+                            dataKey='count'
+                            stroke='#4f46e5'
+                            dot={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <p className='text-muted-foreground'>
+                        No trend data available
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -549,7 +555,7 @@ export default function WorkflowDetailPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent style={{ height: 400 }}>
-                    {heatmap && heatmap.length > 0 ? (
+                    {heatmap.length > 0 ? (
                       <ResponsiveContainer width='100%' height='100%'>
                         <ScatterChart
                           margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
