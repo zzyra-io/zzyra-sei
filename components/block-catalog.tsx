@@ -43,8 +43,8 @@ interface BlockCatalogProps {
 }
 
 export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
-  const FAVORITES_KEY = 'block_favorites';
-  const RECENT_KEY = 'block_recent';
+  const FAVORITES_KEY = "block_favorites";
+  const RECENT_KEY = "block_recent";
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [favorites, setFavorites] = useState<BlockType[]>(() => {
@@ -55,9 +55,16 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
     const stored = localStorage.getItem(RECENT_KEY);
     return stored ? JSON.parse(stored) : [];
   });
-  useEffect(() => { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites)); }, [favorites]);
-  useEffect(() => { localStorage.setItem(RECENT_KEY, JSON.stringify(recents)); }, [recents]);
-  const toggleFavorite = (type: BlockType) => setFavorites(f => f.includes(type) ? f.filter(t=>t!==type) : [type, ...f]);
+  useEffect(() => {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  }, [favorites]);
+  useEffect(() => {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recents));
+  }, [recents]);
+  const toggleFavorite = (type: BlockType) =>
+    setFavorites((f) =>
+      f.includes(type) ? f.filter((t) => t !== type) : [type, ...f]
+    );
 
   // Define block categories
   const categories = [
@@ -90,7 +97,9 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
     event: React.DragEvent,
     block: (typeof blocks)[0]
   ) => {
-    setRecents(r => [block.type, ...r.filter(t => t !== block.type)].slice(0, 10));
+    setRecents((r) =>
+      [block.type, ...r.filter((t) => t !== block.type)].slice(0, 10)
+    );
     // Create a serializable version of the block data
     const blockData = {
       blockType: block.type, // Use the enum value
@@ -125,7 +134,9 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
 
   // Handle block click for direct addition
   const handleBlockClick = (block: (typeof blocks)[0]) => {
-    setRecents(r => [block.type, ...r.filter(t => t !== block.type)].slice(0, 10));
+    setRecents((r) =>
+      [block.type, ...r.filter((t) => t !== block.type)].slice(0, 10)
+    );
     if (typeof onAddBlock === "function") {
       onAddBlock(block.type);
     }
@@ -139,10 +150,16 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
           <div>
             <div className='text-xs font-medium mb-1'>Favorites</div>
             <div className='flex gap-2 overflow-x-auto'>
-              {favorites.map(ft => {
-                const blk = BLOCK_CATALOG[ft]; if(!blk) return null;
+              {favorites.map((ft) => {
+                const blk = BLOCK_CATALOG[ft];
+                if (!blk) return null;
                 return (
-                  <div key={ft} draggable onDragStart={e=>handleDragStart(e,blk)} onClick={()=>handleBlockClick(blk)} className='flex items-center gap-1 p-2 bg-card rounded shadow'>
+                  <div
+                    key={ft}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, blk)}
+                    onClick={() => handleBlockClick(blk)}
+                    className='flex items-center gap-1 p-2 bg-card rounded shadow'>
                     {getBlockIcon(blk.icon)}
                     <span className='text-xs'>{blk.label}</span>
                   </div>
@@ -155,10 +172,16 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
           <div>
             <div className='text-xs font-medium mb-1'>Recent</div>
             <div className='flex gap-2 overflow-x-auto'>
-              {recents.map(rt => {
-                const blk = BLOCK_CATALOG[rt]; if(!blk) return null;
+              {recents.map((rt) => {
+                const blk = BLOCK_CATALOG[rt];
+                if (!blk) return null;
                 return (
-                  <div key={rt} draggable onDragStart={e=>handleDragStart(e,blk)} onClick={()=>handleBlockClick(blk)} className='flex items-center gap-1 p-2 bg-card rounded shadow'>
+                  <div
+                    key={rt}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, blk)}
+                    onClick={() => handleBlockClick(blk)}
+                    className='flex items-center gap-1 p-2 bg-card rounded shadow'>
                     {getBlockIcon(blk.icon)}
                     <span className='text-xs'>{blk.label}</span>
                   </div>
@@ -248,7 +271,17 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
                   </div>
                 </div>
                 <div className='absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity'>
-                  <Star className={`h-4 w-4 cursor-pointer ${favorites.includes(block.type)?'text-yellow-400':'text-muted-foreground'}`} onClick={e=>{ e.stopPropagation(); toggleFavorite(block.type); }} />
+                  <Star
+                    className={`h-4 w-4 cursor-pointer ${
+                      favorites.includes(block.type)
+                        ? "text-yellow-400"
+                        : "text-muted-foreground"
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(block.type);
+                    }}
+                  />
                 </div>
                 <div className='absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-70 transition-opacity'>
                   <GripHorizontal className='h-4 w-4 text-muted-foreground' />
@@ -273,29 +306,29 @@ function getBlockIcon(iconName: string) {
   const iconProps = { className: "h-5 w-5" };
 
   switch (iconName) {
-    case "price-monitor":
+    case BlockType.PRICE_MONITOR:
       return <BarChart3 {...iconProps} />;
-    case "schedule":
+    case BlockType.SCHEDULE:
       return <Calendar {...iconProps} />;
-    case "webhook":
+    case BlockType.WEBHOOK:
       return <Webhook {...iconProps} />;
-    case "email":
+    case BlockType.EMAIL:
       return <Mail {...iconProps} />;
-    case "notification":
+    case BlockType.NOTIFICATION:
       return <Bell {...iconProps} />;
-    case "database":
+    case BlockType.DATABASE:
       return <Database {...iconProps} />;
-    case "wallet":
+    case BlockType.WALLET:
       return <Wallet {...iconProps} />;
-    case "transaction":
+    case BlockType.TRANSACTION:
       return <ArrowUpRight {...iconProps} />;
-    case "condition":
+    case BlockType.CONDITION:
       return <Filter {...iconProps} />;
-    case "delay":
+    case BlockType.DELAY:
       return <Clock {...iconProps} />;
-    case "transform":
+    case BlockType.TRANSFORM:
       return <Zap {...iconProps} />;
-    case "goat-finance":
+    case BlockType.GOAT_FINANCE:
       return <DollarSign {...iconProps} />;
     default:
       return <Package {...iconProps} />;

@@ -38,12 +38,12 @@ export enum NodeCategory {
 
 // Block metadata interface
 export interface BlockMetadata {
-  type: BlockType
-  label: string
-  description: string
-  category: NodeCategory
-  icon: string
-  defaultConfig: Record<string, any>
+  type: BlockType;
+  label: string;
+  description: string;
+  category: NodeCategory;
+  icon: string;
+  defaultConfig: Record<string, any>;
 }
 
 // Block catalog definition with metadata for each block type
@@ -55,7 +55,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
     category: NodeCategory.TRIGGER,
     icon: "price-monitor",
     defaultConfig: {
-      asset: "ETH",
+      asset: "ETHEREUM",
       condition: "above",
       targetPrice: "2000",
       checkInterval: "5",
@@ -214,62 +214,73 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
     icon: "unknown",
     defaultConfig: {},
   },
-}
+};
 
 // Helper functions for working with block types
-export const getBlockMetadata = (blockType: BlockType | string): BlockMetadata => {
+export const getBlockMetadata = (
+  blockType: BlockType | string
+): BlockMetadata => {
   // If it's already a BlockType enum, use it directly
   if (Object.values(BlockType).includes(blockType as BlockType)) {
-    return BLOCK_CATALOG[blockType as BlockType]
+    return BLOCK_CATALOG[blockType as BlockType];
   }
 
   // Try to find a matching block type
-  const normalizedType = (blockType || "").toLowerCase().replace(/_/g, "-")
-  const matchedType = Object.values(BlockType).find((type) => type === normalizedType)
+  const normalizedType = (blockType || "").toLowerCase().replace(/_/g, "-");
+  const matchedType = Object.values(BlockType).find(
+    (type) => type === normalizedType
+  );
 
   if (matchedType) {
-    return BLOCK_CATALOG[matchedType]
+    return BLOCK_CATALOG[matchedType];
   }
 
   // Return unknown block type if no match found
-  return BLOCK_CATALOG[BlockType.UNKNOWN]
-}
+  return BLOCK_CATALOG[BlockType.UNKNOWN];
+};
 
 // Get category color
 export const getCategoryColor = (category: NodeCategory): string => {
   switch (category) {
     case NodeCategory.TRIGGER:
-      return "blue"
+      return "blue";
     case NodeCategory.ACTION:
-      return "green"
+      return "green";
     case NodeCategory.LOGIC:
-      return "purple"
+      return "purple";
     case NodeCategory.FINANCE:
-      return "amber"
+      return "amber";
     default:
-      return "gray"
+      return "gray";
   }
-}
+};
 
 // Helper to get block type from various sources
 export const getBlockType = (data: any): BlockType => {
   // Check if it's a custom block
   if (data?.customBlockId) {
-    return BlockType.CUSTOM
+    return BlockType.CUSTOM;
   }
 
   // Gather possible type fields
-  const possibleTypes = [data?.blockType, data?.type, data?.nodeType, data?.id].filter(Boolean)
+  const possibleTypes = [
+    data?.blockType,
+    data?.type,
+    data?.nodeType,
+    data?.id,
+  ].filter(Boolean);
 
   // Try to match each possible type to a BlockType enum
   for (const typeValue of possibleTypes) {
-    const normalizedType = (typeValue || "").toLowerCase().replace(/_/g, "-")
-    const matchedType = Object.values(BlockType).find((type) => type === normalizedType)
+    const normalizedType = (typeValue || "").toLowerCase().replace(/_/g, "-");
+    const matchedType = Object.values(BlockType).find(
+      (type) => type === normalizedType
+    );
     if (matchedType) {
-      return matchedType
+      return matchedType;
     }
   }
 
   // Return unknown if no match found
-  return BlockType.UNKNOWN
-}
+  return BlockType.UNKNOWN;
+};

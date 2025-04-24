@@ -720,7 +720,7 @@ export const ExecutionLogCard = ({
                     <p className='text-sm'>
                       {log.completed_at
                         ? formatDistance(
-                            new Date(log.started_at),
+                            new Date(log.created_at),
                             new Date(log.completed_at)
                           )
                         : "In progress"}

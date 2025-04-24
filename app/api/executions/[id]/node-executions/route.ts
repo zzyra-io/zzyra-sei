@@ -43,7 +43,7 @@ export async function GET(
     // 3. Fetch all node_executions for this execution
     const { data: nodeExecs, error: nodeExecError } = await supabase
       .from('node_executions')
-      .select('id, node_id, status, output_data, error, started_at, completed_at')
+      .select('id, node_id, status, output, error, started_at, finished_at')
       .eq('execution_id', executionId);
     if (nodeExecError) {
       return NextResponse.json({ error: nodeExecError.message }, { status: 500 });
@@ -61,8 +61,8 @@ export async function GET(
         config: node.data?.config || null,
         status: exec?.status || 'pending',
         started_at: exec?.started_at || null,
-        completed_at: exec?.completed_at || null,
-        output_data: exec?.output_data || null,
+        completed_at: exec?.finished_at || null,
+        output_data: exec?.output || null,
         error: exec?.error || null,
       };
     });
@@ -73,4 +73,3 @@ export async function GET(
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
-

@@ -26,15 +26,16 @@ export function ExecutionNodeExecutions({ executionId }: ExecutionNodeExecutions
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let unsubscribed = false;
+
     async function fetchNodes() {
       try {
         setLoading(true)
         const res = await fetch(`/api/executions/${executionId}/node-executions`)
-        console.log('fetchNodes response status:', res.status)
         const json = await res.json()
-        console.log('fetchNodes json payload:', json)
         if (!res.ok) throw new Error(json.error || 'Failed to fetch node executions')
-        setNodes(json.nodes || [])
+        if (!unsubscribed) setNodes(json.nodes || [])
       } catch (err: any) {
         setError(err.message)
       } finally {
@@ -43,8 +44,53 @@ export function ExecutionNodeExecutions({ executionId }: ExecutionNodeExecutions
     }
 
     fetchNodes()
-    const interval = setInterval(fetchNodes, 2000)
-    return () => clearInterval(interval)
+
+    // Listen for real-time node updates via SSE
+    eventSource = new EventSource(`/api/executions/${executionId}/events`)
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        // Update only the affected node
+        setNodes((prev) => {
+          const idx = prev.findIndex(n => n.node_id === data.nodeId)
+          if (idx !== -1) {
+            const updated = [...prev]
+            updated[idx] = {
+              ...updated[idx],
+              status: data.status,
+              error: data.error || null,
+              output_data: data.output || null,
+              started_at: data.status === 'running' ? data.updatedAt : updated[idx].started_at,
+              completed_at: data.status === 'completed' || data.status === 'failed' ? data.updatedAt : updated[idx].completed_at,
+            }
+            return updated
+          }
+          // If node not found, append
+          return [
+            ...prev,
+            {
+              id: data.nodeId,
+              execution_id: executionId,
+              node_id: data.nodeId,
+              status: data.status,
+              error: data.error || null,
+              output_data: data.output || null,
+              started_at: data.status === 'running' ? data.updatedAt : null,
+              completed_at: data.status === 'completed' || data.status === 'failed' ? data.updatedAt : null,
+            }
+          ]
+        })
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+    eventSource.onerror = () => {
+      eventSource?.close()
+    }
+    return () => {
+      unsubscribed = true;
+      eventSource?.close()
+    }
   }, [executionId])
 
   if (loading) return <div className="text-center py-4">Loading node executions...</div>
