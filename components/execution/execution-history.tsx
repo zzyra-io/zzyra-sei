@@ -45,7 +45,9 @@ export function ExecutionHistory({ workflowId, executions, onSelectExecution }: 
           <div className="flex items-center gap-3">
             {getStatusIcon(execution.status)}
             <div>
-              <p className="text-sm font-medium">{new Date(execution.started_at).toLocaleString()}</p>
+              <p className="text-sm font-medium">
+                {execution.started_at ? new Date(execution.started_at).toLocaleString() : '-'}
+              </p>
               <p className="text-xs text-muted-foreground">
                 {execution.completed_at
                   ? `Duration: ${Math.round(

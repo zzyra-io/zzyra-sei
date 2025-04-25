@@ -128,39 +128,51 @@ export type Database = {
           duration_ms: number | null
           error: string | null
           execution_id: string
+          finished_at: string | null
           id: string
+          logs: Json | null
           node_id: string
+          output: Json | null
           output_data: Json | null
           retry_count: number | null
           started_at: string
           status: string
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           completed_at?: string
           duration_ms?: number | null
           error?: string | null
           execution_id: string
+          finished_at?: string | null
           id?: string
+          logs?: Json | null
           node_id: string
+          output?: Json | null
           output_data?: Json | null
           retry_count?: number | null
           started_at?: string
           status: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           completed_at?: string
           duration_ms?: number | null
           error?: string | null
           execution_id?: string
+          finished_at?: string | null
           id?: string
+          logs?: Json | null
           node_id?: string
+          output?: Json | null
           output_data?: Json | null
           retry_count?: number | null
           started_at?: string
           status?: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -174,29 +186,27 @@ export type Database = {
       }
       node_inputs: {
         Row: {
-          data: Json
+          created_at: string | null
           execution_id: string
+          id: string
+          input_data: Json | null
           node_id: string
         }
         Insert: {
-          data: Json
+          created_at?: string | null
           execution_id: string
+          id?: string
+          input_data?: Json | null
           node_id: string
         }
         Update: {
-          data?: Json
+          created_at?: string | null
           execution_id?: string
+          id?: string
+          input_data?: Json | null
           node_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "node_inputs_execution_id_fkey"
-            columns: ["execution_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_executions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       node_logs: {
         Row: {
@@ -238,29 +248,27 @@ export type Database = {
       }
       node_outputs: {
         Row: {
-          data: Json
+          created_at: string | null
           execution_id: string
+          id: string
           node_id: string
+          output_data: Json | null
         }
         Insert: {
-          data: Json
+          created_at?: string | null
           execution_id: string
+          id?: string
           node_id: string
+          output_data?: Json | null
         }
         Update: {
-          data?: Json
+          created_at?: string | null
           execution_id?: string
+          id?: string
           node_id?: string
+          output_data?: Json | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "node_outputs_execution_id_fkey"
-            columns: ["execution_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_executions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -453,9 +461,10 @@ export type Database = {
           duration_ms: number | null
           error: string | null
           id: string
+          idempotency_key: string | null
           logs: Json | null
           result: Json | null
-          started_at: string | null
+          started_at: string
           status: string
           triggered_by: string | null
           updated_at: string | null
@@ -467,9 +476,10 @@ export type Database = {
           duration_ms?: number | null
           error?: string | null
           id?: string
+          idempotency_key?: string | null
           logs?: Json | null
           result?: Json | null
-          started_at?: string | null
+          started_at?: string
           status: string
           triggered_by?: string | null
           updated_at?: string | null
@@ -481,9 +491,10 @@ export type Database = {
           duration_ms?: number | null
           error?: string | null
           id?: string
+          idempotency_key?: string | null
           logs?: Json | null
           result?: Json | null
-          started_at?: string | null
+          started_at?: string
           status?: string
           triggered_by?: string | null
           updated_at?: string | null

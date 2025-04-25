@@ -159,7 +159,9 @@ export function ExecutionPanel({ workflowId, executions, activeExecutionId }: Ex
                   <div>
                     <p className="text-sm font-medium">Started</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(activeExecution.started_at).toLocaleString()}
+                      {activeExecution.started_at
+                        ? new Date(activeExecution.started_at).toLocaleString()
+                        : '-'}
                     </p>
                   </div>
                   {activeExecution.completed_at && (

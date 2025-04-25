@@ -24,6 +24,7 @@ export async function startExecution(workflowId: string) {
       workflow_id: workflowId,
       status: "pending",
       triggered_by: user.id,
+      started_at: new Date().toISOString(),
     });
 
     if (error) {
@@ -58,10 +59,10 @@ async function simulateExecution(executionId: string, workflowId: string) {
   const supabase = await createClient();
 
   try {
-    // Update status to running
+    // Update status to running and record start time
     await supabase
       .from("workflow_executions")
-      .update({ status: "running" })
+      .update({ status: "running", started_at: new Date().toISOString() })
       .eq("id", executionId);
 
     // Log execution progress
