@@ -18,15 +18,14 @@ export async function GET(request: Request) {
 
   try {
     // Get execution counts by status
-    const { data: statusCounts, error: statusError } = await supabase
+    const { count, error } = await supabase
       .from("workflow_executions")
-      .select("status, count:count(*)")
-      .eq("workflow_id", workflowId)
-      .gte("started_at", since);
-
-    if (statusError) {
-      console.error("Status Error:", statusError);
-      throw statusError;
+      .select("*", { count: "exact", head: true })
+      .eq("workflow_id", workflowId);
+    console.log("count", count);
+    if (error) {
+      console.error("Status Error:", error);
+      throw error;
     }
 
     // Get average duration
@@ -59,7 +58,7 @@ export async function GET(request: Request) {
 
     // Format response
     const result = {
-      statusCounts: statusCounts || [],
+      statusCounts: count || 0,
       durationStats: durationStats || { avg: 0, min: 0, max: 0 },
       nodeStats: nodeStats || [],
       since,

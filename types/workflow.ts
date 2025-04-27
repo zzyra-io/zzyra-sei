@@ -28,6 +28,13 @@ export enum BlockType {
   UNKNOWN = "unknown",
 }
 
+export interface BlockExecutionContext {
+  executionId: string;
+  userId?: string;
+  previousOutputs?: Record<string, any>;
+  // Add more as needed
+}
+
 // Node type categories
 export enum NodeCategory {
   TRIGGER = "trigger",

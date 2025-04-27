@@ -447,7 +447,7 @@ export default function WorkflowDetailPage() {
                             Total Executions
                           </div>
                           <div className='mt-1 text-2xl font-bold'>
-                            {executionSummary.total}
+                            {stats?.statusCounts || 0}
                           </div>
                         </div>
                         <div className='rounded-lg border p-4'>

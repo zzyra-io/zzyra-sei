@@ -383,6 +383,14 @@ export default function BuilderPage() {
     }
     setIsExecuting(true);
     try {
+      await workflowService.updateWorkflow(execId, {
+        // name,
+        // description,
+        nodes,
+        edges,
+        // is_public: false,
+        //  tags,
+      });
       const resp = await fetch("/api/execute-workflow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -539,11 +547,16 @@ export default function BuilderPage() {
 
   // Execution Preview & Step-Through
   const [isPreviewing, setIsPreviewing] = useState(false);
-  const [previewLogs, setPreviewLogs] = useState<Array<{ nodeId: string; message: string }>>([]);
+  const [previewLogs, setPreviewLogs] = useState<
+    Array<{ nodeId: string; message: string }>
+  >([]);
   const [previewStep, setPreviewStep] = useState(0);
   const handlePreview = () => {
     // simulate dry-run logs
-    const logs = nodes.map((n) => ({ nodeId: n.id, message: `Mock output for block ${n.type} (${n.id})` }));
+    const logs = nodes.map((n) => ({
+      nodeId: n.id,
+      message: `Mock output for block ${n.type} (${n.id})`,
+    }));
     setPreviewLogs(logs);
     setPreviewStep(0);
     setIsPreviewing(true);
@@ -801,14 +814,35 @@ export default function BuilderPage() {
       )}
       {/* Preview panel */}
       {isPreviewing && (
-        <div className="fixed bottom-0 left-0 right-0 h-1/2 bg-background border-t shadow-lg p-4 overflow-auto">
-          <h3 className="text-lg font-semibold mb-2">Execution Preview</h3>
-          <pre className="bg-muted p-2 rounded mb-4">{previewLogs[previewStep]?.message}</pre>
-          <div className="flex justify-between">
-            <Button size="sm" onClick={() => setPreviewStep((s) => Math.max(s - 1, 0))} disabled={previewStep === 0}>Previous</Button>
-            <span>{previewStep + 1} / {previewLogs.length}</span>
-            <Button size="sm" onClick={() => setPreviewStep((s) => Math.min(s + 1, previewLogs.length - 1))} disabled={previewStep === previewLogs.length - 1}>Next</Button>
-            <Button size="sm" variant="ghost" onClick={() => setIsPreviewing(false)}>Close</Button>
+        <div className='fixed bottom-0 left-0 right-0 h-1/2 bg-background border-t shadow-lg p-4 overflow-auto'>
+          <h3 className='text-lg font-semibold mb-2'>Execution Preview</h3>
+          <pre className='bg-muted p-2 rounded mb-4'>
+            {previewLogs[previewStep]?.message}
+          </pre>
+          <div className='flex justify-between'>
+            <Button
+              size='sm'
+              onClick={() => setPreviewStep((s) => Math.max(s - 1, 0))}
+              disabled={previewStep === 0}>
+              Previous
+            </Button>
+            <span>
+              {previewStep + 1} / {previewLogs.length}
+            </span>
+            <Button
+              size='sm'
+              onClick={() =>
+                setPreviewStep((s) => Math.min(s + 1, previewLogs.length - 1))
+              }
+              disabled={previewStep === previewLogs.length - 1}>
+              Next
+            </Button>
+            <Button
+              size='sm'
+              variant='ghost'
+              onClick={() => setIsPreviewing(false)}>
+              Close
+            </Button>
           </div>
         </div>
       )}

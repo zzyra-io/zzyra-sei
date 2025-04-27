@@ -49,8 +49,8 @@ export function DashboardHeader() {
     { name: "Dashboard", href: "/dashboard", icon: Home },
     { name: "Builder", href: "/builder", icon: Layers, badge: "New" },
     { name: "Templates", href: "/templates", icon: FileText },
-    { name: "Finance", href: "/finance", icon: Zap },
-    { name: "Blockchain", href: "/blockchain", icon: Wallet },
+    // { name: "Finance", href: "/finance", icon: Zap },
+    // { name: "Blockchain", href: "/blockchain", icon: Wallet },
   ];
 
   return (

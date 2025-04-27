@@ -57,191 +57,293 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { createClient } from "@/lib/supabase/client";
-import { debounce } from "lodash"; // Ensure lodash is installed: npm install lodash
+import { debounce } from "lodash";
+import { topologicalSort } from "@/lib/utils/graph";
+import { Workflow } from "@/lib/supabase/schema";
+
+// ### TypeScript Interfaces
+interface Execution {
+  id: string;
+  workflow_id: string;
+  status: "completed" | "failed" | "running" | "paused" | "pending";
+  started_at: string;
+  completed_at?: string;
+  error?: string;
+}
+
+interface NodeExecution {
+  id: string;
+  execution_id: string;
+  node_id: string;
+  status: "completed" | "failed" | "running" | "paused" | "pending";
+  started_at: string;
+  completed_at?: string;
+  error?: string;
+  output_data?: any;
+}
+
+interface NodeInput {
+  execution_id: string;
+  node_id: string;
+  data: any;
+}
+
+interface NodeOutput {
+  execution_id: string;
+  node_id: string;
+  data: any;
+}
+
+interface NodeLog {
+  execution_id: string;
+  node_id: string;
+  timestamp: string;
+  level: "info" | "warning" | "error";
+  message: string;
+  data?: any;
+}
 
 interface ExecutionLogsListProps {
   workflowId: string;
+  workflow?: Workflow;
 }
 
-export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
+// ### Main Component
+export function ExecutionLogsList({
+  workflowId,
+  workflow,
+}: ExecutionLogsListProps) {
   const supabase = createClient();
   const { toast } = useToast();
 
-  // State
-  const [logs, setLogs] = useState<any[]>([]);
+  // ### State Definitions
+  const [executions, setExecutions] = useState<Execution[]>([]);
+  const [nodeExecutionsMap, setNodeExecutionsMap] = useState<
+    Record<string, NodeExecution[]>
+  >({});
+  const [nodeInputsMap, setNodeInputsMap] = useState<Record<string, any>>({});
+  const [nodeOutputsMap, setNodeOutputsMap] = useState<Record<string, any>>({});
+  const [nodeLogsMap, setNodeLogsMap] = useState<Record<string, NodeLog[]>>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | Execution["status"]>(
+    "all"
+  );
   const [sortKey, setSortKey] = useState<"started_at" | "duration">(
     "started_at"
   );
   const [sortAsc, setSortAsc] = useState(false);
   const [expandedLogs, setExpandedLogs] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState<"all" | Execution["status"]>(
+    "all"
+  );
   const [jsonViewerData, setJsonViewerData] = useState<any>(null);
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
-  const [nodeInputs, setNodeInputs] = useState<Record<string, any>>({});
-  const [nodeOutputs, setNodeOutputs] = useState<Record<string, any>>({});
-  const [nodeLogs, setNodeLogs] = useState<Record<string, any[]>>({});
+  const [loadingExecutionIds, setLoadingExecutionIds] = useState<Set<string>>(
+    new Set()
+  );
 
-  // Fetch logs with useCallback for memoization
+  // ### Fetch Executions (Lazy Loading Initial Data)
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
-      let q = supabase
+      let query = supabase
         .from("workflow_executions")
-        .select("*, node_executions(*)")
+        .select("*")
         .eq("workflow_id", workflowId)
         .order(sortKey, { ascending: sortAsc });
 
-      if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      if (statusFilter !== "all") query = query.eq("status", statusFilter);
 
-      const { data: executionData, error } = await q;
-      if (error) throw error;
+      const { data, error } = await query;
+      if (error)
+        throw new Error(`Failed to fetch executions: ${error.message}`);
+      if (!data) throw new Error("No execution data returned");
 
-      setLogs(executionData || []);
-
-      const execIds = executionData?.map((e: any) => e.id) || [];
-      if (!execIds.length) return;
-
-      // Batch Supabase calls with Promise.all for parallel fetching
-      const [inputs, outputs, logsData] = await Promise.all([
-        supabase.from("node_inputs").select("*").in("execution_id", execIds),
-        supabase.from("node_outputs").select("*").in("execution_id", execIds),
-        supabase.from("node_logs").select("*").in("execution_id", execIds),
-      ]);
-
-      const inputsMap = Object.fromEntries(
-        (inputs.data || []).map((i: any) => [
-          `${i.execution_id}_${i.node_id}`,
-          i.data,
-        ])
-      );
-      setNodeInputs(inputsMap);
-
-      const outputsMap = Object.fromEntries(
-        (outputs.data || []).map((o: any) => [
-          `${o.execution_id}_${o.node_id}`,
-          o.data,
-        ])
-      );
-      setNodeOutputs(outputsMap);
-
-      const logsMap: Record<string, any[]> = {};
-      (logsData.data || []).forEach((l: any) => {
-        const key = `${l.execution_id}_${l.node_id}`;
-        if (!logsMap[key]) logsMap[key] = [];
-        logsMap[key].push(l);
-      });
-      setNodeLogs(logsMap);
-
-      // Conditional logging for development only
-      if (process.env.NODE_ENV === "development") {
-        console.log("[ExecutionLogsList] fetched node_logs data:", logsData);
-      }
+      setExecutions(data as Execution[]);
     } catch (e: any) {
       toast({
-        title: "Fetch error",
-        description: e.message,
+        title: "Fetch Error",
+        description: e.message || "An unexpected error occurred",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   }, [supabase, workflowId, statusFilter, sortKey, sortAsc, toast]);
+  console.log("nodeExecutionsMap", nodeExecutionsMap);
 
-  // Debounced version of fetchLogs for real-time subscriptions
   const debouncedFetchLogs = useCallback(debounce(fetchLogs, 1000), [
     fetchLogs,
   ]);
 
-  // Real-time subscriptions with debounced fetchLogs
+  const loadNodeData = useCallback(
+    async (executionId: string) => {
+      if (
+        loadingExecutionIds.has(executionId) ||
+        nodeExecutionsMap[executionId]
+      ) {
+        return;
+      }
+
+      setLoadingExecutionIds((prev) => new Set(prev).add(executionId));
+      try {
+        const [nodeExecutionsRes, inputsRes, outputsRes, logsRes] =
+          await Promise.all([
+            supabase
+              .from("node_executions")
+              .select("*")
+              .eq("execution_id", executionId),
+            supabase
+              .from("node_inputs")
+              .select("*")
+              .eq("execution_id", executionId),
+            supabase
+              .from("node_outputs")
+              .select("*")
+              .eq("execution_id", executionId),
+            supabase
+              .from("node_logs")
+              .select("*")
+              .eq("execution_id", executionId),
+          ]);
+
+        if (nodeExecutionsRes.error)
+          throw new Error(nodeExecutionsRes.error.message);
+        if (inputsRes.error) throw new Error(inputsRes.error.message);
+        if (outputsRes.error) throw new Error(outputsRes.error.message);
+        if (logsRes.error) throw new Error(logsRes.error.message);
+
+        const nodeExecutions = nodeExecutionsRes.data as NodeExecution[];
+        const inputsMap = Object.fromEntries(
+          (inputsRes.data || []).map((i: NodeInput) => [
+            `${i.execution_id}_${i.node_id}`,
+            i.data,
+          ])
+        );
+        const outputsMap = Object.fromEntries(
+          (outputsRes.data || []).map((o: NodeOutput) => [
+            `${o.execution_id}_${o.node_id}`,
+            o.data,
+          ])
+        );
+        const logsMap = (logsRes.data || []).reduce(
+          (acc: Record<string, NodeLog[]>, l: NodeLog) => {
+            const key = `${l.execution_id}_${l.node_id}`;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(l);
+            return acc;
+          },
+          {}
+        );
+
+        setNodeExecutionsMap((prev) => ({
+          ...prev,
+          [executionId]: nodeExecutions,
+        }));
+        setNodeInputsMap((prev) => ({ ...prev, ...inputsMap }));
+        setNodeOutputsMap((prev) => ({ ...prev, ...outputsMap }));
+        setNodeLogsMap((prev) => ({ ...prev, ...logsMap }));
+      } catch (error: any) {
+        toast({
+          title: "Error Loading Node Data",
+          description: error.message || "Failed to load node details",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingExecutionIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(executionId);
+          return newSet;
+        });
+      }
+    },
+    [
+      supabase,
+      toast,
+      loadingExecutionIds,
+      nodeExecutionsMap,
+      setNodeExecutionsMap,
+      setNodeInputsMap,
+      setNodeOutputsMap,
+      setNodeLogsMap,
+    ]
+  );
+
+  // Optimized useEffect to trigger loadNodeData
   useEffect(() => {
-    fetchLogs(); // Immediate fetch on mount or filter change
-
-    const execSub = supabase
-      .channel("realtime-executions")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "workflow_executions",
-          filter: `workflow_id=eq.${workflowId}`,
-        },
-        debouncedFetchLogs
+    const toLoad = Object.entries(expandedLogs)
+      .filter(
+        ([id, isExpanded]) =>
+          isExpanded && !nodeExecutionsMap[id] && !loadingExecutionIds.has(id)
       )
-      .subscribe();
+      .map(([id]) => id);
 
-    const nodeSub = supabase
-      .channel("realtime-node_executions")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "node_executions" },
-        debouncedFetchLogs
-      )
-      .subscribe();
+    if (toLoad.length === 0) return;
 
-    const inputSub = supabase
-      .channel("realtime-node_inputs")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "node_inputs" },
-        debouncedFetchLogs
-      )
-      .subscribe();
-
-    const outputSub = supabase
-      .channel("realtime-node_outputs")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "node_outputs" },
-        debouncedFetchLogs
-      )
-      .subscribe();
-
-    const logsSub = supabase
-      .channel("realtime-node_logs")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "node_logs" },
-        debouncedFetchLogs
-      )
-      .subscribe();
-
-    // Cleanup subscriptions
-    return () => {
-      supabase.removeChannel(execSub);
-      supabase.removeChannel(nodeSub);
-      supabase.removeChannel(inputSub);
-      supabase.removeChannel(outputSub);
-      supabase.removeChannel(logsSub);
+    // Batch load to prevent multiple rapid triggers
+    const loadAll = async () => {
+      await Promise.all(toLoad.map((executionId) => loadNodeData(executionId)));
     };
-  }, [workflowId, statusFilter, sortKey, sortAsc, debouncedFetchLogs]);
 
-  // Memoized status counts
+    loadAll();
+  }, [expandedLogs, nodeExecutionsMap, loadingExecutionIds, loadNodeData]);
+
+  // ### Real-Time Subscriptions
+  useEffect(() => {
+    fetchLogs();
+
+    const subscriptions = [
+      supabase
+        .channel("realtime-executions")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "workflow_executions",
+            filter: `workflow_id=eq.${workflowId}`,
+          },
+          debouncedFetchLogs
+        )
+        .subscribe(),
+    ];
+
+    return () => {
+      subscriptions.forEach((sub) => supabase.removeChannel(sub));
+    };
+  }, [
+    workflowId,
+    statusFilter,
+    sortKey,
+    sortAsc,
+    debouncedFetchLogs,
+    fetchLogs,
+  ]);
+
+  // ### Memoized Status Counts
   const statusCounts = useMemo(() => {
     const counts = {
-      all: logs.length,
+      all: executions.length,
       completed: 0,
       failed: 0,
       running: 0,
       paused: 0,
     };
-    logs.forEach((log) => {
-      if (counts[log.status as keyof typeof counts] !== undefined) {
-        counts[log.status as keyof typeof counts]++;
+    executions.forEach((exec) => {
+      if (counts[exec.status as keyof typeof counts] !== undefined) {
+        counts[exec.status as keyof typeof counts]++;
       }
     });
     return counts;
-  }, [logs]);
+  }, [executions]);
 
-  // Memoized filtered logs
+  // ### Memoized Filtered Executions
   const filteredLogs = useMemo(() => {
-    if (activeTab === "all") return logs;
-    return logs.filter((log) => log.status === activeTab);
-  }, [logs, activeTab]);
+    if (activeTab === "all") return executions;
+    return executions.filter((exec) => exec.status === activeTab);
+  }, [executions, activeTab]);
 
-  // Utility functions
+  // ### Utility Functions
   const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat("en-US", {
@@ -257,15 +359,25 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
   const getStatusIcon = useCallback((status: string) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className='h-4 w-4 text-green-500' />;
+        return (
+          <CheckCircle2
+            className='h-4 w-4 text-green-500'
+            aria-label='Completed'
+          />
+        );
       case "failed":
-        return <XCircle className='h-4 w-4 text-red-500' />;
+        return <XCircle className='h-4 w-4 text-red-500' aria-label='Failed' />;
       case "running":
-        return <Loader2 className='h-4 w-4 text-blue-500 animate-spin' />;
+        return (
+          <Loader2
+            className='h-4 w-4 text-blue-500 animate-spin'
+            aria-label='Running'
+          />
+        );
       case "paused":
-        return <Pause className='h-4 w-4 text-amber-500' />;
+        return <Pause className='h-4 w-4 text-amber-500' aria-label='Paused' />;
       default:
-        return <Clock className='h-4 w-4 text-gray-500' />;
+        return <Clock className='h-4 w-4 text-gray-500' aria-label='Pending' />;
     }
   }, []);
 
@@ -314,7 +426,6 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
     }
   }, []);
 
-  // Action handler
   const handleAction = async (
     action: string,
     logId: string,
@@ -322,16 +433,17 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
   ) => {
     setIsLoading(true);
     try {
-      await fetch(`/api/execution/${action}`, {
+      const response = await fetch(`/api/execution/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ executionId: logId, nodeId }),
       });
+      if (!response.ok) throw new Error(`Action ${action} failed`);
       await fetchLogs();
     } catch (e: any) {
       toast({
-        title: "Action error",
-        description: e.message,
+        title: "Action Error",
+        description: e.message || "An unexpected error occurred",
         variant: "destructive",
       });
     } finally {
@@ -344,6 +456,7 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
     setIsJsonDialogOpen(true);
   };
 
+  // ### Render
   return (
     <div className='space-y-6'>
       {/* Header */}
@@ -354,7 +467,6 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
             Monitor and manage your workflow executions
           </CardDescription>
         </CardHeader>
-
         <div className='flex items-center gap-2'>
           <TooltipProvider>
             <Tooltip>
@@ -364,6 +476,7 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
                   size='icon'
                   onClick={fetchLogs}
                   disabled={isLoading}
+                  aria-label='Refresh logs'
                   className='h-9 w-9'>
                   <RefreshCw
                     className={isLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"}
@@ -373,7 +486,6 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
               <TooltipContent>Refresh logs</TooltipContent>
             </Tooltip>
           </TooltipProvider>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant='outline' size='sm' className='gap-1'>
@@ -382,40 +494,27 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end' className='w-56'>
-              <DropdownMenuItem
-                className={statusFilter === "all" ? "bg-muted" : ""}
-                onClick={() => setStatusFilter("all")}>
+              <DropdownMenuItem onClick={() => setStatusFilter("all")}>
                 All Statuses
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className={statusFilter === "completed" ? "bg-muted" : ""}
-                onClick={() => setStatusFilter("completed")}>
+              <DropdownMenuItem onClick={() => setStatusFilter("completed")}>
                 <CheckCircle2 className='mr-2 h-4 w-4 text-green-500' />
                 Completed
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className={statusFilter === "failed" ? "bg-muted" : ""}
-                onClick={() => setStatusFilter("failed")}>
+              <DropdownMenuItem onClick={() => setStatusFilter("failed")}>
                 <XCircle className='mr-2 h-4 w-4 text-red-500' />
                 Failed
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className={statusFilter === "running" ? "bg-muted" : ""}
-                onClick={() => setStatusFilter("running")}>
+              <DropdownMenuItem onClick={() => setStatusFilter("running")}>
                 <Loader2 className='mr-2 h-4 w-4 text-blue-500' />
                 Running
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className={statusFilter === "paused" ? "bg-muted" : ""}
-                onClick={() => setStatusFilter("paused")}>
+              <DropdownMenuItem onClick={() => setStatusFilter("paused")}>
                 <Pause className='mr-2 h-4 w-4 text-amber-500' />
                 Paused
               </DropdownMenuItem>
-
               <DropdownMenuSeparator />
-
               <DropdownMenuItem
-                className={sortKey === "started_at" ? "bg-muted" : ""}
                 onClick={() => {
                   setSortKey("started_at");
                   setSortAsc(false);
@@ -424,7 +523,6 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
                 Sort by Start Time
               </DropdownMenuItem>
               <DropdownMenuItem
-                className={sortKey === "duration" ? "bg-muted" : ""}
                 onClick={() => {
                   setSortKey("duration");
                   setSortAsc(false);
@@ -432,9 +530,7 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
                 <FileText className='mr-2 h-4 w-4' />
                 Sort by Duration
               </DropdownMenuItem>
-
               <DropdownMenuSeparator />
-
               <DropdownMenuItem onClick={() => setSortAsc(!sortAsc)}>
                 {sortAsc ? (
                   <>
@@ -453,72 +549,54 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
         </div>
       </div>
 
-      {/* Status tabs */}
-      <Tabs
-        defaultValue='all'
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className='w-full'>
+      {/* Status Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
         <TabsList className='grid grid-cols-5'>
-          <TabsTrigger value='all' className='relative'>
-            All
+          <TabsTrigger value='all'>
+            All{" "}
             <Badge variant='secondary' className='ml-1 text-xs'>
               {statusCounts.all}
             </Badge>
           </TabsTrigger>
-          <TabsTrigger value='running' className='relative'>
-            Running
+          <TabsTrigger value='running'>
+            Running{" "}
             <Badge variant='secondary' className='ml-1 text-xs'>
               {statusCounts.running}
             </Badge>
           </TabsTrigger>
-          <TabsTrigger value='paused' className='relative'>
-            Paused
+          <TabsTrigger value='paused'>
+            Paused{" "}
             <Badge variant='secondary' className='ml-1 text-xs'>
               {statusCounts.paused}
             </Badge>
           </TabsTrigger>
-          <TabsTrigger value='completed' className='relative'>
-            Completed
+          <TabsTrigger value='completed'>
+            Completed{" "}
             <Badge variant='secondary' className='ml-1 text-xs'>
               {statusCounts.completed}
             </Badge>
           </TabsTrigger>
-          <TabsTrigger value='failed' className='relative'>
-            Failed
+          <TabsTrigger value='failed'>
+            Failed{" "}
             <Badge variant='secondary' className='ml-1 text-xs'>
               {statusCounts.failed}
             </Badge>
           </TabsTrigger>
         </TabsList>
-
         <TabsContent value={activeTab} className='mt-4'>
           {isLoading ? (
             <div className='flex items-center justify-center p-12'>
-              <div className='flex flex-col items-center gap-2'>
-                <Loader2 className='h-8 w-8 animate-spin text-primary' />
-                <p className='text-sm text-muted-foreground'>
-                  Loading execution logs...
-                </p>
-              </div>
+              <Loader2 className='h-8 w-8 animate-spin text-primary' />
+              <p className='text-sm text-muted-foreground'>
+                Loading execution logs...
+              </p>
             </div>
           ) : filteredLogs.length === 0 ? (
             <div className='flex flex-col items-center justify-center rounded-lg border border-dashed p-12'>
-              <div className='flex h-20 w-20 items-center justify-center rounded-full bg-muted'>
-                <FileText className='h-10 w-10 text-muted-foreground' />
-              </div>
+              <FileText className='h-10 w-10 text-muted-foreground' />
               <h3 className='mt-4 text-lg font-semibold'>
                 No execution logs found
               </h3>
-              <p className='mt-2 text-center text-sm text-muted-foreground'>
-                {statusFilter !== "all"
-                  ? `No executions with status "${statusFilter}" were found.`
-                  : "There are no execution logs available."}
-              </p>
-              <Button onClick={fetchLogs} variant='outline' className='mt-4'>
-                <RefreshCw className='mr-2 h-4 w-4' />
-                Refresh
-              </Button>
             </div>
           ) : (
             <div className='space-y-4'>
@@ -533,9 +611,12 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
                   getStatusBadge={getStatusBadge}
                   handleAction={handleAction}
                   viewJsonData={viewJsonData}
-                  nodeInputs={nodeInputs}
-                  nodeOutputs={nodeOutputs}
-                  nodeLogs={nodeLogs}
+                  nodeExecutions={nodeExecutionsMap[log.id]}
+                  nodeInputs={nodeInputsMap}
+                  nodeOutputs={nodeOutputsMap}
+                  nodeLogs={nodeLogsMap}
+                  isLoading={loadingExecutionIds.has(log.id)}
+                  workflow={workflow}
                 />
               ))}
             </div>
@@ -565,7 +646,30 @@ export function ExecutionLogsList({ workflowId }: ExecutionLogsListProps) {
   );
 }
 
-// Memoized ExecutionLogCard
+// ### Execution Log Card Component
+interface ExecutionLogCardProps {
+  log: Execution;
+  expandedLogs: Record<string, boolean>;
+  setExpandedLogs: React.Dispatch<
+    React.SetStateAction<Record<string, boolean>>
+  >;
+  formatDate: (dateString: string) => string;
+  getStatusIcon: (status: string) => JSX.Element;
+  getStatusBadge: (status: string) => JSX.Element;
+  handleAction: (
+    action: string,
+    logId: string,
+    nodeId?: string
+  ) => Promise<void>;
+  viewJsonData: (data: any) => void;
+  nodeExecutions?: NodeExecution[];
+  nodeInputs: Record<string, any>;
+  nodeOutputs: Record<string, any>;
+  nodeLogs: Record<string, NodeLog[]>;
+  isLoading: boolean;
+  workflow?: Workflow;
+}
+
 export const ExecutionLogCard = React.memo(
   ({
     log,
@@ -576,59 +680,30 @@ export const ExecutionLogCard = React.memo(
     getStatusBadge,
     handleAction,
     viewJsonData,
+    nodeExecutions,
     nodeInputs,
     nodeOutputs,
     nodeLogs,
-  }: {
-    log: any;
-    expandedLogs: Record<string, boolean>;
-    setExpandedLogs: React.Dispatch<
-      React.SetStateAction<Record<string, boolean>>
-    >;
-    formatDate: (dateString: string) => string;
-    getStatusIcon: (status: string) => JSX.Element;
-    getStatusBadge: (status: string) => JSX.Element;
-    handleAction: (
-      action: string,
-      logId: string,
-      nodeId?: string
-    ) => Promise<void>;
-    viewJsonData: (data: any) => void;
-    nodeInputs: Record<string, any>;
-    nodeOutputs: Record<string, any>;
-    nodeLogs: Record<string, any[]>;
-  }) => {
-    // Memoized duration
+    isLoading,
+    workflow,
+  }: ExecutionLogCardProps) => {
     const duration = useMemo(() => {
       return log.completed_at
         ? formatDistance(new Date(log.started_at), new Date(log.completed_at))
         : "In progress";
     }, [log.completed_at, log.started_at]);
 
-    // Conditional logging for development only
-    if (process.env.NODE_ENV === "development") {
-      console.log("log", log);
-    }
-
     return (
       <Card
         className={`overflow-hidden transition-all duration-200 ${
-          log.status === "failed"
-            ? "border-red-200"
-            : log.status === "running"
-            ? "border-blue-200"
-            : log.status === "paused"
-            ? "border-amber-200"
-            : log.status === "completed"
-            ? "border-green-200"
-            : ""
+          log.status === "failed" ? "border-red-200" : ""
         }`}>
         <CardHeader className='pb-2'>
           <div className='flex justify-between items-start'>
             <div className='flex items-center gap-2'>
               {getStatusIcon(log.status)}
               <div>
-                <CardTitle className='text-base flex items-center gap-2'>
+                <CardTitle className='text-base'>
                   Execution {log.id.substring(0, 8)}
                 </CardTitle>
                 <CardDescription>
@@ -638,53 +713,26 @@ export const ExecutionLogCard = React.memo(
             </div>
             <div className='flex items-center gap-2'>
               {getStatusBadge(log.status)}
+              {/* Action Buttons */}
               {log.status === "running" && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size='icon'
-                        variant='ghost'
-                        className='h-8 w-8 text-amber-600 hover:bg-amber-50 hover:text-amber-700'
-                        onClick={() => handleAction("pause", log.id)}>
-                        <Pause className='h-4 w-4' />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Pause Execution</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button
+                  size='sm'
+                  variant='outline'
+                  onClick={() => handleAction("pause", log.id)}
+                  className='h-7 text-xs px-2'>
+                  <Pause className='w-3 h-3 mr-1' />
+                  Pause
+                </Button>
               )}
               {log.status === "paused" && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size='icon'
-                        variant='ghost'
-                        className='h-8 w-8 text-green-600 hover:bg-green-50 hover:text-green-700'
-                        onClick={() => handleAction("resume", log.id)}>
-                        <Play className='h-4 w-4' />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Resume Execution</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {log.status === "failed" && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size='icon'
-                        variant='ghost'
-                        className='h-8 w-8 text-blue-600 hover:bg-blue-50 hover:text-blue-700'
-                        onClick={() => handleAction("retry", log.id)}>
-                        <RotateCcw className='h-4 w-4' />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Retry Execution</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button
+                  size='sm'
+                  variant='default'
+                  onClick={() => handleAction("resume", log.id)}
+                  className='h-7 text-xs px-2'>
+                  <Play className='w-3 h-3 mr-1' />
+                  Resume
+                </Button>
               )}
             </div>
           </div>
@@ -711,38 +759,20 @@ export const ExecutionLogCard = React.memo(
                       </p>
                       <p className='text-sm'>{formatDate(log.started_at)}</p>
                     </div>
-                    <div>
-                      <p className='text-xs font-medium text-muted-foreground'>
-                        Completed
-                      </p>
-                      <p className='text-sm'>
-                        {log.completed_at
-                          ? formatDate(log.completed_at)
-                          : "Not completed"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className='text-xs font-medium text-muted-foreground'>
-                        Duration
-                      </p>
-                      <p className='text-sm'>{duration}</p>
-                    </div>
-                    <div>
-                      <p className='text-xs font-medium text-muted-foreground'>
-                        Execution ID
-                      </p>
-                      <p className='text-sm font-mono'>{log.id}</p>
-                    </div>
+                    {log.completed_at && (
+                      <div>
+                        <p className='text-xs font-medium text-muted-foreground'>
+                          Completed
+                        </p>
+                        <p className='text-sm'>
+                          {formatDate(log.completed_at)}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {log.error && (
                     <div className='bg-red-50 border border-red-200 rounded-md p-3'>
-                      <div className='flex items-center gap-2 mb-1'>
-                        <AlertCircle className='h-4 w-4 text-red-500' />
-                        <p className='text-sm font-medium text-red-800'>
-                          Error
-                        </p>
-                      </div>
                       <p className='text-sm text-red-700'>{log.error}</p>
                     </div>
                   )}
@@ -751,37 +781,45 @@ export const ExecutionLogCard = React.memo(
                     <div className='flex items-center justify-between mb-3'>
                       <p className='text-sm font-medium'>Node Executions</p>
                       <Badge variant='outline' className='text-xs'>
-                        {log.node_executions?.length || 0} nodes
+                        {nodeExecutions?.length || 0} nodes
                       </Badge>
                     </div>
 
-                    {!log.node_executions ? (
-                      <div className='flex items-center justify-center p-8 border rounded-md'>
-                        <Loader2 className='h-4 w-4 animate-spin mr-2' />
-                        <span className='text-sm text-muted-foreground'>
-                          Loading node executions...
-                        </span>
-                      </div>
-                    ) : (
-                      <div className='border rounded-md divide-y'>
-                        {log.node_executions.map((nodeExec: any) => (
-                          <NodeExecutionItem
-                            key={nodeExec.id}
-                            nodeExec={nodeExec}
-                            log={log}
-                            expandedLogs={expandedLogs}
-                            setExpandedLogs={setExpandedLogs}
-                            getStatusIcon={getStatusIcon}
-                            getStatusBadge={getStatusBadge}
-                            formatDate={formatDate}
-                            handleAction={handleAction}
-                            viewJsonData={viewJsonData}
-                            nodeInputs={nodeInputs}
-                            nodeOutputs={nodeOutputs}
-                            nodeLogs={nodeLogs}
-                          />
-                        ))}
-                      </div>
+                    {expandedLogs[log.id] && (
+                      <>
+                        {isLoading ? (
+                          <div className='flex items-center justify-center p-8'>
+                            <Loader2 className='h-4 w-4 animate-spin mr-2' />
+                            <span className='text-sm text-muted-foreground'>
+                              Loading node executions...
+                            </span>
+                          </div>
+                        ) : nodeExecutions ? (
+                          <div className='border rounded-md divide-y'>
+                            {nodeExecutions.map((nodeExec) => (
+                              <NodeExecutionItem
+                                key={nodeExec.id}
+                                nodeExec={nodeExec}
+                                log={log}
+                                expandedLogs={expandedLogs}
+                                setExpandedLogs={setExpandedLogs}
+                                getStatusIcon={getStatusIcon}
+                                getStatusBadge={getStatusBadge}
+                                formatDate={formatDate}
+                                handleAction={handleAction}
+                                viewJsonData={viewJsonData}
+                                nodeInputs={nodeInputs}
+                                nodeOutputs={nodeOutputs}
+                                nodeLogs={nodeLogs}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className='text-sm text-muted-foreground'>
+                            No node executions available
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -801,7 +839,7 @@ export const ExecutionLogCard = React.memo(
   }
 );
 
-// Memoized NodeExecutionItem
+// ### Node Execution Item Component
 const NodeExecutionItem = React.memo(
   ({
     nodeExec,
@@ -816,32 +854,43 @@ const NodeExecutionItem = React.memo(
     nodeInputs,
     nodeOutputs,
     nodeLogs,
-  }: NodeExecutionItemProps) => {
-    const [logLevel, setLogLevel] = useState("all");
-    const [resumeData, setResumeData] = useState("");
+  }: {
+    nodeExec: NodeExecution;
+    log: Execution;
+    expandedLogs: Record<string, boolean>;
+    setExpandedLogs: React.Dispatch<
+      React.SetStateAction<Record<string, boolean>>
+    >;
+    getStatusIcon: (status: string) => JSX.Element;
+    getStatusBadge: (status: string) => JSX.Element;
+    formatDate: (dateString: string) => string;
+    handleAction: (
+      action: string,
+      logId: string,
+      nodeId?: string
+    ) => Promise<void>;
+    viewJsonData: (data: any) => void;
+    nodeInputs: Record<string, any>;
+    nodeOutputs: Record<string, any>;
+    nodeLogs: Record<string, NodeLog[]>;
+  }) => {
+    const [logLevel, setLogLevel] = useState<
+      "all" | "info" | "warning" | "error"
+    >("all");
+    console.log("nodeInputs", nodeInputs);
 
-    const loadInputData = async () => {
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        const mockInputData = {
-          parameters: { threshold: 0.85, maxItems: 10 },
-          data: {
-            items: [
-              { id: 1, name: "Item 1", value: 42 },
-              { id: 2, name: "Item 2", value: 18 },
-            ],
-          },
-        };
-        setResumeData(JSON.stringify(mockInputData, null, 2));
-      } catch (error) {}
-    };
-
-    // Memoized filtered logs
     const filteredNodeLogs = useMemo(() => {
       const logsArr = nodeLogs[`${log.id}_${nodeExec.node_id}`] || [];
       if (logLevel === "all") return logsArr;
-      return logsArr.filter((l: any) => l.level === logLevel);
+      return logsArr.filter((l) => l.level === logLevel);
     }, [nodeLogs, log.id, nodeExec.node_id, logLevel]);
+    console.log("log", {
+      log,
+      nodeExec,
+      nodeLogs,
+      logLevel,
+      filteredNodeLogs,
+    });
 
     return (
       <div className='p-3'>
@@ -854,11 +903,9 @@ const NodeExecutionItem = React.memo(
           </div>
           {getStatusBadge(nodeExec.status)}
         </div>
-
         <p className='text-xs text-muted-foreground mt-1'>
           {formatDate(nodeExec.completed_at || nodeExec.started_at)}
         </p>
-
         <div className='flex flex-wrap gap-2 mt-3 items-center justify-between border-t pt-2'>
           <div className='flex gap-1.5'>
             {nodeExec.status === "running" && (
@@ -900,16 +947,12 @@ const NodeExecutionItem = React.memo(
               size='sm'
               variant='default'
               className='h-7 text-xs px-3 bg-green-600 hover:bg-green-700'
-              onClick={() => {
-                const key = `${log.id}-${nodeExec.node_id}`;
-                setExpandedLogs((prev) => ({ ...prev, [key]: true }));
-              }}>
+              onClick={() => handleAction("resume", log.id, nodeExec.node_id)}>
               <Play className='w-3 h-3 mr-1' />
               Resume
             </Button>
           )}
         </div>
-
         <div className='mt-3'>
           <Accordion
             type='single'
@@ -937,7 +980,11 @@ const NodeExecutionItem = React.memo(
                     <select
                       className='text-xs border rounded px-2 py-1 bg-white'
                       value={logLevel}
-                      onChange={(e) => setLogLevel(e.target.value)}>
+                      onChange={(e) =>
+                        setLogLevel(
+                          e.target.value as "all" | "info" | "warning" | "error"
+                        )
+                      }>
                       <option value='all'>All Levels</option>
                       <option value='info'>Info</option>
                       <option value='warning'>Warning</option>
@@ -948,7 +995,6 @@ const NodeExecutionItem = React.memo(
                     {filteredNodeLogs.length} log entries
                   </div>
                 </div>
-
                 <div className='mb-3 grid grid-cols-1 md:grid-cols-2 gap-2'>
                   <div>
                     <span className='text-xs font-medium text-muted-foreground'>
@@ -957,7 +1003,7 @@ const NodeExecutionItem = React.memo(
                     <pre className='bg-muted p-2 rounded text-xs overflow-x-auto mt-1'>
                       {nodeInputs[`${log.id}_${nodeExec.node_id}`]
                         ? JSON.stringify(
-                            nodeInputs[`${log.id}_${nodeExec.node_id}`],
+                            nodeExec?.input_data || nodeExec?.input,
                             null,
                             2
                           )
@@ -971,7 +1017,7 @@ const NodeExecutionItem = React.memo(
                     <pre className='bg-muted p-2 rounded text-xs overflow-x-auto mt-1'>
                       {nodeOutputs[`${log.id}_${nodeExec.node_id}`]
                         ? JSON.stringify(
-                            nodeOutputs[`${log.id}_${nodeExec.node_id}`],
+                            nodeExec?.output_data || nodeExec?.output,
                             null,
                             2
                           )
@@ -979,10 +1025,9 @@ const NodeExecutionItem = React.memo(
                     </pre>
                   </div>
                 </div>
-
                 <div className='bg-gray-50 border rounded-md p-3 max-h-48 overflow-y-auto text-xs font-mono'>
                   {filteredNodeLogs.length > 0 ? (
-                    filteredNodeLogs.map((logEntry: any, idx: number) => {
+                    filteredNodeLogs.map((logEntry, idx) => {
                       let levelClass = "";
                       let levelBadge = null;
                       if (logEntry.level === "error") {
@@ -1047,7 +1092,6 @@ const NodeExecutionItem = React.memo(
                     </div>
                   )}
                 </div>
-
                 {nodeExec.output_data && (
                   <div className='mt-2'>
                     <div className='font-medium text-xs mb-1'>Output Data</div>
@@ -1065,7 +1109,6 @@ const NodeExecutionItem = React.memo(
                     </div>
                   </div>
                 )}
-
                 {nodeExec.error && (
                   <div className='mt-2'>
                     <div className='font-medium text-xs mb-1 text-red-700'>
@@ -1073,49 +1116,6 @@ const NodeExecutionItem = React.memo(
                     </div>
                     <div className='bg-red-50 border border-red-200 rounded-md p-2'>
                       <p className='text-xs text-red-700'>{nodeExec.error}</p>
-                    </div>
-                  </div>
-                )}
-
-                {nodeExec.status === "paused" && (
-                  <div className='mt-4 border rounded-md bg-green-50 border-green-100 p-3'>
-                    <div className='flex items-center gap-2 mb-2'>
-                      <Play className='h-4 w-4 text-green-600' />
-                      <div className='font-medium text-sm text-green-800'>
-                        Resume Paused Execution
-                      </div>
-                    </div>
-                    <div className='text-xs text-green-700 mb-2'>
-                      This node is paused. You can modify the input data before
-                      resuming execution.
-                    </div>
-                    <div className='mb-1 text-xs font-medium text-green-800'>
-                      Input Data:
-                    </div>
-                    <textarea
-                      value={resumeData}
-                      onChange={(e) => setResumeData(e.target.value)}
-                      className='w-full text-xs border rounded p-2 mb-3 font-mono bg-white border-green-200 focus:border-green-400 focus:ring-green-400'
-                      rows={5}
-                      placeholder='Edit input data before resuming (JSON format)'
-                    />
-                    <div className='flex justify-between items-center'>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='text-xs bg-white border-green-200 text-green-700 hover:bg-green-100'
-                        onClick={loadInputData}>
-                        Load Input Data
-                      </Button>
-                      <Button
-                        size='sm'
-                        className='text-xs bg-green-600 hover:bg-green-700'
-                        onClick={() =>
-                          handleAction("resume", log.id, nodeExec.node_id)
-                        }>
-                        <Play className='h-3 w-3 mr-1' />
-                        Resume Execution
-                      </Button>
                     </div>
                   </div>
                 )}
@@ -1128,23 +1128,4 @@ const NodeExecutionItem = React.memo(
   }
 );
 
-type NodeExecutionItemProps = {
-  nodeExec: any;
-  log: any;
-  expandedLogs: Record<string, boolean>;
-  setExpandedLogs: React.Dispatch<
-    React.SetStateAction<Record<string, boolean>>
-  >;
-  getStatusIcon: (status: string) => React.ReactNode;
-  getStatusBadge: (status: string) => React.ReactNode;
-  formatDate: (dateString: string) => string;
-  handleAction: (
-    action: string,
-    logId: string,
-    nodeId?: string
-  ) => Promise<void>;
-  viewJsonData: (data: any) => void;
-  nodeInputs: Record<string, any>;
-  nodeOutputs: Record<string, any>;
-  nodeLogs: Record<string, any[]>;
-};
+export default ExecutionLogsList;
