@@ -40,31 +40,89 @@ async function startWorker() {
     "execution_queue",
     async (msg: any) => {
       if (!msg) return;
-      const { executionId, workflowId } = JSON.parse(msg.content.toString());
+      const { executionId, workflowId, userId } = JSON.parse(msg.content.toString());
       console.log(`[Worker] Processing job: ${executionId}`);
+      const supabase = createServiceClient();
 
       try {
-        // Update status to running
+        // Check if execution is already completed or failed
+        const { data: execution } = await supabase
+          .from('workflow_executions')
+          .select('status')
+          .eq('id', executionId)
+          .single();
+
+        if (execution?.status === 'completed' || execution?.status === 'failed') {
+          console.log(`[Worker] Skipping already ${execution.status} job: ${executionId}`);
+          channel.ack(msg);
+          return;
+        }
+
+        // Check if execution is paused - if so, don't process yet
+        if (execution?.status === 'paused') {
+          console.log(`[Worker] Skipping paused job: ${executionId}`);
+          // Requeue with a delay for paused jobs
+          channel.nack(msg, false, true);
+          return;
+        }
+
+        // Update status to running and add log
         await executionService.updateExecutionStatus(executionId, "running");
+        await supabase.from("execution_logs").insert({
+          execution_id: executionId,
+          node_id: "system",
+          level: "info",
+          message: "Execution started",
+          timestamp: new Date().toISOString(),
+        });
 
         // Retrieve full workflow and orchestrate via DAG
         const wf = await workflowService.getWorkflow(workflowId);
+        if (!wf || !wf.nodes || !wf.edges) {
+          throw new Error(`Workflow ${workflowId} not found or invalid`);
+        }
+
         const results = await executeWorkflow(wf.nodes, wf.edges);
+        
         // Mark workflow completed with outputs
         await executionService.updateExecutionStatus(
           executionId,
           "completed",
           results
         );
+        
+        // Add completion log
+        await supabase.from("execution_logs").insert({
+          execution_id: executionId,
+          node_id: "system",
+          level: "info",
+          message: "Execution completed successfully",
+          timestamp: new Date().toISOString(),
+        });
+        
         console.log(`[Worker] Completed job: ${executionId}`);
         channel.ack(msg);
       } catch (error) {
         console.error(`[Worker] Job ${executionId} failed:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        // Update execution status
         await executionService.updateExecutionStatus(
           executionId,
           "failed",
-          (error as Error).message
+          errorMessage
         );
+        
+        // Add error log
+        await supabase.from("execution_logs").insert({
+          execution_id: executionId,
+          node_id: "system",
+          level: "error",
+          message: `Execution failed: ${errorMessage}`,
+          timestamp: new Date().toISOString(),
+        });
+        
+        // Don't requeue failed jobs
         channel.nack(msg, false, false);
       }
     },
@@ -73,12 +131,61 @@ async function startWorker() {
 }
 
 async function executeNode(node: any): Promise<any> {
+  const startTime = Date.now();
   const cfg = node.data as Record<string, any>;
   // Initialize Supabase client for DB operations
   const supabase = createServiceClient();
   // common validation wrapper
   const blockType = getBlockType(cfg);
   const { config } = cfg;
+  const executionId = cfg.executionId;
+  
+  // Create or update node execution record
+  if (executionId) {
+    try {
+      // Check if node execution record exists
+      const { data } = await supabase
+        .from('node_executions')
+        .select('id')
+        .eq('execution_id', executionId)
+        .eq('node_id', node.id)
+        .maybeSingle();
+      
+      if (data) {
+        // Update existing record
+        await supabase
+          .from('node_executions')
+          .update({
+            status: 'running',
+            started_at: new Date().toISOString(),
+          })
+          .eq('execution_id', executionId)
+          .eq('node_id', node.id);
+      } else {
+        // Create new record
+        await supabase
+          .from('node_executions')
+          .insert({
+            execution_id: executionId,
+            node_id: node.id,
+            status: 'running',
+            started_at: new Date().toISOString(),
+          });
+      }
+      
+      // Log node execution start
+      await supabase.from("node_logs").insert({
+        execution_id: executionId,
+        node_id: node.id,
+        level: "info",
+        message: `Executing ${blockType} node`,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error(`Error updating node execution status: ${err}`);
+      // Continue execution even if logging fails
+    }
+  }
 
   switch (blockType) {
     case BlockType.EMAIL: {
@@ -338,21 +445,107 @@ async function executeNode(node: any): Promise<any> {
 // Orchestrate full workflow execution
 export async function executeWorkflow(
   nodes: Node[],
-  edges: Edge[]
+  edges: Edge[],
+  executionId?: string
 ): Promise<Record<string, any>> {
-  // Graph validations
-  validateAcyclic(nodes, edges);
-  validateOrphans(nodes, edges);
-  validateTerminals(nodes, edges);
-  // Topologically sorted run
-  const sorted = topologicalSort(nodes, edges);
-  const outputs: Record<string, any> = {};
-  for (const node of sorted) {
-    // attach previous outputs if needed
-    const inputNode = { ...node, data: { ...node.data, previous: outputs } };
-    outputs[node.id] = await executeNode(inputNode);
+  const supabase = createServiceClient();
+  
+  try {
+    // Graph validations
+    validateAcyclic(nodes, edges);
+    validateOrphans(nodes, edges);
+    validateTerminals(nodes, edges);
+    
+    // Topologically sorted run
+    const sorted = topologicalSort(nodes, edges);
+    const outputs: Record<string, any> = {};
+    
+    for (const node of sorted) {
+      // Check if execution is paused before each node
+      if (executionId) {
+        const { data: execution } = await supabase
+          .from('workflow_executions')
+          .select('status')
+          .eq('id', executionId)
+          .single();
+          
+        if (execution?.status === 'paused') {
+          throw new Error('EXECUTION_PAUSED');
+        }
+      }
+      
+      // attach previous outputs and execution ID if needed
+      const inputNode = { 
+        ...node, 
+        data: { 
+          ...node.data, 
+          previous: outputs,
+          executionId: executionId 
+        } 
+      };
+      
+      try {
+        outputs[node.id] = await executeNode(inputNode);
+        
+        // Update node execution status to completed
+        if (executionId) {
+          await supabase
+            .from('node_executions')
+            .update({
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+              output: outputs[node.id] || {},
+            })
+            .eq('execution_id', executionId)
+            .eq('node_id', node.id);
+            
+          // Log node completion
+          await supabase.from("node_logs").insert({
+            execution_id: executionId,
+            node_id: node.id,
+            level: "info",
+            message: `Node completed successfully`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } catch (error) {
+        // Update node execution status to failed
+        if (executionId) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          
+          await supabase
+            .from('node_executions')
+            .update({
+              status: 'failed',
+              completed_at: new Date().toISOString(),
+              error: errorMessage,
+            })
+            .eq('execution_id', executionId)
+            .eq('node_id', node.id);
+            
+          // Log node failure
+          await supabase.from("node_logs").insert({
+            execution_id: executionId,
+            node_id: node.id,
+            level: "error",
+            message: `Node failed: ${errorMessage}`,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        
+        // Rethrow to fail the whole workflow
+        throw error;
+      }
+    }
+    return outputs;
+  } catch (error) {
+    // Special handling for paused executions
+    if (error instanceof Error && error.message === 'EXECUTION_PAUSED') {
+      console.log(`Execution ${executionId} is paused`);
+      return { status: 'paused' };
+    }
+    throw error;
   }
-  return outputs;
 }
 
 startWorker().catch((err) => console.error(err));

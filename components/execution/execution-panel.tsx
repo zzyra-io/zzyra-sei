@@ -1,18 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Play, AlertCircle, CheckCircle, Clock, Loader2 } from "lucide-react"
-import { startExecution, resumeExecution } from "@/app/actions/execution-actions"
+import { Play, AlertCircle, CheckCircle, Clock, Loader2, Pause, RotateCw } from "lucide-react"
+import { startExecution, resumeExecution, pauseExecution, retryExecution } from "@/app/actions/execution-actions"
 import { ExecutionHistory } from "@/components/execution/execution-history"
 import { ExecutionLogs } from "@/components/execution/execution-logs"
 import { ExecutionNodeExecutions } from "@/components/execution/execution-node-executions"
 import { toast } from "@/components/ui/use-toast"
+import { createClient } from "@/lib/supabase/client"
 
 interface ExecutionPanelProps {
   workflowId: string
@@ -23,12 +24,49 @@ interface ExecutionPanelProps {
 export function ExecutionPanel({ workflowId, executions, activeExecutionId }: ExecutionPanelProps) {
   const [isExecuting, setIsExecuting] = useState(false)
   const [isResuming, setIsResuming] = useState(false)
+  const [isPausing, setIsPausing] = useState(false)
+  const [isRetrying, setIsRetrying] = useState(false)
   const [currentExecutionId, setCurrentExecutionId] = useState<string | undefined>(activeExecutionId)
   const router = useRouter()
 
+  // Set up real-time subscription to execution updates
+  useEffect(() => {
+    if (!currentExecutionId) return
+    
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`execution-${currentExecutionId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'workflow_executions', filter: `id=eq.${currentExecutionId}` },
+        () => {
+          // Trigger a refresh when execution is updated
+          router.refresh()
+        }
+      )
+      .subscribe()
+      
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [currentExecutionId, router])
+  
+  // Get the active execution
   const activeExecution = currentExecutionId
     ? executions.find((execution) => execution.id === currentExecutionId)
     : undefined
+    
+  // Poll for updates every 3 seconds for running executions
+  useEffect(() => {
+    if (!currentExecutionId) return
+    if (!activeExecution || activeExecution.status !== 'running') return
+    
+    const interval = setInterval(() => {
+      router.refresh()
+    }, 3000)
+    
+    return () => clearInterval(interval)
+  }, [currentExecutionId, router, activeExecution])
 
   async function handleExecute() {
     setIsExecuting(true)
@@ -137,6 +175,33 @@ export function ExecutionPanel({ workflowId, executions, activeExecutionId }: Ex
                   </div>
                   <div className="flex items-center space-x-2">
                     {getStatusBadge(activeExecution.status)}
+                    {activeExecution.status === 'running' && (
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        setIsPausing(true)
+                        try {
+                          const res = await pauseExecution(activeExecution.id)
+                          if (res.error) throw new Error(res.error)
+                          toast({ title: 'Execution paused' })
+                          router.refresh()
+                        } catch (err) {
+                          const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+                          toast({ title: 'Pause failed', description: errorMessage, variant: 'destructive' })
+                        } finally { setIsPausing(false) }
+                      }} disabled={isPausing}>
+                        {isPausing ? (
+                          <>
+                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                            Pausing...
+                          </>
+                        ) : (
+                          <>
+                            <Pause className="mr-2 h-3 w-3" />
+                            Pause
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    
                     {activeExecution.status === 'paused' && (
                       <Button size="sm" variant="outline" onClick={async () => {
                         setIsResuming(true)
@@ -145,11 +210,49 @@ export function ExecutionPanel({ workflowId, executions, activeExecutionId }: Ex
                           if (res.error) throw new Error(res.error)
                           toast({ title: 'Execution resumed' })
                           router.refresh()
-                        } catch (err: any) {
-                          toast({ title: 'Resume failed', description: err.message, variant: 'destructive' })
+                        } catch (err) {
+                          const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+                          toast({ title: 'Resume failed', description: errorMessage, variant: 'destructive' })
                         } finally { setIsResuming(false) }
                       }} disabled={isResuming}>
-                        {isResuming ? 'Resuming...' : 'Resume'}
+                        {isResuming ? (
+                          <>
+                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                            Resuming...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="mr-2 h-3 w-3" />
+                            Resume
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    
+                    {activeExecution.status === 'failed' && (
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        setIsRetrying(true)
+                        try {
+                          const res = await retryExecution(activeExecution.id, workflowId)
+                          if (res.error) throw new Error(res.error)
+                          toast({ title: 'Execution retry initiated' })
+                          router.refresh()
+                        } catch (err) {
+                          const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+                          toast({ title: 'Retry failed', description: errorMessage, variant: 'destructive' })
+                        } finally { setIsRetrying(false) }
+                      }} disabled={isRetrying}>
+                        {isRetrying ? (
+                          <>
+                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                            Retrying...
+                          </>
+                        ) : (
+                          <>
+                            <RotateCw className="mr-2 h-3 w-3" />
+                            Retry
+                          </>
+                        )}
                       </Button>
                     )}
                   </div>
@@ -211,7 +314,8 @@ export function ExecutionPanel({ workflowId, executions, activeExecutionId }: Ex
               onSelectExecution={(id) => {
                 setCurrentExecutionId(id)
                 // Switch back to current tab
-                document.querySelector('[data-value="current"]')?.click()
+                const currentTab = document.querySelector('[data-value="current"]') as HTMLElement
+                if (currentTab) currentTab.click()
               }}
             />
           </TabsContent>

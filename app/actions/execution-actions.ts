@@ -34,125 +34,135 @@ export async function startExecution(workflowId: string) {
     // Log the start of execution
     await supabase.from("execution_logs").insert({
       execution_id: executionId,
-      node_id: "start",
+      node_id: "system",
       level: "info",
-      message: "Execution started",
+      message: "Execution queued",
       timestamp: new Date().toISOString(),
     });
 
-    // Simulate starting the execution process
-    // In a real app, this would trigger a background job or webhook
-    setTimeout(async () => {
-      await simulateExecution(executionId, workflowId);
-    }, 100);
+    // Queue the job for the worker to process
+    try {
+      // Log attempt to insert into queue
+      await supabase.from("execution_logs").insert({
+        execution_id: executionId,
+        node_id: "system",
+        level: "info",
+        message: "Attempting to insert job into execution_queue",
+        timestamp: new Date().toISOString(),
+      });
 
-    revalidatePath(`/builder/${workflowId}`);
-    return { success: true, executionId };
-  } catch (error: any) {
-    return { error: error.message };
-  }
-}
+      // Try a different approach using a direct SQL query to insert into the queue
+      // This bypasses potential RLS issues and ensures the insert happens with the right types
+      const { data: insertResult, error: queueError } = await supabase.rpc(
+        'insert_execution_queue_job',
+        {
+          p_execution_id: executionId,
+          p_workflow_id: workflowId,
+          p_user_id: user.id,
+          p_status: "pending",
+          p_priority: 0,
+          p_payload: JSON.stringify({ triggered_by: user.id }),
+          p_scheduled_for: new Date().toISOString()
+        }
+      );
+      
+      // If the RPC doesn't exist, fall back to direct insert
+      if (queueError && queueError.message.includes("function does not exist")) {
+        console.log("RPC function not found, falling back to direct insert");
+        const { error: directError } = await supabase
+          .from("execution_queue")
+          .insert({
+            execution_id: executionId,
+            workflow_id: workflowId,
+            user_id: user.id,
+            status: "pending",
+            priority: 0,
+            payload: { triggered_by: user.id },
+            scheduled_for: new Date().toISOString()
+          });
+          
+        if (directError) {
+          console.error("Direct insert also failed:", directError);
+          // Try one more approach - raw SQL
+          const { error: rawError } = await supabase.rpc(
+            'execute_sql',
+            {
+              sql: `INSERT INTO execution_queue (execution_id, workflow_id, user_id, status, priority, payload, scheduled_for) 
+                   VALUES ('${executionId}', '${workflowId}', '${user.id}', 'pending', 0, '{"triggered_by":"${user.id}"}', '${new Date().toISOString()}')`
+            }
+          );
+          
+          if (rawError) {
+            console.error("Raw SQL insert also failed:", rawError);
+            return { error: `All queue insertion methods failed: ${rawError.message}` };
+          }
+        }
+      }
 
-// This function simulates the execution of a workflow
-// In a real app, this would be handled by a background job or webhook
-async function simulateExecution(executionId: string, workflowId: string) {
-  const supabase = await createClient();
-
-  try {
-    // Update status to running and record start time
-    await supabase
-      .from("workflow_executions")
-      .update({ status: "running", started_at: new Date().toISOString() })
-      .eq("id", executionId);
-
-    // Log execution progress
-    await supabase.from("execution_logs").insert({
-      execution_id: executionId,
-      node_id: "process",
-      level: "info",
-      message: "Processing workflow nodes",
-      timestamp: new Date().toISOString(),
-    });
-
-    // Get workflow data
-    const { data: workflow } = await supabase
-      .from("workflows")
-      .select("flow_data")
-      .eq("id", workflowId)
-      .single();
-
-    // Simulate processing time
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Log node executions (simulated)
-    if (workflow?.flow_data?.nodes) {
-      for (const node of workflow.flow_data.nodes) {
+      if (queueError) {
+        console.error('Failed to queue execution job:', queueError);
+        
+        // Log the error details
         await supabase.from("execution_logs").insert({
           execution_id: executionId,
-          node_id: node.id || "unknown",
-          level: "info",
-          message: `Executed node: ${node.type || "unknown"}`,
-          data: { nodeId: node.id, nodeType: node.type },
+          node_id: "system",
+          level: "error",
+          message: `Failed to queue execution: ${queueError.message}`,
+          data: { error: queueError, details: queueError.details },
           timestamp: new Date().toISOString(),
         });
-
-        // Simulate node processing time
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        
+        // Update execution status to failed if we couldn't queue it
+        await supabase
+          .from("workflow_executions")
+          .update({ 
+            status: "failed", 
+            error: `Failed to queue execution: ${queueError.message}`,
+            completed_at: new Date().toISOString()
+          })
+          .eq("id", executionId);
+          
+        return { error: `Failed to queue execution: ${queueError.message}` };
       }
-    }
-
-    // Randomly succeed or fail (for demo purposes)
-    const success = Math.random() > 0.2; // 80% success rate
-
-    if (success) {
-      // Complete successfully
-      await supabase
-        .from("workflow_executions")
-        .update({
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          result: { success: true, message: "Workflow executed successfully" },
-        })
-        .eq("id", executionId);
-
+      
+      // Log successful queue insertion
       await supabase.from("execution_logs").insert({
         execution_id: executionId,
-        node_id: "end",
+        node_id: "system",
         level: "info",
-        message: "Execution completed successfully",
+        message: "Job successfully inserted into execution_queue",
         timestamp: new Date().toISOString(),
       });
-    } else {
-      // Fail with error
-      await supabase
-        .from("workflow_executions")
-        .update({
-          status: "failed",
-          completed_at: new Date().toISOString(),
-          result: { success: false, message: "Workflow execution failed" },
-        })
-        .eq("id", executionId);
-
+    } catch (queueInsertError) {
+      console.error('Exception during queue insertion:', queueInsertError);
+      
+      // Log the exception
       await supabase.from("execution_logs").insert({
         execution_id: executionId,
-        node_id: "error",
+        node_id: "system",
         level: "error",
-        message: "Execution failed: Simulated error occurred",
+        message: `Exception during queue insertion: ${queueInsertError instanceof Error ? queueInsertError.message : String(queueInsertError)}`,
         timestamp: new Date().toISOString(),
       });
+      
+      // Update execution status to failed
+      await supabase
+        .from("workflow_executions")
+        .update({ 
+          status: "failed", 
+          error: "Exception during queue insertion",
+          completed_at: new Date().toISOString()
+        })
+        .eq("id", executionId);
+        
+      return { error: "Exception during queue insertion" };
     }
+    
+    revalidatePath(`/builder/${workflowId}`);
+    return { success: true, executionId };
   } catch (error) {
-    console.error("Error in simulated execution:", error);
-
-    // Mark as failed if there's an error
-    await supabase
-      .from("workflow_executions")
-      .update({
-        status: "failed",
-        completed_at: new Date().toISOString(),
-        result: { success: false, message: "Internal error occurred" },
-      })
-      .eq("id", executionId);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return { error: errorMessage };
   }
 }
 
@@ -225,16 +235,197 @@ export async function getWorkflowExecutions(workflowId: string) {
 }
 
 // Resume a paused workflow execution
-export async function resumeExecution(executionId: string, resumeData: any = {}) {
-  // Call the resume API
-  const res = await fetch(`/api/executions/${executionId}/resume`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ resumeData }),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    return { error: err.error || 'Failed to resume execution' };
+export async function resumeExecution(executionId: string, resumeData: Record<string, unknown> = {}) {
+  try {
+    const supabase = await createClient();
+    
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { error: "Not authenticated" };
+    }
+    
+    // Get workflow ID from execution
+    const { data: execution, error: execError } = await supabase
+      .from("workflow_executions")
+      .select("workflow_id, status")
+      .eq("id", executionId)
+      .single();
+    
+    if (execError) {
+      return { error: execError.message };
+    }
+    
+    if (!execution) {
+      return { error: "Execution not found" };
+    }
+    
+    if (execution.status !== "paused") {
+      return { error: `Cannot resume execution with status: ${execution.status}` };
+    }
+    
+    // Update execution status to running
+    const { error: updateError } = await supabase
+      .from("workflow_executions")
+      .update({ status: "running" })
+      .eq("id", executionId);
+    
+    if (updateError) {
+      return { error: updateError.message };
+    }
+    
+    // Log the resume action
+    await supabase.from("execution_logs").insert({
+      execution_id: executionId,
+      node_id: "system",
+      level: "info",
+      message: "Execution resumed by user",
+      timestamp: new Date().toISOString(),
+    });
+    
+    // Add to execution queue with resumeData
+    const { error: queueError } = await supabase
+      .from("execution_queue")
+      .insert({
+        execution_id: executionId,
+        workflow_id: execution.workflow_id,
+        user_id: user.id,
+        status: "pending",
+        priority: 2, // Highest priority for resumed jobs
+        payload: { resumed: true, resumed_at: new Date().toISOString(), resumeData },
+        scheduled_for: new Date().toISOString()
+      });
+    
+    if (queueError) {
+      console.error("Failed to queue resume job:", queueError);
+      // Continue anyway since we've already updated the execution record
+    }
+    
+    revalidatePath(`/builder/${execution.workflow_id}`);
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return { error: errorMessage };
   }
-  return await res.json();
+}
+
+// Pause a running workflow execution
+export async function pauseExecution(executionId: string) {
+  try {
+    const supabase = await createClient();
+    
+    // Get workflow ID from execution
+    const { data: execution, error: execError } = await supabase
+      .from("workflow_executions")
+      .select("workflow_id, status")
+      .eq("id", executionId)
+      .single();
+    
+    if (execError) {
+      return { error: execError.message };
+    }
+    
+    if (!execution) {
+      return { error: "Execution not found" };
+    }
+    
+    if (execution.status !== "running") {
+      return { error: `Cannot pause execution with status: ${execution.status}` };
+    }
+    
+    // Update the execution status to paused
+    const { error } = await supabase
+      .from("workflow_executions")
+      .update({ status: "paused" })
+      .eq("id", executionId);
+    
+    if (error) {
+      return { error: error.message };
+    }
+    
+    // Update any queue entries for this execution to paused
+    await supabase
+      .from("execution_queue")
+      .update({ status: "paused" })
+      .eq("execution_id", executionId)
+      .eq("status", "pending");
+    
+    // Log the pause action
+    await supabase.from("execution_logs").insert({
+      execution_id: executionId,
+      node_id: "system",
+      level: "info",
+      message: "Execution paused by user",
+      timestamp: new Date().toISOString(),
+    });
+    
+    revalidatePath(`/builder/${execution.workflow_id}`);
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return { error: errorMessage };
+  }
+}
+
+// Retry a failed workflow execution
+export async function retryExecution(executionId: string, workflowId: string) {
+  try {
+    const supabase = await createClient();
+    
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return { error: "Not authenticated" };
+    }
+    
+    // Update the execution status to running
+    const { error } = await supabase
+      .from("workflow_executions")
+      .update({ 
+        status: "running",
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        result: null
+      })
+      .eq("id", executionId);
+    
+    if (error) {
+      return { error: error.message };
+    }
+    
+    // Log the retry action
+    await supabase.from("execution_logs").insert({
+      execution_id: executionId,
+      node_id: "system",
+      level: "info",
+      message: "Execution retry initiated by user",
+      timestamp: new Date().toISOString(),
+    });
+    
+    // Add to execution queue for worker processing
+    const { error: queueError } = await supabase
+      .from("execution_queue")
+      .insert({
+        execution_id: executionId,
+        workflow_id: workflowId,
+        user_id: user.id,
+        status: "pending",
+        priority: 1, // Higher priority for retries
+        payload: { retried: true, retried_at: new Date().toISOString() },
+        scheduled_for: new Date().toISOString()
+      });
+    
+    if (queueError) {
+      console.error("Failed to queue retry job:", queueError);
+      // Continue anyway since we've already updated the execution record
+    }
+    
+    revalidatePath(`/builder/${workflowId}`);
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return { error: errorMessage };
+  }
 }

@@ -113,37 +113,75 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
     setLocalNode(updatedNode);
   }
 
-  // If this is a custom block and we have the definition, render the custom block config panel
-  if (isCustomBlock && customBlockDefinition) {
-    return (
-      <CustomBlockConfigPanel
-        node={node}
-        onUpdate={onUpdate}
-        onClose={onClose}
-        customBlockDefinition={customBlockDefinition}
-      />
-    )
-  }
-
-  // If we're still loading the custom block definition, show a loading state
-  if (isCustomBlock && isLoadingCustomBlock) {
-    return (
-      <div className="w-80 h-full flex flex-col bg-background border-l">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-medium">Loading Block Configuration...</h3>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-sm text-muted-foreground">Loading custom block definition</p>
+  // --- PATCH: Robust Custom Block Handling and Diagnosis ---
+  if (isCustomBlock) {
+    // Logging for diagnosis
+    console.log('[BlockConfigPanel] Custom block detected:', {
+      node,
+      customBlockDefinition,
+      isLoadingCustomBlock,
+    });
+    if (isLoadingCustomBlock) {
+      return (
+        <div className="w-80 h-full flex flex-col bg-background border-l">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="font-medium">Loading Block Configuration...</h3>
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-2 text-sm text-muted-foreground">Loading custom block definition</p>
+            </div>
           </div>
         </div>
-      </div>
-    )
+      );
+    }
+    if (!customBlockDefinition) {
+      // User-facing error if block definition is missing
+      return (
+        <div className="w-80 h-full flex flex-col bg-background border-l">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="font-medium">Custom Block Error</h3>
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-destructive mb-2">Custom block definition not found.</p>
+              <p className="text-xs text-muted-foreground">Please check your custom block setup or try reloading.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    // Always render the CustomBlockConfigPanel for custom blocks
+    return (
+      <CustomBlockConfigPanel
+        blockId={node.data.customBlockId}
+        config={localNode.data.config || {}}
+        onUpdate={(config) => {
+          // Patch: Always update both config and customBlockId for robustness
+          const updatedNode = {
+            ...localNode,
+            data: {
+              ...localNode.data,
+              customBlockId: node.data.customBlockId,
+              config,
+            },
+          };
+          console.log('[BlockConfigPanel] Custom block config updated:', updatedNode);
+          onUpdate(updatedNode);
+          setLocalNode(updatedNode);
+        }}
+        onClose={onClose}
+      />
+    );
   }
+  // --- END PATCH ---
 
   // Render the appropriate config component based on block type
   const renderConfigComponent = () => {

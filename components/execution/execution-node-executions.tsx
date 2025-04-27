@@ -31,8 +31,8 @@ export function ExecutionNodeExecutions({ executionId }: ExecutionNodeExecutions
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'node_executions', filter: `execution_id=eq.${executionId}` },
-        (payload) => {
-          const rec = payload.new
+        (payload: { new: Record<string, unknown> }) => {
+          const rec = payload.new as NodeExecutionWithLogs
           setNodes(prev => prev.map(n => n.id === rec.id ? { ...rec, logs: n.logs } : n))
         }
       )
@@ -43,13 +43,22 @@ export function ExecutionNodeExecutions({ executionId }: ExecutionNodeExecutions
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'node_logs', filter: `execution_id=eq.${executionId}` },
-        (payload) => {
-          const log = payload.new
-          setNodes(prev => prev.map(n =>
-            n.node_id === log.node_id
-              ? { ...n, logs: [...(n.logs ?? []), log] }
-              : n
-          ))
+        (payload: { new: Record<string, unknown> }) => {
+          const log = payload.new as Database["public"]["Tables"]["node_logs"]["Row"]
+          // Prevent infinite loop by checking if log already exists
+          setNodes(prev => prev.map(n => {
+            if (n.node_id === log.node_id) {
+              // Check if this log already exists in the array
+              const logExists = (n.logs ?? []).some(existingLog => {
+                return existingLog && typeof existingLog === 'object' && 'id' in existingLog && existingLog.id === log.id
+              })
+              if (logExists) return n
+              
+              // Add the new log
+              return { ...n, logs: [...(n.logs ?? []), log] }
+            }
+            return n
+          }))
         }
       )
       .subscribe()
@@ -59,7 +68,10 @@ export function ExecutionNodeExecutions({ executionId }: ExecutionNodeExecutions
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'workflow_executions', filter: `id=eq.${executionId}` },
-        (payload) => setExecution(prev => prev ? { ...prev, ...payload.new } : payload.new)
+        (payload: { new: Record<string, unknown> }) => {
+          const newExecution = payload.new as Partial<WorkflowExecutionRow>
+          setExecution(prev => prev ? { ...prev, ...newExecution } : newExecution as WorkflowExecutionRow)
+        }
       )
       .subscribe()
 
@@ -68,21 +80,50 @@ export function ExecutionNodeExecutions({ executionId }: ExecutionNodeExecutions
       try {
         const { data: execData, error: execErr } = await supabase
           .from('workflow_executions')
-          .select('id, status, started_at, completed_at, error')
+          .select('*')
           .eq('id', executionId)
           .single()
         if (execErr) throw execErr
-        setExecution(execData)
+        setExecution(execData as WorkflowExecutionRow)
 
+        // Fetch node executions
         const { data: nodeData, error: nodeErr } = await supabase
           .from('node_executions')
           .select('*')
           .eq('execution_id', executionId)
           .order('started_at', { ascending: true })
         if (nodeErr) throw nodeErr
-        setNodes(nodeData?.map(n => ({ ...n, logs: [] })) ?? [])
-      } catch (err: any) {
-        setError(err.message)
+        
+        // Initialize nodes with empty logs array
+        const nodesWithEmptyLogs = nodeData?.map(n => ({ ...n, logs: [] })) ?? []
+        setNodes(nodesWithEmptyLogs)
+        
+        // Fetch logs for each node
+        if (nodesWithEmptyLogs.length > 0) {
+          const { data: logsData, error: logsErr } = await supabase
+            .from('node_logs')
+            .select('*')
+            .eq('execution_id', executionId)
+            .order('timestamp', { ascending: true })
+          
+          if (!logsErr && logsData) {
+            // Group logs by node_id
+            const logsByNode = logsData.reduce((acc, log) => {
+              if (!acc[log.node_id]) acc[log.node_id] = []
+              acc[log.node_id].push(log)
+              return acc
+            }, {} as Record<string, Database["public"]["Tables"]["node_logs"]["Row"][]>)
+            
+            // Update nodes with their logs
+            setNodes(nodesWithEmptyLogs.map(node => ({
+              ...node,
+              logs: logsByNode[node.node_id] || []
+            })))
+          }
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred'
+        setError(errorMessage)
       } finally {
         setLoading(false)
       }
@@ -144,10 +185,24 @@ export function ExecutionNodeExecutions({ executionId }: ExecutionNodeExecutions
                 <td className="p-1">{n.completed_at ? new Date(n.completed_at).toLocaleTimeString() : '-'}</td>
                 <td className="p-1">
                   {n.status === 'failed' && <pre className="text-xs text-red-500">{n.error}</pre>}
-                  {n.status === 'completed' && n.output_data && <pre className="text-xs">{JSON.stringify(n.output_data, null, 2)}</pre>}
-                  {n.logs?.map(log => (
-                    <pre key={log.id} className="text-xs">{log.message}</pre>
-                  ))}
+                  {n.status === 'completed' && n.output_data && (
+                    <pre className="text-xs bg-muted p-1 mt-1 rounded overflow-x-auto">
+                      {JSON.stringify(n.output_data, null, 2)}
+                    </pre>
+                  )}
+                  {n.logs && n.logs.length > 0 ? (
+                    <div className="mt-2 border-t pt-1">
+                      <div className="text-xs font-medium mb-1">Logs ({n.logs.length})</div>
+                      <div className="max-h-[150px] overflow-y-auto">
+                        {n.logs.map(log => (
+                          <div key={log.id} className="text-xs mb-1 border-l-2 border-blue-300 pl-2">
+                            <span className="text-muted-foreground">{new Date(log.timestamp).toLocaleTimeString()}: </span>
+                            {log.message}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </td>
               </tr>
             ))}

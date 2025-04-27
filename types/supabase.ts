@@ -122,6 +122,75 @@ export type Database = {
           },
         ]
       }
+      execution_queue: {
+        Row: {
+          created_at: string
+          error: string | null
+          execution_id: string
+          id: string
+          locked_by: string | null
+          locked_until: string | null
+          max_retries: number
+          payload: Json | null
+          priority: number
+          retry_count: number
+          scheduled_for: string
+          status: string
+          updated_at: string
+          user_id: string | null
+          workflow_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          execution_id: string
+          id?: string
+          locked_by?: string | null
+          locked_until?: string | null
+          max_retries?: number
+          payload?: Json | null
+          priority?: number
+          retry_count?: number
+          scheduled_for?: string
+          status: string
+          updated_at?: string
+          user_id?: string | null
+          workflow_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          execution_id?: string
+          id?: string
+          locked_by?: string | null
+          locked_until?: string | null
+          max_retries?: number
+          payload?: Json | null
+          priority?: number
+          retry_count?: number
+          scheduled_for?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "execution_queue_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "execution_queue_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       node_executions: {
         Row: {
           completed_at: string
@@ -461,7 +530,6 @@ export type Database = {
           duration_ms: number | null
           error: string | null
           id: string
-          idempotency_key: string | null
           logs: Json | null
           result: Json | null
           started_at: string
@@ -476,7 +544,6 @@ export type Database = {
           duration_ms?: number | null
           error?: string | null
           id?: string
-          idempotency_key?: string | null
           logs?: Json | null
           result?: Json | null
           started_at?: string
@@ -491,7 +558,6 @@ export type Database = {
           duration_ms?: number | null
           error?: string | null
           id?: string
-          idempotency_key?: string | null
           logs?: Json | null
           result?: Json | null
           started_at?: string
@@ -637,6 +703,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_next_execution_job: {
+        Args: { worker_id: string; batch_size?: number }
+        Returns: {
+          created_at: string
+          error: string | null
+          execution_id: string
+          id: string
+          locked_by: string | null
+          locked_until: string | null
+          max_retries: number
+          payload: Json | null
+          priority: number
+          retry_count: number
+          scheduled_for: string
+          status: string
+          updated_at: string
+          user_id: string | null
+          workflow_id: string
+        }[]
+      }
+      execute_sql: {
+        Args: { sql: string }
+        Returns: undefined
+      }
       get_execution_duration_stats: {
         Args: { workflow_id: string; since_date: string }
         Returns: {
@@ -653,6 +743,34 @@ export type Database = {
           avg_duration: number
           failure_rate: number
         }[]
+      }
+      insert_execution_queue_job: {
+        Args: {
+          p_execution_id: string
+          p_workflow_id: string
+          p_user_id: string
+          p_status: string
+          p_priority: number
+          p_payload: Json
+          p_scheduled_for: string
+        }
+        Returns: {
+          created_at: string
+          error: string | null
+          execution_id: string
+          id: string
+          locked_by: string | null
+          locked_until: string | null
+          max_retries: number
+          payload: Json | null
+          priority: number
+          retry_count: number
+          scheduled_for: string
+          status: string
+          updated_at: string
+          user_id: string | null
+          workflow_id: string
+        }
       }
       reset_monthly_execution_count: {
         Args: Record<PropertyKey, never>
