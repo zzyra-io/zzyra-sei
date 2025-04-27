@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { formatDistance } from "date-fns";
 import {
-  AlertCircle,
   CheckCircle2,
   Clock,
   Loader2,
@@ -58,7 +57,7 @@ import {
 } from "@/components/ui/tooltip";
 import { createClient } from "@/lib/supabase/client";
 import { debounce } from "lodash";
-import { topologicalSort } from "@/lib/utils/graph";
+// import { topologicalSort } from "@/lib/utils/graph";
 import { Workflow } from "@/lib/supabase/schema";
 
 // ### TypeScript Interfaces
@@ -79,19 +78,19 @@ interface NodeExecution {
   started_at: string;
   completed_at?: string;
   error?: string;
-  output_data?: any;
+  output_data?: Record<string, unknown>;
 }
 
 interface NodeInput {
   execution_id: string;
   node_id: string;
-  data: any;
+  data: Record<string, unknown>;
 }
 
 interface NodeOutput {
   execution_id: string;
   node_id: string;
-  data: any;
+  data: Record<string, unknown>;
 }
 
 interface NodeLog {
@@ -100,7 +99,7 @@ interface NodeLog {
   timestamp: string;
   level: "info" | "warning" | "error";
   message: string;
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 interface ExecutionLogsListProps {
@@ -121,8 +120,8 @@ export function ExecutionLogsList({
   const [nodeExecutionsMap, setNodeExecutionsMap] = useState<
     Record<string, NodeExecution[]>
   >({});
-  const [nodeInputsMap, setNodeInputsMap] = useState<Record<string, any>>({});
-  const [nodeOutputsMap, setNodeOutputsMap] = useState<Record<string, any>>({});
+  const [nodeInputsMap, setNodeInputsMap] = useState<Record<string, Record<string, unknown>>>({});
+  const [nodeOutputsMap, setNodeOutputsMap] = useState<Record<string, Record<string, unknown>>>({});
   const [nodeLogsMap, setNodeLogsMap] = useState<Record<string, NodeLog[]>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | Execution["status"]>(
@@ -136,7 +135,7 @@ export function ExecutionLogsList({
   const [activeTab, setActiveTab] = useState<"all" | Execution["status"]>(
     "all"
   );
-  const [jsonViewerData, setJsonViewerData] = useState<any>(null);
+  const [jsonViewerData, setJsonViewerData] = useState<Record<string, unknown> | null>(null);
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
   const [loadingExecutionIds, setLoadingExecutionIds] = useState<Set<string>>(
     new Set()
@@ -243,10 +242,11 @@ export function ExecutionLogsList({
         setNodeInputsMap((prev) => ({ ...prev, ...inputsMap }));
         setNodeOutputsMap((prev) => ({ ...prev, ...outputsMap }));
         setNodeLogsMap((prev) => ({ ...prev, ...logsMap }));
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         toast({
           title: "Error Loading Node Data",
-          description: error.message || "Failed to load node details",
+          description: errorMessage || "Failed to load node details",
           variant: "destructive",
         });
       } finally {
@@ -342,6 +342,18 @@ export function ExecutionLogsList({
     if (activeTab === "all") return executions;
     return executions.filter((exec) => exec.status === activeTab);
   }, [executions, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "all") {
+      setStatusFilter(activeTab);
+    } else {
+      setStatusFilter("all");
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!supabase) return;
+  }, [supabase]);
 
   // ### Utility Functions
   const formatDate = useCallback((dateString: string) => {
@@ -451,7 +463,7 @@ export function ExecutionLogsList({
     }
   };
 
-  const viewJsonData = (data: any) => {
+  const viewJsonData = (data: Record<string, unknown>) => {
     setJsonViewerData(data);
     setIsJsonDialogOpen(true);
   };
@@ -978,13 +990,14 @@ const NodeExecutionItem = React.memo(
                   <div className='flex items-center gap-2'>
                     <span className='text-xs font-medium'>Filter:</span>
                     <select
-                      className='text-xs border rounded px-2 py-1 bg-white'
+                      className='text-xs bg-transparent border-none focus:outline-none focus:ring-0'
                       value={logLevel}
                       onChange={(e) =>
                         setLogLevel(
                           e.target.value as "all" | "info" | "warning" | "error"
                         )
-                      }>
+                      }
+                      title='Filter logs by level'>
                       <option value='all'>All Levels</option>
                       <option value='info'>Info</option>
                       <option value='warning'>Warning</option>
@@ -1092,9 +1105,48 @@ const NodeExecutionItem = React.memo(
                     </div>
                   )}
                 </div>
-                {nodeExec.output_data && (
+                {/* Display Node Input Data */}
+                {nodeInputs[nodeExec.node_id] && (
+                  <div className='mt-2'>
+                    <div className='font-medium text-xs mb-1'>Input Data</div>
+                    <div className='relative'>
+                      <pre className='text-xs bg-muted p-2 rounded-md overflow-auto max-h-40'>
+                        {JSON.stringify(nodeInputs[nodeExec.node_id], null, 2)}
+                      </pre>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='absolute top-2 right-2 h-6 text-xs'
+                        onClick={() => viewJsonData(nodeInputs[nodeExec.node_id])}>
+                        Expand
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Display Node Output Data */}
+                {nodeOutputs[nodeExec.node_id] && (
                   <div className='mt-2'>
                     <div className='font-medium text-xs mb-1'>Output Data</div>
+                    <div className='relative'>
+                      <pre className='text-xs bg-muted p-2 rounded-md overflow-auto max-h-40'>
+                        {JSON.stringify(nodeOutputs[nodeExec.node_id], null, 2)}
+                      </pre>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='absolute top-2 right-2 h-6 text-xs'
+                        onClick={() => viewJsonData(nodeOutputs[nodeExec.node_id])}>
+                        Expand
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Fallback to output_data if nodeOutputs doesn't have this node's data */}
+                {!nodeOutputs[nodeExec.node_id] && nodeExec.output_data && (
+                  <div className='mt-2'>
+                    <div className='font-medium text-xs mb-1'>Output Data (Legacy)</div>
                     <div className='relative'>
                       <pre className='text-xs bg-muted p-2 rounded-md overflow-auto max-h-40'>
                         {JSON.stringify(nodeExec.output_data, null, 2)}
@@ -1127,5 +1179,9 @@ const NodeExecutionItem = React.memo(
     );
   }
 );
+
+// Add display names to components
+ExecutionLogsList.displayName = 'ExecutionLogsList';
+ExecutionLogCard.displayName = 'ExecutionLogCard';
 
 export default ExecutionLogsList;
