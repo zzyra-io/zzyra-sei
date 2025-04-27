@@ -58,6 +58,34 @@ export default function SettingsPage() {
     if (session?.user) {
       setEmail(session.user.email || "");
 
+      // Fetch usage data
+      const fetchUsage = async () => {
+        setUsageLoading(true);
+        try {
+          // Get the monthly executions from the profile data
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("monthly_executions_used")
+            .eq("id", session.user.id)
+            .maybeSingle();
+            
+          if (error) throw error;
+          
+          if (data) {
+            setMonthlyExecutionsUsed(data.monthly_executions_used || 0);
+          }
+        } catch (error) {
+          console.error("Error fetching usage data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load usage data",
+            variant: "destructive",
+          });
+        } finally {
+          setUsageLoading(false);
+        }
+      };
+
       // Fetch user profile
       const fetchProfile = async () => {
         try {
@@ -66,6 +94,7 @@ export default function SettingsPage() {
             .select("*")
             .eq("id", session.user.id)
             .maybeSingle();
+          console.log("Profile data:", data);
           if (error) throw error;
           // If no profile exists, create one
           if (!data) {
@@ -98,9 +127,12 @@ export default function SettingsPage() {
         }
       };
 
+
+
       fetchProfile();
+      fetchUsage();
     }
-  }, [session, supabase]);
+  }, [session, supabase, darkMode, discordWebhook, emailNotifications, name, telegramHandle, toast]);
 
   useEffect(() => {
     if (session?.user) {
@@ -205,8 +237,7 @@ export default function SettingsPage() {
                     onClick={() => router.push("/billing")}
                     variant='outline'
                     size='sm'
-                    className='group'
-                  >
+                    className='group'>
                     <CreditCard className='mr-2 h-4 w-4' />
                     Upgrade
                     <ChevronRight className='ml-1 h-4 w-4 transition-transform group-hover:translate-x-1' />
@@ -220,22 +251,19 @@ export default function SettingsPage() {
                 <TabsList className='grid w-full grid-cols-3 max-w-md mx-auto'>
                   <TabsTrigger
                     value='profile'
-                    className='flex items-center gap-2'
-                  >
+                    className='flex items-center gap-2'>
                     <User className='h-4 w-4' />
                     <span className='hidden sm:inline'>Profile</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value='appearance'
-                    className='flex items-center gap-2'
-                  >
+                    className='flex items-center gap-2'>
                     <Palette className='h-4 w-4' />
                     <span className='hidden sm:inline'>Appearance</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value='notifications'
-                    className='flex items-center gap-2'
-                  >
+                    className='flex items-center gap-2'>
                     <Bell className='h-4 w-4' />
                     <span className='hidden sm:inline'>Notifications</span>
                   </TabsTrigger>
@@ -260,14 +288,12 @@ export default function SettingsPage() {
                           e.preventDefault();
                           handleSaveProfile();
                         }}
-                        className='space-y-5'
-                      >
+                        className='space-y-5'>
                         <div className='grid gap-5 sm:grid-cols-2'>
                           <div className='space-y-2'>
                             <Label
                               htmlFor='name'
-                              className='text-sm font-medium'
-                            >
+                              className='text-sm font-medium'>
                               Full Name
                             </Label>
                             <Input
@@ -281,8 +307,7 @@ export default function SettingsPage() {
                           <div className='space-y-2'>
                             <Label
                               htmlFor='email'
-                              className='text-sm font-medium'
-                            >
+                              className='text-sm font-medium'>
                               Email
                             </Label>
                             <Input
@@ -303,8 +328,7 @@ export default function SettingsPage() {
                           <div className='space-y-2'>
                             <Label
                               htmlFor='telegram'
-                              className='text-sm font-medium'
-                            >
+                              className='text-sm font-medium'>
                               Telegram Handle
                             </Label>
                             <Input
@@ -320,8 +344,7 @@ export default function SettingsPage() {
                           <div className='space-y-2'>
                             <Label
                               htmlFor='discord'
-                              className='text-sm font-medium'
-                            >
+                              className='text-sm font-medium'>
                               Discord Webhook
                             </Label>
                             <Input
@@ -343,8 +366,7 @@ export default function SettingsPage() {
                         type='submit'
                         onClick={handleSaveProfile}
                         disabled={isLoading}
-                        className='relative overflow-hidden group'
-                      >
+                        className='relative overflow-hidden group'>
                         {isLoading ? (
                           <>
                             <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -374,8 +396,7 @@ export default function SettingsPage() {
                       <div className='flex items-center justify-between'>
                         <h3 className='text-sm font-medium'>Current Plan</h3>
                         <Badge
-                          className={`px-3 py-1 ${getSubscriptionBadgeColor()}`}
-                        >
+                          className={`px-3 py-1 ${getSubscriptionBadgeColor()}`}>
                           {subscriptionTier.charAt(0).toUpperCase() +
                             subscriptionTier.slice(1)}
                         </Badge>
@@ -407,8 +428,7 @@ export default function SettingsPage() {
                             onClick={() => router.push("/billing")}
                             variant='default'
                             size='sm'
-                            className='bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0'
-                          >
+                            className='bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0'>
                             <CreditCard className='mr-2 h-4 w-4' />
                             Upgrade Plan
                           </Button>
@@ -472,8 +492,7 @@ export default function SettingsPage() {
                               onClick={() => router.push("/billing")}
                               variant='default'
                               size='sm'
-                              className='bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0'
-                            >
+                              className='bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0'>
                               <CreditCard className='mr-2 h-4 w-4' />
                               Upgrade Now
                             </Button>
@@ -502,8 +521,7 @@ export default function SettingsPage() {
                         <div className='space-y-1'>
                           <Label
                             htmlFor='dark-mode'
-                            className='text-base font-medium'
-                          >
+                            className='text-base font-medium'>
                             Dark Mode
                           </Label>
                           <p className='text-sm text-muted-foreground'>
@@ -525,8 +543,7 @@ export default function SettingsPage() {
                     <Button
                       onClick={handleSaveProfile}
                       disabled={isLoading}
-                      className='relative overflow-hidden group'
-                    >
+                      className='relative overflow-hidden group'>
                       {isLoading ? (
                         <>
                           <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -562,8 +579,7 @@ export default function SettingsPage() {
                         <div className='space-y-1'>
                           <Label
                             htmlFor='email-notifications'
-                            className='text-base font-medium'
-                          >
+                            className='text-base font-medium'>
                             Email Notifications
                           </Label>
                           <p className='text-sm text-muted-foreground'>
@@ -585,8 +601,7 @@ export default function SettingsPage() {
                     <Button
                       onClick={handleSaveProfile}
                       disabled={isLoading}
-                      className='relative overflow-hidden group'
-                    >
+                      className='relative overflow-hidden group'>
                       {isLoading ? (
                         <>
                           <Loader2 className='mr-2 h-4 w-4 animate-spin' />
