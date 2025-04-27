@@ -18,7 +18,7 @@ export enum BlockType {
   TRANSFORM = "transform",
 
   // Finance blocks
-  GOAT_FINANCE = "goat-finance",
+  GOAT_FINANCE = "ai-blockchain-operations",
 
   // Custom blocks
   CUSTOM = "custom",
@@ -185,7 +185,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
     label: "Finance Operations",
     description: "Execute financial operations",
     category: NodeCategory.FINANCE,
-    icon: "goat-finance",
+    icon: "ai-blockchain-operations",
     defaultConfig: {
       operation: "balance",
       blockchain: "ethereum",
