@@ -79,6 +79,9 @@ interface NodeExecution {
   completed_at?: string;
   error?: string;
   output_data?: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  input_data?: Record<string, unknown>;
+  input?: Record<string, unknown>;
 }
 
 interface NodeInput {
@@ -213,16 +216,18 @@ export function ExecutionLogsList({
         if (logsRes.error) throw new Error(logsRes.error.message);
 
         const nodeExecutions = nodeExecutionsRes.data as NodeExecution[];
+        // Map inputs from the database to our state
         const inputsMap = Object.fromEntries(
-          (inputsRes.data || []).map((i: NodeInput) => [
-            `${i.execution_id}_${i.node_id}`,
-            i.data,
+          (inputsRes.data || []).map((input: any) => [
+            `${input.execution_id}_${input.node_id}`,
+            input.input_data || input.data,
           ])
         );
+        // Map outputs from the database to our state
         const outputsMap = Object.fromEntries(
-          (outputsRes.data || []).map((o: NodeOutput) => [
-            `${o.execution_id}_${o.node_id}`,
-            o.data,
+          (outputsRes.data || []).map((output: any) => [
+            `${output.execution_id}_${output.node_id}`,
+            output.output_data || output.data,
           ])
         );
         const logsMap = (logsRes.data || []).reduce(
@@ -1014,13 +1019,31 @@ const NodeExecutionItem = React.memo(
                       Inputs
                     </span>
                     <pre className='bg-muted p-2 rounded text-xs overflow-x-auto mt-1'>
-                      {nodeInputs[`${log.id}_${nodeExec.node_id}`]
-                        ? JSON.stringify(
-                            nodeExec?.input_data || nodeExec?.input,
-                            null,
-                            2
-                          )
-                        : "No input"}
+                      {nodeInputs[`${log.id}_${nodeExec.node_id}`] ? (
+                        <div className='relative'>
+                          {JSON.stringify(nodeInputs[`${log.id}_${nodeExec.node_id}`], null, 2)}
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            className='absolute top-2 right-2 h-6 text-xs'
+                            onClick={() => viewJsonData(nodeInputs[`${log.id}_${nodeExec.node_id}`])}
+                          >
+                            Expand
+                          </Button>
+                        </div>
+                      ) : nodeExec?.input_data || nodeExec?.input ? (
+                        <div className='relative'>
+                          {JSON.stringify(nodeExec?.input_data || nodeExec?.input, null, 2)}
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            className='absolute top-2 right-2 h-6 text-xs'
+                            onClick={() => viewJsonData(nodeExec?.input_data || nodeExec?.input)}
+                          >
+                            Expand
+                          </Button>
+                        </div>
+                      ) : "No input"}
                     </pre>
                   </div>
                   <div>
@@ -1028,13 +1051,31 @@ const NodeExecutionItem = React.memo(
                       Outputs
                     </span>
                     <pre className='bg-muted p-2 rounded text-xs overflow-x-auto mt-1'>
-                      {nodeOutputs[`${log.id}_${nodeExec.node_id}`]
-                        ? JSON.stringify(
-                            nodeExec?.output_data || nodeExec?.output,
-                            null,
-                            2
-                          )
-                        : "No output"}
+                      {nodeOutputs[`${log.id}_${nodeExec.node_id}`] ? (
+                        <div className='relative'>
+                          {JSON.stringify(nodeOutputs[`${log.id}_${nodeExec.node_id}`], null, 2)}
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            className='absolute top-2 right-2 h-6 text-xs'
+                            onClick={() => viewJsonData(nodeOutputs[`${log.id}_${nodeExec.node_id}`])}
+                          >
+                            Expand
+                          </Button>
+                        </div>
+                      ) : nodeExec?.output_data || nodeExec?.output ? (
+                        <div className='relative'>
+                          {JSON.stringify(nodeExec?.output_data || nodeExec?.output, null, 2)}
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            className='absolute top-2 right-2 h-6 text-xs'
+                            onClick={() => viewJsonData(nodeExec?.output_data || nodeExec?.output)}
+                          >
+                            Expand
+                          </Button>
+                        </div>
+                      ) : "No output"}
                     </pre>
                   </div>
                 </div>
