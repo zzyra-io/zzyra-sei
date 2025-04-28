@@ -1,5 +1,5 @@
 import type React from "react";
-import { Inter, Open_Sans, Poppins } from "next/font/google";
+import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
@@ -9,12 +9,14 @@ import { FinanceProvider } from "@/lib/finance/finance-context";
 import { SkipLink } from "@/components/a11y/skip-link";
 import QueryProvider from "@/components/web3/query-provider";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import { NotificationToastContainer } from "@/components/NotificationToast";
+import { NotificationSocketProvider } from "@/components/notification/notification-socket-provider";
 
 // Removed ReactQueryProvider; QueryProvider now handles React Query and Wagmi/ConnectKit
 
-const inter = Poppins({
+const inter = Space_Grotesk({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: ["300", "400", "500", "600", "700"],
   display: "swap",
   variable: "--font-inter",
 });
@@ -41,12 +43,15 @@ export default function RootLayout({
                 defaultTheme='system'
                 enableSystem
                 disableTransitionOnChange>
-                <Web3Provider>
-                  <FinanceProvider>
-                    <main id='main-content'>{children}</main>
-                    <Toaster />
-                  </FinanceProvider>
-                </Web3Provider>
+                <NotificationSocketProvider>
+                  <Web3Provider>
+                    <FinanceProvider>
+                      <main id='main-content'>{children}</main>
+                      <Toaster />
+                      <NotificationToastContainer />
+                    </FinanceProvider>
+                  </Web3Provider>
+                </NotificationSocketProvider>
               </ThemeProvider>
             </AuthProvider>
           </QueryProvider>

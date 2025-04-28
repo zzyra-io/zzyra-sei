@@ -17,12 +17,13 @@ export async function GET(req: NextRequest) {
     .from("notifications")
     .select("*")
     .eq("user_id", user.id)
-    .is("read_at", null)
+    .eq("read", false)
     .order("created_at", { ascending: false });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error fetching notifications:", error);
+    return NextResponse.json([], { status: 200 });
   }
-  return NextResponse.json(data);
+  return NextResponse.json(data || []);
 }
 
 export async function PATCH(req: NextRequest) {
@@ -40,7 +41,7 @@ export async function PATCH(req: NextRequest) {
   }
   const { error } = await supabase
     .from("notifications")
-    .update({ read_at: new Date().toISOString() })
+    .update({ read: true })
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) {
