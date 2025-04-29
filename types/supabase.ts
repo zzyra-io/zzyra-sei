@@ -339,6 +339,105 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_logs: {
+        Row: {
+          channel: string
+          content: Json
+          created_at: string | null
+          error_message: string | null
+          id: string
+          notification_type: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          channel: string
+          content: Json
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          notification_type: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          content?: Json
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          notification_type?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          created_at: string | null
+          discord_enabled: boolean | null
+          email_enabled: boolean | null
+          id: string
+          in_app_enabled: boolean | null
+          notification_type: string
+          telegram_enabled: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          discord_enabled?: boolean | null
+          email_enabled?: boolean | null
+          id?: string
+          in_app_enabled?: boolean | null
+          notification_type: string
+          telegram_enabled?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          discord_enabled?: boolean | null
+          email_enabled?: boolean | null
+          id?: string
+          in_app_enabled?: boolean | null
+          notification_type?: string
+          telegram_enabled?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notification_templates: {
+        Row: {
+          body: string
+          channel: string
+          created_at: string | null
+          id: string
+          notification_type: string
+          subject: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          body: string
+          channel: string
+          created_at?: string | null
+          id?: string
+          notification_type: string
+          subject?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          body?: string
+          channel?: string
+          created_at?: string | null
+          id?: string
+          notification_type?: string
+          subject?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string | null
@@ -376,49 +475,58 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string | null
+          discord_webhook_url: string | null
           email: string | null
           full_name: string | null
           id: string
           last_seen_at: string | null
           monthly_execution_count: number | null
           monthly_execution_quota: number | null
+          monthly_executions_used: number
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_expires_at: string | null
           subscription_status: string | null
           subscription_tier: string | null
+          telegram_chat_id: string | null
           updated_at: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
+          discord_webhook_url?: string | null
           email?: string | null
           full_name?: string | null
           id: string
           last_seen_at?: string | null
           monthly_execution_count?: number | null
           monthly_execution_quota?: number | null
+          monthly_executions_used?: number
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_expires_at?: string | null
           subscription_status?: string | null
           subscription_tier?: string | null
+          telegram_chat_id?: string | null
           updated_at?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
+          discord_webhook_url?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
           last_seen_at?: string | null
           monthly_execution_count?: number | null
           monthly_execution_quota?: number | null
+          monthly_executions_used?: number
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_expires_at?: string | null
           subscription_status?: string | null
           subscription_tier?: string | null
+          telegram_chat_id?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -530,6 +638,7 @@ export type Database = {
           duration_ms: number | null
           error: string | null
           id: string
+          locked_by: string | null
           logs: Json | null
           result: Json | null
           started_at: string
@@ -544,6 +653,7 @@ export type Database = {
           duration_ms?: number | null
           error?: string | null
           id?: string
+          locked_by?: string | null
           logs?: Json | null
           result?: Json | null
           started_at?: string
@@ -558,6 +668,7 @@ export type Database = {
           duration_ms?: number | null
           error?: string | null
           id?: string
+          locked_by?: string | null
           logs?: Json | null
           result?: Json | null
           started_at?: string
@@ -723,6 +834,10 @@ export type Database = {
           workflow_id: string
         }[]
       }
+      claim_workflow_execution: {
+        Args: { p_execution_id: string; p_worker_id: string }
+        Returns: boolean
+      }
       execute_sql: {
         Args: { sql: string }
         Returns: undefined
@@ -742,6 +857,20 @@ export type Database = {
           execution_count: number
           avg_duration: number
           failure_rate: number
+        }[]
+      }
+      get_user_notification_preferences: {
+        Args: { user_id_param: string }
+        Returns: {
+          created_at: string | null
+          discord_enabled: boolean | null
+          email_enabled: boolean | null
+          id: string
+          in_app_enabled: boolean | null
+          notification_type: string
+          telegram_enabled: boolean | null
+          updated_at: string | null
+          user_id: string
         }[]
       }
       insert_execution_queue_job: {
@@ -772,8 +901,52 @@ export type Database = {
           workflow_id: string
         }
       }
+      mark_workflow_execution_failed: {
+        Args: { p_execution_id: string; p_error: string; p_details?: Json }
+        Returns: undefined
+      }
+      release_workflow_lock: {
+        Args: { p_execution_id: string; p_worker_id: string }
+        Returns: boolean
+      }
       reset_monthly_execution_count: {
         Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      send_test_notification: {
+        Args: { user_id_param: string }
+        Returns: undefined
+      }
+      setup_workflow_execution_listener: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      update_user_notification_channels: {
+        Args: {
+          user_id_param: string
+          telegram_chat_id_param: string
+          discord_webhook_url_param: string
+        }
+        Returns: undefined
+      }
+      upsert_notification_preference: {
+        Args: {
+          user_id_param: string
+          notification_type_param: string
+          email_enabled_param: boolean
+          in_app_enabled_param: boolean
+          telegram_enabled_param: boolean
+          discord_enabled_param: boolean
+        }
+        Returns: undefined
+      }
+      upsert_notification_template: {
+        Args: {
+          notification_type_param: string
+          channel_param: string
+          subject_param: string
+          body_param: string
+        }
         Returns: undefined
       }
     }
