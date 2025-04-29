@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, useEffect } from "react";
-import { Handle, Position, type NodeProps, NodeResizer } from "reactflow";
+import { Position, type NodeProps, NodeResizer } from "reactflow";
 import { cn } from "@/lib/utils";
 import {
   DollarSign,
@@ -34,6 +34,7 @@ import {
   getBlockType,
   getBlockMetadata,
 } from "@/types/workflow";
+import { HandleHelper } from "@/components/handle-helper";
 
 // alias to avoid JSX member expression parsing issues
 const MotionDiv = motion.div;
@@ -45,7 +46,7 @@ const categoryColors = {
     border: "border-blue-400",
     text: "text-blue-700",
     badge: "bg-blue-50 text-blue-700 border-blue-200",
-    handle: "border-blue-500",
+    handle: "#3b82f6",
     glow: "shadow-blue-500/20",
   },
   [NodeCategory.ACTION]: {
@@ -53,7 +54,7 @@ const categoryColors = {
     border: "border-emerald-400",
     text: "text-emerald-700",
     badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    handle: "border-emerald-500",
+    handle: "#10b981",
     glow: "shadow-emerald-500/20",
   },
   [NodeCategory.LOGIC]: {
@@ -61,7 +62,7 @@ const categoryColors = {
     border: "border-violet-400",
     text: "text-violet-700",
     badge: "bg-violet-50 text-violet-700 border-violet-200",
-    handle: "border-violet-500",
+    handle: "#8b5cf6",
     glow: "shadow-violet-500/20",
   },
   [NodeCategory.FINANCE]: {
@@ -69,7 +70,7 @@ const categoryColors = {
     border: "border-amber-400",
     text: "text-amber-700",
     badge: "bg-amber-50 text-amber-700 border-amber-200",
-    handle: "border-amber-500",
+    handle: "#f59e0b",
     glow: "shadow-amber-500/20",
   },
 };
@@ -91,7 +92,7 @@ const blockIcons = {
   [BlockType.UNKNOWN]: MoreHorizontal,
 };
 
-export const CustomNode = memo(
+export const ImprovedCustomNode = memo(
   ({ data, isConnectable, selected, id }: NodeProps) => {
     // Get the block type using our helper function
     const blockType = getBlockType(data);
@@ -129,104 +130,46 @@ export const CustomNode = memo(
     const hasInputs = data.inputs !== false;
     const hasOutputs = data.outputs !== false;
 
-    // Update the input handles generation code to make them larger and more interactive
+    // Generate input handles
     const inputHandles = [];
     if (hasInputs) {
       const inputStep = 1 / (inputCount + 1);
       for (let i = 1; i <= inputCount; i++) {
         const inputPosition = inputStep * i;
         inputHandles.push(
-          <div
-            key={`input-handle-wrapper-${i}`}
-            className='absolute -left-3 flex items-center justify-center'
-            style={{
-              top: `calc(${inputPosition * 100}% - 12px)`,
-              width: 24,
-              height: 24,
-            }}>
-            <Handle
-              key={`input-${i}`}
-              type='target'
-              position={Position.Left}
-              id={`input-${i}`}
-              isConnectable={isConnectable && isEnabled}
-              className={cn(
-                "!h-4 !w-4 !bg-background !border-2 transition-all duration-300",
-                isEnabled
-                  ? categoryColor.handle
-                  : "!border-muted-foreground opacity-50",
-                (selected || isHovered) && "!scale-110"
-              )}
-              style={{
-                boxShadow: "0 0 0 4px rgba(255, 255, 255, 0.4)",
-                zIndex: 10,
-              }}
-            />
-            <div
-              className={cn(
-                "absolute opacity-0 transition-opacity duration-200 bg-white dark:bg-slate-800 text-xs rounded px-2 py-1 -left-1 transform -translate-x-full",
-                "pointer-events-none",
-                "border",
-                categoryColor.border
-              )}
-              style={{
-                whiteSpace: "nowrap",
-                opacity: isHovered ? 0.9 : 0,
-              }}>
-              Input {i}
-            </div>
-          </div>
+          <HandleHelper
+            key={`input-${i}`}
+            type='target'
+            position={Position.Left}
+            id={`input-${i}`}
+            isConnectable={isConnectable && isEnabled}
+            handleColor={categoryColor.handle}
+            label={`Input ${i}`}
+            isEnabled={isEnabled}
+            isSelected={selected}
+          />
         );
       }
     }
 
-    // Update the output handles generation code to make them larger and more interactive
+    // Generate output handles
     const outputHandles = [];
     if (hasOutputs) {
       const outputStep = 1 / (outputCount + 1);
       for (let i = 1; i <= outputCount; i++) {
         const outputPosition = outputStep * i;
         outputHandles.push(
-          <div
-            key={`output-handle-wrapper-${i}`}
-            className='absolute -right-3 flex items-center justify-center'
-            style={{
-              top: `calc(${outputPosition * 100}% - 12px)`,
-              width: 24,
-              height: 24,
-            }}>
-            <Handle
-              key={`output-${i}`}
-              type='source'
-              position={Position.Right}
-              id={`output-${i}`}
-              isConnectable={isConnectable && isEnabled}
-              className={cn(
-                "!h-4 !w-4 !bg-background !border-2 transition-all duration-300",
-                isEnabled
-                  ? categoryColor.handle
-                  : "!border-muted-foreground opacity-50",
-                (selected || isHovered) && "!scale-110"
-              )}
-              style={{
-                boxShadow: "0 0 0 4px rgba(255, 255, 255, 0.4)",
-                zIndex: 10,
-              }}
-            />
-            <div
-              className={cn(
-                "absolute opacity-0 transition-opacity duration-200 bg-white dark:bg-slate-800 text-xs rounded px-2 py-1 -right-1 transform translate-x-full",
-                "pointer-events-none",
-                "border",
-                categoryColor.border
-              )}
-              style={{
-                whiteSpace: "nowrap",
-                opacity: isHovered ? 0.9 : 0,
-              }}>
-              Output {i}
-            </div>
-          </div>
+          <HandleHelper
+            key={`output-${i}`}
+            type='source'
+            position={Position.Right}
+            id={`output-${i}`}
+            isConnectable={isConnectable && isEnabled}
+            handleColor={categoryColor.handle}
+            label={`Output ${i}`}
+            isEnabled={isEnabled}
+            isSelected={selected}
+          />
         );
       }
     }
@@ -474,12 +417,47 @@ export const CustomNode = memo(
           )}
         </AnimatePresence>
 
-        {/* Input and output handles */}
-        {inputHandles}
-        {outputHandles}
+        {/* Position the handles along the sides of the node */}
+        <div className='absolute inset-0'>
+          {/* Input handles on the left side */}
+          {inputHandles.map((handle, index) => {
+            const inputStep = 1 / (inputCount + 1);
+            const inputPosition = inputStep * (index + 1);
+            return (
+              <div
+                key={`input-position-${index}`}
+                className='absolute'
+                style={{
+                  left: 0,
+                  top: `${inputPosition * 100}%`,
+                  transform: "translate(-50%, -50%)",
+                }}>
+                {handle}
+              </div>
+            );
+          })}
+
+          {/* Output handles on the right side */}
+          {outputHandles.map((handle, index) => {
+            const outputStep = 1 / (outputCount + 1);
+            const outputPosition = outputStep * (index + 1);
+            return (
+              <div
+                key={`output-position-${index}`}
+                className='absolute'
+                style={{
+                  right: 0,
+                  top: `${outputPosition * 100}%`,
+                  transform: "translate(50%, -50%)",
+                }}>
+                {handle}
+              </div>
+            );
+          })}
+        </div>
       </MotionDiv>
     );
   }
 );
 
-CustomNode.displayName = "CustomNode";
+ImprovedCustomNode.displayName = "ImprovedCustomNode";

@@ -1188,5 +1188,5 @@ export default function BuilderPage() {
 
 export function BuilderRedirectPage() {
   const uuid = uuidv4();
-  redirect(`/builder/${uuid}`);
+  redirect(`/builder?id=${uuid}`);
 }
