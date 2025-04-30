@@ -69,21 +69,14 @@ export default function BuilderPage() {
   // State variables that depend on initialId
   const [isRedirecting, setIsRedirecting] = useState(!searchParams);
 
-  useEffect(() => {
-    if (!searchParams) {
-      router.replace("/builder");
-    }
-  }, [searchParams, router]);
-
-  if (isRedirecting) {
-    return (
-      <AuthGate>
-        <div className='flex min-h-screen items-center justify-center'>
-          Redirecting...
-        </div>
-      </AuthGate>
-    );
-  }
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const flowRef = useRef<any>(null);
+  const toolbarRef = useRef<any>({
+    canUndo: false,
+    canRedo: false,
+    undo: () => {},
+    redo: () => {},
+  });
 
   // Memoize nodes and edges to prevent unnecessary re-renders
   const memoizedNodes = useMemo(() => nodes, [nodes]);
@@ -666,15 +659,6 @@ export default function BuilderPage() {
     }
   };
 
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const flowRef = useRef<any>(null);
-  const toolbarRef = useRef<any>({
-    canUndo: false,
-    canRedo: false,
-    undo: () => {},
-    redo: () => {},
-  });
-
   const handleDragStart = (
     event: React.DragEvent,
     blockType: BlockType,
@@ -903,6 +887,22 @@ export default function BuilderPage() {
       console.log(`BuilderPage has rendered ${renderCount.current} times`);
     }
   });
+
+  useEffect(() => {
+    if (!searchParams) {
+      router.replace("/builder");
+    }
+  }, [searchParams, router]);
+
+  if (isRedirecting) {
+    return (
+      <AuthGate>
+        <div className='flex min-h-screen items-center justify-center'>
+          Redirecting...
+        </div>
+      </AuthGate>
+    );
+  }
 
   return (
     <AuthGate>
@@ -1136,14 +1136,16 @@ export default function BuilderPage() {
       )}
 
       <SaveWorkflowDialog
-        open={isSaveDialogOpen}
+        open={isSaveDialogOpen && !initialId}
         onOpenChange={setIsSaveDialogOpen}
         onSave={handleSaveWorkflow}
         initialName={workflowName}
         initialDescription={workflowDescription}
       />
 
-      <AlertDialog open={isExitDialogOpen} onOpenChange={setIsExitDialogOpen}>
+      <AlertDialog
+        open={isExitDialogOpen && !initialId}
+        onOpenChange={setIsExitDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>

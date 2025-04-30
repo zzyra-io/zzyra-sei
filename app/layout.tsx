@@ -11,6 +11,7 @@ import QueryProvider from "@/components/web3/query-provider";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { NotificationToastContainer } from "@/components/NotificationToast";
 import { NotificationSocketProvider } from "@/components/notification/notification-socket-provider";
+import { FloatingParticles } from "@/components/floating-particles";
 
 // Removed ReactQueryProvider; QueryProvider now handles React Query and Wagmi/ConnectKit
 
@@ -46,6 +47,9 @@ export default function RootLayout({
                 <NotificationSocketProvider>
                   <Web3Provider>
                     <FinanceProvider>
+                      <div className='fixed inset-0 pointer-events-none z-0'>
+                        <FloatingParticles />
+                      </div>
                       <main id='main-content'>{children}</main>
                       <Toaster />
                       <NotificationToastContainer />

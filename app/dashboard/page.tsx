@@ -295,7 +295,7 @@ export default function DashboardPage() {
                           transition={{
                             duration: 1,
                             ease: "linear",
-                            repeat: isRefreshing ? Infinity : 0,
+                            repeat: isRefreshing ? Number.POSITIVE_INFINITY : 0,
                           }}>
                           <RefreshCw className='h-4 w-4 mr-1' />
                         </motion.div>
@@ -937,7 +937,7 @@ export default function DashboardPage() {
                           transition={{
                             duration: 1,
                             ease: "linear",
-                            repeat: isRefreshing ? Infinity : 0,
+                            repeat: isRefreshing ? Number.POSITIVE_INFINITY : 0,
                           }}
                           className='mr-1'>
                           <RefreshCw className='h-3 w-3' />
