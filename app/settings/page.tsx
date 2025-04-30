@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { NotificationPreferencesForm } from "@/components/settings/notification-preferences-form";
 
 export default function SettingsPage() {
   const { supabase, session } = useSupabase();
@@ -68,9 +69,9 @@ export default function SettingsPage() {
             .select("monthly_executions_used")
             .eq("id", session.user.id)
             .maybeSingle();
-            
+
           if (error) throw error;
-          
+
           if (data) {
             setMonthlyExecutionsUsed(data.monthly_executions_used || 0);
           }
@@ -127,12 +128,19 @@ export default function SettingsPage() {
         }
       };
 
-
-
       fetchProfile();
       fetchUsage();
     }
-  }, [session, supabase, darkMode, discordWebhook, emailNotifications, name, telegramHandle, toast]);
+  }, [
+    session,
+    supabase,
+    darkMode,
+    discordWebhook,
+    emailNotifications,
+    name,
+    telegramHandle,
+    toast,
+  ]);
 
   useEffect(() => {
     if (session?.user) {
@@ -564,17 +572,9 @@ export default function SettingsPage() {
 
               <TabsContent value='notifications' className='space-y-6'>
                 <Card className='overflow-hidden border-none shadow-md'>
-                  <CardHeader className='bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-900 dark:to-slate-800'>
-                    <div className='flex items-center gap-2'>
-                      <Bell className='h-5 w-5 text-slate-600 dark:text-slate-400' />
-                      <CardTitle>Notification Settings</CardTitle>
-                    </div>
-                    <CardDescription>
-                      Control how and when you receive notifications
-                    </CardDescription>
-                  </CardHeader>
                   <CardContent className='p-6'>
-                    <div className='space-y-6'>
+                    <NotificationPreferencesForm />
+                    {/* <div className='space-y-6'>
                       <div className='flex items-center justify-between'>
                         <div className='space-y-1'>
                           <Label
@@ -594,10 +594,10 @@ export default function SettingsPage() {
                           className='data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-teal-500 data-[state=checked]:to-emerald-500'
                         />
                       </div>
-                    </div>
+                    </div> */}
                   </CardContent>
                   <Separator />
-                  <CardFooter className='flex justify-between p-6 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800'>
+                  {/* <CardFooter className='flex justify-between p-6 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800'>
                     <Button
                       onClick={handleSaveProfile}
                       disabled={isLoading}
@@ -616,7 +616,7 @@ export default function SettingsPage() {
                         </>
                       )}
                     </Button>
-                  </CardFooter>
+                  </CardFooter> */}
                 </Card>
               </TabsContent>
             </Tabs>
