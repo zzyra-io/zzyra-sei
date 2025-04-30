@@ -1,7 +1,8 @@
 "use client";
 
 import type React from "react";
-import { useCallback, useRef, useState, useEffect, memo } from "react";
+import { useCallback, useRef, useState, useEffect, memo, useMemo } from "react";
+import { debounce } from "lodash";
 import ReactFlow, {
   Background,
   Controls,
@@ -43,6 +44,7 @@ import {
 import { wouldCreateCycle } from "@/lib/workflow/cycle-detection";
 import { ImprovedCustomNode } from "./custom-node_improved";
 import { CustomConnectionLine } from "./custom-connection-line";
+import { createClient } from "@/lib/supabase/client";
 
 // Memoize CustomNode for performance
 const MemoizedCustomNode = memo(ImprovedCustomNode);
@@ -57,6 +59,7 @@ const edgeTypes: EdgeTypes = {
 };
 
 interface FlowCanvasProps {
+  executionId?: string | null;
   initialNodes?: Node[];
   initialEdges?: Edge[];
   onNodesChange?: (nodes: Node[]) => void;
@@ -87,11 +90,13 @@ function FlowContent({
   onNodesChange,
   onEdgesChange,
   toolbarRef,
+  executionId,
 }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useNodesState(initialNodes);
   const [edges, setEdges] = useEdgesState(initialEdges);
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [reactFlowInstance, setReactFlowInstance] =
+    useState<ReactFlowInstance | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [isGridVisible, setIsGridVisible] = useState(true);
@@ -122,6 +127,308 @@ function FlowContent({
 
   // Add state for edge being dragged
   const [edgeUpdateSuccessful, setEdgeUpdateSuccessful] = useState(true);
+
+  const supabase = useMemo(() => createClient(), []);
+
+  const [statusMap, setStatusMap] = useState<Record<string, string>>({});
+
+  // Define interface for node status data outside the effect
+  interface NodeStatusData {
+    id: number;
+    execution_id: string;
+    node_id: string;
+    status: string; // Using string instead of union type to avoid type errors
+    updated_at: string;
+  }
+
+  // Use a ref to track if we've already fetched initial statuses
+  const initialStatusesFetched = useRef(false);
+
+  useEffect(() => {
+    if (!executionId) {
+      console.log("No execution ID provided, skipping subscription setup");
+      return;
+    }
+
+    console.log(`Setting up status tracking for execution ID: ${executionId}`);
+
+    // Reset the status map when execution ID changes
+    setStatusMap({});
+    initialStatusesFetched.current = false;
+
+    // Fetch existing statuses first
+    const fetchExistingStatuses = async () => {
+      try {
+        console.log(
+          `Fetching existing statuses for execution ID: ${executionId}`
+        );
+        const { data, error } = await supabase
+          .from("execution_node_status")
+          .select("*")
+          .eq("execution_id", executionId);
+
+        if (error) {
+          console.error("Error fetching node statuses:", error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          console.log(`Found ${data.length} existing node statuses:`, data);
+
+          // Type-safe implementation
+          const statusMapFromData: Record<string, NodeStatusData> = {};
+
+          // Group by node_id and keep the latest status
+          data.forEach((item: NodeStatusData) => {
+            if (
+              !statusMapFromData[item.node_id] ||
+              new Date(item.updated_at) >
+                new Date(statusMapFromData[item.node_id].updated_at)
+            ) {
+              statusMapFromData[item.node_id] = item;
+            }
+          });
+
+          // Convert to simple status map
+          const simpleStatusMap: Record<string, string> = {};
+          Object.keys(statusMapFromData).forEach((nodeId) => {
+            simpleStatusMap[nodeId] = statusMapFromData[nodeId].status;
+          });
+
+          console.log("Setting initial status map:", simpleStatusMap);
+          setStatusMap(simpleStatusMap);
+        } else {
+          console.log("No existing node statuses found");
+        }
+
+        initialStatusesFetched.current = true;
+      } catch (err) {
+        console.error("Error in fetchExistingStatuses:", err);
+      }
+    };
+
+    fetchExistingStatuses();
+
+    // Set up real-time subscription for new updates
+    console.log(`Setting up subscription for execution ID: ${executionId}`);
+
+    // Create a more reliable channel name
+    const channelName = `node_status_${executionId}_${Date.now()}`;
+    console.log(`Channel name: ${channelName}`);
+
+    // We'll set up test status updates in a separate useEffect
+
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "execution_node_status",
+          filter: `execution_id=eq.${executionId}`,
+        },
+        (payload) => {
+          console.log("Received node status update via subscription:", payload);
+          if (payload.new) {
+            const nodeId = payload.new.node_id;
+            const status = payload.new.status;
+            console.log(`Updating node ${nodeId} with status: ${status}`);
+
+            // Alert to make it very visible in the console
+            console.warn(
+              `⚠️ SOCKET UPDATE: Node ${nodeId} status changed to ${status}`
+            );
+
+            setStatusMap((prev) => {
+              const newMap = { ...prev, [nodeId]: status };
+              console.log("Updated status map:", newMap);
+              return newMap;
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log("Subscription status:", status);
+      });
+
+    console.log("Subscription channel created:", channel);
+
+    return () => {
+      console.log(`Removing channel subscription for ${channelName}`);
+      supabase.removeChannel(channel);
+    };
+  }, [executionId, supabase]);
+
+  // Debug logging function for node status updates - only active in development
+  const debugLog = (message: string, data?: any) => {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[Node Status] ${message}`, data);
+    }
+  };
+
+  // Track component mount state to prevent updates after unmount
+  const isMountedRef = useRef(true);
+  const lastProcessedStatusMapRef = useRef<Record<string, string>>({});
+  // Handle component unmount
+  useEffect(() => {
+    // Set up cleanup function
+    return () => {
+      // Mark component as unmounted to prevent state updates after unmount
+      isMountedRef.current = false;
+      // Cancel any pending debounced operations to prevent memory leaks
+      debouncedSetNodesRef.current?.cancel?.();
+    };
+  }, []); // Empty dependency array as this should only run on mount/unmount
+
+  // Ref to store the debounced function to prevent re-creation on each render
+  // Define a proper type for the debounced function
+  type DebouncedSetNodesFunction = {
+    (updater: (nodes: Node[]) => Node[]): void;
+    cancel: () => void;
+    flush: () => void;
+  };
+  const debouncedSetNodesRef = useRef<DebouncedSetNodesFunction | null>(null);
+
+  // Create debounced status update function to prevent excessive re-renders
+  useMemo(() => {
+    // Create a debounced function with appropriate timing based on environment
+    const debounceTime = process.env.NODE_ENV === "production" ? 25 : 50;
+
+    debouncedSetNodesRef.current = debounce(
+      (updater: (nodes: Node[]) => Node[]) => {
+        if (isMountedRef.current) {
+          setNodes(updater);
+        }
+      },
+      debounceTime
+    );
+  }, [setNodes]);
+
+  // Remove test status update code as it's no longer needed
+
+  // Enterprise-grade production-ready node status update implementation
+  useEffect(() => {
+    // Skip processing if component is unmounted
+    if (!isMountedRef.current) return;
+
+    // Skip empty status maps
+    if (Object.keys(statusMap).length === 0) return;
+
+    try {
+      // Check if this is a duplicate update with the same status values
+      const statusMapStr = JSON.stringify(statusMap);
+      const lastStatusMapStr = JSON.stringify(
+        lastProcessedStatusMapRef.current
+      );
+
+      if (statusMapStr === lastStatusMapStr) return;
+
+      // Update the last processed status map
+      lastProcessedStatusMapRef.current = { ...statusMap };
+
+      // In production, we only need minimal logging
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          "Processing status updates:",
+          Object.entries(statusMap)
+            .map(([id, status]) => `${id}:${status}`)
+            .join(", ")
+        );
+      }
+
+      // Use debounced node updates to prevent excessive re-renders
+      // For production, we use a shorter debounce time for more responsive UI
+      // No need to update debounce time here as it's now handled in the useMemo hook
+
+      // Use a performance-optimized approach for production
+      const updateNodes = (nds: Node[]) => {
+        // Performance optimization: Create a Map for O(1) lookups
+        const nodeMap = new Map<string, Node>();
+        const dataIdMap = new Map<string, Node>();
+        const nodeStatusMap = new Map<string, string>();
+
+        // Track if we need to update the UI
+        let hasUpdates = false;
+
+        // Build lookup maps for efficient node finding
+        nds.forEach((node) => {
+          nodeMap.set(node.id, node);
+          if (node.data?.id) {
+            dataIdMap.set(node.data.id, node);
+          }
+          // Store current status for comparison
+          nodeStatusMap.set(node.id, node.data?.status);
+        });
+
+        // Batch all updates for better performance
+        const updatedNodes = [...nds];
+        const updatedIndices = new Set<number>();
+
+        // Find nodes that need status updates
+        Object.entries(statusMap).forEach(([statusNodeId, status]) => {
+          // Try to find the node by direct ID first
+          let node = nodeMap.get(statusNodeId);
+          let nodeIndex = -1;
+
+          // If not found by direct ID, try data.id
+          if (!node) {
+            node = dataIdMap.get(statusNodeId);
+          }
+
+          if (node) {
+            nodeIndex = nds.findIndex((n) => n.id === node!.id);
+          }
+
+          // If node found, status is different, and we haven't updated this node yet
+          if (
+            node &&
+            nodeIndex !== -1 &&
+            nodeStatusMap.get(node.id) !== status &&
+            !updatedIndices.has(nodeIndex)
+          ) {
+            // Mark that we have updates
+            hasUpdates = true;
+
+            // Create updated node with new status
+            updatedNodes[nodeIndex] = {
+              ...node,
+              data: {
+                ...node.data,
+                status: status,
+                // Add timestamp for animation triggers and debugging
+                statusUpdatedAt: Date.now(),
+              },
+            };
+
+            // Mark this index as updated
+            updatedIndices.add(nodeIndex);
+          }
+        });
+
+        // If no nodes were updated, return original array
+        if (!hasUpdates) return nds;
+
+        return updatedNodes;
+      };
+
+      // Apply the updates with debouncing
+      if (debouncedSetNodesRef.current) {
+        debouncedSetNodesRef.current(updateNodes);
+      }
+    } catch (error) {
+      // In production, we should log errors to a monitoring service
+      console.error("Error updating node statuses:", error);
+
+      // In a real production app, you would report this to your error tracking service
+      // reportErrorToMonitoring(error);
+    }
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      debouncedSetNodesRef.current?.cancel?.();
+    };
+  }, [statusMap]); // Only depend on statusMap changes
 
   // Add to history when nodes or edges change
   const addToHistory = useCallback((newNodes: Node[], newEdges: Edge[]) => {
@@ -187,7 +494,7 @@ function FlowContent({
   // Handle node alignment
   const handleAlignHorizontal = useCallback(
     (alignment: "left" | "center" | "right") => {
-      if (!selectedNode || nodes.length <= 1) return;
+      if (!selectedNode) return;
 
       let alignPosition: number;
 
@@ -245,7 +552,7 @@ function FlowContent({
   // Handle node vertical alignment
   const handleAlignVertical = useCallback(
     (alignment: "top" | "center" | "bottom") => {
-      if (!selectedNode || nodes.length <= 1) return;
+      if (!selectedNode) return;
 
       let alignPosition: number;
 
@@ -548,11 +855,13 @@ function FlowContent({
   );
 
   // Handle node selection
-  const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    console.log("Node clicked:", node);
-    // setSelectedNode(node);
-    // setShowConfigPanel(true);
-  }, []);
+  const onNodeDoubleClick = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      setSelectedNode(node);
+      setShowConfigPanel(true);
+    },
+    [setSelectedNode]
+  );
 
   // Add edge click handler
   const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
@@ -1055,7 +1364,7 @@ function FlowContent({
             });
           }}
           onConnect={onConnect}
-          onNodeClick={onNodeClick}
+          // onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
           onNodeContextMenu={onNodeContextMenu}
           onEdgeContextMenu={onEdgeContextMenu}

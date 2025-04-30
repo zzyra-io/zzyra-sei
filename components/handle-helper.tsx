@@ -14,6 +14,8 @@ interface HandleHelperProps {
   label?: string;
   isEnabled?: boolean;
   isSelected?: boolean;
+  pulse?: boolean;
+  status?: string;
 }
 
 export const HandleHelper = memo(
@@ -26,6 +28,8 @@ export const HandleHelper = memo(
     label,
     isEnabled = true,
     isSelected = false,
+    pulse = false,
+    status = 'idle',
   }: HandleHelperProps) => {
     const [isHovered, setIsHovered] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
@@ -98,7 +102,8 @@ export const HandleHelper = memo(
               ? `!border-[${handleColor}]`
               : "!border-muted-foreground opacity-50",
             (isSelected || isHovered) && "!scale-110",
-            isDragging && "!scale-125"
+            isDragging && "!scale-125",
+            pulse && status !== 'idle' && "animate-pulse"
           )}
           style={{
             boxShadow: `0 0 0 4px rgba(255, 255, 255, ${
@@ -110,6 +115,18 @@ export const HandleHelper = memo(
           onMouseUp={() => setIsDragging(false)}
         />
         <AnimatePresence>
+          {/* Status-based glow effect */}
+          {status !== 'idle' && pulse && (
+            <motion.div
+              key={`status-${status}`}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 0.5, scale: 1.8 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ repeat: Infinity, repeatType: "reverse", duration: 1 }}
+              className='absolute rounded-full'
+              style={{ width: 20, height: 20, backgroundColor: handleColor }}
+            />
+          )}
           {isHovered && (
             <motion.div
               initial={{ opacity: 0, scale: 0 }}

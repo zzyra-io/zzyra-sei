@@ -122,6 +122,38 @@ export type Database = {
           },
         ]
       }
+      execution_node_status: {
+        Row: {
+          execution_id: string
+          id: number
+          node_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          execution_id: string
+          id?: number
+          node_id: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          execution_id?: string
+          id?: number
+          node_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "execution_node_status_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       execution_queue: {
         Row: {
           created_at: string
@@ -376,10 +408,12 @@ export type Database = {
         Row: {
           created_at: string | null
           discord_enabled: boolean | null
+          discord_webhook_url: string | null
           email_enabled: boolean | null
           id: string
           in_app_enabled: boolean | null
           notification_type: string
+          telegram_chat_id: string | null
           telegram_enabled: boolean | null
           updated_at: string | null
           user_id: string
@@ -387,10 +421,12 @@ export type Database = {
         Insert: {
           created_at?: string | null
           discord_enabled?: boolean | null
+          discord_webhook_url?: string | null
           email_enabled?: boolean | null
           id?: string
           in_app_enabled?: boolean | null
           notification_type: string
+          telegram_chat_id?: string | null
           telegram_enabled?: boolean | null
           updated_at?: string | null
           user_id: string
@@ -398,10 +434,12 @@ export type Database = {
         Update: {
           created_at?: string | null
           discord_enabled?: boolean | null
+          discord_webhook_url?: string | null
           email_enabled?: boolean | null
           id?: string
           in_app_enabled?: boolean | null
           notification_type?: string
+          telegram_chat_id?: string | null
           telegram_enabled?: boolean | null
           updated_at?: string | null
           user_id?: string
@@ -641,6 +679,7 @@ export type Database = {
           locked_by: string | null
           logs: Json | null
           result: Json | null
+          retry_count: number | null
           started_at: string
           status: string
           triggered_by: string | null
@@ -656,6 +695,7 @@ export type Database = {
           locked_by?: string | null
           logs?: Json | null
           result?: Json | null
+          retry_count?: number | null
           started_at?: string
           status: string
           triggered_by?: string | null
@@ -671,6 +711,7 @@ export type Database = {
           locked_by?: string | null
           logs?: Json | null
           result?: Json | null
+          retry_count?: number | null
           started_at?: string
           status?: string
           triggered_by?: string | null
@@ -834,10 +875,6 @@ export type Database = {
           workflow_id: string
         }[]
       }
-      claim_workflow_execution: {
-        Args: { p_execution_id: string; p_worker_id: string }
-        Returns: boolean
-      }
       execute_sql: {
         Args: { sql: string }
         Returns: undefined
@@ -864,10 +901,12 @@ export type Database = {
         Returns: {
           created_at: string | null
           discord_enabled: boolean | null
+          discord_webhook_url: string | null
           email_enabled: boolean | null
           id: string
           in_app_enabled: boolean | null
           notification_type: string
+          telegram_chat_id: string | null
           telegram_enabled: boolean | null
           updated_at: string | null
           user_id: string
@@ -901,23 +940,7 @@ export type Database = {
           workflow_id: string
         }
       }
-      mark_workflow_execution_failed: {
-        Args: { p_execution_id: string; p_error: string; p_details?: Json }
-        Returns: undefined
-      }
-      release_workflow_lock: {
-        Args: { p_execution_id: string; p_worker_id: string }
-        Returns: boolean
-      }
       reset_monthly_execution_count: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      send_test_notification: {
-        Args: { user_id_param: string }
-        Returns: undefined
-      }
-      setup_workflow_execution_listener: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
@@ -937,15 +960,6 @@ export type Database = {
           in_app_enabled_param: boolean
           telegram_enabled_param: boolean
           discord_enabled_param: boolean
-        }
-        Returns: undefined
-      }
-      upsert_notification_template: {
-        Args: {
-          notification_type_param: string
-          channel_param: string
-          subject_param: string
-          body_param: string
         }
         Returns: undefined
       }

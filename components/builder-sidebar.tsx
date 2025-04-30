@@ -24,6 +24,7 @@ import {
 import type { BlockType } from "@/types/workflow";
 import type { Node } from "@/components/flow-canvas";
 import type { CustomBlockDefinition } from "@/types/custom-block";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface BuilderSidebarProps {
   onAddNode: (
@@ -53,6 +54,8 @@ export function BuilderSidebar({
 }: BuilderSidebarProps) {
   const [mainTab, setMainTab] = useState("blocks");
   const [blockCatalogTab, setBlockCatalogTab] = useState("blocks");
+  const [isMobileCollapsed, setIsMobileCollapsed] = useState(true);
+  const isMobile = useIsMobile();
 
   // Handle drag start from the catalog
   const handleDragStart = (
@@ -69,7 +72,25 @@ export function BuilderSidebar({
   const lastUpdated = new Date().toLocaleDateString();
 
   return (
-    <div className='h-full flex flex-col bg-background border-r'>
+    <div
+      className={`h-full flex flex-col bg-background border-r transition-all duration-300 ${
+        isMobile
+          ? isMobileCollapsed
+            ? "w-0 opacity-0 overflow-hidden"
+            : "w-full absolute inset-y-0 left-0 z-40"
+          : "relative"
+      }`}>
+      {isMobile && (
+        <button
+          onClick={() => setIsMobileCollapsed(!isMobileCollapsed)}
+          className='fixed bottom-4 right-4 z-50 bg-primary text-primary-foreground p-3 rounded-full shadow-lg'>
+          {isMobileCollapsed ? (
+            <ChevronRight className='h-5 w-5' />
+          ) : (
+            <ChevronRight className='h-5 w-5 rotate-180' />
+          )}
+        </button>
+      )}
       {/* Sidebar Header */}
       <div className='p-4 border-b bg-muted/30'>
         <div className='flex items-center gap-2 mb-1'>
@@ -84,7 +105,7 @@ export function BuilderSidebar({
       {/* Main Tabs */}
       <div className='border-b'>
         <Tabs value={mainTab} onValueChange={setMainTab} className='w-full'>
-          <TabsList className='w-full h-12'>
+          <TabsList className='w-full h-12 flex-wrap'>
             <TabsTrigger
               value='blocks'
               className='flex-1 flex items-center gap-2'>
@@ -118,7 +139,7 @@ export function BuilderSidebar({
               </div>
 
               <Tabs value={blockCatalogTab} onValueChange={setBlockCatalogTab}>
-                <TabsList className='w-full grid grid-cols-2 h-9'>
+                <TabsList className='w-full grid grid-cols-2 h-9 text-xs'>
                   <TabsTrigger value='blocks' className='text-xs'>
                     Standard Blocks
                   </TabsTrigger>
@@ -152,7 +173,9 @@ export function BuilderSidebar({
                       <ChevronRight className='h-3 w-3 mr-1' />
                       <span>Your custom workflow blocks</span>
                     </div>
-                    <CustomBlockCatalog onAddBlock={block => onAddCustomBlock?.(block)} />
+                    <CustomBlockCatalog
+                      onAddBlock={(block) => onAddCustomBlock?.(block)}
+                    />
                   </div>
                 </ScrollArea>
               )}
@@ -215,7 +238,7 @@ export function BuilderSidebar({
                 <h3 className='font-medium'>Workflow Stats</h3>
               </div>
 
-              <div className='grid grid-cols-2 gap-3'>
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
                 <Card className='bg-muted/30 border shadow-sm'>
                   <CardContent className='p-3 flex items-center justify-between'>
                     <div>

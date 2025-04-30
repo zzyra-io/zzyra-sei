@@ -11,7 +11,14 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { generateFlow } from "@/lib/api";
 import { workflowService } from "@/lib/services/workflow-service";
-import { Loader2, Save, Play, ArrowLeft } from "lucide-react";
+import {
+  Loader2,
+  Save,
+  Play,
+  ArrowLeft,
+  ArrowRight,
+  Workflow,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +33,7 @@ import { redirect } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { useHotkeys } from "react-hotkeys-hook";
 import { debounce } from "lodash";
+import { motion } from "framer-motion";
 
 // Import types from flow-canvas
 import type { Node, Edge } from "@/components/flow-canvas";
@@ -59,9 +67,11 @@ export default function BuilderPage() {
   const [catalogTab, setCatalogTab] = useState("blocks");
   const [isGridVisible, setIsGridVisible] = useState(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [executionId, setExecutionId] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const initialId = searchParams.get("id") || undefined;
   const [workflowId, setWorkflowId] = useState<string | undefined>(initialId);
@@ -546,6 +556,7 @@ export default function BuilderPage() {
         title: "Execution started",
         description: `Execution ID: ${execId}`,
       });
+      setExecutionId(execId);
 
       // Track execution in analytics
       try {
@@ -742,6 +753,19 @@ export default function BuilderPage() {
     Array<{ nodeId: string; message: string }>
   >([]);
   const [previewStep, setPreviewStep] = useState(0);
+  const [activeNode, setActiveNode] = useState<number | null>(null);
+
+  // Simulate workflow execution
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveNode((prev) => {
+        if (prev === null || prev >= 5) return 0;
+        return prev + 1;
+      });
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handlePreview = () => {
     // Validate workflow before preview
@@ -1067,6 +1091,7 @@ export default function BuilderPage() {
               <ResizableHandle />
               <ResizablePanel defaultSize={80}>
                 <FlowCanvas
+                  executionId={executionId}
                   initialNodes={memoizedNodes}
                   initialEdges={memoizedEdges}
                   onNodesChange={setNodes}
@@ -1083,56 +1108,103 @@ export default function BuilderPage() {
 
       {/* Preview panel */}
       {isPreviewing && (
-        <div
-          className='fixed bottom-0 left-0 right-0 h-1/2 bg-background border-t shadow-lg p-4 overflow-auto'
-          role='dialog'
-          aria-labelledby='preview-title'>
-          <div className='flex justify-between items-center mb-4'>
-            <h3 id='preview-title' className='text-lg font-semibold'>
-              Execution Preview
-            </h3>
-            <Button
-              size='sm'
-              variant='ghost'
-              onClick={() => setIsPreviewing(false)}
-              aria-label='Close preview'>
-              Close
-            </Button>
+        <motion.div
+          ref={containerRef}
+          className='relative rounded-xl border bg-background/80 p-6 shadow-lg backdrop-blur-sm overflow-hidden'
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}>
+          <div className='absolute top-4 left-4 flex items-center space-x-2'>
+            <Workflow className='h-5 w-5 text-primary' />
+            <span className='font-medium'>DeFi Position Manager</span>
           </div>
 
-          <div className='bg-muted p-4 rounded mb-4'>
-            <div className='font-medium mb-2'>
-              Node:{" "}
-              {nodes.find((n) => n.id === previewLogs[previewStep]?.nodeId)
-                ?.data.label || "Unknown"}
+          <div className='mt-12 flex flex-wrap justify-center gap-4 md:gap-6'>
+            {nodes.map((node, index) => (
+              <div key={node.id} className='flex flex-col items-center'>
+                <motion.div
+                  className={`relative flex h-16 w-16 items-center justify-center rounded-lg ${
+                    activeNode === node.id ? node.color : "bg-muted"
+                  } transition-colors duration-300`}
+                  animate={{
+                    scale: activeNode === node.id ? 1.1 : 1,
+                    boxShadow:
+                      activeNode === node.id
+                        ? "0 0 15px rgba(124, 58, 237, 0.5)"
+                        : "0 0 0 rgba(0, 0, 0, 0)",
+                  }}>
+                  <node.icon
+                    className={`h-8 w-8 ${
+                      activeNode === node.id
+                        ? "text-white"
+                        : "text-muted-foreground"
+                    }`}
+                  />
+
+                  {/* Pulse animation when active */}
+                  {activeNode === node.id && (
+                    <motion.div
+                      className='absolute inset-0 rounded-lg'
+                      initial={{ opacity: 0.7, scale: 1 }}
+                      animate={{ opacity: 0, scale: 1.3 }}
+                      transition={{
+                        duration: 1,
+                        repeat: Number.POSITIVE_INFINITY,
+                      }}
+                      style={{ backgroundColor: node.color }}
+                    />
+                  )}
+                </motion.div>
+
+                <span className='mt-2 text-xs font-medium'>{node.title}</span>
+
+                {/* Arrow connecting nodes */}
+                {index < nodes.length - 1 && (
+                  <div className='flex items-center justify-center h-8 w-8 md:h-0 md:w-8'>
+                    <ArrowRight className='h-4 w-4 text-muted-foreground hidden md:block' />
+                    <ArrowRight className='h-4 w-4 text-muted-foreground rotate-90 md:hidden' />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className='mt-8 grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <div className='rounded-lg border bg-muted/50 p-4'>
+              <h4 className='text-sm font-medium mb-2'>Workflow Details</h4>
+              <div className='space-y-2'>
+                <div className='flex justify-between text-xs'>
+                  <span className='text-muted-foreground'>Status:</span>
+                  <span className='font-medium text-green-500'>Running</span>
+                </div>
+                <div className='flex justify-between text-xs'>
+                  <span className='text-muted-foreground'>Last Run:</span>
+                  <span className='font-medium'>2 minutes ago</span>
+                </div>
+                <div className='flex justify-between text-xs'>
+                  <span className='text-muted-foreground'>Success Rate:</span>
+                  <span className='font-medium'>98.5%</span>
+                </div>
+              </div>
             </div>
-            <pre className='bg-background p-2 rounded text-sm overflow-x-auto'>
-              {previewLogs[previewStep]?.message || "No output available"}
-            </pre>
-          </div>
 
-          <div className='flex justify-between items-center'>
-            <Button
-              size='sm'
-              onClick={() => setPreviewStep((s) => Math.max(s - 1, 0))}
-              disabled={previewStep === 0}
-              aria-label='Previous step'>
-              Previous
-            </Button>
-            <span className='text-sm'>
-              Step {previewStep + 1} of {previewLogs.length}
-            </span>
-            <Button
-              size='sm'
-              onClick={() =>
-                setPreviewStep((s) => Math.min(s + 1, previewLogs.length - 1))
-              }
-              disabled={previewStep === previewLogs.length - 1}
-              aria-label='Next step'>
-              Next
-            </Button>
+            <div className='rounded-lg border bg-muted/50 p-4'>
+              <h4 className='text-sm font-medium mb-2'>Performance</h4>
+              <div className='h-[60px] w-full'>
+                {/* Simple chart visualization */}
+                <div className='flex h-full items-end space-x-1'>
+                  {[40, 65, 35, 85, 55, 70, 90, 45, 60, 75].map((height, i) => (
+                    <div
+                      key={i}
+                      className='flex-1 bg-primary/60 rounded-t-sm'
+                      style={{ height: `${height}%` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       <SaveWorkflowDialog
