@@ -1,9 +1,10 @@
+// Define the AIProvider interface
 export interface AIProvider {
   generateFlow(
     prompt: string,
-    userId: string,
+    userId: string
   ): Promise<{
-    nodes: any[]
-    edges: any[]
-  }>
+    nodes: any[];
+    edges: any[];
+  }>;
 }

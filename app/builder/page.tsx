@@ -34,6 +34,8 @@ import { v4 as uuidv4 } from "uuid";
 import { useHotkeys } from "react-hotkeys-hook";
 import { debounce } from "lodash";
 import { motion } from "framer-motion";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 
 // Import types from flow-canvas
 import type { Node, Edge } from "@/components/flow-canvas";
@@ -53,6 +55,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { TourModal } from "@/components/tour-modal";
+
+// Add these imports at the top with the other imports
+import { ChevronDown, Sparkles, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function BuilderPage() {
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -92,6 +103,12 @@ export default function BuilderPage() {
   // Memoize nodes and edges to prevent unnecessary re-renders
   const memoizedNodes = useMemo(() => nodes, [nodes]);
   const memoizedEdges = useMemo(() => edges, [edges]);
+
+  // Add these state variables after the other useState declarations (around line 50-60)
+  const [nlPrompt, setNlPrompt] = useState<string>("");
+  const [isNlGenerating, setIsNlGenerating] = useState<boolean>(false);
+  const [showExamples, setShowExamples] = useState<boolean>(false);
+  const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
 
   // Workflow validation function
   const validateWorkflow = (
@@ -805,6 +822,135 @@ export default function BuilderPage() {
     setIsPreviewing(true);
   };
 
+  // Add these example prompts after the tourMessages array (around line 520-530)
+  const examplePrompts = [
+    "Send email when Bitcoin price goes above $50,000",
+    "Monitor Ethereum price and notify me on Discord",
+    "Check Bitcoin price every hour and buy if below $40,000",
+    "Sell ETH when price reaches $3,000 and send SMS notification",
+    "Monitor gas prices and execute transaction when below 30 gwei",
+  ];
+
+  // Add this function before the return statement (around line 550-560)
+  const handleNlGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nlPrompt.trim()) return;
+
+    setIsNlGenerating(true);
+    try {
+      // Store the current prompt in recent prompts
+      setRecentPrompts((prev) => {
+        const updated = [nlPrompt, ...prev.filter((p) => p !== nlPrompt)];
+        return updated.slice(0, 5); // Keep only the 5 most recent prompts
+      });
+
+      // Basic client-side parsing to enhance the prompt
+      let enhancedPrompt = nlPrompt;
+      if (!enhancedPrompt.toLowerCase().includes("workflow")) {
+        enhancedPrompt = `Create a workflow to ${enhancedPrompt}`;
+      }
+
+      // Get canvas center position for new nodes
+      const canvasCenter = {
+        x: 600,
+        y: 300,
+      };
+      if (toolbarRef.current && toolbarRef.current.getCenter) {
+        const center = toolbarRef.current.getCenter();
+        if (center) {
+          canvasCenter.x = center.x;
+          canvasCenter.y = center.y;
+        }
+      }
+
+      const result = await generateFlow(enhancedPrompt);
+      if (result.nodes && result.edges) {
+        // Instead of replacing, append the new nodes and edges
+        if (nodes.length > 0) {
+          // If there are existing nodes, we need to:
+          // 1. Adjust the positions of new nodes to avoid overlap
+          // 2. Generate unique IDs for the new nodes
+          // 3. Update edge references to use the new IDs
+
+          // Create a map of old IDs to new IDs
+          const idMap = new Map();
+
+          // Create new nodes with unique IDs and adjusted positions
+          const newNodes = result.nodes.map((node) => {
+            const newId = `${node.id}-${Date.now()}-${Math.floor(
+              Math.random() * 1000
+            )}`;
+            idMap.set(node.id, newId);
+
+            return {
+              ...node,
+              id: newId,
+              position: {
+                x: node.position.x + canvasCenter.x - 300, // Offset from center
+                y: node.position.y + canvasCenter.y - 150, // Offset from center
+              },
+            };
+          });
+
+          // Create new edges with updated source/target references
+          const newEdges = result.edges.map((edge) => {
+            const newSource = idMap.get(edge.source) || edge.source;
+            const newTarget = idMap.get(edge.target) || edge.target;
+
+            return {
+              ...edge,
+              id: `${edge.id}-${Date.now()}`,
+              source: newSource,
+              target: newTarget,
+              sourceHandle: edge.sourceHandle,
+              targetHandle: edge.targetHandle,
+            };
+          });
+
+          // Append the new nodes and edges to the existing ones
+          setNodes((currentNodes) => [...currentNodes, ...newNodes]);
+          setEdges((currentEdges) => [...currentEdges, ...newEdges]);
+
+          toast({
+            title: "Workflow updated",
+            description: `Added ${newNodes.length} new blocks based on your instructions.`,
+          });
+        } else {
+          // If there are no existing nodes, just use the generated workflow
+          setNodes(result.nodes);
+          setEdges(result.edges);
+          toast({
+            title: "Workflow generated",
+            description:
+              "Your workflow has been generated from your instructions.",
+          });
+        }
+
+        // Auto-fit view to show all nodes
+        if (toolbarRef.current && toolbarRef.current.fitView) {
+          setTimeout(() => toolbarRef.current.fitView(), 100);
+        }
+      }
+    } catch (error: any) {
+      console.error("NL generation error:", error);
+      toast({
+        title: "Generation failed",
+        description:
+          error.message ||
+          "Failed to generate workflow from instructions. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsNlGenerating(false);
+    }
+  };
+
+  // Add this function to handle example prompt selection
+  const handleSelectExample = (prompt: string) => {
+    setNlPrompt(prompt);
+    setShowExamples(false);
+  };
+
   // Keyboard shortcuts: ensure form tags also capture shortcuts
   // Use 'mod' for cross-platform (Cmd on Mac, Ctrl on others)
   useHotkeys(
@@ -900,7 +1046,7 @@ export default function BuilderPage() {
 
   const nextStep = () => {
     if (tourStep < tourMessages.length - 1) setTourStep((s) => s + 1);
-    else endTour();
+    else endTour;
   };
 
   // Accessibility improvements - focus management
@@ -1104,6 +1250,87 @@ export default function BuilderPage() {
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
+          </div>
+
+          {/* Add this JSX right before the closing </div> of the main container (around line 650-660) */}
+          {/* This is the natural language input component at the bottom of the screen */}
+          {/* Natural Language Input */}
+          <div className='absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-full max-w-2xl px-4'>
+            <Card className='bg-background/80 backdrop-blur-sm border shadow-lg'>
+              <form
+                onSubmit={handleNlGenerate}
+                className='flex items-center p-2'>
+                <div className='relative flex-1'>
+                  <Input
+                    type='text'
+                    placeholder="Describe your workflow (e.g., 'send email when bitcoin reaches $50,000')"
+                    value={nlPrompt}
+                    onChange={(e) => setNlPrompt(e.target.value)}
+                    className='flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm pr-8'
+                    disabled={isNlGenerating}
+                  />
+                  {nlPrompt && (
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      className='absolute right-0 top-0 h-full px-2'
+                      onClick={() => setNlPrompt("")}>
+                      <X className='h-4 w-4' />
+                      <span className='sr-only'>Clear input</span>
+                    </Button>
+                  )}
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant='ghost' size='sm' className='ml-1'>
+                      <ChevronDown className='h-4 w-4' />
+                      <span className='sr-only'>Show examples</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align='end' className='w-[400px]'>
+                    <div className='px-2 py-1.5 text-sm font-semibold'>
+                      Example prompts
+                    </div>
+                    {examplePrompts.map((prompt, i) => (
+                      <DropdownMenuItem
+                        key={i}
+                        onClick={() => handleSelectExample(prompt)}>
+                        {prompt}
+                      </DropdownMenuItem>
+                    ))}
+                    {recentPrompts.length > 0 && (
+                      <>
+                        <div className='px-2 py-1.5 text-sm font-semibold mt-2'>
+                          Recent prompts
+                        </div>
+                        {recentPrompts.map((prompt, i) => (
+                          <DropdownMenuItem
+                            key={`recent-${i}`}
+                            onClick={() => handleSelectExample(prompt)}>
+                            {prompt}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button
+                  type='submit'
+                  size='sm'
+                  className='ml-1'
+                  disabled={isNlGenerating || !nlPrompt.trim()}>
+                  {isNlGenerating ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                  ) : (
+                    <Sparkles className='h-4 w-4' />
+                  )}
+                  <span className='sr-only'>Generate workflow</span>
+                </Button>
+              </form>
+            </Card>
           </div>
         </div>
       )}
