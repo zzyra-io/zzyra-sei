@@ -9,6 +9,181 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      pricing_tiers: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          price_monthly: number
+          price_yearly: number
+          workflow_limit: number
+          execution_limit: number
+          features: Record<string, unknown>
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          price_monthly: number
+          price_yearly: number
+          workflow_limit: number
+          execution_limit: number
+          features?: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          price_monthly?: number
+          price_yearly?: number
+          workflow_limit?: number
+          execution_limit?: number
+          features?: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          tier_id: string
+          status: string
+          current_period_start: string
+          current_period_end: string
+          cancel_at_period_end: boolean
+          stripe_subscription_id: string | null
+          stripe_customer_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          tier_id: string
+          status: string
+          current_period_start: string
+          current_period_end: string
+          cancel_at_period_end?: boolean
+          stripe_subscription_id?: string | null
+          stripe_customer_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          tier_id?: string
+          status?: string
+          current_period_start?: string
+          current_period_end?: string
+          cancel_at_period_end?: boolean
+          stripe_subscription_id?: string | null
+          stripe_customer_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_tiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      usage_logs: {
+        Row: {
+          id: string
+          subscription_id: string
+          resource_type: string
+          quantity: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          subscription_id: string
+          resource_type: string
+          quantity?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          subscription_id?: string
+          resource_type?: string
+          quantity?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_logs_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      subscription_invoices: {
+        Row: {
+          id: string
+          subscription_id: string
+          amount: number
+          currency: string
+          status: string
+          stripe_invoice_id: string | null
+          billing_period_start: string
+          billing_period_end: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          subscription_id: string
+          amount: number
+          currency?: string
+          status: string
+          stripe_invoice_id?: string | null
+          billing_period_start: string
+          billing_period_end: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          subscription_id?: string
+          amount?: number
+          currency?: string
+          status?: string
+          stripe_invoice_id?: string | null
+          billing_period_start?: string
+          billing_period_end?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
       audit_logs: {
         Row: {
           action: string
