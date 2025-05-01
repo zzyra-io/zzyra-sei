@@ -52,6 +52,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { TourModal } from "@/components/tour-modal";
 
 export default function BuilderPage() {
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -318,12 +319,13 @@ export default function BuilderPage() {
       }
     } catch (error: any) {
       console.error("Generation error:", error);
-      if (error.message === 'Workflow creation limit reached') {
+      if (error.message === "Workflow creation limit reached") {
         toast({
-          title: 'Limit reached',
-          description: 'You have reached your workflow creation limit for this billing period.',
-          variant: 'destructive',
-        })
+          title: "Limit reached",
+          description:
+            "You have reached your workflow creation limit for this billing period.",
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Generation failed",
@@ -576,12 +578,13 @@ export default function BuilderPage() {
       }
     } catch (error: any) {
       console.error("Execution error:", error);
-      if (error.message === 'Execution limit reached') {
+      if (error.message === "Execution limit reached") {
         toast({
-          title: 'Limit reached',
-          description: 'You have reached your execution limit for this billing period.',
-          variant: 'destructive',
-        })
+          title: "Limit reached",
+          description:
+            "You have reached your execution limit for this billing period.",
+          variant: "destructive",
+        });
       } else if (error.message?.includes("timeout")) {
         toast({
           title: "Execution timeout",
@@ -943,28 +946,14 @@ export default function BuilderPage() {
 
   return (
     <AuthGate>
-      {showTour && (
-        <div
-          className='fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center'
-          role='dialog'
-          aria-modal='true'
-          aria-labelledby='tour-title'>
-          <div className='bg-white rounded shadow-lg p-4 max-w-xs'>
-            <h2 id='tour-title' className='text-lg font-semibold mb-2'>
-              Workflow Builder Tour
-            </h2>
-            <p className='text-sm text-gray-800'>{tourMessages[tourStep]}</p>
-            <div className='mt-4 flex justify-end space-x-2'>
-              <Button size='sm' variant='ghost' onClick={endTour}>
-                Skip
-              </Button>
-              <Button size='sm' onClick={nextStep}>
-                {tourStep < tourMessages.length - 1 ? "Next" : "Done"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <TourModal
+        tourMessages={tourMessages}
+        initialStep={tourStep}
+        isOpen={showTour}
+        onOpenChange={setShowTour}
+        onComplete={() => console.log("Tour completed!")}
+      />
+
       {isLoading ? (
         <div
           className='flex min-h-screen items-center justify-center'
