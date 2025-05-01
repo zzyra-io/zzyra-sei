@@ -318,12 +318,20 @@ export default function BuilderPage() {
       }
     } catch (error: any) {
       console.error("Generation error:", error);
-      toast({
-        title: "Generation failed",
-        description:
-          error.message || "Failed to generate workflow. Please try again.",
-        variant: "destructive",
-      });
+      if (error.message === 'Workflow creation limit reached') {
+        toast({
+          title: 'Limit reached',
+          description: 'You have reached your workflow creation limit for this billing period.',
+          variant: 'destructive',
+        })
+      } else {
+        toast({
+          title: "Generation failed",
+          description:
+            error.message || "Failed to generate workflow. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -568,8 +576,13 @@ export default function BuilderPage() {
       }
     } catch (error: any) {
       console.error("Execution error:", error);
-
-      if (error.message?.includes("timeout")) {
+      if (error.message === 'Execution limit reached') {
+        toast({
+          title: 'Limit reached',
+          description: 'You have reached your execution limit for this billing period.',
+          variant: 'destructive',
+        })
+      } else if (error.message?.includes("timeout")) {
         toast({
           title: "Execution timeout",
           description:
