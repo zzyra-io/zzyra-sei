@@ -9,22 +9,32 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { PlusCircle, Trash2, MoveUp, MoveDown } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PlusCircle, Trash2, MoveUp, MoveDown, Sparkles, Code, AlertCircle } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/components/ui/use-toast"
 import { type CustomBlockDefinition, type BlockParameter, DataType, LogicType } from "@/types/custom-block"
 import { NodeCategory } from "@/types/workflow"
+import { Loader2 } from "lucide-react"
+
+// Import CodeMirror components for code editing
+import { EditorView } from "@codemirror/view"
+import { javascript } from "@codemirror/lang-javascript"
+import { json } from "@codemirror/lang-json"
+import { vscodeDark } from "@uiw/codemirror-theme-vscode"
+import CodeMirror from "@uiw/react-codemirror"
 
 interface CustomBlockBuilderDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialBlock?: CustomBlockDefinition
   onSave: (block: CustomBlockDefinition) => void
+  onGenerateWithAI?: (prompt: string, callback: (block: Partial<CustomBlockDefinition>) => void) => void
 }
 
-export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onSave }: CustomBlockBuilderDialogProps) {
+export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onSave, onGenerateWithAI }: CustomBlockBuilderDialogProps) {
   const [activeTab, setActiveTab] = useState("general")
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -36,6 +46,9 @@ export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onS
   const [logic, setLogic] = useState("")
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState("")
+  const [aiPrompt, setAiPrompt] = useState("")
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const { toast } = useToast()
 
   // Reset form when dialog opens or initialBlock changes
@@ -179,46 +192,90 @@ export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onS
     setTags(tags.filter((t) => t !== tag))
   }
 
+  // Validate form and return errors
+  const validateForm = (): Record<string, string> => {
+    const errors: Record<string, string> = {}
+    
+    if (!name.trim()) {
+      errors.name = "Name is required"
+    }
+    
+    if (inputs.length === 0) {
+      errors.inputs = "At least one input parameter is required"
+    } else {
+      // Check for duplicate input names
+      const inputNames = inputs.map(input => input.name)
+      const hasDuplicateInputs = inputNames.some((name, index) => 
+        inputNames.indexOf(name) !== index
+      )
+      if (hasDuplicateInputs) {
+        errors.inputs = "Input parameter names must be unique"
+      }
+    }
+    
+    if (outputs.length === 0) {
+      errors.outputs = "At least one output parameter is required"
+    } else {
+      // Check for duplicate output names
+      const outputNames = outputs.map(output => output.name)
+      const hasDuplicateOutputs = outputNames.some((name, index) => 
+        outputNames.indexOf(name) !== index
+      )
+      if (hasDuplicateOutputs) {
+        errors.outputs = "Output parameter names must be unique"
+      }
+    }
+    
+    if (!logic.trim()) {
+      errors.logic = "Logic is required"
+    } else {
+      // Basic validation based on logic type
+      try {
+        if (logicType === LogicType.JAVASCRIPT) {
+          // Check if it contains a function declaration
+          if (!logic.includes('function process') && !logic.includes('const process =') && !logic.includes('let process =')) {
+            errors.logic = "JavaScript logic must include a 'process' function"
+          }
+        } else if (logicType === LogicType.JSON_TRANSFORM) {
+          // Try parsing as JSON
+          JSON.parse(logic)
+        }
+      } catch (e) {
+        errors.logic = logicType === LogicType.JSON_TRANSFORM 
+          ? "Invalid JSON format" 
+          : "Logic validation failed"
+      }
+    }
+    
+    return errors
+  }
+
   // Handle form submission
   const handleSave = () => {
     // Validate form
-    if (!name.trim()) {
+    const errors = validateForm()
+    setValidationErrors(errors)
+    
+    if (Object.keys(errors).length > 0) {
+      // Show toast for the first error
+      const firstError = Object.entries(errors)[0]
       toast({
-        title: "Name is required",
-        description: "Please enter a name for your custom block.",
+        title: firstError[0].charAt(0).toUpperCase() + firstError[0].slice(1) + " error",
+        description: firstError[1],
         variant: "destructive",
       })
-      setActiveTab("general")
-      return
-    }
-
-    if (inputs.length === 0) {
-      toast({
-        title: "Inputs are required",
-        description: "Please add at least one input parameter.",
-        variant: "destructive",
-      })
-      setActiveTab("inputs")
-      return
-    }
-
-    if (outputs.length === 0) {
-      toast({
-        title: "Outputs are required",
-        description: "Please add at least one output parameter.",
-        variant: "destructive",
-      })
-      setActiveTab("outputs")
-      return
-    }
-
-    if (!logic.trim()) {
-      toast({
-        title: "Logic is required",
-        description: "Please enter the processing logic for your block.",
-        variant: "destructive",
-      })
-      setActiveTab("logic")
+      
+      // Navigate to the tab with the error
+      if (errors.name) {
+        setActiveTab("general")
+      } else if (errors.inputs) {
+        setActiveTab("inputs")
+      } else if (errors.outputs) {
+        setActiveTab("outputs")
+      } else if (errors.logic) {
+        setActiveTab("logic")
+      }
+      
       return
     }
 
@@ -589,52 +646,130 @@ export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onS
                         {logicType === LogicType.CONDITION && "inputs.value > 10"}
                       </div>
                     </div>
-                    <Textarea
-                      id="logic"
-                      value={logic}
-                      onChange={(e) => setLogic(e.target.value)}
-                      placeholder={
-                        logicType === LogicType.JAVASCRIPT
-                          ? "function process(inputs) {\n  // Your code here\n  return { output: inputs.value };\n}"
-                          : logicType === LogicType.JSON_TRANSFORM
-                            ? '{\n  "output": "{{inputs.value}}"\n}'
-                            : logicType === LogicType.TEMPLATE
-                              ? "Hello {{inputs.name}},\n\nThis is a template."
-                              : "inputs.value > 10"
-                      }
-                      rows={15}
-                      className="font-mono text-sm"
-                    />
+                    
+                    {validationErrors.logic && (
+                      <Alert variant="destructive" className="py-2 mb-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="text-xs ml-2">{validationErrors.logic}</AlertDescription>
+                      </Alert>
+                    )}
+                    
+                    <div className="border rounded-md overflow-hidden">
+                      <CodeMirror
+                        value={logic}
+                        height="350px"
+                        theme={vscodeDark}
+                        extensions={[
+                          EditorView.lineWrapping,
+                          logicType === LogicType.JAVASCRIPT ? javascript() : 
+                          logicType === LogicType.JSON_TRANSFORM ? json() : 
+                          EditorView.lineWrapping
+                        ]}
+                        onChange={(value) => setLogic(value)}
+                        placeholder={
+                          logicType === LogicType.JAVASCRIPT
+                            ? "function process(inputs) {\n  // Your code here\n  return { output: inputs.value };\n}"
+                            : logicType === LogicType.JSON_TRANSFORM
+                              ? '{\n  "output": "{{inputs.value}}"\n}'
+                              : logicType === LogicType.TEMPLATE
+                                ? "Hello {{inputs.name}},\n\nThis is a template."
+                                : "inputs.value > 10"
+                        }
+                        className="text-sm"
+                      />
+                    </div>
                   </div>
 
-                  <div className="bg-muted p-3 rounded-md">
-                    <h4 className="text-sm font-medium mb-2">Logic Type Help</h4>
-                    <p className="text-xs text-muted-foreground">
-                      {logicType === LogicType.JAVASCRIPT && (
-                        <>
-                          Write a JavaScript function that processes inputs and returns outputs. The function should
-                          accept an <code>inputs</code> object and return an object with output values.
-                        </>
-                      )}
-                      {logicType === LogicType.JSON_TRANSFORM && (
-                        <>
-                          Define a JSON template with variables in double curly braces. For example:{" "}
-                          <code>{"{{inputs.value}}"}</code> will be replaced with the actual input value.
-                        </>
-                      )}
-                      {logicType === LogicType.TEMPLATE && (
-                        <>
-                          Create a text template with variables in double curly braces. For example:{" "}
-                          <code>{"Hello {{inputs.name}}"}</code> will be replaced with the actual name.
-                        </>
-                      )}
-                      {logicType === LogicType.CONDITION && (
-                        <>
-                          Write a condition expression that evaluates to true or false. Use <code>inputs.value</code> to
-                          reference input values. For example: <code>inputs.value &gt; 10</code>.
-                        </>
-                      )}
-                    </p>
+                  <div className="space-y-4">
+                    <div className="bg-muted p-3 rounded-md">
+                      <h4 className="text-sm font-medium mb-2">Logic Type Help</h4>
+                      <p className="text-xs text-muted-foreground">
+                        {logicType === LogicType.JAVASCRIPT && (
+                          <>
+                            Write a JavaScript function that processes inputs and returns outputs. The function should
+                            accept an <code>inputs</code> object and return an object with output values.
+                          </>
+                        )}
+                        {logicType === LogicType.JSON_TRANSFORM && (
+                          <>
+                            Define a JSON template with variables in double curly braces. For example:{" "}
+                            <code>{"{{inputs.value}}"}</code> will be replaced with the actual input value.
+                          </>
+                        )}
+                        {logicType === LogicType.TEMPLATE && (
+                          <>
+                            Create a text template with variables in double curly braces. For example:{" "}
+                            <code>{"Hello {{inputs.name}}"}</code> will be replaced with the actual name.
+                          </>
+                        )}
+                        {logicType === LogicType.CONDITION && (
+                          <>
+                            Write a condition expression that evaluates to true or false. Use <code>inputs.value</code> to
+                            reference input values. For example: <code>inputs.value &gt; 10</code>.
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    
+                    {onGenerateWithAI && (
+                      <Card>
+                        <CardHeader className="py-3">
+                          <CardTitle className="text-sm font-medium flex items-center">
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Generate with AI
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground">
+                              Let AI generate logic based on your inputs and outputs.
+                            </p>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Describe what your block should do..."
+                                value={aiPrompt}
+                                onChange={(e) => setAiPrompt(e.target.value)}
+                                disabled={isGenerating}
+                              />
+                              <Button 
+                                size="sm" 
+                                onClick={() => {
+                                  if (!aiPrompt.trim()) return;
+                                  setIsGenerating(true);
+                                  
+                                  onGenerateWithAI?.(aiPrompt, (generatedBlock) => {
+                                    if (generatedBlock.logic) {
+                                      setLogic(generatedBlock.logic);
+                                      
+                                      // If logic type is provided, update it
+                                      if (generatedBlock.logicType) {
+                                        setLogicType(generatedBlock.logicType);
+                                      }
+                                      
+                                      toast({
+                                        title: "Logic Generated",
+                                        description: "AI has generated logic for your block.",
+                                      });
+                                    }
+                                    setIsGenerating(false);
+                                  });
+                                }}
+                                disabled={!aiPrompt.trim() || isGenerating || !onGenerateWithAI}
+                              >
+                                {isGenerating ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Generating...
+                                  </>
+                                ) : (
+                                  <>Generate</>  
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
                 </div>
               </ScrollArea>

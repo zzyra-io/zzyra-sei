@@ -77,6 +77,36 @@ export class OpenRouterProvider implements AIProvider {
     // Set default model or use environment variable
     this.modelName = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
   }
+  
+  /**
+   * Generate a custom block definition based on a prompt
+   */
+  async generateCustomBlock(prompt: string, systemPrompt: string, userId: string) {
+    try {
+      // Use the AI SDK's generateText function with OpenRouter
+      const { text } = await generateText({
+        model: this.openrouter("openai/gpt-4o-mini"),
+        system: systemPrompt,
+        prompt: prompt,
+        temperature: 0.2, // Lower temperature for more consistent outputs
+      });
+
+      // Parse the JSON response
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(text);
+      } catch (error) {
+        console.error("Failed to parse AI response as JSON:", text);
+        throw new Error("AI returned invalid JSON");
+      }
+
+      // Return the parsed response
+      return parsedResponse;
+    } catch (error) {
+      console.error("OpenRouter AI provider error:", error);
+      throw error;
+    }
+  }
 
   async generateFlow(prompt: string, userId: string) {
     try {
