@@ -22,6 +22,7 @@ import {
   Loader2,
   AlertCircle,
   Sparkles,
+  Code,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -196,6 +197,7 @@ const blockIcons = {
   [BlockType.DELAY]: Clock3,
   [BlockType.TRANSFORM]: Zap,
   [BlockType.GOAT_FINANCE]: Coins,
+  [BlockType.CUSTOM]: Sparkles,
   [BlockType.UNKNOWN]: MoreHorizontal,
 };
 
@@ -389,6 +391,27 @@ export const ImprovedCustomNode = memo(
               {config.blockchain || "ethereum"}
             </div>
           );
+        case BlockType.CUSTOM:
+          // For custom blocks, show inputs and outputs
+          if (data.customBlockDefinition) {
+            const customBlock = data.customBlockDefinition;
+            return (
+              <div className='text-xs text-muted-foreground mt-1'>
+                <div className='flex items-center gap-1'>
+                  <Code className='h-3 w-3' />
+                  <span>{customBlock.logicType || "JavaScript"}</span>
+                </div>
+                <div className='mt-1'>
+                  {customBlock.inputs?.length || 0} inputs, {customBlock.outputs?.length || 0} outputs
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div className='text-xs text-muted-foreground mt-1'>
+              Custom Block: {data.customBlockId || "Unknown"}
+            </div>
+          );
         default:
           return null;
       }
@@ -512,7 +535,9 @@ export const ImprovedCustomNode = memo(
             </motion.div>
             <div className='flex-1 min-w-0'>
               <div className='font-medium truncate text-white'>
-                {data.label || blockMetadata.label}
+                {blockType === BlockType.CUSTOM && data.customBlockDefinition 
+                  ? data.customBlockDefinition.name 
+                  : (data.label || blockMetadata.label)}
               </div>
               {data.nodeType && (
                 <Badge

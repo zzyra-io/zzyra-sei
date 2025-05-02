@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, PlusCircle, Edit, Trash2, Copy } from "lucide-react"
+import { Search, PlusCircle, Edit, Trash2, Copy, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -21,16 +21,18 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { type CustomBlockDefinition, LogicType } from "@/types/custom-block"
-import { NodeCategory } from "@/types/workflow"
+import { BlockType, NodeCategory } from "@/types/workflow"
 import { CustomBlockBuilderDialog } from "./custom-block-builder-dialog"
 import { customBlockService } from "@/lib/services/custom-block-service"
 import { cn } from "@/lib/utils"
 
 interface CustomBlockCatalogProps {
   onAddBlock: (block: CustomBlockDefinition) => void
+  onGenerateCustomBlock?: (prompt: string) => Promise<void>
+  onDragStart?: (event: React.DragEvent, block: CustomBlockDefinition) => void
 }
 
-export function CustomBlockCatalog({ onAddBlock }: CustomBlockCatalogProps) {
+export function CustomBlockCatalog({ onAddBlock, onGenerateCustomBlock, onDragStart }: CustomBlockCatalogProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [customBlocks, setCustomBlocks] = useState<CustomBlockDefinition[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -189,12 +191,68 @@ export function CustomBlockCatalog({ onAddBlock }: CustomBlockCatalogProps) {
         return "?"
     }
   }
+  
+  // Handle drag start event for custom blocks
+  const handleDragStart = (event: React.DragEvent, block: CustomBlockDefinition) => {
+    // Create a serializable version of the block data
+    const blockData = {
+      label: block.name,
+      description: block.description,
+      blockType: BlockType.CUSTOM,
+      customBlockId: block.id,
+      nodeType: block.category,
+      iconName: "custom-block",
+      isEnabled: true,
+      config: {},
+      style: {
+        backgroundColor: "bg-card",
+        borderColor: "border-border",
+        textColor: "text-foreground",
+        accentColor: block.category === NodeCategory.TRIGGER ? "blue" :
+                    block.category === NodeCategory.ACTION ? "green" :
+                    block.category === NodeCategory.LOGIC ? "purple" : "amber",
+        width: 220,
+      },
+    };
+
+    // Set the data directly on the dataTransfer object
+    event.dataTransfer.setData("application/reactflow/type", BlockType.CUSTOM);
+    event.dataTransfer.setData(
+      "application/reactflow/data",
+      JSON.stringify(blockData)
+    );
+    event.dataTransfer.setData(
+      "application/reactflow/customBlock",
+      JSON.stringify(block)
+    );
+    event.dataTransfer.effectAllowed = "move";
+
+    // Only call onDragStart if it's provided
+    if (typeof onDragStart === "function") {
+      onDragStart(event, block);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b">
         <div className="flex justify-between items-center mb-4">
           <h3 className="font-medium">Custom Blocks</h3>
+          {onGenerateCustomBlock && (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => {
+                const prompt = window.prompt("Enter a description for your custom block:");
+                if (prompt && prompt.trim()) {
+                  onGenerateCustomBlock(prompt.trim());
+                }
+              }}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI Generate
+            </Button>
+          )}
           <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
             <PlusCircle className="h-4 w-4 mr-2" />
             Create
@@ -240,14 +298,19 @@ export function CustomBlockCatalog({ onAddBlock }: CustomBlockCatalogProps) {
           ) : filteredBlocks.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <p>No custom blocks found</p>
-              <p className="text-xs mt-1">
-                {searchQuery ? "Try a different search term" : "Click 'Create' to add your first custom block"}
+              <p className="text-xs text-muted-foreground">
+                {searchQuery ? "Try a different search term" : "Click 'Create' to add your first custom block or use AI to generate one"}
               </p>
             </div>
           ) : (
             <div className="space-y-3">
               {filteredBlocks.map((block) => (
-                <Card key={block.id} className="overflow-hidden">
+                <Card 
+                  key={block.id} 
+                  className="overflow-hidden"
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, block)}
+                >
                   <CardHeader className="p-4 pb-2">
                     <div className="flex justify-between items-start">
                       <div>
@@ -325,7 +388,10 @@ export function CustomBlockCatalog({ onAddBlock }: CustomBlockCatalogProps) {
                       </Badge>
                     </div>
                   </CardContent>
-                  <CardFooter className="p-2 bg-muted/50 flex justify-end">
+                  <CardFooter className="p-2 bg-muted/50 flex justify-between">
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      <span className="mr-1">Drag to canvas or</span>
+                    </div>
                     <Button size="sm" onClick={() => onAddBlock(block)}>
                       Add to Canvas
                     </Button>

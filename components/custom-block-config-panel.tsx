@@ -32,6 +32,26 @@ export function CustomBlockConfigPanel({ blockId, config, onUpdate, onClose }: C
     const loadBlock = async () => {
       setLoading(true)
       try {
+        // First check if we have the block in the config
+        if (config.customBlockDefinition) {
+          setBlock(config.customBlockDefinition)
+          
+          // Initialize values from config or defaults
+          const initialValues: Record<string, any> = {}
+          config.customBlockDefinition.inputs.forEach((input) => {
+            initialValues[input.name] =
+              config[input.name] !== undefined
+                ? config[input.name]
+                : input.defaultValue !== undefined
+                  ? input.defaultValue
+                  : getDefaultValueForType(input.dataType)
+          })
+          setValues(initialValues)
+          setLoading(false)
+          return
+        }
+        
+        // Otherwise try to load from database
         const blockData = await customBlockService.getCustomBlockById(blockId)
         if (blockData) {
           setBlock(blockData)
@@ -48,11 +68,31 @@ export function CustomBlockConfigPanel({ blockId, config, onUpdate, onClose }: C
           })
           setValues(initialValues)
         } else {
-          toast({
-            title: "Block not found",
-            description: "The custom block definition could not be loaded.",
-            variant: "destructive",
-          })
+          // Try to find in example blocks
+          const exampleBlocks = customBlockService.getExampleBlocks()
+          const exampleBlock = exampleBlocks.find(b => b.id === blockId)
+          
+          if (exampleBlock) {
+            setBlock(exampleBlock)
+            
+            // Initialize values from config or defaults
+            const initialValues: Record<string, any> = {}
+            exampleBlock.inputs.forEach((input) => {
+              initialValues[input.name] =
+                config[input.name] !== undefined
+                  ? config[input.name]
+                  : input.defaultValue !== undefined
+                    ? input.defaultValue
+                    : getDefaultValueForType(input.dataType)
+            })
+            setValues(initialValues)
+          } else {
+            toast({
+              title: "Block not found",
+              description: "The custom block definition could not be loaded.",
+              variant: "destructive",
+            })
+          }
         }
       } catch (error) {
         console.error("Error loading custom block:", error)

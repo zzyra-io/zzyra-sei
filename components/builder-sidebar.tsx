@@ -35,6 +35,7 @@ interface BuilderSidebarProps {
     customBlock: CustomBlockDefinition,
     position?: { x: number; y: number }
   ) => void;
+  onGenerateCustomBlock?: (prompt: string) => Promise<void>;
   workflowName: string;
   workflowDescription: string;
   onWorkflowDetailsChange: (details: {
@@ -42,15 +43,22 @@ interface BuilderSidebarProps {
     description?: string;
   }) => void;
   nodes: Node[];
+  selectedNode?: Node | null;
+  onNodeSelect?: (node: Node | null) => void;
+  onNodeUpdate?: (nodeId: string, updates: any) => void;
 }
 
 export function BuilderSidebar({
   onAddNode,
   onAddCustomBlock,
+  onGenerateCustomBlock,
   workflowName,
   workflowDescription,
   onWorkflowDetailsChange,
   nodes,
+  selectedNode,
+  onNodeSelect,
+  onNodeUpdate,
 }: BuilderSidebarProps) {
   const [mainTab, setMainTab] = useState("blocks");
   const [blockCatalogTab, setBlockCatalogTab] = useState("blocks");
@@ -64,6 +72,14 @@ export function BuilderSidebar({
     blockData: any
   ) => {
     console.log("Drag started:", blockType, blockData);
+  };
+  
+  // Handle drag start for custom blocks
+  const handleCustomBlockDragStart = (
+    event: React.DragEvent,
+    customBlock: CustomBlockDefinition
+  ) => {
+    console.log("Custom block drag started:", customBlock);
   };
 
   // Calculate some example stats
@@ -175,6 +191,8 @@ export function BuilderSidebar({
                     </div>
                     <CustomBlockCatalog
                       onAddBlock={(block) => onAddCustomBlock?.(block)}
+                      onGenerateCustomBlock={onGenerateCustomBlock}
+                      onDragStart={handleCustomBlockDragStart}
                     />
                   </div>
                 </ScrollArea>

@@ -51,22 +51,35 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
       const loadCustomBlock = async () => {
         setIsLoadingCustomBlock(true)
         try {
-          // In a real app, we would load from the database
-          // const blockDef = await customBlockService.getCustomBlock(node.data.customBlockId)
-
-          // For now, try to find it in the example blocks
-          const exampleBlocks = customBlockService.getExampleBlocks()
-          const blockDef = exampleBlocks.find((b) => b.id === node.data.customBlockId)
-
-          if (blockDef) {
-            setCustomBlockDefinition(blockDef)
-          } else {
-            toast({
-              title: "Block Not Found",
-              description: "The custom block definition could not be found",
-              variant: "destructive",
-            })
+          // First check if the definition is already in the node data
+          if (node.data?.customBlockDefinition) {
+            setCustomBlockDefinition(node.data.customBlockDefinition)
+            return
           }
+
+          // Otherwise try to load from the database
+          const blockDef = await customBlockService.getCustomBlockById(node.data.customBlockId)
+
+          // If not found in database, try example blocks
+          if (!blockDef) {
+            const exampleBlocks = customBlockService.getExampleBlocks()
+            const exampleBlockDef = exampleBlocks.find((b) => b.id === node.data.customBlockId)
+            
+            if (exampleBlockDef) {
+              setCustomBlockDefinition(exampleBlockDef)
+              return
+            }
+          } else {
+            setCustomBlockDefinition(blockDef)
+            return
+          }
+
+          // If we get here, the block was not found
+          toast({
+            title: "Block Not Found",
+            description: "The custom block definition could not be found",
+            variant: "destructive",
+          })
         } catch (error) {
           console.error("Error loading custom block:", error)
           toast({

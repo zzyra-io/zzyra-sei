@@ -1174,6 +1174,22 @@ function FlowContent({
         y: event.clientY - reactFlowBounds.top,
       });
 
+      // Check if this is a custom block
+      let customBlockData = null;
+      if (blockType === BlockType.CUSTOM) {
+        try {
+          const customBlockString = event.dataTransfer.getData(
+            "application/reactflow/customBlock"
+          );
+          if (customBlockString) {
+            customBlockData = JSON.parse(customBlockString);
+            console.log("Custom block data:", customBlockData);
+          }
+        } catch (error) {
+          console.error("Error parsing custom block data:", error);
+        }
+      }
+
       // Create a new node
       const newNode: Node = {
         id: `${blockType}-${Date.now()}`,
@@ -1182,6 +1198,8 @@ function FlowContent({
         data: {
           ...nodeData,
           blockType: blockType, // Explicitly set blockType to the enum value
+          customBlockId: customBlockData?.id, // Add custom block ID if available
+          customBlockDefinition: customBlockData, // Store the full custom block definition
         },
       };
 

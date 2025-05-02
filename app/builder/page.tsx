@@ -71,6 +71,7 @@ export default function BuilderPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
+  // State for storing the currently selected node
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [workflowName, setWorkflowName] = useState("Untitled Workflow");
   const [workflowDescription, setWorkflowDescription] = useState("");
@@ -437,17 +438,6 @@ export default function BuilderPage() {
       setIsLoading(false);
     }
   };
-
-  const handleNodeSelect = useCallback((node: Node | null) => {
-    setSelectedNode(node);
-  }, []);
-
-  const handleNodeUpdate = useCallback((updatedNode: Node) => {
-    setNodes((nds) =>
-      nds.map((n) => (n.id === updatedNode.id ? updatedNode : n))
-    );
-    setHasUnsavedChanges(true);
-  }, []);
 
   const handleAddBlock = useCallback(
     (blockType: BlockType, position?: { x: number; y: number }) => {
@@ -842,7 +832,7 @@ export default function BuilderPage() {
           const idMap = new Map();
 
           // Create new nodes with unique IDs and adjusted positions
-          const newNodes = result.nodes.map((node) => {
+          const newNodes = result.nodes.map((node: any) => {
             const newId = `${node.id}-${Date.now()}-${Math.floor(
               Math.random() * 1000
             )}`;
@@ -869,7 +859,6 @@ export default function BuilderPage() {
               source: newSource,
               target: newTarget,
               sourceHandle: edge.sourceHandle,
-              targetHandle: edge.targetHandle,
             };
           });
 
@@ -1193,13 +1182,18 @@ export default function BuilderPage() {
               <ResizablePanel defaultSize={25} minSize={15} maxSize={30}>
                 <BuilderSidebar
                   onAddNode={handleAddBlock}
+                  onAddCustomBlock={handleAddCustomBlock}
                   workflowName={workflowName}
                   workflowDescription={workflowDescription}
                   onWorkflowDetailsChange={handleWorkflowDetailsChange}
                   nodes={nodes}
-                  selectedNode={selectedNode}
-                  onNodeSelect={handleNodeSelect}
-                  onNodeUpdate={handleNodeUpdate}
+                  onGenerateCustomBlock={async (prompt) => {
+                    // Use the existing handleNlGenerate function with a synthetic event
+                    setNlPrompt(prompt);
+                    const syntheticEvent = { preventDefault: () => {} } as React.FormEvent;
+                    await handleNlGenerate(syntheticEvent);
+                    return Promise.resolve();
+                  }}
                 />
               </ResizablePanel>
               <ResizableHandle />
@@ -1211,16 +1205,12 @@ export default function BuilderPage() {
                   onNodesChange={setNodes}
                   onEdgesChange={setEdges}
                   toolbarRef={toolbarRef}
-                  onNodeSelect={handleNodeSelect}
-                  onNodeUpdate={handleNodeUpdate}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
           </div>
 
-          {/* Add this JSX right before the closing </div> of the main container (around line 650-660) */}
-          {/* This is the natural language input component at the bottom of the screen */}
-          {/* Natural Language Input */}
+          {/* Natural Language Input Component */}
           <div className='absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-full max-w-2xl px-4'>
             <Card className='bg-background/80 backdrop-blur-sm border shadow-lg'>
               <form
