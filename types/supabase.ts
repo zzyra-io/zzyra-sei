@@ -9,181 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      pricing_tiers: {
-        Row: {
-          id: string
-          name: string
-          description: string | null
-          price_monthly: number
-          price_yearly: number
-          workflow_limit: number
-          execution_limit: number
-          features: Record<string, unknown>
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          description?: string | null
-          price_monthly: number
-          price_yearly: number
-          workflow_limit: number
-          execution_limit: number
-          features?: Record<string, unknown>
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string | null
-          price_monthly?: number
-          price_yearly?: number
-          workflow_limit?: number
-          execution_limit?: number
-          features?: Record<string, unknown>
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      subscriptions: {
-        Row: {
-          id: string
-          user_id: string
-          tier_id: string
-          status: string
-          current_period_start: string
-          current_period_end: string
-          cancel_at_period_end: boolean
-          stripe_subscription_id: string | null
-          stripe_customer_id: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          tier_id: string
-          status: string
-          current_period_start: string
-          current_period_end: string
-          cancel_at_period_end?: boolean
-          stripe_subscription_id?: string | null
-          stripe_customer_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          tier_id?: string
-          status?: string
-          current_period_start?: string
-          current_period_end?: string
-          cancel_at_period_end?: boolean
-          stripe_subscription_id?: string | null
-          stripe_customer_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscriptions_tier_id_fkey"
-            columns: ["tier_id"]
-            isOneToOne: false
-            referencedRelation: "pricing_tiers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      usage_logs: {
-        Row: {
-          id: string
-          subscription_id: string
-          resource_type: string
-          quantity: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          subscription_id: string
-          resource_type: string
-          quantity?: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          subscription_id?: string
-          resource_type?: string
-          quantity?: number
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "usage_logs_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "subscriptions"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      subscription_invoices: {
-        Row: {
-          id: string
-          subscription_id: string
-          amount: number
-          currency: string
-          status: string
-          stripe_invoice_id: string | null
-          billing_period_start: string
-          billing_period_end: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          subscription_id: string
-          amount: number
-          currency?: string
-          status: string
-          stripe_invoice_id?: string | null
-          billing_period_start: string
-          billing_period_end: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          subscription_id?: string
-          amount?: number
-          currency?: string
-          status?: string
-          stripe_invoice_id?: string | null
-          billing_period_start?: string
-          billing_period_end?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscription_invoices_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "subscriptions"
-            referencedColumns: ["id"]
-          }
-        ]
-      },
       audit_logs: {
         Row: {
           action: string
@@ -211,6 +36,48 @@ export type Database = {
           table_name?: string
           timestamp?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      block_definitions: {
+        Row: {
+          block_type: string
+          created_at: string
+          handler_code: string | null
+          human_config: string
+          icon_name: string
+          id: string
+          json_schema: Json
+          label: string
+          node_type: string
+          ui_schema: Json | null
+          updated_at: string
+        }
+        Insert: {
+          block_type: string
+          created_at?: string
+          handler_code?: string | null
+          human_config: string
+          icon_name: string
+          id?: string
+          json_schema: Json
+          label: string
+          node_type: string
+          ui_schema?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          block_type?: string
+          created_at?: string
+          handler_code?: string | null
+          human_config?: string
+          icon_name?: string
+          id?: string
+          json_schema?: Json
+          label?: string
+          node_type?: string
+          ui_schema?: Json | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -684,6 +551,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pricing_tiers: {
+        Row: {
+          created_at: string
+          description: string | null
+          execution_limit: number
+          features: Json
+          id: string
+          name: string
+          price_monthly: number
+          price_yearly: number
+          updated_at: string
+          workflow_limit: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          execution_limit: number
+          features?: Json
+          id?: string
+          name: string
+          price_monthly: number
+          price_yearly: number
+          updated_at?: string
+          workflow_limit: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          execution_limit?: number
+          features?: Json
+          id?: string
+          name?: string
+          price_monthly?: number
+          price_yearly?: number
+          updated_at?: string
+          workflow_limit?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -743,6 +649,103 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      subscription_invoices: {
+        Row: {
+          amount: number
+          billing_reason: string
+          created_at: string
+          id: string
+          invoice_pdf: string | null
+          status: string
+          stripe_invoice_id: string | null
+          subscription_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          billing_reason: string
+          created_at?: string
+          id?: string
+          invoice_pdf?: string | null
+          status: string
+          stripe_invoice_id?: string | null
+          subscription_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          billing_reason?: string
+          created_at?: string
+          id?: string
+          invoice_pdf?: string | null
+          status?: string
+          stripe_invoice_id?: string | null
+          subscription_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          cancel_at: string | null
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancel_at?: string | null
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end: string
+          current_period_start: string
+          id?: string
+          status: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancel_at?: string | null
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_members: {
         Row: {
@@ -840,6 +843,38 @@ export type Database = {
             columns: ["execution_id"]
             isOneToOne: false
             referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_logs: {
+        Row: {
+          created_at: string
+          id: string
+          quantity: number
+          resource_type: string
+          subscription_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          quantity: number
+          resource_type: string
+          subscription_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          quantity?: number
+          resource_type?: string
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_logs_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
             referencedColumns: ["id"]
           },
         ]
@@ -1030,6 +1065,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_subscription_limits: {
+        Args: { p_user_id: string; p_resource_type: string; p_quantity: number }
+        Returns: boolean
+      }
       claim_next_execution_job: {
         Args: { worker_id: string; batch_size?: number }
         Returns: {

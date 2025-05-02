@@ -19,6 +19,7 @@ import { CustomBlockBuilderDialog } from "@/components/custom-block-builder-dial
 
 interface Props {
   blocks: CustomBlockDefinition[]
+  onAddBlock: (b: CustomBlockDefinition) => void
   onEdit: (b: CustomBlockDefinition) => void
   onDuplicate: (b: CustomBlockDefinition) => void
   onDelete: (b: CustomBlockDefinition) => void
@@ -26,7 +27,7 @@ interface Props {
   onGenerateCustomBlock: (prompt: string) => Promise<void>
 }
 
-export function CustomBlockCatalog({ blocks = [], onEdit, onDuplicate, onDelete, onDragStart, onGenerateCustomBlock }: Props) {
+export function CustomBlockCatalog({ blocks = [], onAddBlock, onEdit, onDuplicate, onDelete, onDragStart, onGenerateCustomBlock }: Props) {
   const { toast } = useToast()
   const [category, setCategory] = useState<string>("all")
   const [search, setSearch] = useState<string>("")
@@ -52,7 +53,11 @@ export function CustomBlockCatalog({ blocks = [], onEdit, onDuplicate, onDelete,
   }
 
   const handleSave = (b: CustomBlockDefinition) => {
-    if (editBlock) onEdit(b)
+    if (editBlock) {
+      onEdit(b)
+    } else {
+      onAddBlock(b)
+    }
     setBuilderOpen(false)
     setEditBlock(undefined)
   }
