@@ -322,40 +322,6 @@ export default function BuilderPage() {
     }
   }, [initialId, toast]);
 
-  const handleGenerate = async (prompt: string) => {
-    setIsGenerating(true);
-    try {
-      const result = await generateFlow(prompt);
-      if (result.nodes && result.edges) {
-        setNodes(result.nodes);
-        setEdges(result.edges);
-        toast({
-          title: "Workflow generated",
-          description: "Your workflow has been generated successfully.",
-        });
-      }
-    } catch (error: any) {
-      console.error("Generation error:", error);
-      if (error.message === "Workflow creation limit reached") {
-        toast({
-          title: "Limit reached",
-          description:
-            "You have reached your workflow creation limit for this billing period.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Generation failed",
-          description:
-            error.message || "Failed to generate workflow. Please try again.",
-          variant: "destructive",
-        });
-      }
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
   const handleSaveWorkflow = async (
     name: string,
     description: string,
