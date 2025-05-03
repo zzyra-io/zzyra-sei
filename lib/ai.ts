@@ -1,5 +1,6 @@
 import type { AIProvider } from "@/lib/ai-provider";
 import { OpenRouterProvider } from "@/lib/ai-providers/openrouter";
+import type { Node, Edge } from "@/components/flow-canvas";
 
 // Update the getAIProvider function to check for environment variables
 export function getAIProvider(): AIProvider {
@@ -16,12 +17,22 @@ export function getAIProvider(): AIProvider {
   }
 }
 
-export async function generateFlowWithAI(prompt: string, userId: string) {
+export async function generateFlowWithAI(
+  prompt: string,
+  userId: string,
+  existingNodes: Node[],
+  existingEdges: Edge[]
+) {
   try {
     const provider = getAIProvider();
 
     // Generate a flow using the AI provider
-    const result = await provider.generateFlow(prompt, userId);
+    const result = await provider.generateFlow(
+      prompt,
+      userId,
+      existingNodes,
+      existingEdges
+    );
 
     // Validate the result
     if (!result || !result.nodes || !result.edges) {

@@ -1,3 +1,6 @@
+import type { Node, Edge } from "@/components/flow-canvas";
+import type { CustomBlockDefinition } from "@/types/custom-block";
+
 // Define the AIProvider interface
 export interface AIProvider {
   /**
@@ -5,10 +8,12 @@ export interface AIProvider {
    */
   generateFlow(
     prompt: string,
-    userId: string
+    userId: string,
+    existingNodes: Node[],
+    existingEdges: Edge[]
   ): Promise<{
-    nodes: any[];
-    edges: any[];
+    nodes: Node[];
+    edges: Edge[];
   }>;
 
   /**
@@ -16,7 +21,6 @@ export interface AIProvider {
    */
   generateCustomBlock(
     prompt: string,
-    systemPrompt: string,
     userId: string
-  ): Promise<any>;
+  ): Promise<CustomBlockDefinition>;
 }

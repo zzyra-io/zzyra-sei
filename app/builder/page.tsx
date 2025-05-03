@@ -819,7 +819,8 @@ export default function BuilderPage() {
         }
       }
 
-      const result = await generateFlow(enhancedPrompt);
+      // Pass existing nodes and edges as context
+      const result = await generateFlow(enhancedPrompt, memoizedNodes, memoizedEdges);
       if (result.nodes && result.edges) {
         // Instead of replacing, append the new nodes and edges
         if (nodes.length > 0) {

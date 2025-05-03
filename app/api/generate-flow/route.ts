@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateFlowWithAI } from "@/lib/ai";
+import type { Node, Edge } from "@/components/flow-canvas";
 
 export const runtime = "edge";
 
@@ -58,10 +59,18 @@ export async function POST(request: Request) {
     //   );
     // }
 
-    // Parse prompt
-    const { prompt } = await request.json();
+    // Parse prompt and context
+    const { prompt, nodes, edges } = await request.json();
     if (!prompt || typeof prompt !== "string") {
       return NextResponse.json({ error: "Invalid prompt" }, { status: 400 });
+    }
+
+    // Validate nodes and edges (basic check)
+    if (!Array.isArray(nodes) || !Array.isArray(edges)) {
+      return NextResponse.json(
+        { error: "Invalid workflow context" },
+        { status: 400 }
+      );
     }
 
     // Track workflow creation
@@ -72,8 +81,13 @@ export async function POST(request: Request) {
     // });
     // if (logError) console.error("Error logging workflow usage", logError);
 
-    // Generate flow
-    const flowData = await generateFlowWithAI(prompt, "");
+    // Generate flow with context
+    const flowData = await generateFlowWithAI(
+      prompt,
+      "", // userId - Assuming generateFlowWithAI will handle auth or it's not needed here
+      nodes as Node[], // Pass nodes context
+      edges as Edge[] // Pass edges context
+    );
     return NextResponse.json(flowData);
   } catch (err) {
     console.error("Error generating flow:", err);

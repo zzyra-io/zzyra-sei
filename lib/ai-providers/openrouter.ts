@@ -2,13 +2,14 @@ import type { AIProvider } from "@/lib/ai-provider";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText } from "ai";
 import { z } from "zod";
+import type { Node, Edge } from "@/components/flow-canvas"; // Add this import
 
 // Define the schema for the workflow response
 const WorkflowResponseSchema = z.object({
   nodes: z.array(
     z.object({
       id: z.string(),
-      type: z.string(),
+      type: z.string().optional().default("custom"), // Ensure type defaults if missing
       position: z.object({
         x: z.number(),
         y: z.number(),
@@ -17,188 +18,221 @@ const WorkflowResponseSchema = z.object({
         blockType: z.string(),
         label: z.string(),
         description: z.string().optional(),
-        nodeType: z.string(),
+        nodeType: z.string(), // Should match 'type' above, consider consolidation
         iconName: z.string(),
         isEnabled: z.boolean().optional().default(true),
-        config: z.record(z.any()).optional().default({}),
-        style: z
-          .object({
-            backgroundColor: z.string().optional(),
-            borderColor: z.string().optional(),
-            textColor: z.string().optional(),
-            accentColor: z.string().optional(),
-            width: z.number().optional(),
-          })
-          .optional(),
+        config: z.record(z.any()).optional(),
+        inputs: z.array(z.any()).optional(), // Define input/output schema if possible
+        outputs: z.array(z.any()).optional(),
       }),
     })
   ),
   edges: z.array(
     z.object({
-      id: z.string().optional(),
-      type: z.string().optional().default("custom"),
+      id: z.string(),
       source: z.string(),
-      sourceHandle: z.string().optional(),
       target: z.string(),
+      sourceHandle: z.string().optional(),
       targetHandle: z.string().optional(),
-      animated: z.boolean().optional(),
-      style: z
-        .object({
-          stroke: z.string().optional(),
-        })
-        .optional(),
-      data: z
-        .object({
-          type: z.string().optional(),
-        })
-        .optional(),
+      type: z.string().optional().default("custom"), // Default edge type
+      animated: z.boolean().optional().default(false),
     })
   ),
 });
 
+// Define schema for custom block definition response
+const CustomBlockResponseSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  category: z.string(),
+  inputs: z.array(z.object({ name: z.string(), type: z.string() })),
+  outputs: z.array(z.object({ name: z.string(), type: z.string() })),
+  code: z.string(), // Consider validating code structure if possible
+});
+
+const openrouter = createOpenRouter({
+  apiKey: process.env.NEXT_PUBLIC_OPENROUTER_API_KEY,
+});
+
 export class OpenRouterProvider implements AIProvider {
-  private openrouter: ReturnType<typeof createOpenRouter>;
-  private modelName: string;
+  private model = openrouter("openai/gpt-4o"); // Or allow model selection
 
-  constructor() {
-    // Get API key from environment variables
-    const apiKey = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY;
-    if (!apiKey) {
-      throw new Error(
-        "NEXT_PUBLIC_OPENROUTER_API_KEY environment variable is not set"
-      );
-    }
-
-    // Initialize OpenRouter client using the SDK
-    this.openrouter = createOpenRouter({
-      apiKey,
-    });
-
-    // Set default model or use environment variable
-    this.modelName = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
-  }
-  
-  /**
-   * Generate a custom block definition based on a prompt
-   */
-  async generateCustomBlock(prompt: string, systemPrompt: string, userId: string) {
+  // Updated generateFlow method
+  async generateFlow(
+    prompt: string,
+    userId: string, // userId might be used for context/personalization later
+    existingNodes: Node[],
+    existingEdges: Edge[]
+  ): Promise<{ nodes: Node[]; edges: Edge[] }> {
     try {
-      // Use the AI SDK's generateText function with OpenRouter
+      // Serialize existing workflow for context
+      const context =
+        existingNodes.length > 0 || existingEdges.length > 0
+          ? `
+Existing Workflow Context:
+Nodes: ${JSON.stringify(existingNodes.map(n => ({id: n.id, type: n.data.blockType, label: n.data.label})), null, 2)} // Simplified node context
+Edges: ${JSON.stringify(existingEdges.map(e => ({source: e.source, target: e.target})), null, 2)} // Simplified edge context
+
+Instructions: Based on the user prompt below, enhance or add to the existing workflow. If adding nodes, try to connect them logically to the existing ones if appropriate. Generate unique IDs for new nodes/edges. Ensure the output adheres strictly to the JSON schema.
+`
+          : "Instructions: Based on the user prompt below, create a new workflow. Ensure the output adheres strictly to the JSON schema.";
+
+      const systemPrompt = `
+You are an AI assistant designed to generate workflow diagrams based on user prompts for the Zyra platform.
+Your output MUST be a JSON object containing 'nodes' and 'edges' arrays, strictly adhering to the provided schema.
+
+Schema Details:
+- Nodes: Require id, type ('custom'), position {x, y}, and data {blockType, label, description, nodeType, iconName, config, inputs, outputs}.
+- Edges: Require id, source, target, and optionally sourceHandle/targetHandle, type ('custom'), animated.
+- 'blockType' must be a known type (e.g., 'TRIGGER_TIMER', 'ACTION_EMAIL', 'LOGIC_FILTER', 'CRYPTO_PRICE_CHECK', 'AI_BLOCKCHAIN').
+- 'nodeType' in data must match the main 'type' field ('custom').
+
+IMPORTANT: Pre-fill Node Configuration:
+- Analyze the user prompt for specific configuration details (e.g., email addresses, URLs, price targets, cron schedules, specific text for messages).
+- Populate the 'data.config' object for each relevant node with these extracted details.
+- Example 1: If prompt is "Send an email to team@example.com with subject 'Update'", the ACTION_EMAIL node's config should be { "to": "team@example.com", "subject": "Update", "body": "" } (infer body if not specified).
+- Example 2: If prompt is "Check if BTC price is above $60000 every 5 minutes", the CRYPTO_PRICE_CHECK node's config should be { "asset": "BTC", "condition": "above", "targetPrice": "60000", "checkInterval": "5m" }.
+- Example 3: If prompt is "Trigger every day at 9 AM UTC", the TRIGGER_TIMER node's config should be { "cron": "0 9 * * *", "timezone": "UTC" }.
+- If details are missing, use reasonable defaults or leave fields empty/null within the config object where appropriate (e.g., empty string for email body if unspecified).
+
+Layout & Connection:
+- Position nodes logically (e.g., left-to-right flow).
+- Connect nodes with edges in the correct execution order.
+- If adding to an existing workflow, try to connect new nodes to relevant existing nodes.
+
+${context}
+
+User Prompt:
+`;
+
       const { text } = await generateText({
-        model: this.openrouter("openai/gpt-4o-mini"),
+        model: this.model,
         system: systemPrompt,
         prompt: prompt,
-        temperature: 0.2, // Lower temperature for more consistent outputs
       });
 
-      // Parse the JSON response
+      // Attempt to parse the response
       let parsedResponse;
       try {
-        parsedResponse = JSON.parse(text);
-      } catch (error) {
-        console.error("Failed to parse AI response as JSON:", text);
-        throw new Error("AI returned invalid JSON");
+        // Clean potential markdown code fences
+        const cleanedText = text.replace(/```json\n?|\n?```/g, "").trim();
+        parsedResponse = JSON.parse(cleanedText);
+      } catch (parseError) {
+        console.error(
+          "Failed to parse AI response JSON:",
+          parseError,
+          "Raw text:",
+          text
+        );
+        throw new Error("AI returned invalid JSON format.");
       }
 
-      // Return the parsed response
-      return parsedResponse;
+      // Validate the parsed response against the Zod schema
+      const validationResult = WorkflowResponseSchema.safeParse(parsedResponse);
+
+      if (!validationResult.success) {
+        console.error(
+          "AI response failed schema validation:",
+          validationResult.error.errors
+        );
+        console.error("Invalid Response Data:", parsedResponse);
+        throw new Error(
+          `AI response did not match the required format: ${validationResult.error.message}`
+        );
+      }
+
+      // Return the validated data, explicitly casting to ensure type safety
+      return validationResult.data as { nodes: Node[]; edges: Edge[] };
     } catch (error) {
-      console.error("OpenRouter AI provider error:", error);
-      throw error;
+      console.error("Error generating flow with OpenRouter:", error);
+      // Re-throw a more generic error for the client
+      throw new Error(
+        `Failed to generate workflow: ${
+          error instanceof Error ? error.message : "Unknown AI error"
+        }`
+      );
     }
   }
 
-  async generateFlow(prompt: string, userId: string) {
+  // generateCustomBlock remains the same
+  async generateCustomBlock(prompt: string, userId: string): Promise<any> {
     try {
-      // Create a system prompt that explains how to generate workflow nodes and edges
-      const systemPrompt = `You are a workflow automation expert. Your task is to convert natural language instructions into a workflow represented as nodes and edges.
+      const systemPrompt = `
+You are an AI assistant that generates custom workflow block definitions.
+Output a JSON object with: name, description, category, inputs (array of {name, type}), outputs (array of {name, type}), and code (string containing JavaScript execution logic).
+The code should be a self-contained function that takes 'inputs' object and 'context' object, and returns an 'outputs' object.
+Example Input: { name: "price", type: "number" }
+Example Output: { name: "result", type: "boolean" }
+Example Code: "async function execute(inputs, context) { return { result: inputs.price > 50000 }; }"
+Ensure the output strictly adheres to the JSON schema.
+`;
 
-INSTRUCTIONS:
-1. Analyze the user's request and identify the key components needed for the workflow.
-2. Generate a JSON object with 'nodes' and 'edges' arrays that represent the workflow.
-3. Each node should have:
-   - A unique 'id' (format: "{blockType}-{timestamp}")
-   - A 'type' (usually "custom")
-   - A 'position' object with x and y coordinates
-   - A 'data' object containing:
-     - 'blockType': The type of block (e.g., "email", "price-monitor", "webhook", "schedule")
-     - 'label': A short, descriptive name
-     - 'description': A brief explanation of what the node does
-     - 'nodeType': Either "trigger" (starts workflow) or "action" (performs task)
-     - 'iconName': Icon to display (e.g., "email", "price-monitor")
-     - 'isEnabled': Boolean, default true
-     - 'config': Object with configuration specific to the block type
-     - 'style': Visual styling options
-
-4. Each edge should have:
-   - A 'source' (ID of source node)
-   - A 'target' (ID of target node)
-   - Optional 'sourceHandle' and 'targetHandle' (usually "output-1" and "input-1")
-   - 'animated' (boolean)
-   - Optional 'style' object
-
-5. Available block types:
-   - price-monitor: Monitors cryptocurrency prices (nodeType: trigger)
-     - config: { asset: string, condition: "above" | "below", targetPrice: string, checkInterval: string }
-   - email: Sends email notifications (nodeType: action)
-     - config: { to: string, subject: string, body: string }
-   - webhook: Triggers on HTTP requests (nodeType: trigger)
-     - config: { url: string, method: string }
-   - schedule: Runs on a schedule (nodeType: trigger)
-     - config: { cron: string, timezone: string }
-   - discord: Sends Discord messages (nodeType: action)
-     - config: { webhookUrl: string, message: string }
-   - telegram: Sends Telegram messages (nodeType: action)
-     - config: { botToken: string, chatId: string, message: string }
-   - sms: Sends SMS messages (nodeType: action)
-     - config: { to: string, message: string }
-   - condition: Evaluates conditions (nodeType: action)
-     - config: { condition: string }
-   - delay: Adds a time delay (nodeType: action)
-     - config: { delayMinutes: number }
-   - api: Makes API calls (nodeType: action)
-     - config: { url: string, method: string, headers: object, body: string }
-
-6. Position nodes in a logical flow from left to right, with triggers on the left.
-7. Connect nodes with edges in the order they should execute.
-8. Ensure all nodes have appropriate configuration based on their type.
-
-RESPONSE FORMAT:
-Return ONLY a valid JSON object with 'nodes' and 'edges' arrays. Do not include any explanations or markdown formatting.`;
-
-      // Use the AI SDK's generateText function with OpenRouter
       const { text } = await generateText({
-        model: this.openrouter("openai/gpt-4o-mini"),
+        model: this.model,
         system: systemPrompt,
-        prompt: `Create a workflow for: ${prompt}`,
-        temperature: 0.2, // Lower temperature for more consistent outputs
-        onStepFinish: (result) => {
-          console.log("result", result);
-        },
-        // format: "json",
+        prompt: prompt,
       });
 
-      // Parse the JSON response
       let parsedResponse;
       try {
-        parsedResponse = JSON.parse(text);
-      } catch (error) {
-        console.error("Failed to parse AI response as JSON:", text);
-        throw new Error("AI returned invalid JSON");
+        const cleanedText = text.replace(/```json\n?|\n?```/g, "").trim();
+        parsedResponse = JSON.parse(cleanedText);
+      } catch (parseError) {
+        console.error(
+          "Failed to parse AI response JSON for custom block:",
+          parseError,
+          "Raw text:",
+          text
+        );
+        throw new Error("AI returned invalid JSON format for custom block.");
       }
 
-      // Validate the response against our schema
-      const validationResult = WorkflowResponseSchema.safeParse(parsedResponse);
+      const validationResult =
+        CustomBlockResponseSchema.safeParse(parsedResponse);
+
       if (!validationResult.success) {
-        console.error("AI response validation failed:", validationResult.error);
-        throw new Error("AI response did not match expected schema");
+        console.error(
+          "Custom block AI response failed schema validation:",
+          validationResult.error.errors
+        );
+        console.error("Invalid Response Data:", parsedResponse);
+        throw new Error(
+          `Custom block AI response did not match the required format: ${validationResult.error.message}`
+        );
       }
 
-      // Return the validated workflow data
       return validationResult.data;
     } catch (error) {
-      console.error("OpenRouter AI provider error:", error);
-      throw error;
+      console.error("Error generating custom block with OpenRouter:", error);
+      throw new Error(
+        `Failed to generate custom block: ${
+          error instanceof Error ? error.message : "Unknown AI error"
+        }`
+      );
+    }
+  }
+
+  // generateContent remains the same
+  async generateContent(
+    prompt: string,
+    userId: string,
+    context?: string
+  ): Promise<string> {
+    try {
+      const systemPrompt = `You are a helpful AI assistant. ${context ? `\nContext: ${context}` : ""}`;
+      const { text } = await generateText({
+        model: this.model,
+        system: systemPrompt,
+        prompt: prompt,
+      });
+      return text;
+    } catch (error) {
+      console.error("Error generating content with OpenRouter:", error);
+      throw new Error(
+        `Failed to generate content: ${
+          error instanceof Error ? error.message : "Unknown AI error"
+        }`
+      );
     }
   }
 }
