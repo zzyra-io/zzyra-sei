@@ -30,6 +30,7 @@ export async function POST(request: Request) {
         workflow_id: workflowId,
         status: "pending",
         triggered_by: user.id,
+        user_id: user.id,
         started_at: new Date().toISOString(),
       },
     ]);

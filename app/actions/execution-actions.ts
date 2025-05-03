@@ -24,6 +24,7 @@ export async function startExecution(workflowId: string) {
       workflow_id: workflowId,
       status: "pending",
       triggered_by: user.id,
+      user_id: user.id,
       started_at: new Date().toISOString(),
     });
 
@@ -268,7 +269,10 @@ export async function resumeExecution(executionId: string, resumeData: Record<st
     // Update execution status to running
     const { error: updateError } = await supabase
       .from("workflow_executions")
-      .update({ status: "running" })
+      .update({ 
+        status: "running",
+        user_id: user.id
+      })
       .eq("id", executionId);
     
     if (updateError) {
@@ -387,7 +391,8 @@ export async function retryExecution(executionId: string, workflowId: string) {
         status: "running",
         started_at: new Date().toISOString(),
         completed_at: null,
-        result: null
+        result: null,
+        user_id: user.id
       })
       .eq("id", executionId);
     
