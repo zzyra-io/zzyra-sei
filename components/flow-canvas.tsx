@@ -1321,6 +1321,15 @@ function FlowContent({
     if (hasChanges) setNodes(updatedNodes);
   }, [nodes, edges, setNodes]);
 
+  // Sync internal ReactFlow state when props change
+  useEffect(() => {
+    setNodes(initialNodes);
+  }, [initialNodes]);
+
+  useEffect(() => {
+    setEdges(initialEdges);
+  }, [initialEdges]);
+
   return (
     <div className='flex h-full'>
       <div
