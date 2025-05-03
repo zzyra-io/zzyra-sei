@@ -23,6 +23,7 @@ import { WalletConfig } from "./block-configs/wallet-config"
 import { TransactionConfig } from "./block-configs/transaction-config"
 import { GoatFinanceConfig } from "./block-configs/goat-finance-config"
 import { BlockType, getBlockType, getBlockMetadata } from "@/types/workflow"
+
 import { CustomBlockConfigPanel } from "./custom-block-config-panel"
 import { customBlockService } from "@/lib/services/custom-block-service"
 import { useToast } from "@/components/ui/use-toast"
@@ -243,6 +244,38 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
         return <EmailConfig config={config} onChange={handleConfigChange} />
       case BlockType.NOTIFICATION:
         return <NotificationConfig config={config} onChange={handleConfigChange} />
+      case 'discord' as BlockType:
+        return (
+          <div className="w-80 h-full flex flex-col bg-background border-l">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-medium">Discord Configuration</h3>
+              <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4"/></Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <form onSubmit={handleSubmit((data) => handleConfigChange(data))}>
+                <div className="mb-4">
+                  <Label htmlFor="webhookUrl" className="mb-1">Webhook URL</Label>
+                  <Input 
+                    id="webhookUrl" 
+                    defaultValue={config.webhookUrl || ''} 
+                    {...register('webhookUrl', { required: 'Webhook URL is required' })} 
+                  />
+                  {errors.webhookUrl?.message && <p className="text-destructive text-sm mt-1">{errors.webhookUrl.message.toString()}</p>}
+                </div>
+                <div className="mb-4">
+                  <Label htmlFor="message" className="mb-1">Message</Label>
+                  <Textarea 
+                    id="message" 
+                    defaultValue={config.message || ''} 
+                    {...register('message', { required: 'Message is required' })} 
+                  />
+                  {errors.message?.message && <p className="text-destructive text-sm mt-1">{errors.message.message.toString()}</p>}
+                </div>
+                <Button type="submit" className="mt-2">Save</Button>
+              </form>
+            </div>
+          </div>
+        )
       case BlockType.DATABASE:
         return <DatabaseConfig config={config} onChange={handleConfigChange} />
       case BlockType.CONDITION:

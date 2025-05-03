@@ -54,7 +54,7 @@ export async function startExecution(workflowId: string) {
 
       // Try a different approach using a direct SQL query to insert into the queue
       // This bypasses potential RLS issues and ensures the insert happens with the right types
-      const { data: insertResult, error: queueError } = await supabase.rpc(
+      const { error: queueError } = await supabase.rpc(
         'insert_execution_queue_job',
         {
           p_execution_id: executionId,
@@ -201,8 +201,9 @@ export async function getExecutionDetails(executionId: string) {
     }
 
     return { execution, logs, error: null };
-  } catch (error: any) {
-    return { execution: null, logs: [], error: error.message };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { execution: null, logs: [], error: errorMessage };
   }
 }
 
@@ -230,8 +231,9 @@ export async function getWorkflowExecutions(workflowId: string) {
     }
 
     return { executions, error: null };
-  } catch (error: any) {
-    return { executions: [], error: error.message };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { executions: [], error: errorMessage };
   }
 }
 
