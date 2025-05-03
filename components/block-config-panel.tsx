@@ -26,6 +26,9 @@ import { BlockType, getBlockType, getBlockMetadata } from "@/types/workflow"
 import { CustomBlockConfigPanel } from "./custom-block-config-panel"
 import { customBlockService } from "@/lib/services/custom-block-service"
 import { useToast } from "@/components/ui/use-toast"
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { blockSchemas } from '@/lib/schemas/blockSchemas';
 
 interface BlockConfigPanelProps {
   node: any
@@ -44,6 +47,15 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
   const blockType = getBlockType(node.data)
   const blockMetadata = getBlockMetadata(blockType)
   const isCustomBlock = blockType === BlockType.CUSTOM && node.data?.customBlockId
+
+  // Dynamic Zod schema for block config
+  const schema = (blockSchemas as Record<string, any>)[blockType]
+  // react-hook-form setup
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: localNode.data.config || {}
+  })
+  useEffect(() => reset(localNode.data.config || {}), [schema, localNode.data.config, reset])
 
   // Load custom block definition if needed
   useEffect(() => {
@@ -196,8 +208,31 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
   }
   // --- END PATCH ---
 
-  // Render the appropriate config component based on block type
+  // Render dynamic config form if schema exists and not custom
   const renderConfigComponent = () => {
+    if (schema && !isCustomBlock) {
+      return (
+        <div className="w-80 h-full flex flex-col bg-background border-l">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="font-medium">{blockMetadata.label} Configuration</h3>
+            <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4"/></Button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            <form onSubmit={handleSubmit((data) => handleConfigChange(data))}>
+              {Object.keys(schema.shape).map((key) => (
+                <div key={key} className="mb-4">
+                  <Label htmlFor={key} className="mb-1">{key}</Label>
+                  <Input id={key} {...register(key)} />
+                  {errors[key] && <p className="text-destructive text-sm mt-1">{errors[key]?.message}</p>}
+                </div>
+              ))}
+              <Button type="submit" className="mt-2">Save</Button>
+            </form>
+          </div>
+        </div>
+      )
+    }
+    // Fallback to existing static panels
     const config = localNode.data.config || {}
     console.log(`Rendering config for ${blockType}:`, config)
 
