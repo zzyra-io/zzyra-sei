@@ -2,14 +2,16 @@ import type { AIProvider } from "@/lib/ai-provider";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText } from "ai";
 import { z } from "zod";
-import type { Node, Edge } from "@/components/flow-canvas"; // Add this import
+import type { Node, Edge } from "@/components/flow-canvas"; 
+import { DataType } from '@/types/custom-block'; 
+import type { AICustomBlockData } from "@/types/custom-block"; 
 
 // Define the schema for the workflow response
 const WorkflowResponseSchema = z.object({
   nodes: z.array(
     z.object({
       id: z.string(),
-      type: z.string().optional().default("custom"), // Ensure type defaults if missing
+      type: z.string().optional().default("custom"), 
       position: z.object({
         x: z.number(),
         y: z.number(),
@@ -18,11 +20,11 @@ const WorkflowResponseSchema = z.object({
         blockType: z.string(),
         label: z.string(),
         description: z.string().optional(),
-        nodeType: z.string(), // Should match 'type' above, consider consolidation
+        nodeType: z.string(), 
         iconName: z.string(),
         isEnabled: z.boolean().optional().default(true),
         config: z.record(z.any()).optional(),
-        inputs: z.array(z.any()).optional(), // Define input/output schema if possible
+        inputs: z.array(z.any()).optional(), 
         outputs: z.array(z.any()).optional(),
       }),
     })
@@ -34,10 +36,31 @@ const WorkflowResponseSchema = z.object({
       target: z.string(),
       sourceHandle: z.string().optional(),
       targetHandle: z.string().optional(),
-      type: z.string().optional().default("custom"), // Default edge type
+      type: z.string().optional().default("custom"), 
       animated: z.boolean().optional().default(false),
     })
   ),
+});
+
+// Define schema for BlockConfigField
+const BlockConfigFieldSchema = z.object({
+  name: z.string(),
+  label: z.string(),
+  type: z.enum(['string', 'number', 'boolean', 'json', 'select']),
+  defaultValue: z.any().optional(),
+  options: z.array(z.string()).optional(),
+  required: z.boolean().optional(),
+  placeholder: z.string().optional(),
+  description: z.string().optional(),
+});
+
+// Define BlockParameterAISchema Zod schema
+const BlockParameterAISchema = z.object({
+  name: z.string().describe("The code-friendly name/identifier for the parameter."),
+  description: z.string().optional().describe("A user-friendly description of the parameter."),
+  dataType: z.nativeEnum(DataType).describe("The data type (e.g., string, number, boolean)."),
+  required: z.boolean().optional().default(true).describe("Whether the parameter is required."),
+  defaultValue: z.any().optional().describe("An optional default value for the parameter."),
 });
 
 // Define schema for custom block definition response
@@ -45,9 +68,10 @@ const CustomBlockResponseSchema = z.object({
   name: z.string(),
   description: z.string(),
   category: z.string(),
-  inputs: z.array(z.object({ name: z.string(), type: z.string() })),
-  outputs: z.array(z.object({ name: z.string(), type: z.string() })),
-  code: z.string(), // Consider validating code structure if possible
+  inputs: z.array(BlockParameterAISchema).optional().default([]).describe("Array of input parameters."),
+  outputs: z.array(BlockParameterAISchema).optional().default([]).describe("Array of output parameters."),
+  configFields: z.array(BlockConfigFieldSchema).optional().default([]), 
+  code: z.string(), 
 });
 
 const openrouter = createOpenRouter({
@@ -55,12 +79,12 @@ const openrouter = createOpenRouter({
 });
 
 export class OpenRouterProvider implements AIProvider {
-  private model = openrouter("openai/gpt-4o"); // Or allow model selection
+  private model = openrouter("openai/gpt-4o"); 
 
   // Updated generateFlow method
   async generateFlow(
     prompt: string,
-    userId: string, // userId might be used for context/personalization later
+    userId: string, 
     existingNodes: Node[],
     existingEdges: Edge[]
   ): Promise<{ nodes: Node[]; edges: Edge[] }> {
@@ -70,8 +94,8 @@ export class OpenRouterProvider implements AIProvider {
         existingNodes.length > 0 || existingEdges.length > 0
           ? `
 Existing Workflow Context:
-Nodes: ${JSON.stringify(existingNodes.map(n => ({id: n.id, type: n.data.blockType, label: n.data.label})), null, 2)} // Simplified node context
-Edges: ${JSON.stringify(existingEdges.map(e => ({source: e.source, target: e.target})), null, 2)} // Simplified edge context
+Nodes: ${JSON.stringify(existingNodes.map(n => ({id: n.id, type: n.data.blockType, label: n.data.label})), null, 2)} 
+Edges: ${JSON.stringify(existingEdges.map(e => ({source: e.source, target: e.target})), null, 2)} 
 
 Instructions: Based on the user prompt below, enhance or add to the existing workflow. If adding nodes, try to connect them logically to the existing ones if appropriate. Generate unique IDs for new nodes/edges. Ensure the output adheres strictly to the JSON schema.
 `
@@ -154,17 +178,61 @@ User Prompt:
     }
   }
 
-  // generateCustomBlock remains the same
-  async generateCustomBlock(prompt: string, userId: string): Promise<any> {
+  // Updated generateCustomBlock
+  async generateCustomBlock(
+    prompt: string,
+    userId: string
+  ): Promise<AICustomBlockData> {
     try {
       const systemPrompt = `
-You are an AI assistant that generates custom workflow block definitions.
-Output a JSON object with: name, description, category, inputs (array of {name, type}), outputs (array of {name, type}), and code (string containing JavaScript execution logic).
-The code should be a self-contained function that takes 'inputs' object and 'context' object, and returns an 'outputs' object.
-Example Input: { name: "price", type: "number" }
-Example Output: { name: "result", type: "boolean" }
-Example Code: "async function execute(inputs, context) { return { result: inputs.price > 50000 }; }"
-Ensure the output strictly adheres to the JSON schema.
+You are an AI assistant that generates custom workflow block definitions in JSON format.
+Output a JSON object adhering strictly to this structure:
+{
+  "name": "Block Name",
+  "description": "Detailed description of what the block does.",
+  "category": "...", 
+  "inputs": [ 
+    {
+      "name": "input_param_name", 
+      "description": "What this input is for.", 
+      "dataType": "string" | "number" | "boolean" | "object" | "array" | "any", 
+      "required": true, 
+      "defaultValue": null 
+    },
+    ...
+  ],
+  "outputs": [ 
+    {
+      "name": "output_param_name",
+      "description": "What this output represents.",
+      "dataType": "string", 
+      "required": true, 
+      "defaultValue": null
+    },
+    ...
+  ],
+  "configFields": [ 
+    {
+      "name": "config_field_name",
+      "label": "UI Label",
+      "type": "string" | "number" | "boolean" | "json" | "select",
+      "defaultValue": "default value",
+      "options": ["option1", "option2"], 
+      "required": false,
+      "placeholder": "Placeholder text",
+      "description": "Help text for the config field."
+    },
+    ...
+  ],
+  "code": "async function execute(inputs, context) { /* JavaScript logic using inputs and context.config.config_field_name */ return { output_param_name: result }; }"
+}
+
+Example Input: { "name": "emailAddress", "description": "Recipient's email", "dataType": "string", "required": true }
+Example Output: { "name": "sentimentScore", "description": "Sentiment score from -1 to 1", "dataType": "number" }
+Example Config: { "name": "threshold", "label": "Threshold", "type": "number", "defaultValue": 0.5, "required": false }
+
+Ensure the output is ONLY the JSON object, without any extra text or markdown formatting.
+Base the generated fields (inputs, outputs, configFields, code) on the user's request: "${prompt}"
 `;
 
       const { text } = await generateText({
@@ -193,7 +261,7 @@ Ensure the output strictly adheres to the JSON schema.
       if (!validationResult.success) {
         console.error(
           "Custom block AI response failed schema validation:",
-          validationResult.error.errors
+          validationResult.error.errors 
         );
         console.error("Invalid Response Data:", parsedResponse);
         throw new Error(
@@ -201,7 +269,8 @@ Ensure the output strictly adheres to the JSON schema.
         );
       }
 
-      return validationResult.data;
+      // Return type now matches AICustomBlockData thanks to schema alignment
+      return validationResult.data as AICustomBlockData;
     } catch (error) {
       console.error("Error generating custom block with OpenRouter:", error);
       throw new Error(

@@ -829,11 +829,46 @@ export default function BuilderPage() {
           // 2. Generate unique IDs for the new nodes
           // 3. Update edge references to use the new IDs
 
-          // Create a map of old IDs to new IDs
-          const idMap = new Map();
+          // --- Calculate Layout Offset based on Existing Nodes ---
+          const NODE_SPACING_X = 250; // Horizontal space between old and new group
+          const NODE_WIDTH_ESTIMATE = 180; // Estimate for bounding box calc
+          const NODE_HEIGHT_ESTIMATE = 60; // Estimate for bounding box calc
 
-          // Create new nodes with unique IDs and adjusted positions
-          const newNodes = result.nodes.map((node: any) => {
+          const existingNodesBounds = nodes.reduce(
+            (bounds: { minX: number; minY: number; maxX: number; maxY: number }, node: Node) => ({
+              minX: Math.min(bounds.minX, node.position.x),
+              minY: Math.min(bounds.minY, node.position.y),
+              // Use actual node dimensions if available, otherwise estimate
+              maxX: Math.max(bounds.maxX, node.position.x + (node.width ?? NODE_WIDTH_ESTIMATE)),
+              maxY: Math.max(bounds.maxY, node.position.y + (node.height ?? NODE_HEIGHT_ESTIMATE)),
+            }),
+            { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+          );
+
+          // Target position for the top-left of the new group
+          const targetOffsetX = existingNodesBounds.maxX + NODE_SPACING_X;
+          const targetOffsetY = existingNodesBounds.minY; // Align top
+
+          // Find the top-left corner of the newly generated nodes (from AI)
+          // to use as a reference for relative positioning within the new group.
+          const newNodesOrigin = result.nodes.reduce(
+            (origin: { minX: number; minY: number }, node: Node) => ({
+              minX: Math.min(origin.minX, node.position.x),
+              minY: Math.min(origin.minY, node.position.y),
+            }),
+            { minX: Infinity, minY: Infinity } // Initial value with type
+          );
+
+          // Fallback if result.nodes is empty or positions are invalid
+          const safeOriginX = newNodesOrigin.minX === Infinity ? 0 : newNodesOrigin.minX;
+          const safeOriginY = newNodesOrigin.minY === Infinity ? 0 : newNodesOrigin.minY;
+          // --- End Calculate Layout Offset ---
+
+          // Create a map of old IDs to new IDs
+          const idMap = new Map<string, string>(); // Explicitly type the map
+
+          // Create new nodes with unique IDs and calculated positions
+          const newNodes = result.nodes.map((node: Node) => {
             const newId = `${node.id}-${Date.now()}-${Math.floor(
               Math.random() * 1000
             )}`;
@@ -843,14 +878,15 @@ export default function BuilderPage() {
               ...node,
               id: newId,
               position: {
-                x: node.position.x + canvasCenter.x - 300, // Offset from center
-                y: node.position.y + canvasCenter.y - 150, // Offset from center
+                // Position relative to calculated offset and new nodes' origin
+                x: targetOffsetX + (node.position.x - safeOriginX),
+                y: targetOffsetY + (node.position.y - safeOriginY),
               },
             };
           });
 
           // Create new edges with updated source/target references
-          const newEdges = result.edges.map((edge) => {
+          const newEdges = result.edges.map((edge: Edge) => {
             const newSource = idMap.get(edge.source) || edge.source;
             const newTarget = idMap.get(edge.target) || edge.target;
 

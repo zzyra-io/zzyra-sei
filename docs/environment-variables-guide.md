@@ -1,169 +1,68 @@
-# Environment Variables Integration Guide
+# Environment Variables Guide
 
-This guide explains how to use the environment variables in your automated workflows.
+This guide lists the essential environment variables required to set up and run the Zyra application locally or in a deployed environment.
 
-## Available Environment Variables
+## Overview
 
-- `NEXT_PUBLIC_RPC_URL`: RPC URL for EVM-compatible blockchains
-- `NEXT_PUBLIC_SOLANA_RPC_URL`: RPC URL for Solana blockchain
-- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`: Project ID for WalletConnect
-- `NEXT_PUBLIC_GOAT_API_KEY`: API key for advanced financial operations
+Environment variables are used to configure the application without hardcoding sensitive information or configuration details directly into the code. Zyra utilizes separate environment variable files for the frontend (`ui/.env`) and the backend worker (`zyra-worker/.env`).
 
-## Using Environment Variables in Workflows
+Template files (`ui/.env.example`, `zyra-worker/.env.example`) are provided in the repository. Copy these to `.env` in their respective directories and fill in the values.
 
-### In Financial Operation Blocks
+**NEVER commit your `.env` files to version control.**
 
-The Financial Operation block automatically uses these environment variables based on the selected blockchain and operation type:
+## Required Variables
 
-1. **EVM Blockchains** (Ethereum, Optimism, Polygon, etc.)
-   - Uses `NEXT_PUBLIC_RPC_URL` for connecting to the blockchain
-   - Uses `NEXT_PUBLIC_GOAT_API_KEY` for enhanced operations like swaps and DeFi interactions
+### `ui/.env` (Frontend - Next.js)
 
-2. **Solana Blockchain**
-   - Uses `NEXT_PUBLIC_SOLANA_RPC_URL` for connecting to Solana
-   - Uses `NEXT_PUBLIC_GOAT_API_KEY` for enhanced operations
+These variables are primarily used by the Next.js frontend application.
 
-3. **Wallet Connection**
-   - Uses `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for WalletConnect integration
-   - This enables secure wallet connections without exposing private keys
+-   `NEXT_PUBLIC_SUPABASE_URL`
+    -   **Purpose:** The public URL of your Supabase project. Used by the Supabase client library in the browser.
+    -   **Source:** Supabase Project Dashboard > Project Settings > API > Project URL.
+    -   **Note:** The `NEXT_PUBLIC_` prefix makes this variable accessible in the browser.
 
-### Programmatic Access
+-   `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+    -   **Purpose:** The anonymous public key for your Supabase project. Used by the Supabase client library in the browser for operations allowed by Row Level Security (RLS) policies for anonymous or authenticated users.
+    -   **Source:** Supabase Project Dashboard > Project Settings > API > Project API Keys > `anon` `public`.
+    -   **Note:** The `NEXT_PUBLIC_` prefix makes this variable accessible in the browser.
 
-You can also access these variables programmatically in custom code blocks:
+-   `SUPABASE_SERVICE_ROLE_KEY`
+    -   **Purpose:** The secret service role key for your Supabase project. Used by Next.js API routes (server-side) or build processes for operations requiring elevated privileges (bypassing RLS). **Keep this secret!**
+    -   **Source:** Supabase Project Dashboard > Project Settings > API > Project API Keys > `service_role` `secret`.
+    -   **Security:** Do NOT expose this key to the frontend/browser. It should only be used in server-side environments.
 
-\`\`\`javascript
-// Access RPC URLs based on blockchain
-const rpcUrl = blockchain === "solana" 
-  ? process.env.NEXT_PUBLIC_SOLANA_RPC_URL 
-  : process.env.NEXT_PUBLIC_RPC_URL;
+-   `DATABASE_URL`
+    -   **Purpose:** The full connection string for your Supabase PostgreSQL database. Primarily used by the Supabase CLI for running migrations (`supabase migration up`) and potentially by server-side processes needing direct database access (though Supabase client is often preferred).
+    -   **Source:** Supabase Project Dashboard > Project Settings > Database > Connection string > URI.
+    -   **Format:** `postgresql://postgres:[YOUR-PASSWORD]@[AWS-ENDPOINT].supabase.co:5432/postgres`
 
-// Access API key for enhanced operations
-const apiKey = process.env.NEXT_PUBLIC_GOAT_API_KEY;
+-   `NEXT_PUBLIC_OPENROUTER_API_KEY` (Optional)
+    -   **Purpose:** Your API key for OpenRouter, used for AI-powered workflow and custom block generation features.
+    -   **Source:** Your OpenRouter account dashboard.
+    -   **Note:** The `NEXT_PUBLIC_` prefix makes this accessible for client-side requests to your own API routes that then use the key server-side (best practice) or potentially directly if needed, though server-side usage is recommended for better security and control.
 
-// Access WalletConnect project ID
-const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
-\`\`\`
+### `zyra-worker/.env` (Backend - NestJS)
 
-## Security Considerations
+These variables are used by the NestJS worker service.
 
-- Environment variables prefixed with `NEXT_PUBLIC_` are exposed to the browser
-- Never store private keys as environment variables
-- Use WalletConnect for secure wallet connections instead of handling private keys directly
-- Consider using server-side operations for sensitive transactions
+-   `DATABASE_URL`
+    -   **Purpose:** The full connection string for your Supabase PostgreSQL database. Used by the worker (e.g., via Prisma or TypeORM if applicable, or direct pg client) to connect to the database for fetching jobs, logging results, and interacting with data.
+    -   **Source:** Supabase Project Dashboard > Project Settings > Database > Connection string > URI.
+    -   **Format:** `postgresql://postgres:[YOUR-PASSWORD]@[AWS-ENDPOINT].supabase.co:5432/postgres`
+    -   **Note:** This MUST be the same database the `ui` application connects to.
 
-## Best Practices
+-   `SUPABASE_SERVICE_ROLE_KEY`
+    -   **Purpose:** The secret service role key for your Supabase project. Used by the worker for privileged database access (e.g., updating execution statuses, writing logs, accessing data needed for jobs). **Keep this secret!**
+    -   **Source:** Supabase Project Dashboard > Project Settings > API > Project API Keys > `service_role` `secret`.
 
-1. **Chain-Specific Configuration**
-   - Create separate workflow templates for different blockchains
-   - Use conditional logic to handle chain-specific requirements
+-   **(Optional) Other Worker-Specific Variables:**
+    -   The worker might require additional variables for specific integrations (e.g., API keys for third-party services used in blocks, notification service keys). Refer to `zyra-worker/.env.example` for any other specific needs.
+    -   `PORT`: Often used to configure the port the NestJS service listens on if it exposes an HTTP interface (though this worker primarily polls the DB). Default is usually 3000 or defined in `main.ts`.
 
-2. **Error Handling**
-   - Always implement proper error handling for RPC failures
-   - Provide fallback RPC providers when possible
+## Security Best Practices
 
-3. **Testing**
-   - Test workflows on testnets before deploying to production
-   - Use minimal amounts when testing on mainnets
-
-4. **Monitoring**
-   - Implement logging for all blockchain operations
-   - Set up alerts for failed transactions
-\`\`\`
-
-Let's update the navigation to include the new Finance page:
-
-\`\`\`typescriptreact file="components/dashboard-header.tsx"
-[v0-no-op-code-block-prefix]"use client"
-
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { UserMenu } from "@/components/user-menu"
-import { ModeToggle } from "@/components/mode-toggle"
-import { Logo } from "@/components/logo"
-import { cn } from "@/lib/utils"
-import { motion } from "framer-motion"
-import { Plus, Home, Settings, FileText, BarChart3, Coins } from 'lucide-react'
-
-export function DashboardHeader() {
-  const pathname = usePathname()
-
-  const navigationItems = [
-    {
-      name: "Dashboard",
-      href: "/dashboard",
-      icon: Home,
-    },
-    {
-      name: "Builder",
-      href: "/builder",
-      icon: FileText,
-    },
-    {
-      name: "Templates",
-      href: "/templates",
-      icon: BarChart3,
-    },
-    {
-      name: "Finance",
-      href: "/finance",
-      icon: Coins,
-    },
-    {
-      name: "Settings",
-      href: "/settings",
-      icon: Settings,
-    },
-  ]
-
-  return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="mr-4 flex">
-          <Link href="/dashboard" className="mr-6 flex items-center space-x-2">
-            <Logo className="h-6 w-6" />
-            <span className="font-bold">Zyra</span>
-          </Link>
-          <nav className="flex items-center space-x-6 text-sm font-medium">
-            {navigationItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center transition-colors hover:text-foreground/80",
-                  pathname === item.href ? "text-foreground" : "text-foreground/60",
-                )}
-              >
-                <motion.div
-                  className="flex items-center gap-1.5"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.name}
-                </motion.div>
-                {pathname === item.href && (
-                  <motion.div
-                    className="absolute bottom-0 left-0 h-0.5 w-full bg-primary"
-                    layoutId="navbar-indicator"
-                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                  />
-                )}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        <div className="ml-auto flex items-center space-x-4">
-          <Button asChild>
-            <Link href="/builder">
-              <Plus className="mr-2 h-4 w-4" />
-              New Workflow
-            </Link>
-          </Button>
-          <ModeToggle />
-          <UserMenu />
-        </div>
-      </div>
-    </header>
-  )
-}
+-   Always use the `.env` file mechanism; do not hardcode secrets.
+-   Ensure `.env` files are included in your `.gitignore`.
+-   Use the `service_role` key only in secure backend environments (API routes, worker).
+-   Prefer using the Supabase client library with RLS policies whenever possible, rather than relying solely on the `service_role` key.
+-   Rotate keys periodically if possible.

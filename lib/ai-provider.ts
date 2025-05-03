@@ -1,5 +1,5 @@
 import type { Node, Edge } from "@/components/flow-canvas";
-import type { CustomBlockDefinition } from "@/types/custom-block";
+import type { CustomBlockDefinition, AICustomBlockData } from "@/types/custom-block";
 
 // Define the AIProvider interface
 export interface AIProvider {
@@ -22,5 +22,14 @@ export interface AIProvider {
   generateCustomBlock(
     prompt: string,
     userId: string
-  ): Promise<CustomBlockDefinition>;
+  ): Promise<AICustomBlockData>;
+
+  /**
+   * Generate generic text content based on a prompt and optional context
+   */
+  generateContent(
+    prompt: string,
+    userId: string,
+    context?: string
+  ): Promise<string>;
 }

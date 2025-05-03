@@ -25,6 +25,17 @@ export interface BlockParameter {
   defaultValue?: any
 }
 
+export interface BlockConfigField {
+  name: string
+  label: string
+  type: 'string' | 'number' | 'boolean' | 'json' | 'select'
+  defaultValue?: any
+  options?: string[]
+  required?: boolean
+  placeholder?: string
+  description?: string
+}
+
 export interface CustomBlockDefinition {
   id: string
   name: string
@@ -32,6 +43,7 @@ export interface CustomBlockDefinition {
   category: NodeCategory
   inputs: BlockParameter[]
   outputs: BlockParameter[]
+  configFields: BlockConfigField[]
   logicType: LogicType
   logic: string
   isPublic: boolean
@@ -83,6 +95,7 @@ export function createCustomBlockDefinition(
   category: NodeCategory,
   inputs: BlockParameter[] = [],
   outputs: BlockParameter[] = [],
+  configFields: BlockConfigField[] = [],
   logicType: LogicType = LogicType.JAVASCRIPT,
   logic = "",
 ): CustomBlockDefinition {
@@ -93,6 +106,7 @@ export function createCustomBlockDefinition(
     category,
     inputs,
     outputs,
+    configFields,
     logicType,
     logic,
     isPublic: false,
@@ -242,3 +256,33 @@ function getNestedValue(obj: Record<string, any>, path: string): any {
 
   return current
 }
+
+export interface BlockParameterAIData {
+  name: string;
+  description?: string; 
+  dataType: DataType;
+  required?: boolean;
+  defaultValue?: any;
+}
+
+export interface AICustomBlockData {
+  name: string;
+  description: string;
+  category: string; 
+  inputs: BlockParameterAIData[];
+  outputs: BlockParameterAIData[];
+  configFields: BlockConfigField[];
+  code: string;
+}
+
+// Custom block execution result
+export interface ExecutionResult {
+  success: boolean
+  outputs: Record<string, any>
+  error?: string
+  logs?: string[]
+}
+
+// Represents the data associated with a node instance in the workflow
+export interface NodeData {
+  // ... (rest of the code remains the same)
