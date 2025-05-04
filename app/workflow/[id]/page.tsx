@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useRouter, useParams } from "next/navigation";
 import { AuthGate } from "@/components/auth-gate";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ExecutionLogsList } from "@/components/execution-logs-list";
@@ -15,45 +13,35 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { format } from "date-fns";
-import { workflowService } from "@/lib/services/workflow-service";
-import { executionService } from "@/lib/services/execution-service";
-import type { Workflow } from "@/lib/supabase/schema";
+import WorkflowTimeline from "@/components/workflow-execution-timeline";
 import type { ExecutionResult } from "@/lib/services/execution-service";
-import { ArrowLeft, Play, Settings, Loader2 } from "lucide-react";
+import { executionService } from "@/lib/services/execution-service";
+import { workflowService } from "@/lib/services/workflow-service";
+import { createClient } from "@/lib/supabase/client";
+import type { Workflow } from "@/lib/supabase/schema";
+import { ArrowLeft, Loader2, Play, Settings } from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
+  Scatter,
   ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
   ZAxis,
-  Scatter,
-  Legend,
-  BarChart,
-  Bar,
-  Cell,
 } from "recharts";
-import { createClient } from "@/lib/supabase/client";
-import WorkflowTimeline from "@/components/workflow-execution-timeline";
-import Link from "next/link";
 
 export default function WorkflowDetailPage() {
   const paramsClient = useParams();
   const id = Array.isArray(paramsClient?.id)
     ? paramsClient.id[0]
     : paramsClient?.id;
-  if (!id) return null; // or show a loader
 
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [executionLogs, setExecutionLogs] = useState<ExecutionResult[]>([]);
@@ -288,6 +276,7 @@ export default function WorkflowDetailPage() {
       </AuthGate>
     );
   }
+  if (!id) return null; // or show a loader
 
   if (!workflow) {
     return (
