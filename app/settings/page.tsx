@@ -224,7 +224,7 @@ export default function SettingsPage() {
 
   return (
     <AuthGate>
-      <div className='flex min-h-screen flex-col bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900'>
+      <div className='flex min-h-screen flex-col bg-gradient-to-b from-slate-50 to-slate-100 '>
         <DashboardHeader />
         <main className='flex-1 px-4 py-8 sm:px-6 lg:px-8'>
           <div className='mx-auto max-w-5xl space-y-8'>

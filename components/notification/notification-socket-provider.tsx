@@ -11,7 +11,7 @@ import { io, Socket } from "socket.io-client";
 import { useToast } from "@/components/ui/use-toast";
 import { createClient } from "@/lib/supabase/client";
 
-interface Notification {
+export interface Notification {
   id: string;
   user_id: string;
   title: string;
@@ -21,6 +21,7 @@ interface Notification {
   data?: {
     originalType?: string;
     timestamp?: string;
+    workflow_name?: string;
     [key: string]: unknown;
   };
   created_at: string;
@@ -53,47 +54,79 @@ export const NotificationSocketProvider: React.FC<{
 }> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [socketConnected, setSocketConnected] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     let socketInstance: Socket | null = null;
     let isMounted = true;
 
-    (async () => {
+    const connectSocket = async () => {
       try {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-        socketInstance = io(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/notifications`,
-          { auth: { userId: user.id }, transports: ["websocket"], reconnectionAttempts: 5, reconnectionDelay: 1000 }
-        );
+        if (!user) {
+          console.log("No authenticated user found");
+          return;
+        }
 
-        socketInstance.on("connect", () => console.log("Notification socket connected"));
-        socketInstance.on("disconnect", () => console.log("Notification socket disconnected"));
-        socketInstance.on("error", (err) => console.error("Socket error:", err));
-        socketInstance.on("notification", (notification: Notification) => {
-          if (!isMounted) return;
-          setNotifications((prev) => [notification, ...prev]);
-          setUnreadCount((prev) => prev + 1);
-          toast({ title: notification.title, description: notification.message, variant: getVariantForType(notification.type) });
+        const socketUrl =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        console.log(`Connecting to notification socket at ${socketUrl}`);
+
+        socketInstance = io(`${socketUrl}/notifications`, {
+          auth: { userId: user.id },
+          transports: ["websocket"],
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
         });
 
-        const res = await fetch("/api/notifications");
-        if (res.ok) {
-          const data = (await res.json()) as Notification[];
-          setNotifications(data);
-          setUnreadCount(data.filter((n) => !n.read).length);
-        }
+        socketInstance.on("connect", () => {
+          console.log("Notification socket connected");
+          setSocketConnected(true);
+        });
+
+        socketInstance.on("disconnect", () => {
+          console.log("Notification socket disconnected");
+          setSocketConnected(false);
+        });
+
+        socketInstance.on("error", (err) => {
+          console.error("Socket error:", err);
+        });
+
+        socketInstance.on("notification", (notification: Notification) => {
+          if (!isMounted) return;
+
+          console.log("New notification received:", notification);
+          setNotifications((prev) => [notification, ...prev]);
+          setUnreadCount((prev) => prev + 1);
+
+          toast({
+            title: notification.title,
+            description: notification.message,
+            variant: getVariantForType(notification.type),
+          });
+        });
+
+        // Initial fetch of notifications
+        await fetchNotifications();
       } catch (e) {
         console.error("Error in notification socket setup:", e);
       }
-    })();
+    };
+
+    connectSocket();
 
     return () => {
       isMounted = false;
-      socketInstance?.disconnect();
+      if (socketInstance) {
+        console.log("Disconnecting notification socket");
+        socketInstance.disconnect();
+      }
     };
   }, [toast]);
 
@@ -102,7 +135,7 @@ export const NotificationSocketProvider: React.FC<{
       case "error":
         return "destructive" as const;
       case "warning":
-        return "default" as const; 
+        return "default" as const;
       case "success":
         return "default" as const;
       default:
@@ -112,13 +145,27 @@ export const NotificationSocketProvider: React.FC<{
 
   const fetchNotifications = useCallback(async () => {
     try {
+      console.log("Fetching notifications from API");
       const response = await fetch("/api/notifications");
-      if (!response.ok) return;
+
+      if (!response.ok) {
+        console.error("Failed to fetch notifications:", response.statusText);
+        return;
+      }
 
       const data = await response.json();
+
       if (Array.isArray(data)) {
+        console.log(`Received ${data.length} notifications`);
         setNotifications(data);
         setUnreadCount(data.filter((n) => !n.read).length);
+      } else if (data.data && Array.isArray(data.data)) {
+        // Handle case where API returns { data: [...] }
+        console.log(`Received ${data.data.length} notifications`);
+        setNotifications(data.data);
+        setUnreadCount(data.data.filter((n) => !n.read).length);
+      } else {
+        console.error("Unexpected notification data format:", data);
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);
@@ -127,11 +174,20 @@ export const NotificationSocketProvider: React.FC<{
 
   const markAsRead = async (id: string) => {
     try {
-      await fetch("/api/notifications", {
+      console.log(`Marking notification ${id} as read`);
+      const response = await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
+
+      if (!response.ok) {
+        console.error(
+          "Failed to mark notification as read:",
+          response.statusText
+        );
+        return;
+      }
 
       setNotifications((prev) =>
         prev.map((notification) =>
@@ -148,10 +204,19 @@ export const NotificationSocketProvider: React.FC<{
 
   const markAllAsRead = async () => {
     try {
-      await fetch("/api/notifications/mark-all-read", {
+      console.log("Marking all notifications as read");
+      const response = await fetch("/api/notifications/mark-all-read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+
+      if (!response.ok) {
+        console.error(
+          "Failed to mark all notifications as read:",
+          response.statusText
+        );
+        return;
+      }
 
       setNotifications((prev) =>
         prev.map((notification) => ({ ...notification, read: true }))

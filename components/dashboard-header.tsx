@@ -1,34 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
-import { UserMenu } from "@/components/user-menu";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import {
-  Database,
-  Home,
-  Settings,
-  FileText,
-  Layers,
-  Zap,
-  Wallet,
-  Menu,
-  X,
-  Search,
-  Bell,
-} from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { UserMenu } from "@/components/user-menu";
+import { cn } from "@/lib/utils";
+import { FileText, Home, Layers, Menu, Search, X } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { NotificationBell } from "./NotificationBell";
 
 export function DashboardHeader() {
@@ -112,17 +95,8 @@ export function DashboardHeader() {
 
         <div className='ml-auto flex items-center space-x-2'>
           {/* Notifications */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant='ghost' size='icon' className='relative'>
-                <Bell className='h-5 w-5' />
-                <span className='absolute top-1 right-1 h-2 w-2 rounded-full bg-primary'></span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end' className='w-80'>
-              <NotificationBell />
-            </DropdownMenuContent>
-          </DropdownMenu>
+
+          <NotificationBell />
 
           {/* Theme Toggle */}
           <ModeToggle />

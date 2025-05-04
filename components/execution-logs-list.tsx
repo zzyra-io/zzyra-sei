@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, JSX } from "react";
 import { formatDistance } from "date-fns";
 import {
   CheckCircle2,
@@ -123,8 +123,12 @@ export function ExecutionLogsList({
   const [nodeExecutionsMap, setNodeExecutionsMap] = useState<
     Record<string, NodeExecution[]>
   >({});
-  const [nodeInputsMap, setNodeInputsMap] = useState<Record<string, Record<string, unknown>>>({});
-  const [nodeOutputsMap, setNodeOutputsMap] = useState<Record<string, Record<string, unknown>>>({});
+  const [nodeInputsMap, setNodeInputsMap] = useState<
+    Record<string, Record<string, unknown>>
+  >({});
+  const [nodeOutputsMap, setNodeOutputsMap] = useState<
+    Record<string, Record<string, unknown>>
+  >({});
   const [nodeLogsMap, setNodeLogsMap] = useState<Record<string, NodeLog[]>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | Execution["status"]>(
@@ -138,7 +142,10 @@ export function ExecutionLogsList({
   const [activeTab, setActiveTab] = useState<"all" | Execution["status"]>(
     "all"
   );
-  const [jsonViewerData, setJsonViewerData] = useState<Record<string, unknown> | null>(null);
+  const [jsonViewerData, setJsonViewerData] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
   const [loadingExecutionIds, setLoadingExecutionIds] = useState<Set<string>>(
     new Set()
@@ -248,7 +255,8 @@ export function ExecutionLogsList({
         setNodeOutputsMap((prev) => ({ ...prev, ...outputsMap }));
         setNodeLogsMap((prev) => ({ ...prev, ...logsMap }));
       } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
         toast({
           title: "Error Loading Node Data",
           description: errorMessage || "Failed to load node details",
@@ -1021,29 +1029,45 @@ const NodeExecutionItem = React.memo(
                     <pre className='bg-muted p-2 rounded text-xs overflow-x-auto mt-1'>
                       {nodeInputs[`${log.id}_${nodeExec.node_id}`] ? (
                         <div className='relative'>
-                          {JSON.stringify(nodeInputs[`${log.id}_${nodeExec.node_id}`], null, 2)}
+                          {JSON.stringify(
+                            nodeInputs[`${log.id}_${nodeExec.node_id}`],
+                            null,
+                            2
+                          )}
                           <Button
                             variant='outline'
                             size='sm'
                             className='absolute top-2 right-2 h-6 text-xs'
-                            onClick={() => viewJsonData(nodeInputs[`${log.id}_${nodeExec.node_id}`])}
-                          >
+                            onClick={() =>
+                              viewJsonData(
+                                nodeInputs[`${log.id}_${nodeExec.node_id}`]
+                              )
+                            }>
                             Expand
                           </Button>
                         </div>
                       ) : nodeExec?.input_data || nodeExec?.input ? (
                         <div className='relative'>
-                          {JSON.stringify(nodeExec?.input_data || nodeExec?.input, null, 2)}
+                          {JSON.stringify(
+                            nodeExec?.input_data || nodeExec?.input,
+                            null,
+                            2
+                          )}
                           <Button
                             variant='outline'
                             size='sm'
                             className='absolute top-2 right-2 h-6 text-xs'
-                            onClick={() => viewJsonData(nodeExec?.input_data || nodeExec?.input)}
-                          >
+                            onClick={() =>
+                              viewJsonData(
+                                nodeExec?.input_data || nodeExec?.input
+                              )
+                            }>
                             Expand
                           </Button>
                         </div>
-                      ) : "No input"}
+                      ) : (
+                        "No input"
+                      )}
                     </pre>
                   </div>
                   <div>
@@ -1053,29 +1077,45 @@ const NodeExecutionItem = React.memo(
                     <pre className='bg-muted p-2 rounded text-xs overflow-x-auto mt-1'>
                       {nodeOutputs[`${log.id}_${nodeExec.node_id}`] ? (
                         <div className='relative'>
-                          {JSON.stringify(nodeOutputs[`${log.id}_${nodeExec.node_id}`], null, 2)}
+                          {JSON.stringify(
+                            nodeOutputs[`${log.id}_${nodeExec.node_id}`],
+                            null,
+                            2
+                          )}
                           <Button
                             variant='outline'
                             size='sm'
                             className='absolute top-2 right-2 h-6 text-xs'
-                            onClick={() => viewJsonData(nodeOutputs[`${log.id}_${nodeExec.node_id}`])}
-                          >
+                            onClick={() =>
+                              viewJsonData(
+                                nodeOutputs[`${log.id}_${nodeExec.node_id}`]
+                              )
+                            }>
                             Expand
                           </Button>
                         </div>
                       ) : nodeExec?.output_data || nodeExec?.output ? (
                         <div className='relative'>
-                          {JSON.stringify(nodeExec?.output_data || nodeExec?.output, null, 2)}
+                          {JSON.stringify(
+                            nodeExec?.output_data || nodeExec?.output,
+                            null,
+                            2
+                          )}
                           <Button
                             variant='outline'
                             size='sm'
                             className='absolute top-2 right-2 h-6 text-xs'
-                            onClick={() => viewJsonData(nodeExec?.output_data || nodeExec?.output)}
-                          >
+                            onClick={() =>
+                              viewJsonData(
+                                nodeExec?.output_data || nodeExec?.output
+                              )
+                            }>
                             Expand
                           </Button>
                         </div>
-                      ) : "No output"}
+                      ) : (
+                        "No output"
+                      )}
                     </pre>
                   </div>
                 </div>
@@ -1158,13 +1198,15 @@ const NodeExecutionItem = React.memo(
                         variant='outline'
                         size='sm'
                         className='absolute top-2 right-2 h-6 text-xs'
-                        onClick={() => viewJsonData(nodeInputs[nodeExec.node_id])}>
+                        onClick={() =>
+                          viewJsonData(nodeInputs[nodeExec.node_id])
+                        }>
                         Expand
                       </Button>
                     </div>
                   </div>
                 )}
-                
+
                 {/* Display Node Output Data */}
                 {nodeOutputs[nodeExec.node_id] && (
                   <div className='mt-2'>
@@ -1177,17 +1219,21 @@ const NodeExecutionItem = React.memo(
                         variant='outline'
                         size='sm'
                         className='absolute top-2 right-2 h-6 text-xs'
-                        onClick={() => viewJsonData(nodeOutputs[nodeExec.node_id])}>
+                        onClick={() =>
+                          viewJsonData(nodeOutputs[nodeExec.node_id])
+                        }>
                         Expand
                       </Button>
                     </div>
                   </div>
                 )}
-                
+
                 {/* Fallback to output_data if nodeOutputs doesn't have this node's data */}
                 {!nodeOutputs[nodeExec.node_id] && nodeExec.output_data && (
                   <div className='mt-2'>
-                    <div className='font-medium text-xs mb-1'>Output Data (Legacy)</div>
+                    <div className='font-medium text-xs mb-1'>
+                      Output Data (Legacy)
+                    </div>
                     <div className='relative'>
                       <pre className='text-xs bg-muted p-2 rounded-md overflow-auto max-h-40'>
                         {JSON.stringify(nodeExec.output_data, null, 2)}
@@ -1222,7 +1268,7 @@ const NodeExecutionItem = React.memo(
 );
 
 // Add display names to components
-ExecutionLogsList.displayName = 'ExecutionLogsList';
-ExecutionLogCard.displayName = 'ExecutionLogCard';
+ExecutionLogsList.displayName = "ExecutionLogsList";
+ExecutionLogCard.displayName = "ExecutionLogCard";
 
 export default ExecutionLogsList;
