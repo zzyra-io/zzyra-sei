@@ -820,7 +820,7 @@ export const ExecutionLogCard = React.memo(
                             </span>
                           </div>
                         ) : nodeExecutions ? (
-                          <div className='border rounded-md divide-y'>
+                          <div>
                             {nodeExecutions.map((nodeExec) => (
                               <NodeExecutionItem
                                 key={nodeExec.id}
@@ -863,7 +863,6 @@ export const ExecutionLogCard = React.memo(
     );
   }
 );
-
 // ### Node Execution Item Component
 const NodeExecutionItem = React.memo(
   ({
@@ -909,16 +908,9 @@ const NodeExecutionItem = React.memo(
       if (logLevel === "all") return logsArr;
       return logsArr.filter((l) => l.level === logLevel);
     }, [nodeLogs, log.id, nodeExec.node_id, logLevel]);
-    console.log("log", {
-      log,
-      nodeExec,
-      nodeLogs,
-      logLevel,
-      filteredNodeLogs,
-    });
 
     return (
-      <div className='p-3'>
+      <div className='p-3 mb-3 border rounded-md '>
         <div className='flex items-center justify-between'>
           <div className='flex items-center gap-2'>
             {getStatusIcon(nodeExec.status)}
@@ -1266,6 +1258,7 @@ const NodeExecutionItem = React.memo(
     );
   }
 );
+NodeExecutionItem.displayName = "Node ExectuionItem";
 
 // Add display names to components
 ExecutionLogsList.displayName = "ExecutionLogsList";
