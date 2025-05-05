@@ -155,17 +155,21 @@ export const NotificationSocketProvider: React.FC<{
           return;
         }
 
-        const apiBaseUrl =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005";
-        const socketUrl = apiBaseUrl.replace(/^(http|https):/, "ws");
+        const socketUrl =
+          process.env.NEXT_PUBLIC_WS_URL ||
+          process.env.NEXT_PUBLIC_API_URL ||
+          "ws://localhost:3000";
         console.log(`Connecting to notification socket at ${socketUrl}`);
 
         socketInstance = io(socketUrl, {
           auth: { userId: user.id },
-          transports: ["websocket"],
-          reconnection: false,
-          timeout: 10000,
-          forceNew: true,
+          transports: ["websocket", "polling"],  // Adding polling as fallback
+          reconnection: true,                    // Enable automatic reconnection
+          reconnectionAttempts: 5,               // Maximum reconnection attempts
+          reconnectionDelay: 1000,               // Initial delay between reconnections
+          reconnectionDelayMax: 5000,            // Maximum delay between reconnections
+          timeout: 20000,                        // Increased timeout
+          forceNew: false,                       // Reuse connections when possible
           autoConnect: false,
         });
 
@@ -182,20 +186,36 @@ export const NotificationSocketProvider: React.FC<{
             return;
           }
 
-          const backoffTime = Math.min(1000 * Math.pow(2, retryCountRef.current), 30000);
-          console.log(`Attempting to connect to WebSocket... Retry ${retryCountRef.current + 1}, backoff: ${backoffTime}ms`);
+          socketInstance?.removeAllListeners();
+
+          const backoffTime = Math.min(
+            1000 * Math.pow(2, retryCountRef.current),
+            30000
+          );
+          console.log(
+            `Attempting to connect to WebSocket... Retry ${
+              retryCountRef.current + 1
+            }/${maxRetries}, backoff: ${backoffTime}ms`
+          );
 
           socketInstance?.connect();
 
-          const timeout = setTimeout(() => {
+          const timeoutId = setTimeout(() => {
             console.log("WebSocket connection timed out");
             socketInstance?.disconnect();
             retryCountRef.current++;
-            connectWithRetry();
-          }, backoffTime);
+
+            if (isMounted && retryCountRef.current < maxRetries) {
+              setTimeout(() => {
+                connectWithRetry();
+              }, backoffTime);
+            } else {
+              connectionAttemptInProgress = false;
+            }
+          }, 10000);
 
           socketInstance?.on("connect", () => {
-            clearTimeout(timeout);
+            clearTimeout(timeoutId);
             console.log("WebSocket connected successfully");
             setSocketConnected(true);
             retryCountRef.current = 0;
@@ -203,21 +223,23 @@ export const NotificationSocketProvider: React.FC<{
           });
 
           socketInstance?.on("connect_error", (error) => {
-            clearTimeout(timeout);
+            clearTimeout(timeoutId);
             console.error("WebSocket connection error:", error);
             socketInstance?.disconnect();
-            setTimeout(() => {
+
+            if (isMounted && retryCountRef.current < maxRetries) {
               retryCountRef.current++;
-              connectWithRetry();
-            }, Math.min(1000 * Math.pow(2, retryCountRef.current), 30000));
+              setTimeout(() => {
+                connectWithRetry();
+              }, backoffTime);
+            } else {
+              connectionAttemptInProgress = false;
+            }
           });
 
           socketInstance?.on("disconnect", () => {
             console.log("WebSocket disconnected");
             setSocketConnected(false);
-            if (isMounted) {
-              setTimeout(connectWithRetry, 5000);
-            }
           });
 
           socketInstance?.on(
