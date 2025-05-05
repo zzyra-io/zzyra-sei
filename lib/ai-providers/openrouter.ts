@@ -80,7 +80,127 @@ const openrouter = createOpenRouter({
 });
 
 export class OpenRouterProvider implements AIProvider {
-  private model = openrouter("openai/gpt-4o"); 
+  private model = openrouter("openai/gpt-4o");
+  
+  // Method for generating any block type
+  async generateBlock({
+    blockType,
+    category,
+    name,
+    description,
+    additionalContext,
+    userId
+  }: {
+    blockType: string,
+    category: string,
+    name: string,
+    description: string,
+    additionalContext?: string,
+    userId: string
+  }): Promise<AICustomBlockData> {
+    try {
+      const systemPrompt = `
+You are an AI assistant specializing in workflow automation. Generate a custom block definition in JSON format.
+
+The block type requested is: ${blockType}
+The category is: ${category}
+The name is: ${name}
+The description is: ${description}
+
+Output a JSON object adhering strictly to this structure:
+{
+  "name": "${name}",
+  "description": "${description}",
+  "category": "${category}", 
+  "inputs": [ 
+    {
+      "name": "input_param_name", 
+      "description": "What this input is for", 
+      "dataType": "string" | "number" | "boolean" | "object" | "array" | "any", 
+      "required": true, 
+      "defaultValue": null 
+    },
+    ...
+  ],
+  "outputs": [ 
+    {
+      "name": "output_param_name",
+      "description": "What this output represents",
+      "dataType": "string", 
+      "required": true
+    },
+    ...
+  ],
+  "configFields": [ 
+    {
+      "name": "config_field_name",
+      "label": "UI Label",
+      "type": "string" | "number" | "boolean" | "json" | "select",
+      "defaultValue": "default value",
+      "options": ["option1", "option2"], 
+      "required": false,
+      "placeholder": "Placeholder text",
+      "description": "Help text for the config field."
+    },
+    ...
+  ],
+  "code": "async function execute(inputs, context) { /* JavaScript logic using inputs and context.config.config_field_name */ return { output_param_name: result }; }"
+}
+
+Example Input: { "name": "inputValue", "description": "Input parameter", "dataType": "string", "required": true }
+Example Output: { "name": "result", "description": "Operation result", "dataType": "number" }
+Example Config: { "name": "configuration", "label": "Configuration", "type": "string", "defaultValue": "default", "required": false }
+
+Ensure the output is ONLY the JSON object, without any extra text or markdown formatting.
+Base the generated fields (inputs, outputs, configFields, code) on the user's request: "${additionalContext || description}"
+`;
+
+      const { text } = await generateText({
+        model: this.model,
+        system: systemPrompt,
+        prompt: additionalContext || description,
+      });
+
+      let parsedResponse;
+      try {
+        const cleanedText = text.replace(/```json\n?|\n?```/g, "").trim();
+        parsedResponse = JSON.parse(cleanedText);
+      } catch (parseError) {
+        console.error(
+          "Failed to parse AI response JSON for custom block:",
+          parseError,
+          "Raw text:",
+          text
+        );
+        throw new Error("AI returned invalid JSON format for custom block.");
+      }
+
+      const validationResult =
+        CustomBlockResponseSchema.safeParse(parsedResponse);
+
+      if (!validationResult.success) {
+        console.error(
+          "Custom block AI response failed schema validation:",
+          validationResult.error.errors 
+        );
+        console.error("Invalid Response Data:", parsedResponse);
+        throw new Error(
+          `Custom block AI response did not match the required format: ${validationResult.error.message}`
+        );
+      }
+
+      // Return type now matches AICustomBlockData thanks to schema alignment
+      return validationResult.data as AICustomBlockData;
+    } catch (error) {
+      console.error("Error generating custom block with OpenRouter:", error);
+      throw new Error(
+        `Failed to generate custom block: ${
+          error instanceof Error ? error.message : "Unknown AI error"
+        }`
+      );
+    }
+  }
+  // Method for compatibility - deprecated in favor of generateBlock
   
   // Method specifically for generating DeFi block definitions
   async generateDefiBlock(

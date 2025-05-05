@@ -43,9 +43,15 @@ const BlockCard = ({ block, onUse, onEdit, onShare, isOwner }: {
       </CardHeader>
       <CardContent className="flex-grow">
         <div className="space-y-4">
-          <div>
-            <div className="text-sm font-medium mb-1">Type</div>
-            <Badge variant="outline">{block.blockType}</Badge>
+          <div className="flex flex-wrap gap-2">
+            <div>
+              <div className="text-sm font-medium mb-1">Type</div>
+              <Badge variant="outline">{block.blockType}</Badge>
+            </div>
+            <div>
+              <div className="text-sm font-medium mb-1">Category</div>
+              <Badge variant="secondary">{block.category || 'ACTION'}</Badge>
+            </div>
           </div>
           
           {block.tags.length > 0 && (
@@ -110,8 +116,10 @@ export default function BlockLibraryPage() {
   const [includeVerified, setIncludeVerified] = useState(true)
   const [sortBy, setSortBy] = useState<'rating' | 'usageCount' | 'createdAt'>('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [blockTypeFilter, setBlockTypeFilter] = useState<string | null>(null)
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [availableTags, setAvailableTags] = useState<string[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
 
   useEffect(() => {
     loadBlockLibrary()
@@ -154,6 +162,14 @@ export default function BlockLibraryPage() {
         includeVerified,
         sortBy,
         sortDirection
+      }
+      
+      if (blockTypeFilter) {
+        params.blockType = blockTypeFilter;
+      }
+      
+      if (categoryFilter) {
+        params.category = categoryFilter;
       }
       
       const results = await searchBlocks(params)
@@ -275,22 +291,42 @@ export default function BlockLibraryPage() {
               
               <div className="w-full md:w-1/4">
                 <Select 
-                  value={selectedBlockType} 
-                  onValueChange={(val) => setSelectedBlockType(val as BlockType)}
+                  value={blockTypeFilter || ""}
+                  onValueChange={(val) => setBlockTypeFilter(val === "" ? null : val)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Block Type" />
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="All Types" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">All Types</SelectItem>
-                    <SelectItem value={BlockType.DEFI_PRICE_MONITOR}>Price Monitor</SelectItem>
-                    <SelectItem value={BlockType.DEFI_SWAP}>Swap</SelectItem>
-                    <SelectItem value={BlockType.DEFI_YIELD_STRATEGY}>Yield Strategy</SelectItem>
-                    <SelectItem value={BlockType.DEFI_PORTFOLIO}>Portfolio</SelectItem>
-                    <SelectItem value={BlockType.DEFI_PROTOCOL}>Protocol Monitor</SelectItem>
-                    <SelectItem value={BlockType.DEFI_GAS}>Gas Optimizer</SelectItem>
-                    <SelectItem value={BlockType.DEFI_LIQUIDITY}>Liquidity</SelectItem>
-                    <SelectItem value={BlockType.DEFI_POSITION}>Position Manager</SelectItem>
+                    <SelectItem value="DEFI_SWAP">DEFI_SWAP</SelectItem>
+                    <SelectItem value="DEFI_BALANCE">DEFI_BALANCE</SelectItem>
+                    <SelectItem value="DEFI_APPROVAL">DEFI_APPROVAL</SelectItem>
+                    <SelectItem value="CUSTOM">CUSTOM</SelectItem>
+                    <SelectItem value="API">API</SelectItem>
+                    <SelectItem value="EMAIL">EMAIL</SelectItem>
+                    <SelectItem value="NOTIFICATION">NOTIFICATION</SelectItem>
+                    <SelectItem value="CONDITION">CONDITION</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="w-full md:w-1/4">
+                <Select
+                  value={categoryFilter || ""}
+                  onValueChange={(val) => setCategoryFilter(val === "" ? null : val)}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Categories</SelectItem>
+                    <SelectItem value="ACTION">ACTION</SelectItem>
+                    <SelectItem value="TRIGGER">TRIGGER</SelectItem>
+                    <SelectItem value="FINANCE">FINANCE</SelectItem>
+                    <SelectItem value="LOGIC">LOGIC</SelectItem>
+                    <SelectItem value="DATA">DATA</SelectItem>
+                    <SelectItem value="NOTIFICATION">NOTIFICATION</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

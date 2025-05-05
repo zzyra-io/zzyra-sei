@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { OpenRouterProvider } from '@/lib/ai-providers/openrouter'
 import { saveBlock } from '@/lib/block-library-api'
-import { BlockType } from '@/types/workflow'
+import { BlockType, NodeCategory, getBlockMetadata } from '@/types/workflow'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -37,6 +37,7 @@ const blockFormSchema = z.object({
     message: "Description must not exceed 200 characters."
   }),
   blockType: z.nativeEnum(BlockType),
+  category: z.nativeEnum(NodeCategory).default(NodeCategory.ACTION),
   isPublic: z.boolean().default(false),
   prompt: z.string().optional(),
   tags: z.array(z.string()).default([]),
@@ -58,7 +59,8 @@ export default function CreateBlockPage() {
     defaultValues: {
       name: '',
       description: '',
-      blockType: BlockType.DEFI_PRICE_MONITOR,
+      blockType: BlockType.CUSTOM,
+      category: NodeCategory.ACTION,
       isPublic: false,
       prompt: '',
       tags: [],
@@ -66,6 +68,7 @@ export default function CreateBlockPage() {
   })
   
   const blockType = form.watch('blockType')
+  const category = form.watch('category')
   const tags = form.watch('tags')
   
   const addTag = () => {
@@ -96,7 +99,8 @@ export default function CreateBlockPage() {
       const openRouter = new OpenRouterProvider()
       
       // Generate block definition using AI
-      const generatedBlock = await openRouter.generateDefiBlock({
+      const generatedBlock = await openRouter.generateBlock({
+        category: data.category,
         blockType: data.blockType,
         name: data.name,
         description: data.description,
@@ -163,7 +167,8 @@ export default function CreateBlockPage() {
   }
   
   const getBlockTypeLabel = (type: BlockType) => {
-    return type.replace('DEFI_', '').replace('_', ' ').toLowerCase()
+    const metadata = getBlockMetadata(type)
+    return metadata.label || type.replace('_', ' ').toLowerCase()
   }
   
   const renderConfigStep = () => (
@@ -208,40 +213,60 @@ export default function CreateBlockPage() {
           )}
         />
         
-        <FormField
-          control={form.control}
-          name="blockType"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Block Type</FormLabel>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {Object.values(BlockType)
-                  .filter(type => type.startsWith('DEFI_'))
-                  .map((type) => (
-                    <div key={type} className="flex">
-                      <Button
-                        type="button"
-                        variant={field.value === type ? "default" : "outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          field.value === type && "text-primary-foreground"
-                        )}
-                        onClick={() => form.setValue('blockType', type as BlockType)}
-                      >
-                        <div className="flex flex-col items-start">
-                          <span className="capitalize">{getBlockTypeLabel(type)}</span>
-                        </div>
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-              <FormDescription>
-                Select the type of DeFi block you want to create
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Category</h3>
+              <select
+                className="w-full h-10 px-3 py-2 text-sm rounded-md border border-input bg-background"
+                {...form.register("category")}
+              >
+                {Object.values(NodeCategory).map(cat => (
+                  <option key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
+              {form.formState.errors.category && (
+                <p className="text-xs text-destructive mt-1">
+                  {form.formState.errors.category.message}
+                </p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Block Type</h3>
+              <select
+                className="w-full h-10 px-3 py-2 text-sm rounded-md border border-input bg-background"
+                {...form.register("blockType")}
+              >
+                <optgroup label="Standard Types">
+                  {Object.values(BlockType)
+                    .filter(type => !type.startsWith('DEFI_') && type !== BlockType.UNKNOWN)
+                    .map(type => (
+                      <option key={type} value={type}>
+                        {getBlockTypeLabel(type)}
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="DeFi Types">
+                  {Object.values(BlockType)
+                    .filter(type => type.startsWith('DEFI_'))
+                    .map(type => (
+                      <option key={type} value={type}>
+                        {getBlockTypeLabel(type)}
+                      </option>
+                    ))}
+                </optgroup>
+              </select>
+              {form.formState.errors.blockType && (
+                <p className="text-xs text-destructive mt-1">
+                  {form.formState.errors.blockType.message}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
         
         <FormField
           control={form.control}
@@ -339,7 +364,7 @@ export default function CreateBlockPage() {
   const renderGenerateStep = () => (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold mb-2">Generate DeFi Block</h2>
+        <h2 className="text-xl font-semibold mb-2">Generate Block</h2>
         <p className="text-muted-foreground">
           Provide additional details to help AI generate your block
         </p>
@@ -349,7 +374,7 @@ export default function CreateBlockPage() {
         <Sparkles className="h-4 w-4" />
         <AlertTitle>AI-Powered Block Generation</AlertTitle>
         <AlertDescription>
-          We'll use AI to generate a custom DeFi block based on your specifications.
+          We'll use AI to generate a custom block based on your specifications.
           Add any additional details that might help create a better block.
         </AlertDescription>
       </Alert>
@@ -563,7 +588,7 @@ export default function CreateBlockPage() {
       
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Create Custom Block</h1>
-        <p className="text-muted-foreground">Create an AI-powered custom DeFi block for your workflows</p>
+        <p className="text-muted-foreground">Create an AI-powered custom block for your workflows</p>
       </div>
       
       <div className="relative">

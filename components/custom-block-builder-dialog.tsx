@@ -9,8 +9,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { PlusCircle, Trash2, MoveUp, MoveDown, Sparkles, Code, AlertCircle } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { PlusCircle, Trash2, MoveUp, MoveDown, Sparkles, AlertCircle } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -32,9 +32,11 @@ interface CustomBlockBuilderDialogProps {
   initialBlock?: CustomBlockDefinition
   onSave: (block: CustomBlockDefinition) => void
   onGenerateWithAI?: (prompt: string, callback: (block: Partial<CustomBlockDefinition>) => void) => void
+  /** When true, renders the dialog content directly without the Dialog wrapper (for embedding) */
+  inline?: boolean
 }
 
-export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onSave, onGenerateWithAI }: CustomBlockBuilderDialogProps) {
+export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onSave, onGenerateWithAI, inline = false }: CustomBlockBuilderDialogProps) {
   const [activeTab, setActiveTab] = useState("general")
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -302,12 +304,14 @@ export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onS
     onOpenChange(false)
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+  // Define the form content to be used in both inline and dialog modes
+  const formContent = (
+    <>
+      {!inline && (
         <DialogHeader>
           <DialogTitle>{initialBlock ? "Edit Custom Block" : "Create Custom Block"}</DialogTitle>
         </DialogHeader>
+      )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
           <TabsList className="grid grid-cols-4">
@@ -670,7 +674,7 @@ export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onS
                           logicType === LogicType.JAVASCRIPT
                             ? "function process(inputs) {\n  // Your code here\n  return { output: inputs.value };\n}"
                             : logicType === LogicType.JSON_TRANSFORM
-                              ? '{\n  "output": "{{inputs.value}}"\n}'
+                              ? '{\n  "output": "{{inputs.value}}" }'
                               : logicType === LogicType.TEMPLATE
                                 ? "Hello {{inputs.name}},\n\nThis is a template."
                                 : "inputs.value > 10"
@@ -699,7 +703,7 @@ export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onS
                         {logicType === LogicType.TEMPLATE && (
                           <>
                             Create a text template with variables in double curly braces. For example:{" "}
-                            <code>{"Hello {{inputs.name}}"}</code> will be replaced with the actual name.
+                            <code>{`Hello {{inputs.name}}`}</code> will be replaced with the actual name.
                           </>
                         )}
                         {logicType === LogicType.CONDITION && (
@@ -777,12 +781,36 @@ export function CustomBlockBuilderDialog({ open, onOpenChange, initialBlock, onS
           </div>
         </Tabs>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>{initialBlock ? "Update" : "Create"}</Button>
-        </DialogFooter>
+        {!inline && (
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>{initialBlock ? "Update" : "Create"}</Button>
+          </DialogFooter>
+        )}
+        
+        {inline && (
+          <div className="flex justify-end p-4 border-t">
+            <Button onClick={handleSave} className="w-full">
+              {initialBlock ? "Update" : "Create"} Block
+            </Button>
+          </div>
+        )}
+    </>
+  );
+  
+  // Render the content in a Dialog for normal mode, or directly for inline mode
+  return inline ? (
+    <div className="custom-block-builder-inline">
+      <div className="max-h-[90vh] flex flex-col">
+        {formContent}
+      </div>
+    </div>
+  ) : (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+        {formContent}
       </DialogContent>
     </Dialog>
   )
