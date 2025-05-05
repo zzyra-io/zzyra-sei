@@ -81,9 +81,192 @@ export type Database = {
         }
         Relationships: []
       }
+      block_execution_logs: {
+        Row: {
+          created_at: string | null
+          execution_id: string
+          id: string
+          level: Database["public"]["Enums"]["log_level"]
+          message: string
+          node_id: string
+          timestamp: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          execution_id: string
+          id?: string
+          level: Database["public"]["Enums"]["log_level"]
+          message: string
+          node_id: string
+          timestamp?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          execution_id?: string
+          id?: string
+          level?: Database["public"]["Enums"]["log_level"]
+          message?: string
+          node_id?: string
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_execution_logs_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "block_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      block_executions: {
+        Row: {
+          block_type: string
+          completed_at: string | null
+          created_at: string | null
+          error: string | null
+          execution_time_ms: number | null
+          id: string
+          inputs: Json | null
+          node_id: string
+          outputs: Json | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["block_status"]
+          workflow_execution_id: string
+        }
+        Insert: {
+          block_type: string
+          completed_at?: string | null
+          created_at?: string | null
+          error?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          inputs?: Json | null
+          node_id: string
+          outputs?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["block_status"]
+          workflow_execution_id: string
+        }
+        Update: {
+          block_type?: string
+          completed_at?: string | null
+          created_at?: string | null
+          error?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          inputs?: Json | null
+          node_id?: string
+          outputs?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["block_status"]
+          workflow_execution_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_executions_workflow_execution_id_fkey"
+            columns: ["workflow_execution_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      block_library: {
+        Row: {
+          block_type: string
+          configuration: Json
+          created_at: string | null
+          description: string
+          execution_code: string | null
+          id: string
+          is_public: boolean | null
+          is_verified: boolean | null
+          name: string
+          rating: number | null
+          tags: string[] | null
+          updated_at: string | null
+          usage_count: number | null
+          user_id: string
+          version: string | null
+        }
+        Insert: {
+          block_type: string
+          configuration?: Json
+          created_at?: string | null
+          description: string
+          execution_code?: string | null
+          id?: string
+          is_public?: boolean | null
+          is_verified?: boolean | null
+          name: string
+          rating?: number | null
+          tags?: string[] | null
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id: string
+          version?: string | null
+        }
+        Update: {
+          block_type?: string
+          configuration?: Json
+          created_at?: string | null
+          description?: string
+          execution_code?: string | null
+          id?: string
+          is_public?: boolean | null
+          is_verified?: boolean | null
+          name?: string
+          rating?: number | null
+          tags?: string[] | null
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id?: string
+          version?: string | null
+        }
+        Relationships: []
+      }
+      block_library_ratings: {
+        Row: {
+          block_id: string
+          comment: string | null
+          created_at: string | null
+          id: string
+          rating: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          block_id: string
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          rating: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          block_id?: string
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          rating?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_library_ratings_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "block_library"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_blocks: {
         Row: {
-          category: string | null
+          category: string
           code: string
           created_at: string | null
           created_by: string | null
@@ -91,13 +274,16 @@ export type Database = {
           icon: string | null
           id: string
           is_public: boolean | null
+          logic: string
+          logic_type: string
           name: string
+          tags: Json
           updated_at: string | null
           updated_by: string | null
           user_id: string
         }
         Insert: {
-          category?: string | null
+          category: string
           code: string
           created_at?: string | null
           created_by?: string | null
@@ -105,13 +291,16 @@ export type Database = {
           icon?: string | null
           id?: string
           is_public?: boolean | null
+          logic: string
+          logic_type?: string
           name: string
+          tags?: Json
           updated_at?: string | null
           updated_by?: string | null
           user_id: string
         }
         Update: {
-          category?: string | null
+          category?: string
           code?: string
           created_at?: string | null
           created_by?: string | null
@@ -119,7 +308,10 @@ export type Database = {
           icon?: string | null
           id?: string
           is_public?: boolean | null
+          logic?: string
+          logic_type?: string
           name?: string
+          tags?: Json
           updated_at?: string | null
           updated_by?: string | null
           user_id?: string
@@ -160,6 +352,54 @@ export type Database = {
             columns: ["execution_id"]
             isOneToOne: false
             referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      execution_metrics: {
+        Row: {
+          created_at: string | null
+          duration_ms: number | null
+          error_count: number | null
+          execution_id: string | null
+          id: string
+          memory_usage_kb: number | null
+          node_id: string | null
+          workflow_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error_count?: number | null
+          execution_id?: string | null
+          id?: string
+          memory_usage_kb?: number | null
+          node_id?: string | null
+          workflow_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error_count?: number | null
+          execution_id?: string | null
+          id?: string
+          memory_usage_kb?: number | null
+          node_id?: string | null
+          workflow_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "execution_metrics_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "execution_metrics_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
             referencedColumns: ["id"]
           },
         ]
@@ -267,12 +507,15 @@ export type Database = {
       }
       node_executions: {
         Row: {
+          block_type: string
           completed_at: string
           duration_ms: number | null
           error: string | null
+          error_details: Json | null
           execution_id: string
           finished_at: string | null
           id: string
+          inputs: Json
           logs: Json | null
           node_id: string
           output: Json | null
@@ -284,12 +527,15 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          block_type?: string
           completed_at?: string
           duration_ms?: number | null
           error?: string | null
+          error_details?: Json | null
           execution_id: string
           finished_at?: string | null
           id?: string
+          inputs?: Json
           logs?: Json | null
           node_id: string
           output?: Json | null
@@ -301,12 +547,15 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          block_type?: string
           completed_at?: string
           duration_ms?: number | null
           error?: string | null
+          error_details?: Json | null
           execution_id?: string
           finished_at?: string | null
           id?: string
+          inputs?: Json
           logs?: Json | null
           node_id?: string
           output?: Json | null
@@ -891,9 +1140,10 @@ export type Database = {
           result: Json | null
           retry_count: number | null
           started_at: string
-          status: string
+          status: Database["public"]["Enums"]["workflow_status"]
           triggered_by: string | null
           updated_at: string | null
+          user_id: string
           workflow_id: string
         }
         Insert: {
@@ -907,9 +1157,10 @@ export type Database = {
           result?: Json | null
           retry_count?: number | null
           started_at?: string
-          status: string
+          status?: Database["public"]["Enums"]["workflow_status"]
           triggered_by?: string | null
           updated_at?: string | null
+          user_id: string
           workflow_id: string
         }
         Update: {
@@ -923,9 +1174,10 @@ export type Database = {
           result?: Json | null
           retry_count?: number | null
           started_at?: string
-          status?: string
+          status?: Database["public"]["Enums"]["workflow_status"]
           triggered_by?: string | null
           updated_at?: string | null
+          user_id?: string
           workflow_id?: string
         }
         Relationships: [
@@ -1012,6 +1264,44 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_versions: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          edges: Json
+          id: string
+          nodes: Json
+          version: number
+          workflow_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          edges: Json
+          id?: string
+          nodes: Json
+          version: number
+          workflow_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          edges?: Json
+          id?: string
+          nodes?: Json
+          version?: number
+          workflow_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_versions_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflows: {
         Row: {
           created_at: string | null
@@ -1093,6 +1383,10 @@ export type Database = {
         Args: { sql: string }
         Returns: undefined
       }
+      get_active_workflows_count: {
+        Args: { time_period?: number }
+        Returns: number
+      }
       get_execution_duration_stats: {
         Args: { workflow_id: string; since_date: string }
         Returns: {
@@ -1125,6 +1419,10 @@ export type Database = {
           updated_at: string | null
           user_id: string
         }[]
+      }
+      increment_block_usage_count: {
+        Args: { block_id: string }
+        Returns: undefined
       }
       insert_execution_queue_job: {
         Args: {
@@ -1179,7 +1477,9 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      block_status: "pending" | "running" | "completed" | "failed"
+      log_level: "info" | "error" | "warn"
+      workflow_status: "pending" | "running" | "completed" | "failed" | "paused"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1294,6 +1594,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      block_status: ["pending", "running", "completed", "failed"],
+      log_level: ["info", "error", "warn"],
+      workflow_status: ["pending", "running", "completed", "failed", "paused"],
+    },
   },
 } as const

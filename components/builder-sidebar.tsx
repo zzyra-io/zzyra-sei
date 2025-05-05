@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, DragEvent } from "react";
+import React, { useState, useEffect, DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { BlockCatalog } from "@/components/block-catalog";
 import { CustomBlockCatalog } from "@/components/custom-block-catalog";
@@ -13,6 +13,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { BlockSimulator } from "@/components/block-simulator";
+import { generateAiBlock, validateAiBlockForm } from "@/components/builder-sidebar-ai-handler";
+
+// Define scrollbar styles for consistency
+const scrollbarStyles = "scrollbar-thin scrollbar-thumb-rounded-md scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/30";
 import {
   LayoutDashboard,
   Workflow,
@@ -28,6 +34,13 @@ import {
   Save,
   Terminal,
   Sparkles,
+  Loader2,
+  PlusIcon, 
+  Trash, 
+  Box,
+  Cog,
+  ChevronsLeft,
+  Share
 } from "lucide-react";
 import { saveBlock } from "@/lib/block-library-api";
 import { useToast } from "@/components/ui/use-toast";
@@ -42,6 +55,8 @@ import { BlockType, NodeCategory } from "@/types/workflow";
 import type { Node } from "@/components/flow-canvas";
 import type { CustomBlockDefinition } from "@/types/custom-block";
 import { useIsMobile } from "@/hooks/use-mobile";
+// import { AIBlockForm } from "./builders/ai-block-form";
+import { CustomBlockConfigModal } from "./custom-block-config-modal";
 
 interface BuilderSidebarProps {
   onAddNode: (
@@ -101,8 +116,28 @@ export function BuilderSidebar({
 }: BuilderSidebarProps) {
   const [mainTab, setMainTab] = useState("blocks");
   const [blockCatalogTab, setBlockCatalogTab] = useState("blocks");
-  const [isMobileCollapsed, setIsMobileCollapsed] = useState(true);
   const isMobile = useIsMobile();
+  const [isMobileCollapsed, setIsMobileCollapsed] = useState(isMobile);
+  
+  // Custom block config modal state
+  const [isCustomBlockModalOpen, setIsCustomBlockModalOpen] = useState(false);
+  const [selectedNodeForEdit, setSelectedNodeForEdit] = useState<string | undefined>(undefined);
+  
+  // Handler for opening custom block config modal
+  const handleOpenCustomBlockModal = (nodeId?: string) => {
+    if (nodeId) {
+      setSelectedNodeForEdit(nodeId);
+    } else {
+      setSelectedNodeForEdit(undefined);
+    }
+    setIsCustomBlockModalOpen(true);
+  };
+  
+  // Handler for closing custom block config modal
+  const handleCloseCustomBlockModal = () => {
+    setIsCustomBlockModalOpen(false);
+    setSelectedNodeForEdit(undefined);
+  };
   const router = useRouter();
   const { toast } = useToast();
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -111,7 +146,9 @@ export function BuilderSidebar({
   const [selectedCustomBlock, setSelectedCustomBlock] =
     useState<CustomBlockDefinition | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [creationMethod, setCreationMethod] = useState<"ai" | "manual" | null>(null);
+  const [creationMethod, setCreationMethod] = useState<"ai" | "manual" | "simulation" | null>(null);
+  const [simulatedBlock, setSimulatedBlock] = useState<CustomBlockDefinition | null>(null);
+  const [isGeneratingBlock, setIsGeneratingBlock] = useState(false);
   
   // Form state for AI block generation
   const [aiBlockForm, setAiBlockForm] = useState({
@@ -128,7 +165,80 @@ export function BuilderSidebar({
       [field]: value
     }));
   };
+  
+  // Handle AI Block submission and generation
+  const handleAiBlockSubmit = async () => {
+    // Validate the form using the enhanced validation function
+    const validationResult = validateAiBlockForm(aiBlockForm);
+    if (!validationResult.valid) {
+      toast({
+        title: "Invalid AI Block Form",
+        description: validationResult.error || "Please check your inputs and try again",
+        variant: "destructive"
+      });
+      return;
+    }
 
+    // Show loading state
+    setIsGeneratingBlock(true);
+    
+    try {
+      // First try to use the AI service
+      let generatedBlock;
+      
+      try {
+        // Call the AI service to generate the block
+        const response = await fetch('/api/ai/generate-block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(aiBlockForm)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to generate block with AI");
+        }
+
+        // Parse the AI-generated block
+        generatedBlock = await response.json();
+        console.log("AI-generated block:", generatedBlock);
+      } catch (aiError) {
+        // If the AI service fails, fall back to local generation
+        console.warn("AI service failed, falling back to template generation:", aiError);
+        generatedBlock = generateAiBlock(aiBlockForm);
+      }
+      
+      // Update state with the generated block
+      setSimulatedBlock(generatedBlock);
+      setCreationMethod("simulation");
+      
+      toast({
+        title: "Block Generated Successfully",
+        description: "Your custom block is ready for simulation. Try it out and make adjustments as needed.",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error("Error generating block:", error);
+      toast({
+        title: "Block Generation Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred during block generation.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingBlock(false);
+    }
+  };
+  
+  useEffect(() => {
+    const handleResize = () => {
+      if (isMobile) {
+        setIsMobileCollapsed(true);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isMobile]);
   // Handle drag start from the catalog
   const handleDragStart = (
     event: DragEvent<Element>,
@@ -154,13 +264,21 @@ export function BuilderSidebar({
   return (
     <div className="relative">
       <div
-        className={`h-full flex flex-col bg-background border-r transition-all duration-300 ${
+        className={cn(
+          "flex h-full w-[320px] flex-col overflow-hidden bg-muted/5 border-r",
           isMobile
             ? isMobileCollapsed
-              ? "w-0 opacity-0 overflow-hidden"
-              : "w-full absolute inset-y-0 left-0 z-40"
-            : "relative"
-        }`}>
+              ? "hidden"
+              : "block"
+            : "block"
+        )}>
+        {/* Custom Block Configuration Modal */}
+        <CustomBlockConfigModal
+          isOpen={isCustomBlockModalOpen}
+          onClose={handleCloseCustomBlockModal}
+          nodeId={selectedNodeForEdit}
+        />
+        
         {isMobile && (
           <button
             onClick={() => setIsMobileCollapsed(!isMobileCollapsed)}
@@ -298,6 +416,86 @@ export function BuilderSidebar({
                   onGenerateWithAI={onGenerateCustomBlock}
                 />
               </div>
+            ) : creationMethod === "simulation" && simulatedBlock ? (
+              <div className="py-4">
+                <BlockSimulator 
+                  block={simulatedBlock} 
+                  onClose={() => {
+                    setCreationMethod("manual");
+                  }}
+                  onFinalize={(finalizedBlock) => {
+                    // Handle the finalized block
+                    if (onAddCustomBlock) {
+                      // Create position slightly offset from center of viewport
+                      const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+                      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+                      const position = { 
+                        x: Math.round(viewportWidth / 2) + 100, 
+                        y: Math.round(viewportHeight / 2) + 100 
+                      };
+                      
+                      // Add the custom block to the workflow
+                      onAddCustomBlock(finalizedBlock, position);
+                      
+                      // Save the block to the library
+                      saveBlock({
+                        blockData: {
+                          name: finalizedBlock.name,
+                          description: finalizedBlock.description,
+                          category: finalizedBlock.category,
+                          inputs: finalizedBlock.inputs.map(input => ({
+                            name: input.name,
+                            description: input.description || '',
+                            dataType: input.dataType,
+                            required: input.required
+                          })),
+                          outputs: finalizedBlock.outputs.map(output => ({
+                            name: output.name,
+                            description: output.description || '',
+                            dataType: output.dataType,
+                            required: output.required
+                          })),
+                          configFields: finalizedBlock.configFields || [],
+                          code: finalizedBlock.logic
+                        },
+                        blockType: 'CUSTOM' as BlockType,
+                        isPublic: false,
+                        tags: []
+                      })
+                      .then(() => {
+                        console.log("Block saved to library");
+                        // Reset UI state after successful save
+                        setSimulatedBlock(null);
+                        setCreationMethod(null);
+                        // Switch to custom tab to see the new block
+                        setBlockCatalogTab("custom");
+                      })
+                      .catch((error) => {
+                        console.error("Error saving block to library:", error);
+                        toast({
+                          title: "Error Saving Block",
+                          description: "The block was added to your workflow but could not be saved to your library.",
+                          variant: "destructive"
+                        });
+                        // Still reset UI state even on error
+                        setSimulatedBlock(null);
+                        setCreationMethod(null);
+                      });
+
+                      toast({
+                        title: "Block Created",
+                        description: `${finalizedBlock.name} has been created and added to your custom blocks.`,
+                      });
+
+                      setCreateModalOpen(false);
+                      setCreationMethod(null);
+                      setSimulatedBlock(null);
+                      // Switch to custom tab to see the new block
+                      setBlockCatalogTab("custom");
+                    }
+                  }}
+                />
+              </div>
             ) : (
               <div className="py-4">
                 <h3 className="text-sm font-medium mb-3">Describe Your Block</h3>
@@ -376,27 +574,28 @@ export function BuilderSidebar({
                 </div>
                 
                 <div className="flex justify-end space-x-2 mt-6">
-                  <Button variant="outline" onClick={() => setCreationMethod(null)}>Back</Button>
-                  <Button onClick={() => {
-                    // Here we would generate the block using AI
-                    // For now, let's show a toast and then go to manual mode with pre-filled info
-                    if (aiBlockForm.blockName.trim() === "" || aiBlockForm.blockDescription.trim() === "") {
-                      toast({
-                        title: "Required fields missing",
-                        description: "Please provide at least a name and description for your block.",
-                        variant: "destructive"
-                      });
-                      return;
-                    }
-                    
-                    toast({
-                      title: "Block Generated",
-                      description: "AI has created a custom block based on your description. You can now review and customize it.",
-                    });
-                    setCreationMethod("manual");
-                  }}>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generate Block
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setCreationMethod(null)} 
+                    disabled={isGeneratingBlock}
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    onClick={handleAiBlockSubmit} 
+                    disabled={isGeneratingBlock}
+                  >
+                    {isGeneratingBlock ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate Block
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -454,65 +653,72 @@ export function BuilderSidebar({
                 {blockCatalogTab === "custom" && (
                   <ScrollArea className='h-full'>
                     <div className='p-4 pt-2'>
-                      <div className='text-xs text-muted-foreground mb-3 flex items-center'>
+                      <div className="flex items-center mb-3">
                         <ChevronRight className='h-3 w-3 mr-1' />
-                        {blockCatalogTab === "custom" && (
-                          <>
-                            <div className="flex flex-col gap-2 mb-3">
-                              <div className="flex space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (selectedNode?.data?.customBlock) {
-                                      setSelectedCustomBlock(
-                                        selectedNode.data.customBlock
-                                      );
-                                      setSaveDialogOpen(true);
-                                    } else {
-                                      toast({
-                                        title: "No custom block selected",
-                                        description:
-                                          "Please select a custom block to save to the library.",
-                                      });
-                                    }
-                                  }}
-                                  disabled={!selectedNode?.data?.customBlock}>
-                                  <Save className="h-3.5 w-3.5 mr-1" />
-                                  Save to Library
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => setCreateModalOpen(true)}>
-                                  <PlusCircle className="h-3.5 w-3.5 mr-1" />
-                                  New Block
-                                </Button>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                Select a custom block on the canvas to save it to your personal library
-                              </p>
-                            </div>
-                            <CustomBlockCatalog
-                              onAddBlock={(block, position) => {
-                                if (onAddCustomBlock) {
-                                  onAddCustomBlock(block, position);
-                                }
-                                // Make sure customBlock has required properties
-                                const customBlock = block.data.customBlock;
-                                if (customBlock) {
-                                  setSelectedCustomBlock(customBlock);
-                                }
-                              }}
-                              onGenerateCustomBlock={onGenerateCustomBlock}
-                              onDragStart={handleCustomBlockDragStart}
-                              onSelect={(block) =>
-                                setSelectedCustomBlock(block)
-                              }
-                            />
-                          </>
-                        )}
+                        <span className="text-xs text-muted-foreground">Custom blocks for your workflow</span>
                       </div>
+                      
+                      <div className="flex flex-col gap-2 mb-3">
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (selectedNode?.data?.customBlock) {
+                                setSelectedCustomBlock(
+                                  selectedNode.data.customBlock
+                                );
+                                setSaveDialogOpen(true);
+                              } else {
+                                toast({
+                                  title: "No custom block selected",
+                                  description:
+                                    "Please select a custom block to save to the library.",
+                                });
+                              }
+                            }}
+                            disabled={!selectedNode?.data?.customBlock}>
+                            <Save className="h-3.5 w-3.5 mr-1" />
+                            Save to Library
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setCreateModalOpen(true)}>
+                            <PlusCircle className="h-3.5 w-3.5 mr-1" />
+                            New Block
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleOpenCustomBlockModal()}>
+                            <Box className="h-3.5 w-3.5 mr-1" />
+                            Configure Block
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Select a custom block on the canvas to save it to your personal library
+                        </p>
+                      </div>
+                      
+                      <CustomBlockCatalog
+                        onAddBlock={(block, position) => {
+                          if (onAddCustomBlock) {
+                            // Type assertion to ensure compatibility with CustomBlockDefinition
+                            onAddCustomBlock(block as CustomBlockDefinition, position);
+                          }
+                          // Make sure customBlock has required properties
+                          const customBlock = block.data?.customBlock;
+                          if (customBlock) {
+                            setSelectedCustomBlock(customBlock);
+                          }
+                        }}
+                        onGenerateCustomBlock={onGenerateCustomBlock}
+                        onDragStart={handleCustomBlockDragStart}
+                        onSelect={(block) =>
+                          setSelectedCustomBlock(block)
+                        }
+                      />
                     </div>
                   </ScrollArea>
                 )}
@@ -560,6 +766,7 @@ export function BuilderSidebar({
                       placeholder='Enter workflow description'
                       rows={3}
                       className='text-sm resize-none min-h-[80px]'
+                      aria-label="Workflow description"
                     />
                   </div>
                 </div>
@@ -835,8 +1042,10 @@ function SaveBlockForm({
                   type='button'
                   variant='outline'
                   size='icon'
-                  onClick={addTag}>
+                  onClick={addTag}
+                  title="Add tag">
                   <PlusCircle className='h-4 w-4' />
+                  <span className="sr-only">Add tag</span>
                 </Button>
               </div>
               <FormMessage />
