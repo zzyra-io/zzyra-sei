@@ -20,6 +20,18 @@ export enum BlockType {
   // Finance blocks
   GOAT_FINANCE = "ai-blockchain-operations",
 
+  // DeFi blocks
+  DEFI_PRICE_MONITOR = "defi-price-monitor",
+  DEFI_YIELD_MONITOR = "defi-yield-monitor",
+  DEFI_PORTFOLIO = "defi-portfolio-balance",
+  DEFI_REBALANCE = "defi-rebalance-calculator",
+  DEFI_SWAP = "defi-swap-executor",
+  DEFI_GAS = "defi-gas-optimizer",
+  DEFI_PROTOCOL = "defi-protocol-monitor",
+  DEFI_YIELD_STRATEGY = "defi-yield-strategy",
+  DEFI_LIQUIDITY = "defi-liquidity-provider",
+  DEFI_POSITION = "defi-position-manager",
+
   // Custom blocks
   CUSTOM = "custom",
   LLM_PROMPT = "llm-prompt",
@@ -220,6 +232,150 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
     category: NodeCategory.ACTION,
     icon: "unknown",
     defaultConfig: {},
+  },
+  
+  // DeFi Blocks
+  [BlockType.DEFI_PRICE_MONITOR]: {
+    type: BlockType.DEFI_PRICE_MONITOR,
+    label: "DeFi Price Monitor",
+    description: "Monitor cryptocurrency prices",
+    category: NodeCategory.FINANCE,
+    icon: "chart-line",
+    defaultConfig: {
+      type: "price_monitor",
+      assets: ["ETH", "BTC"],
+      threshold: 5,
+      monitoringInterval: 15
+    },
+  },
+  [BlockType.DEFI_YIELD_MONITOR]: {
+    type: BlockType.DEFI_YIELD_MONITOR,
+    label: "DeFi Yield Monitor",
+    description: "Monitor yields across protocols",
+    category: NodeCategory.FINANCE,
+    icon: "chart-bar",
+    defaultConfig: {
+      type: "yield_monitor",
+      protocol: "aave",
+      assets: ["ETH", "USDC"],
+      monitoringInterval: 60,
+      yieldThreshold: 2
+    },
+  },
+  [BlockType.DEFI_PORTFOLIO]: {
+    type: BlockType.DEFI_PORTFOLIO,
+    label: "Portfolio Tracker",
+    description: "Track portfolio balances across protocols",
+    category: NodeCategory.FINANCE,
+    icon: "portfolio",
+    defaultConfig: {
+      type: "portfolio_balance",
+      assets: ["ETH", "BTC", "USDC"],
+      protocols: ["aave", "compound"],
+      monitoringInterval: 60
+    },
+  },
+  [BlockType.DEFI_REBALANCE]: {
+    type: BlockType.DEFI_REBALANCE,
+    label: "Portfolio Rebalancer",
+    description: "Calculate portfolio rebalancing",
+    category: NodeCategory.FINANCE,
+    icon: "rebalance",
+    defaultConfig: {
+      type: "rebalance_calculator",
+      targetWeights: {
+        "ETH": 0.4,
+        "BTC": 0.3,
+        "USDC": 0.3
+      },
+      rebalanceThreshold: 5,
+      slippage: 0.5
+    },
+  },
+  [BlockType.DEFI_SWAP]: {
+    type: BlockType.DEFI_SWAP,
+    label: "Token Swap",
+    description: "Execute token swaps",
+    category: NodeCategory.FINANCE,
+    icon: "swap",
+    defaultConfig: {
+      type: "swap_executor",
+      sourceAsset: "ETH",
+      targetAsset: "USDC",
+      amount: "0.1",
+      slippage: 0.5,
+      gasLimit: 250000,
+      maxFee: 50
+    },
+  },
+  [BlockType.DEFI_GAS]: {
+    type: BlockType.DEFI_GAS,
+    label: "Gas Optimizer",
+    description: "Optimize gas for transactions",
+    category: NodeCategory.FINANCE,
+    icon: "gas",
+    defaultConfig: {
+      type: "gas_optimizer",
+      gasLimit: 250000,
+      maxFee: 50,
+      optimizationStrategy: "gas_price"
+    },
+  },
+  [BlockType.DEFI_PROTOCOL]: {
+    type: BlockType.DEFI_PROTOCOL,
+    label: "Protocol Monitor",
+    description: "Monitor DeFi protocol health",
+    category: NodeCategory.FINANCE,
+    icon: "protocol",
+    defaultConfig: {
+      type: "protocol_monitor",
+      protocol: "aave",
+      monitoringInterval: 60,
+      healthThreshold: 80
+    },
+  },
+  [BlockType.DEFI_YIELD_STRATEGY]: {
+    type: BlockType.DEFI_YIELD_STRATEGY,
+    label: "Yield Strategy",
+    description: "Execute yield farming strategies",
+    category: NodeCategory.FINANCE,
+    icon: "strategy",
+    defaultConfig: {
+      type: "yield_strategy",
+      strategy: "conservative",
+      assets: ["USDC", "DAI"],
+      protocols: ["aave", "compound"],
+      optimizationGoal: "balanced"
+    },
+  },
+  [BlockType.DEFI_LIQUIDITY]: {
+    type: BlockType.DEFI_LIQUIDITY,
+    label: "Liquidity Provider",
+    description: "Manage liquidity pools",
+    category: NodeCategory.FINANCE,
+    icon: "liquidity",
+    defaultConfig: {
+      type: "liquidity_provider",
+      poolAddress: "",
+      tokenA: "ETH",
+      tokenB: "USDC",
+      amount: "0.1",
+      slippage: 0.5
+    },
+  },
+  [BlockType.DEFI_POSITION]: {
+    type: BlockType.DEFI_POSITION,
+    label: "Position Manager",
+    description: "Manage and monitor positions",
+    category: NodeCategory.FINANCE,
+    icon: "position",
+    defaultConfig: {
+      type: "position_manager",
+      assets: ["ETH", "BTC", "USDC"],
+      protocols: ["aave", "compound"],
+      riskThreshold: 70,
+      monitoringInterval: 60
+    },
   },
 };
 

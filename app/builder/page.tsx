@@ -780,11 +780,24 @@ export default function BuilderPage() {
 
   // Add these example prompts after the tourMessages array (around line 520-530)
   const examplePrompts = [
+    // Crypto Price Alerts
     "Send email when Bitcoin price goes above $50,000",
     "Monitor Ethereum price and notify me on Discord",
+    
+    // DeFi Trading Automation
     "Check Bitcoin price every hour and buy if below $40,000",
     "Sell ETH when price reaches $3,000 and send SMS notification",
     "Monitor gas prices and execute transaction when below 30 gwei",
+    
+    // DeFi Yield Optimization
+    "Automatically move funds to the highest yield protocol between Aave and Compound",
+    "Create a dollar-cost averaging strategy for Bitcoin and Ethereum",
+    "Monitor and rebalance my liquidity positions across Uniswap pools",
+    
+    // DeFi Position Management
+    "Create a risk management workflow for my DeFi positions",
+    "Automatically add collateral to prevent liquidation on Aave",
+    "Set up a yield farming strategy across multiple protocols",
   ];
 
   // Add this function before the return statement (around line 550-560)
