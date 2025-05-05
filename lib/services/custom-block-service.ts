@@ -4,6 +4,7 @@ import type { Database } from "@/types/supabase";
 import type { CustomBlockDefinition } from "@/types/custom-block"
 import { DataType, LogicType } from "@/types/custom-block"
 import { NodeCategory } from "@/types/workflow"
+import { mapDatabaseRecordToBlockDefinition, mapBlockDefinitionToDatabaseRecord } from "./custom-block-mapper"
 
 class CustomBlockService {
   private supabase: SupabaseClient<Database> = createClient()

@@ -174,7 +174,9 @@ export type Database = {
       }
       block_library: {
         Row: {
+          block_data: Json | null
           block_type: string
+          category: string | null
           configuration: Json
           created_at: string | null
           description: string
@@ -191,7 +193,9 @@ export type Database = {
           version: string | null
         }
         Insert: {
+          block_data?: Json | null
           block_type: string
+          category?: string | null
           configuration?: Json
           created_at?: string | null
           description: string
@@ -208,7 +212,9 @@ export type Database = {
           version?: string | null
         }
         Update: {
+          block_data?: Json | null
           block_type?: string
+          category?: string | null
           configuration?: Json
           created_at?: string | null
           description?: string
@@ -266,6 +272,8 @@ export type Database = {
       }
       custom_blocks: {
         Row: {
+          block_data: Json | null
+          block_type: string | null
           category: string
           code: string
           created_at: string | null
@@ -274,15 +282,21 @@ export type Database = {
           icon: string | null
           id: string
           is_public: boolean | null
+          is_verified: boolean | null
           logic: string
           logic_type: string
           name: string
+          rating: number | null
           tags: Json
           updated_at: string | null
           updated_by: string | null
+          usage_count: number | null
           user_id: string
+          version: string | null
         }
         Insert: {
+          block_data?: Json | null
+          block_type?: string | null
           category: string
           code: string
           created_at?: string | null
@@ -291,15 +305,21 @@ export type Database = {
           icon?: string | null
           id?: string
           is_public?: boolean | null
+          is_verified?: boolean | null
           logic: string
           logic_type?: string
           name: string
+          rating?: number | null
           tags?: Json
           updated_at?: string | null
           updated_by?: string | null
+          usage_count?: number | null
           user_id: string
+          version?: string | null
         }
         Update: {
+          block_data?: Json | null
+          block_type?: string | null
           category?: string
           code?: string
           created_at?: string | null
@@ -308,13 +328,17 @@ export type Database = {
           icon?: string | null
           id?: string
           is_public?: boolean | null
+          is_verified?: boolean | null
           logic?: string
           logic_type?: string
           name?: string
+          rating?: number | null
           tags?: Json
           updated_at?: string | null
           updated_by?: string | null
+          usage_count?: number | null
           user_id?: string
+          version?: string | null
         }
         Relationships: []
       }
