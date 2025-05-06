@@ -783,17 +783,17 @@ export default function BuilderPage() {
     // Crypto Price Alerts
     "Send email when Bitcoin price goes above $50,000",
     "Monitor Ethereum price and notify me on Discord",
-    
+
     // DeFi Trading Automation
     "Check Bitcoin price every hour and buy if below $40,000",
     "Sell ETH when price reaches $3,000 and send SMS notification",
     "Monitor gas prices and execute transaction when below 30 gwei",
-    
+
     // DeFi Yield Optimization
     "Automatically move funds to the highest yield protocol between Aave and Compound",
     "Create a dollar-cost averaging strategy for Bitcoin and Ethereum",
     "Monitor and rebalance my liquidity positions across Uniswap pools",
-    
+
     // DeFi Position Management
     "Create a risk management workflow for my DeFi positions",
     "Automatically add collateral to prevent liquidation on Aave",
@@ -833,7 +833,11 @@ export default function BuilderPage() {
       }
 
       // Pass existing nodes and edges as context
-      const result = await generateFlow(enhancedPrompt, memoizedNodes, memoizedEdges);
+      const result = await generateFlow(
+        enhancedPrompt,
+        memoizedNodes,
+        memoizedEdges
+      );
       if (result.nodes && result.edges) {
         // Instead of replacing, append the new nodes and edges
         if (nodes.length > 0) {
@@ -848,12 +852,26 @@ export default function BuilderPage() {
           const NODE_HEIGHT_ESTIMATE = 60; // Estimate for bounding box calc
 
           const existingNodesBounds = nodes.reduce(
-            (bounds: { minX: number; minY: number; maxX: number; maxY: number }, node: Node) => ({
+            (
+              bounds: {
+                minX: number;
+                minY: number;
+                maxX: number;
+                maxY: number;
+              },
+              node: Node
+            ) => ({
               minX: Math.min(bounds.minX, node.position.x),
               minY: Math.min(bounds.minY, node.position.y),
               // Use actual node dimensions if available, otherwise estimate
-              maxX: Math.max(bounds.maxX, node.position.x + (node.width ?? NODE_WIDTH_ESTIMATE)),
-              maxY: Math.max(bounds.maxY, node.position.y + (node.height ?? NODE_HEIGHT_ESTIMATE)),
+              maxX: Math.max(
+                bounds.maxX,
+                node.position.x + (node.width ?? NODE_WIDTH_ESTIMATE)
+              ),
+              maxY: Math.max(
+                bounds.maxY,
+                node.position.y + (node.height ?? NODE_HEIGHT_ESTIMATE)
+              ),
             }),
             { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
           );
@@ -873,8 +891,10 @@ export default function BuilderPage() {
           );
 
           // Fallback if result.nodes is empty or positions are invalid
-          const safeOriginX = newNodesOrigin.minX === Infinity ? 0 : newNodesOrigin.minX;
-          const safeOriginY = newNodesOrigin.minY === Infinity ? 0 : newNodesOrigin.minY;
+          const safeOriginX =
+            newNodesOrigin.minX === Infinity ? 0 : newNodesOrigin.minX;
+          const safeOriginY =
+            newNodesOrigin.minY === Infinity ? 0 : newNodesOrigin.minY;
           // --- End Calculate Layout Offset ---
 
           // Create a map of old IDs to new IDs
@@ -1240,7 +1260,9 @@ export default function BuilderPage() {
                   onGenerateCustomBlock={async (prompt) => {
                     // Use the existing handleNlGenerate function with a synthetic event
                     setNlPrompt(prompt);
-                    const syntheticEvent = { preventDefault: () => {} } as React.FormEvent;
+                    const syntheticEvent = {
+                      preventDefault: () => {},
+                    } as React.FormEvent;
                     await handleNlGenerate(syntheticEvent);
                     return Promise.resolve();
                   }}
@@ -1354,56 +1376,6 @@ export default function BuilderPage() {
             <span className='font-medium'>DeFi Position Manager</span>
           </div>
 
-          <div className='mt-12 flex flex-wrap justify-center gap-4 md:gap-6'>
-            {nodes.map((node, index) => (
-              <div key={node.id} className='flex flex-col items-center'>
-                <motion.div
-                  className={`relative flex h-16 w-16 items-center justify-center rounded-lg ${
-                    activeNode === node.id ? node.color : "bg-muted"
-                  } transition-colors duration-300`}
-                  animate={{
-                    scale: activeNode === node.id ? 1.1 : 1,
-                    boxShadow:
-                      activeNode === node.id
-                        ? "0 0 15px rgba(124, 58, 237, 0.5)"
-                        : "0 0 0 rgba(0, 0, 0, 0)",
-                  }}>
-                  <node.icon
-                    className={`h-8 w-8 ${
-                      activeNode === node.id
-                        ? "text-white"
-                        : "text-muted-foreground"
-                    }`}
-                  />
-
-                  {/* Pulse animation when active */}
-                  {activeNode === node.id && (
-                    <motion.div
-                      className='absolute inset-0 rounded-lg'
-                      initial={{ opacity: 0.7, scale: 1 }}
-                      animate={{ opacity: 0, scale: 1.3 }}
-                      transition={{
-                        duration: 1,
-                        repeat: Number.POSITIVE_INFINITY,
-                      }}
-                      style={{ backgroundColor: node.color }}
-                    />
-                  )}
-                </motion.div>
-
-                <span className='mt-2 text-xs font-medium'>{node.title}</span>
-
-                {/* Arrow connecting nodes */}
-                {index < nodes.length - 1 && (
-                  <div className='flex items-center justify-center h-8 w-8 md:h-0 md:w-8'>
-                    <ArrowRight className='h-4 w-4 text-muted-foreground hidden md:block' />
-                    <ArrowRight className='h-4 w-4 text-muted-foreground rotate-90 md:hidden' />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
           <div className='mt-8 grid grid-cols-1 md:grid-cols-2 gap-4'>
             <div className='rounded-lg border bg-muted/50 p-4'>
               <h4 className='text-sm font-medium mb-2'>Workflow Details</h4>
@@ -1496,6 +1468,7 @@ export default function BuilderPage() {
 }
 
 export function BuilderRedirectPage() {
-  const uuid = uuidv4();
+  const searchParams = useSearchParams();
+  const uuid = searchParams?.get("id");
   redirect(`/builder?id=${uuid}`);
 }

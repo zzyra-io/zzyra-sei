@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, useEffect } from "react";
-import { Position, type NodeProps, NodeResizer } from "reactflow";
+import { Position, type NodeProps, NodeResizer } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 import {
   DollarSign,
@@ -272,7 +272,9 @@ export const ImprovedCustomNode = memo(
             position={Position.Left}
             id={`input-${i}`}
             isConnectable={isConnectable && isEnabled}
-            handleColor={currentStatusConfig.handleEffect?.color || categoryColor.handle}
+            handleColor={
+              currentStatusConfig.handleEffect?.color || categoryColor.handle
+            }
             label={`Input ${i}`}
             isEnabled={isEnabled}
             isSelected={selected}
@@ -296,7 +298,9 @@ export const ImprovedCustomNode = memo(
             position={Position.Right}
             id={`output-${i}`}
             isConnectable={isConnectable && isEnabled}
-            handleColor={currentStatusConfig.handleEffect?.color || categoryColor.handle}
+            handleColor={
+              currentStatusConfig.handleEffect?.color || categoryColor.handle
+            }
             label={`Output ${i}`}
             isEnabled={isEnabled}
             isSelected={selected}
@@ -402,7 +406,8 @@ export const ImprovedCustomNode = memo(
                   <span>{customBlock.logicType || "JavaScript"}</span>
                 </div>
                 <div className='mt-1'>
-                  {customBlock.inputs?.length || 0} inputs, {customBlock.outputs?.length || 0} outputs
+                  {customBlock.inputs?.length || 0} inputs,{" "}
+                  {customBlock.outputs?.length || 0} outputs
                 </div>
               </div>
             );
@@ -419,27 +424,6 @@ export const ImprovedCustomNode = memo(
 
     return (
       <>
-        {/* Success effect overlay */}
-        <AnimatePresence>
-          {showSuccessEffect && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1.2 }}
-              exit={{ opacity: 0, scale: 1.5 }}
-              className='absolute inset-0 z-10 flex items-center justify-center'>
-              <motion.div
-                animate={{
-                  opacity: [0, 1, 0],
-                  scale: [0.8, 1.2, 1.5],
-                }}
-                transition={{ duration: 1.5 }}
-                className='text-green-500'>
-                <Sparkles className='h-12 w-12' />
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <MotionDiv
           key={`node-${id}-animation-${animationKey}`}
           initial={{ scale: 0.8, opacity: 0 }}
@@ -471,10 +455,10 @@ export const ImprovedCustomNode = memo(
             width: data.style?.width || 220,
             height: data.height,
           }}>
-          <NodeResizer
+          {selected && <NodeResizer
             minWidth={180}
             minHeight={100}
-            isVisible={selected}
+            isVisible={true}
             lineClassName={cn(
               "border-2",
               categoryColor.border.replace("border-", "border-")
@@ -483,36 +467,7 @@ export const ImprovedCustomNode = memo(
               "h-3 w-3 bg-white dark:bg-slate-800 border-2",
               categoryColor.border
             )}
-          />
-
-          {/* Status indicator */}
-          <AnimatePresence>
-            {status !== "idle" && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className='absolute top-0 right-0 z-10 p-2 flex flex-col items-center'>
-                {StatusIcon && (
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    className={cn("h-5 w-5", currentStatusConfig.iconClass)}>
-                    <StatusIcon />
-                  </motion.div>
-                )}
-                {currentStatusConfig.badge && (
-                  <Badge
-                    variant='outline'
-                    className={cn(
-                      "text-[10px] mt-1 px-1.5 py-0",
-                      currentStatusConfig.badge.class
-                    )}>
-                    {currentStatusConfig.badge.text}
-                  </Badge>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          />}
 
           {/* Node header with gradient */}
           <div
@@ -535,9 +490,9 @@ export const ImprovedCustomNode = memo(
             </motion.div>
             <div className='flex-1 min-w-0'>
               <div className='font-medium truncate text-white'>
-                {blockType === BlockType.CUSTOM && data.customBlockDefinition 
-                  ? data.customBlockDefinition.name 
-                  : (data.label || blockMetadata.label)}
+                {blockType === BlockType.CUSTOM && data.customBlockDefinition
+                  ? data.customBlockDefinition.name
+                  : data.label || blockMetadata.label}
               </div>
               {data.nodeType && (
                 <Badge

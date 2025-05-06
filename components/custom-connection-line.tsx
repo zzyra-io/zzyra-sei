@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useState, useEffect, useRef } from "react";
-import { type ConnectionLineComponent, useKeyPress, Position } from "reactflow";
+import { useCallback, useState, useEffect, useRef, useMemo } from "react";
+import { type ConnectionLineComponent, useKeyPress, Position, ConnectionState } from "@xyflow/react";
 import { motion } from "framer-motion";
+import { throttle } from "lodash";
 
 interface CustomConnectionLineProps {
   fromX: number;
@@ -11,7 +12,7 @@ interface CustomConnectionLineProps {
   toY: number;
   fromPosition?: Position;
   toPosition?: Position;
-  connectionStatus?: string;
+  connectionStatus?: ConnectionState | null;
 }
 
 export const CustomConnectionLine: ConnectionLineComponent = ({
@@ -23,112 +24,136 @@ export const CustomConnectionLine: ConnectionLineComponent = ({
   toPosition,
   connectionStatus,
 }: CustomConnectionLineProps) => {
-  const [points, setPoints] = useState<{ x: number; y: number }[]>([]);
+  // State for tracking points in freeform drawing mode
+  const [points, setPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingStarted, setDrawingStarted] = useState(false);
+  
+  // References for performance optimizations
   const spacePressed = useKeyPress("Space");
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
-  const minDistanceThreshold = 10; // Minimum distance between points to avoid too many points
   const connectionStartedRef = useRef(false);
+  const reactFlowBoundsRef = useRef<DOMRect | null>(null);
+  
+  // Configuration constants
+  const minDistanceThreshold = 15; // Minimum distance between points
+  const maxPoints = 100; // Maximum points to store (prevents memory issues)
+  const debugMode = false; // Set to true only when debugging
 
-  // Reset points when connection starts
+  // Reset drawing state when a new connection starts
   useEffect(() => {
-    // Only reset when a new connection starts (fromX and fromY change from 0)
     if (fromX !== 0 && fromY !== 0 && !connectionStartedRef.current) {
+      // New connection started
       connectionStartedRef.current = true;
       setPoints([]);
       setIsDrawing(false);
       setDrawingStarted(false);
       lastPointRef.current = null;
     } else if (fromX === 0 && fromY === 0) {
-      // Reset the connection started flag when connection is done
+      // Connection ended
       connectionStartedRef.current = false;
     }
   }, [fromX, fromY]);
 
-  // Handle space key for freeform drawing - fixed to prevent infinite loop
+  // Cache ReactFlow container bounds
   useEffect(() => {
-    // Only start drawing if space is pressed, we haven't started drawing yet,
-    // and we have valid coordinates
+    const updateBounds = () => {
+      reactFlowBoundsRef.current = document
+        .querySelector(".react-flow")
+        ?.getBoundingClientRect() || null;
+    };
+    
+    // Initial update and listen for resize
+    updateBounds();
+    window.addEventListener('resize', updateBounds);
+    
+    return () => {
+      window.removeEventListener('resize', updateBounds);
+    };
+  }, []);
+
+  // Handle space key for freeform drawing mode
+  useEffect(() => {
+    // Skip if no active connection
+    if (fromX === 0 && fromY === 0) return;
+    
     if (spacePressed && !drawingStarted && fromX !== 0 && fromY !== 0) {
+      // Start drawing mode
       setIsDrawing(true);
       setDrawingStarted(true);
       setPoints([{ x: fromX, y: fromY }]);
       lastPointRef.current = { x: fromX, y: fromY };
-    }
-    // Only stop drawing if space is released and we were drawing
-    else if (!spacePressed && drawingStarted) {
+    } else if (!spacePressed && isDrawing) {
+      // Stop drawing mode
       setIsDrawing(false);
-      // Note: we don't reset drawingStarted here to prevent toggling
     }
-  }, [spacePressed, drawingStarted, fromX, fromY]);
+  }, [spacePressed, drawingStarted, isDrawing, fromX, fromY]);
 
-  // Add points when drawing and mouse moves
-  const handleMouseMove = useCallback(
-    (event: MouseEvent) => {
-      if (isDrawing) {
-        // Get the ReactFlow container bounds
-        const reactFlowBounds = document
-          .querySelector(".react-flow")
-          ?.getBoundingClientRect();
-        if (!reactFlowBounds) return;
+  // Define the mouse move handler with proper dependencies
+  const handleMouseMove = useCallback((event: MouseEvent) => {
+    if (!isDrawing) return;
+    
+    // Update or get bounds if needed
+    if (!reactFlowBoundsRef.current) {
+      reactFlowBoundsRef.current = document
+        .querySelector(".react-flow")
+        ?.getBoundingClientRect() || null;
+      if (!reactFlowBoundsRef.current) return;
+    }
 
-        // Calculate the position in the ReactFlow coordinate system
-        const newPoint = {
-          x: event.clientX - reactFlowBounds.left,
-          y: event.clientY - reactFlowBounds.top,
-        };
+    // Convert screen coordinates to ReactFlow coordinates
+    const newPoint = {
+      x: event.clientX - (reactFlowBoundsRef.current?.left || 0),
+      y: event.clientY - (reactFlowBoundsRef.current?.top || 0),
+    };
 
-        // Check if the new point is far enough from the last point
-        if (lastPointRef.current) {
-          const dx = newPoint.x - lastPointRef.current.x;
-          const dy = newPoint.y - lastPointRef.current.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+    // Filter points that are too close together
+    if (lastPointRef.current) {
+      const dx = newPoint.x - lastPointRef.current.x;
+      const dy = newPoint.y - lastPointRef.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-          if (distance < minDistanceThreshold) {
-            return; // Skip this point if it's too close
-          }
-        }
+      if (distance < minDistanceThreshold) return;
+    }
 
-        // Add the new point
-        setPoints((prevPoints) => [...prevPoints, newPoint]);
-        lastPointRef.current = newPoint;
-      }
-    },
-    [isDrawing]
+    // Update points with limit to prevent performance issues
+    setPoints(prevPoints => {
+      const newPoints = [...prevPoints, newPoint];
+      return newPoints.length > maxPoints ? newPoints.slice(-maxPoints) : newPoints;
+    });
+    
+    lastPointRef.current = newPoint;
+  }, [isDrawing, minDistanceThreshold, maxPoints]);
+  
+  // Create a throttled version of the handler
+  const throttledMouseMove = useMemo(
+    () => throttle(handleMouseMove, 16), // ~60fps throttling
+    [handleMouseMove]
   );
 
+  // Attach/detach mousemove listener
   useEffect(() => {
     if (isDrawing) {
-      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mousemove", throttledMouseMove);
     }
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-    };
-  }, [isDrawing, handleMouseMove]);
+    return () => window.removeEventListener("mousemove", throttledMouseMove);
+  }, [isDrawing, throttledMouseMove]);
 
   // Generate path for freeform drawing
-  const getFreeformPath = () => {
+  const getFreeformPath = useCallback(() => {
     if (points.length === 0) {
       return `M${fromX},${fromY} L${toX},${toY}`;
     }
 
     let path = `M${fromX},${fromY} `;
-
-    // Add line segments for each point
-    points.forEach((point) => {
-      path += `L${point.x},${point.y} `;
-    });
-
-    // Add final line to current mouse position
+    points.forEach(point => path += `L${point.x},${point.y} `);
     path += `L${toX},${toY}`;
 
     return path;
-  };
+  }, [fromX, fromY, toX, toY, points]);
 
   // Generate path for standard connection
-  const getStandardPath = () => {
+  const getStandardPath = useCallback(() => {
     // Default positions if not provided
     const sourcePosition = fromPosition || Position.Right;
     const targetPosition = toPosition || Position.Left;
@@ -176,13 +201,11 @@ export const CustomConnectionLine: ConnectionLineComponent = ({
         break;
     }
 
-    return `M${fromX},${fromY} C${fromX + sourceOffsetX},${
-      fromY + sourceOffsetY
-    } ${toX + targetOffsetX},${toY + targetOffsetY} ${toX},${toY}`;
-  };
+    return `M${fromX},${fromY} C${fromX + sourceOffsetX},${fromY + sourceOffsetY} ${toX + targetOffsetX},${toY + targetOffsetY} ${toX},${toY}`;
+  }, [fromX, fromY, toX, toY, fromPosition, toPosition]);
 
   // Determine connection status color
-  const getStatusColor = () => {
+  const getStatusColor = useCallback(() => {
     switch (connectionStatus) {
       case "valid":
         return "#10b981";
@@ -191,45 +214,54 @@ export const CustomConnectionLine: ConnectionLineComponent = ({
       default:
         return "#64748b";
     }
-  };
+  }, [connectionStatus]);
 
-  // Choose path based on drawing mode
-  const path = isDrawing ? getFreeformPath() : getStandardPath();
-  const statusColor = getStatusColor();
+  // Memoize path calculation and status color
+  const path = useMemo(
+    () => isDrawing ? getFreeformPath() : getStandardPath(),
+    [isDrawing, getFreeformPath, getStandardPath]
+  );
+  
+  const statusColor = useMemo(
+    () => getStatusColor(), 
+    [getStatusColor]
+  );
+
+  // No inline styles - they are defined in CSS
 
   return (
     <g>
       {/* Main connection line */}
       <path
-        fill='none'
+        fill="none"
         stroke={statusColor}
         strokeWidth={2}
-        className='animated-dash'
-        style={{
-          strokeDasharray: "5,5",
-          animation: "dashdraw 0.5s linear infinite",
-        }}
+        className="animated-dash"
         d={path}
       />
 
       {/* Glow effect */}
       <path
-        fill='none'
+        fill="none"
         stroke={statusColor}
         strokeWidth={6}
         strokeOpacity={0.2}
-        filter='blur(3px)'
+        filter="blur(3px)"
         d={path}
       />
 
-      {/* Endpoint indicator */}
+      {/* Endpoint indicator - optimized animation */}
       <motion.circle
         cx={toX}
         cy={toY}
         r={5}
         fill={statusColor}
         animate={{ scale: [1, 1.3, 1] }}
-        transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY }}
+        transition={{ 
+          duration: 1, 
+          repeat: 5, // Limited repeats instead of infinite for better performance
+          repeatType: "loop" 
+        }}
       />
 
       {/* Drawing mode indicator */}
@@ -241,23 +273,24 @@ export const CustomConnectionLine: ConnectionLineComponent = ({
             width={140}
             height={20}
             rx={4}
-            fill='rgba(0, 0, 0, 0.7)'
-            filter='blur(1px)'
+            fill="rgba(0, 0, 0, 0.7)"
+            filter="blur(1px)"
           />
           <text
             x={toX + 15}
             y={toY - 15}
             fontSize={12}
-            fill='white'
-            style={{ pointerEvents: "none" }}>
+            fill="white"
+            className="connection-label">
             Drawing Mode (Space)
           </text>
         </g>
       )}
 
-      {/* Points for freeform drawing (for debugging) */}
-      {isDrawing &&
-        points.map((point, index) => (
+      {/* Points visualization - only in debug mode */}
+      {isDrawing && debugMode &&
+        // Only show every 3rd point to reduce rendering overhead
+        points.filter((_, i) => i % 3 === 0).map((point, index) => (
           <circle
             key={`point-${index}`}
             cx={point.x}
@@ -265,22 +298,11 @@ export const CustomConnectionLine: ConnectionLineComponent = ({
             r={2}
             fill={statusColor}
             opacity={0.5}
-            style={{ pointerEvents: "none" }}
+            className="connection-point"
           />
         ))}
 
-      <style>
-        {`
-          @keyframes dashdraw {
-            from {
-              stroke-dashoffset: 10;
-            }
-            to {
-              stroke-dashoffset: 0;
-            }
-          }
-        `}
-      </style>
+      {/* Styles moved to global CSS */}
     </g>
   );
 };

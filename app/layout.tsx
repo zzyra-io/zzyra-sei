@@ -1,6 +1,7 @@
 import type React from "react";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import "@/styles/flow-components.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
 import { Toaster } from "@/components/ui/toaster";

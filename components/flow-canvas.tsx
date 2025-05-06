@@ -3,23 +3,33 @@
 import type React from "react";
 import { useCallback, useRef, useState, useEffect, memo, useMemo } from "react";
 import { debounce } from "lodash";
-import ReactFlow, {
-  Background,
+import {
+  ReactFlow,
   Controls,
+  Background,
   MiniMap,
+  NodeTypes,
+  Edge,
+  Connection,
+  ReactFlowInstance,
+  ReactFlowProvider,
+  Node,
   addEdge,
-  useNodesState,
-  useEdgesState,
+  EdgeTypes,
   applyNodeChanges,
   applyEdgeChanges,
-  ReactFlowProvider,
-  type Connection,
-  type Edge,
-  type Node,
-  type NodeTypes,
-  type EdgeTypes,
-} from "reactflow";
-import "reactflow/dist/style.css";
+  NodeChange,
+  EdgeChange,
+  NodeDragHandler,
+  OnNodesChange,
+  OnEdgesChange,
+  updateEdge,
+  MarkerType,
+  Position,
+  useReactFlow,
+  Panel,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 // import { CustomNode } from "./custom-node";
 import { CustomEdge } from "./custom-edge";
 import { BlockConfigPanel } from "./block-config-panel";
@@ -46,17 +56,9 @@ import { ImprovedCustomNode } from "./custom-node_improved";
 import { CustomConnectionLine } from "./custom-connection-line";
 import { createClient } from "@/lib/supabase/client";
 
-// Memoize CustomNode for performance
+// Pre-memoize components at module level is safe for SSR
 const MemoizedCustomNode = memo(ImprovedCustomNode);
-
-// Define custom node and edge types
-const nodeTypes: NodeTypes = {
-  custom: MemoizedCustomNode,
-};
-
-const edgeTypes: EdgeTypes = {
-  custom: CustomEdge,
-};
+const MemoizedCustomEdge = memo(CustomEdge);
 
 interface FlowCanvasProps {
   executionId?: string | null;
@@ -91,12 +93,44 @@ function FlowContent({
   onEdgesChange,
   toolbarRef,
   executionId,
-}: FlowCanvasProps) {
+}: FlowCanvasProps): React.ReactNode {
+  // Define node and edge types inside the component with useMemo
+  // This prevents server-side rendering errors
+  const nodeTypes = useMemo(
+    () => ({
+      custom: MemoizedCustomNode,
+    }),
+    []
+  ) as NodeTypes;
+
+  const edgeTypes = useMemo<EdgeTypes>(
+    () => ({
+      custom: MemoizedCustomEdge,
+    }),
+    []
+  );
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes] = useNodesState(initialNodes);
-  const [edges, setEdges] = useEdgesState(initialEdges);
+  // XYFlow uses regular useState hooks instead of the specialized ones from ReactFlow
+  const [nodes, setNodes] = useState<Node[]>(initialNodes);
+  const [edges, setEdges] = useState<Edge[]>(initialEdges);
+  // Use the XYFlow hook to get access to the instance and its methods
+  const reactFlowHook = useReactFlow();
+
+  // Optimize node updates with debounce
+  const updateNodesOptimized = useCallback(
+    (changes: NodeChange[]) => {
+      setNodes((nds) => applyNodeChanges(changes, nds));
+    },
+    [setNodes]
+  );
+
+  const debouncedNodeUpdate = useMemo(
+    () => debounce(updateNodesOptimized, 50),
+    [updateNodesOptimized]
+  );
   const [reactFlowInstance, setReactFlowInstance] =
     useState<ReactFlowInstance | null>(null);
+  const [isPanning, setIsPanning] = useState<boolean>(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
   const [isGridVisible, setIsGridVisible] = useState(true);
@@ -125,8 +159,8 @@ function FlowContent({
     id?: string;
   } | null>(null);
 
-  // Add state for edge being dragged
-  const [edgeUpdateSuccessful, setEdgeUpdateSuccessful] = useState(true);
+  // Edge state management with XYFlow approach
+  // XYFlow handles edge updates differently than ReactFlow
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -358,7 +392,7 @@ function FlowContent({
             dataIdMap.set(node.data.id, node);
           }
           // Store current status for comparison
-          nodeStatusMap.set(node.id, node.data?.status);
+          // nodeStatusMap.set(node.id, node.data?.status);
         });
 
         // Batch all updates for better performance
@@ -366,45 +400,45 @@ function FlowContent({
         const updatedIndices = new Set<number>();
 
         // Find nodes that need status updates
-        Object.entries(statusMap).forEach(([statusNodeId, status]) => {
-          // Try to find the node by direct ID first
-          let node = nodeMap.get(statusNodeId);
-          let nodeIndex = -1;
+        // Object.entries(statusMap).forEach(([statusNodeId, status]) => {
+        //   // Try to find the node by direct ID first
+        //   let node = nodeMap.get(statusNodeId);
+        //   let nodeIndex = -1;
 
-          // If not found by direct ID, try data.id
-          if (!node) {
-            node = dataIdMap.get(statusNodeId);
-          }
+        //   // If not found by direct ID, try data.id
+        //   if (!node) {
+        //     node = dataIdMap.get(statusNodeId);
+        //   }
 
-          if (node) {
-            nodeIndex = nds.findIndex((n) => n.id === node!.id);
-          }
+        //   if (node) {
+        //     nodeIndex = nds.findIndex((n) => n.id === node!.id);
+        //   }
 
-          // If node found, status is different, and we haven't updated this node yet
-          if (
-            node &&
-            nodeIndex !== -1 &&
-            nodeStatusMap.get(node.id) !== status &&
-            !updatedIndices.has(nodeIndex)
-          ) {
-            // Mark that we have updates
-            hasUpdates = true;
+        //   // If node found, status is different, and we haven't updated this node yet
+        //   if (
+        //     node &&
+        //     nodeIndex !== -1 &&
+        //     nodeStatusMap.get(node.id) !== status &&
+        //     !updatedIndices.has(nodeIndex)
+        //   ) {
+        //     // Mark that we have updates
+        //     hasUpdates = true;
 
-            // Create updated node with new status
-            updatedNodes[nodeIndex] = {
-              ...node,
-              data: {
-                ...node.data,
-                status: status,
-                // Add timestamp for animation triggers and debugging
-                statusUpdatedAt: Date.now(),
-              },
-            };
+        //     // Create updated node with new status
+        //     updatedNodes[nodeIndex] = {
+        //       ...node,
+        //       data: {
+        //         ...node.data,
+        //         status: status,
+        //         // Add timestamp for animation triggers and debugging
+        //         statusUpdatedAt: Date.now(),
+        //       },
+        //     };
 
-            // Mark this index as updated
-            updatedIndices.add(nodeIndex);
-          }
-        });
+        //     // Mark this index as updated
+        //     updatedIndices.add(nodeIndex);
+        //   }
+        // });
 
         // If no nodes were updated, return original array
         if (!hasUpdates) return nds;
@@ -621,7 +655,7 @@ function FlowContent({
       description: "All nodes and connections have been removed",
       duration: 1500,
     });
-  }, [setNodes, setEdges, onNodesChange, onEdgesChange, addToHistory, toast]);
+  }, [onNodesChange, setNodes, setEdges, onEdgesChange, addToHistory, reactFlowHook, toast]);
 
   // Handle zoom in
   const handleZoomIn = useCallback(() => {
@@ -703,7 +737,6 @@ function FlowContent({
   useHotkeys("ctrl+d", handleDuplicateSelectedNode, [
     handleDuplicateSelectedNode,
   ]);
-  // Add more shortcuts as needed
 
   // Update the onConnect function to check for cycles
   const onConnect = useCallback(
@@ -742,71 +775,40 @@ function FlowContent({
     [nodes, edges, onEdgesChange, setEdges, addToHistory, toast]
   );
 
-  // Also update the onEdgeUpdate function to check for cycles
-  const onEdgeUpdate = useCallback(
-    (oldEdge: Edge, newConnection: Connection) => {
-      // Check if updating this edge would create a cycle
-      if (
-        wouldCreateCycle(
-          nodes,
-          edges.filter((e) => e.id !== oldEdge.id),
-          newConnection
-        )
-      ) {
-        toast({
-          title: "Cannot Update Connection",
-          description:
-            "This would create a circular dependency in your workflow",
-          variant: "destructive",
-          duration: 3000,
-        });
-        setEdgeUpdateSuccessful(false);
-        return;
-      }
+  // XYFlow uses a different approach for edge updates
+  // const onEdgeUpdate = useCallback(
+  //   (oldEdge: Edge, newConnection: Connection) => {
+  //     // Check if updating this edge would create a cycle
+  //     if (
+  //       wouldCreateCycle(
+  //         nodes,
+  //         edges.filter((e) => e.id !== oldEdge.id),
+  //         newConnection
+  //       )
+  //     ) {
+  //       toast({
+  //         title: "Cannot Update Connection",
+  //         description:
+  //           "This would create a circular dependency in your workflow",
+  //         variant: "destructive",
+  //         duration: 3000,
+  //       });
+  //       return;
+  //     }
 
-      // If we have a valid new connection, update the edge
-      if (newConnection.source && newConnection.target) {
-        setEdgeUpdateSuccessful(true);
-        setEdges((eds) => {
-          const updatedEdges = eds.map((e) =>
-            e.id === oldEdge.id ? { ...oldEdge, ...newConnection } : e
-          );
-          addToHistory(nodes, updatedEdges);
-          return updatedEdges;
-        });
-      }
-    },
-    [nodes, edges, setEdges, addToHistory, toast]
-  );
+  //     // Create an updated edge manually
+  //     setEdges((eds) => {
+  //       const updatedEdges = eds.map((e) =>
+  //         e.id === oldEdge.id ? { ...oldEdge, ...newConnection } : e
+  //       );
+  //       addToHistory(nodes, updatedEdges);
+  //       return updatedEdges;
+  //     });
+  //   },
+  //   [nodes, edges, setEdges, addToHistory, toast]
+  // );
 
-  const onEdgeUpdateStart = useCallback(() => {
-    // Set edge update to not successful by default
-    // It will be set to true if the edge connects to a valid target
-    setEdgeUpdateSuccessful(false);
-  }, []);
-
-  const onEdgeUpdateEnd = useCallback(
-    (_: React.MouseEvent, edge: Edge) => {
-      // If the edge update was not successful (no valid target), delete the edge
-      if (!edgeUpdateSuccessful) {
-        setEdges((eds) => {
-          const newEdges = eds.filter((e) => e.id !== edge.id);
-          addToHistory(nodes, newEdges);
-          return newEdges;
-        });
-
-        toast({
-          title: "Edge Deleted",
-          description: "Connection has been removed",
-          duration: 1500,
-        });
-      }
-
-      // Reset the state
-      setEdgeUpdateSuccessful(true);
-    },
-    [edgeUpdateSuccessful, nodes, setEdges, addToHistory, toast]
-  );
+  // XYFlow doesn't require separate start/end handlers like ReactFlow did
 
   // Handle node update from config panel
   const handleNodeUpdate = useCallback(
@@ -855,81 +857,81 @@ function FlowContent({
   );
 
   // Handle node selection
-  const onNodeDoubleClick = useCallback(
-    (event: React.MouseEvent, node: Node) => {
-      setSelectedNode(node);
-      setShowConfigPanel(true);
-    },
-    [setSelectedNode]
-  );
+  // const onNodeDoubleClick = useCallback(
+  //   (event: React.MouseEvent, node: Node) => {
+  //     setSelectedNode(node);
+  //     setShowConfigPanel(true);
+  //   },
+  //   [setSelectedNode]
+  // );
 
-  // Add edge click handler
-  const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
-    console.log("Edge clicked:", edge);
-    setSelectedEdge(edge);
-    setShowEdgeConfigPanel(true);
-  }, []);
+  // // Add edge click handler
+  // const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
+  //   console.log("Edge clicked:", edge);
+  //   setSelectedEdge(edge);
+  //   setShowEdgeConfigPanel(true);
+  // }, []);
 
-  // Add context menu handlers
-  const onNodeContextMenu = useCallback(
-    (event: React.MouseEvent, node: Node) => {
-      // Prevent default context menu
-      event.preventDefault();
+  // // Add context menu handlers
+  // const onNodeContextMenu = useCallback(
+  //   (event: React.MouseEvent, node: Node) => {
+  //     // Prevent default context menu
+  //     event.preventDefault();
 
-      // Select the node
-      setSelectedNode(node);
-      // setShowConfigPanel(true);
+  //     // Select the node
+  //     setSelectedNode(node);
+  //     // setShowConfigPanel(true);
 
-      // Show context menu
-      setContextMenu({
-        x: event.clientX,
-        y: event.clientY,
-        type: "node",
-        id: node.id,
-      });
-    },
-    [setSelectedNode, setShowConfigPanel, setContextMenu]
-  );
+  //     // Show context menu
+  //     setContextMenu({
+  //       x: event.clientX,
+  //       y: event.clientY,
+  //       type: "node",
+  //       id: node.id,
+  //     });
+  //   },
+  //   [setSelectedNode, setShowConfigPanel, setContextMenu]
+  // );
+  // Event handlers for context menus
+  // const onEdgeContextMenu = useCallback(
+  //   (event: React.MouseEvent, edge: Edge) => {
+  //     // Prevent default context menu
+  //     event.preventDefault();
 
-  const onEdgeContextMenu = useCallback(
-    (event: React.MouseEvent, edge: Edge) => {
-      // Prevent default context menu
-      event.preventDefault();
+  //     // Select the edge
+  //     setSelectedEdge(edge);
+  //     setShowEdgeConfigPanel(true);
 
-      // Select the edge
-      setSelectedEdge(edge);
-      setShowEdgeConfigPanel(true);
+  //     // Show context menu
+  //     setContextMenu({
+  //       x: event.clientX,
+  //       y: event.clientY,
+  //       type: "edge",
+  //       id: edge.id,
+  //     });
+  //   },
+  //   [setSelectedEdge, setShowEdgeConfigPanel, setContextMenu]
+  // );
 
-      // Show context menu
-      setContextMenu({
-        x: event.clientX,
-        y: event.clientY,
-        type: "edge",
-        id: edge.id,
-      });
-    },
-    [setSelectedEdge, setShowEdgeConfigPanel, setContextMenu]
-  );
+  // const onPaneContextMenu = useCallback(
+  //   (event: React.MouseEvent) => {
+  //     // Prevent default context menu
+  //     event.preventDefault();
 
-  const onPaneContextMenu = useCallback(
-    (event: React.MouseEvent) => {
-      // Prevent default context menu
-      event.preventDefault();
-
-      // Show context menu
-      setContextMenu({
-        x: event.clientX,
-        y: event.clientY,
-        type: "canvas",
-      });
-    },
-    [setContextMenu]
-  );
+  //     // Show context menu
+  //     setContextMenu({
+  //       x: event.clientX,
+  //       y: event.clientY,
+  //       type: "canvas",
+  //     });
+  //   },
+  //   [setContextMenu]
+  // );
 
   // Add context menu close handler
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
-  }, []);
+  }, [setContextMenu]);
 
   // Add context menu options
   const getContextMenuOptions = useCallback(() => {
@@ -1113,7 +1115,7 @@ function FlowContent({
     (event: React.DragEvent) => {
       event.preventDefault();
 
-      if (!reactFlowWrapper.current || !reactFlowInstance) {
+      if (!reactFlowWrapper.current || !reactFlowHook) {
         return;
       }
 
@@ -1168,8 +1170,8 @@ function FlowContent({
         };
       }
 
-      // Get the position where the node was dropped
-      const position = reactFlowInstance.project({
+      // Get the position where the node was dropped - using XYFlow pattern
+      const position = reactFlowHook.screenToFlowPosition({
         x: event.clientX - reactFlowBounds.left,
         y: event.clientY - reactFlowBounds.top,
       });
@@ -1217,14 +1219,8 @@ function FlowContent({
         onNodesChange([...nodes, newNode]);
       }
     },
-    [nodes, edges, onNodesChange, reactFlowInstance, setNodes, addToHistory]
+    [nodes, edges, onNodesChange, reactFlowHook, setNodes, addToHistory]
   );
-
-  // Handle drag over event
-  const handleDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-  }, []);
 
   // Drag highlighting: show dashed outline on valid drop
   const [isDragActive, setIsDragActive] = useState(false);
@@ -1341,38 +1337,119 @@ function FlowContent({
         onDragLeave={handleDragLeaveCanvas}
         onDrop={handleDropCanvas}>
         <ReactFlow
-          // Animated connection and smooth grid snap
-          snapToGrid
+          snapToGrid={true}
           snapGrid={[16, 16]}
-          // connectionLineStyle={{
-          //   stroke: "#3b82f6",
-          //   strokeWidth: 2,
-          //   transition: "stroke 0.2s ease-in-out",
-          // }}
           connectionLineComponent={CustomConnectionLine}
-          connectionRadius={20} // Proximity connect
+          connectionRadius={20}
           nodes={nodes}
           edges={edges}
-          onNodesChange={(changes) => {
-            setNodes((nds) => {
-              const updatedNodes = applyNodeChanges(changes, nds);
+          nodesFocusable={false}
+          elevateEdgesOnSelect={true}
+          nodeExtent={[
+            [0, 0],
+            [3000, 3000],
+          ]}
+          onlyRenderVisibleElements={true}
+          defaultMarkerColor='rgba(100, 116, 139, 0.5)'
+          selectNodesOnDrag={false}
+          onPaneClick={() => setSelectedNode(null)}
+          onConnect={(params) => {
+            // Check for cycles before adding connection
+            if (wouldCreateCycle(nodes, edges, params)) {
+              toast({
+                title: "Cannot Create Connection",
+                description:
+                  "This would create a circular dependency in your workflow",
+                variant: "destructive",
+                duration: 3000,
+              });
+              return;
+            }
 
-              // Only add to history for position changes or resize changes, not selection changes
-              const hasPositionChanges = changes.some(
-                (change) => change.type === "position" && change.position
-              );
-              const hasResizeChanges = changes.some(
-                (change) =>
-                  change.type === "dimensions" &&
-                  (change.dimensions?.width || change.dimensions?.height)
-              );
-
-              if (hasPositionChanges || hasResizeChanges) {
-                addToHistory(updatedNodes, edges);
-              }
-
-              return updatedNodes;
+            onConnect(params);
+          }}
+          onEdgeClick={(event, edge) => {
+            // Prevent edge selection during pane drag
+            setSelectedNode(null);
+            setShowConfigPanel(false); // Close node config panel
+            setSelectedEdge(edge);
+            setShowEdgeConfigPanel(true);
+          }}
+          onNodeContextMenu={(event, node) => {
+            event.preventDefault();
+            setSelectedNode(node);
+            setContextMenu({
+              x: event.clientX,
+              y: event.clientY,
+              type: "node",
+              id: node.id,
             });
+          }}
+          onEdgeContextMenu={(event, edge) => {
+            // Prevent default context menu
+            event.preventDefault();
+
+            // Select the edge
+            setSelectedEdge(edge);
+            setShowEdgeConfigPanel(true);
+
+            // Show context menu
+            setContextMenu({
+              x: event.clientX,
+              y: event.clientY,
+              type: "edge",
+              id: edge.id,
+            });
+          }}
+          onPaneContextMenu={(event) => {
+            // Prevent default context menu
+            event.preventDefault();
+
+            // Show context menu
+            setContextMenu({
+              x: event.clientX,
+              y: event.clientY,
+              type: "canvas",
+            });
+          }}
+          // XYFlow uses onEdgesChange instead of onEdgeUpdate
+          onInit={setReactFlowInstance}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView
+          deleteKeyCode={["Backspace", "Delete"]}
+          multiSelectionKeyCode={["Meta", "Shift"]}
+          defaultEdgeOptions={{ type: "custom" }}
+          onNodesChange={(changes) => {
+            // Use optimized handler for position changes, direct handler for other changes
+            const hasPositionChanges = changes.some(
+              (change) => change.type === "position" && change.position
+            );
+            const hasResizeChanges = changes.some(
+              (change) =>
+                change.type === "dimensions" &&
+                (change.dimensions?.width || change.dimensions?.height)
+            );
+
+            if (hasPositionChanges) {
+              // Use debounced update for smoother drag experience
+              debouncedNodeUpdate(changes);
+
+              // Only add to history after debounce completes
+              const updatedNodes = applyNodeChanges(changes, nodes);
+              addToHistory(updatedNodes, edges);
+            } else {
+              // Direct update for selection and other changes
+              setNodes((nds) => {
+                const updatedNodes = applyNodeChanges(changes, nds);
+
+                if (hasResizeChanges) {
+                  addToHistory(updatedNodes, edges);
+                }
+
+                return updatedNodes;
+              });
+            }
           }}
           onEdgesChange={(changes) => {
             setEdges((eds) => {
@@ -1389,24 +1466,12 @@ function FlowContent({
 
               return updatedEdges;
             });
-          }}
-          onConnect={onConnect}
-          // onNodeClick={onNodeClick}
-          onEdgeClick={onEdgeClick}
-          onNodeContextMenu={onNodeContextMenu}
-          onEdgeContextMenu={onEdgeContextMenu}
-          onPaneContextMenu={onPaneContextMenu}
-          onEdgeUpdateStart={onEdgeUpdateStart}
-          onEdgeUpdate={onEdgeUpdate}
-          onEdgeUpdateEnd={onEdgeUpdateEnd}
-          onInit={setReactFlowInstance}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView
-          defaultEdgeOptions={{ type: "custom" }}>
-          {isGridVisible && <Background />}
-          <Controls showInteractive={true} />
-          <MiniMap />
+          }}>
+          {isGridVisible && (
+            <Background variant='dots' gap={16} size={0.6} color='#f8fafc' />
+          )}
+          <Controls />
+          {nodes.length > 10 && <MiniMap pannable zoomable />}
         </ReactFlow>
       </div>
 
@@ -1437,10 +1502,30 @@ function FlowContent({
 }
 
 // Main component that wraps the flow content with the provider
-export function FlowCanvas(props: FlowCanvasProps) {
+export function FlowCanvas({
+  executionId,
+  initialNodes,
+  initialEdges,
+  onNodesChange,
+  onEdgesChange,
+  toolbarRef,
+}: FlowCanvasProps) {
   return (
     <ReactFlowProvider>
-      <FlowContent {...props} />
+      <FlowContent
+        executionId={executionId}
+        initialNodes={initialNodes}
+        initialEdges={initialEdges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        toolbarRef={toolbarRef}
+      />
     </ReactFlowProvider>
   );
 }
+
+// Add this to ensure NextJS knows this needs client-side rendering only
+FlowCanvas.displayName = "FlowCanvas";
+
+// Export types for use in other files
+export type { Node, Edge } from '@xyflow/react';

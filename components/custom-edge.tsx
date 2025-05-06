@@ -8,7 +8,7 @@ import {
   type EdgeProps,
   EdgeLabelRenderer,
   useKeyPress,
-} from "reactflow";
+} from "@xyflow/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { NodeCategory } from "@/types/workflow";
