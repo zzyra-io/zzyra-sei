@@ -101,7 +101,7 @@ export default function BuilderPage() {
     redo: () => {},
   });
 
-  // Memoize nodes and edges to prevent unnecessary re-renders
+  // Use useMemo for values that should be derived from state but not cause re-renders
   const memoizedNodes = useMemo(() => nodes, [nodes]);
   const memoizedEdges = useMemo(() => edges, [edges]);
 
@@ -1033,7 +1033,12 @@ export default function BuilderPage() {
   }, [nodes, edges]);
 
   const [configWarned, setConfigWarned] = useState(false);
-  useEffect(() => setConfigWarned(false), [nodes]);
+  // Fix the direct state update that could cause render loops
+  useEffect(() => {
+    if (nodes.length > 0) {
+      setConfigWarned(false);
+    }
+  }, [nodes]);
 
   const warnInvalidConfig = () => {
     if (hasInvalidConfig && !configWarned) {

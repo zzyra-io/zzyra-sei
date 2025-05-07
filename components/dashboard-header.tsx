@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
-import { FileText, Home, Layers, Menu, Search, X } from "lucide-react";
+import { Blocks, FileText, Home, Layers, Menu, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -32,7 +32,7 @@ export function DashboardHeader() {
     { name: "Dashboard", href: "/dashboard", icon: Home },
     { name: "Builder", href: "/builder", icon: Layers, badge: "New" },
     { name: "Templates", href: "/templates", icon: FileText },
-    // { name: "Finance", href: "/finance", icon: Zap },
+    { name: "Blocks Library", href: "/blocks/library", icon: Blocks },
     // { name: "Blockchain", href: "/blockchain", icon: Wallet },
   ];
 
