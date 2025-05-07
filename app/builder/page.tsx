@@ -10,6 +10,10 @@ import { SaveWorkflowDialog } from "@/components/save-workflow-dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { generateFlow } from "@/lib/api";
+import {
+  generateWorkflow,
+  refineWorkflow,
+} from "@/lib/api/workflow-generation";
 import { workflowService } from "@/lib/services/workflow-service";
 import {
   Loader2,
@@ -18,6 +22,10 @@ import {
   ArrowLeft,
   ArrowRight,
   Workflow,
+  ChevronDown,
+  Sparkles,
+  X,
+  RefreshCw,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -29,6 +37,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { redirect } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -56,8 +65,16 @@ import {
 } from "@/components/ui/tooltip";
 import { TourModal } from "@/components/tour-modal";
 
-// Add these imports at the top with the other imports
-import { ChevronDown, Sparkles, X } from "lucide-react";
+// Import AI workflow generation components
+import {
+  NlWorkflowGenerator,
+  type GenerationOptions,
+} from "@/components/workflow/nl-workflow-generator";
+import {
+  WorkflowRefinement,
+  type RefinementOptions,
+} from "@/components/workflow/workflow-refinement";
+import { WorkflowGenerationStatus } from "@/components/workflow/workflow-generation-status";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -105,11 +122,35 @@ export default function BuilderPage() {
   const memoizedNodes = useMemo(() => nodes, [nodes]);
   const memoizedEdges = useMemo(() => edges, [edges]);
 
-  // Add these state variables after the other useState declarations (around line 50-60)
+  // AI Workflow Generation state
   const [nlPrompt, setNlPrompt] = useState<string>("");
   const [isNlGenerating, setIsNlGenerating] = useState<boolean>(false);
+  const [generationStatus, setGenerationStatus] = useState({
+    status: "idle" as
+      | "idle"
+      | "preparing"
+      | "generating"
+      | "finalizing"
+      | "complete"
+      | "error",
+    progress: 0,
+    error: "",
+  });
+  const [partialNodes, setPartialNodes] = useState<Partial<Node>[]>([]);
+
+  // Refinement state
+  const [isRefinementOpen, setIsRefinementOpen] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
+
+  // Example prompts for the interface
   const [showExamples, setShowExamples] = useState<boolean>(false);
   const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
+  const examplePrompts = [
+    "Monitor ETH price every hour and send email when it crosses $3000",
+    "Create a workflow that fetches BTC price and sends a Telegram message when it drops by 5%",
+    "Build a data pipeline that collects trading volumes and saves them to a database",
+    "Create a system to regularly check gas prices and execute trades when they're low",
+  ];
 
   // Workflow validation function
   const validateWorkflow = (
@@ -779,26 +820,6 @@ export default function BuilderPage() {
   };
 
   // Add these example prompts after the tourMessages array (around line 520-530)
-  const examplePrompts = [
-    // Crypto Price Alerts
-    "Send email when Bitcoin price goes above $50,000",
-    "Monitor Ethereum price and notify me on Discord",
-
-    // DeFi Trading Automation
-    "Check Bitcoin price every hour and buy if below $40,000",
-    "Sell ETH when price reaches $3,000 and send SMS notification",
-    "Monitor gas prices and execute transaction when below 30 gwei",
-
-    // DeFi Yield Optimization
-    "Automatically move funds to the highest yield protocol between Aave and Compound",
-    "Create a dollar-cost averaging strategy for Bitcoin and Ethereum",
-    "Monitor and rebalance my liquidity positions across Uniswap pools",
-
-    // DeFi Position Management
-    "Create a risk management workflow for my DeFi positions",
-    "Automatically add collateral to prevent liquidation on Aave",
-    "Set up a yield farming strategy across multiple protocols",
-  ];
 
   // Add this function before the return statement (around line 550-560)
   const handleNlGenerate = async (e: React.FormEvent) => {
@@ -1287,84 +1308,92 @@ export default function BuilderPage() {
             </ResizablePanelGroup>
           </div>
 
-          {/* Natural Language Input Component */}
+          {/* AI Workflow Generation Component */}
           <div className='absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-full max-w-2xl px-4'>
-            <Card className='bg-background/80 backdrop-blur-sm border shadow-lg'>
-              <form
-                onSubmit={handleNlGenerate}
-                className='flex items-center p-2'>
-                <div className='relative flex-1'>
-                  <Input
-                    type='text'
-                    placeholder="Describe your workflow (e.g., 'send email when bitcoin reaches $50,000')"
-                    value={nlPrompt}
-                    onChange={(e) => setNlPrompt(e.target.value)}
-                    className='flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm pr-8'
-                    disabled={isNlGenerating}
-                  />
-                  {nlPrompt && (
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      className='absolute right-0 top-0 h-full px-2'
-                      onClick={() => setNlPrompt("")}>
-                      <X className='h-4 w-4' />
-                      <span className='sr-only'>Clear input</span>
-                    </Button>
-                  )}
-                </div>
+            <Card className='bg-background/80 backdrop-blur-sm border shadow-lg p-4'>
+              <NlWorkflowGenerator
+                onNodesGenerated={(newNodes, newEdges) => {
+                  // Update existing nodes and edges with the new ones
+                  setNodes((currentNodes) => [...currentNodes, ...newNodes]);
+                  setEdges((currentEdges) => [...currentEdges, ...newEdges]);
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant='ghost' size='sm' className='ml-1'>
-                      <ChevronDown className='h-4 w-4' />
-                      <span className='sr-only'>Show examples</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align='end' className='w-[400px]'>
-                    <div className='px-2 py-1.5 text-sm font-semibold'>
-                      Example prompts
-                    </div>
-                    {examplePrompts.map((prompt, i) => (
-                      <DropdownMenuItem
-                        key={i}
-                        onClick={() => handleSelectExample(prompt)}>
-                        {prompt}
-                      </DropdownMenuItem>
-                    ))}
-                    {recentPrompts.length > 0 && (
-                      <>
-                        <div className='px-2 py-1.5 text-sm font-semibold mt-2'>
-                          Recent prompts
-                        </div>
-                        {recentPrompts.map((prompt, i) => (
-                          <DropdownMenuItem
-                            key={`recent-${i}`}
-                            onClick={() => handleSelectExample(prompt)}>
-                            {prompt}
-                          </DropdownMenuItem>
-                        ))}
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  // Auto-fit view to show all nodes
+                  if (toolbarRef.current && toolbarRef.current.fitView) {
+                    setTimeout(() => toolbarRef.current.fitView(), 100);
+                  }
 
-                <Button
-                  type='submit'
-                  size='sm'
-                  className='ml-1'
-                  disabled={isNlGenerating || !nlPrompt.trim()}>
-                  {isNlGenerating ? (
-                    <Loader2 className='h-4 w-4 animate-spin' />
-                  ) : (
-                    <Sparkles className='h-4 w-4' />
-                  )}
-                  <span className='sr-only'>Generate workflow</span>
-                </Button>
-              </form>
+                  // Mark as having unsaved changes
+                  setHasUnsavedChanges(true);
+
+                  toast({
+                    title: "Workflow generated",
+                    description: `Created ${newNodes.length} components based on your description.`,
+                  });
+                }}
+                existingNodes={nodes}
+                existingEdges={edges}
+                isGenerating={isNlGenerating}
+                setIsGenerating={setIsNlGenerating}
+              />
             </Card>
           </div>
+
+          {/* Workflow Refinement Dialog */}
+          {isRefinementOpen && (
+            <Dialog open={isRefinementOpen} onOpenChange={setIsRefinementOpen}>
+              <DialogContent className='sm:max-w-[700px]'>
+                <WorkflowRefinement
+                  nodes={nodes}
+                  edges={edges}
+                  isRefining={isRefining}
+                  onClose={() => setIsRefinementOpen(false)}
+                  onRefine={async (prompt, options) => {
+                    setIsRefining(true);
+                    try {
+                      const result = await refineWorkflow(
+                        prompt,
+                        options,
+                        nodes,
+                        edges,
+                        (status, progress, partial) => {
+                          setGenerationStatus({
+                            status: status as any,
+                            progress,
+                            error: "",
+                          });
+                          if (partial) setPartialNodes(partial);
+                        }
+                      );
+
+                      if (result && result.nodes && result.edges) {
+                        setNodes(result.nodes);
+                        setEdges(result.edges);
+                        setHasUnsavedChanges(true);
+                        setIsRefinementOpen(false);
+
+                        toast({
+                          title: "Workflow refined",
+                          description: `Updated workflow based on your refinement request.`,
+                        });
+                      }
+                    } catch (error) {
+                      console.error("Error refining workflow:", error);
+                      toast({
+                        title: "Refinement failed",
+                        description:
+                          error instanceof Error
+                            ? error.message
+                            : "Failed to refine workflow. Please try again.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setIsRefining(false);
+                    }
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       )}
 
