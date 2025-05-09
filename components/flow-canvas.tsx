@@ -83,8 +83,6 @@ interface FlowCanvasProps {
   }>;
 }
 
-export type { Node, Edge };
-
 // Create a separate component for the flow content to use hooks inside the provider
 function FlowContent({
   initialNodes = [],
@@ -497,7 +495,7 @@ function FlowContent({
         duration: 1500,
       });
     }
-  }, [selectedNode, nodes, edges, setNodes, addToHistory, toast]);
+  }, [selectedNode, edges, setNodes, addToHistory, toast]);
 
   // Handle node duplication
   const handleDuplicateSelectedNode = useCallback(() => {
@@ -523,7 +521,7 @@ function FlowContent({
         duration: 1500,
       });
     }
-  }, [selectedNode, nodes, edges, setNodes, addToHistory, toast]);
+  }, [selectedNode, edges, setNodes, addToHistory, toast]);
 
   // Handle node alignment
   const handleAlignHorizontal = useCallback(
@@ -575,12 +573,8 @@ function FlowContent({
         addToHistory(newNodes, edges);
         return newNodes;
       });
-
-      if (onNodesChange) {
-        onNodesChange(nodes);
-      }
     },
-    [selectedNode, nodes, edges, onNodesChange, setNodes, addToHistory]
+    [selectedNode, edges, setNodes, addToHistory]
   );
 
   // Handle node vertical alignment
@@ -633,12 +627,8 @@ function FlowContent({
         addToHistory(newNodes, edges);
         return newNodes;
       });
-
-      if (onNodesChange) {
-        onNodesChange(nodes);
-      }
     },
-    [selectedNode, nodes, edges, onNodesChange, setNodes, addToHistory]
+    [selectedNode, edges, setNodes, addToHistory]
   );
 
   // Handle canvas reset
@@ -647,15 +637,12 @@ function FlowContent({
     setEdges([]);
     addToHistory([], []);
 
-    if (onNodesChange) onNodesChange([]);
-    if (onEdgesChange) onEdgesChange([]);
-
     toast({
       title: "Canvas Reset",
       description: "All nodes and connections have been removed",
       duration: 1500,
     });
-  }, [onNodesChange, setNodes, setEdges, onEdgesChange, addToHistory, reactFlowHook, toast]);
+  }, [setNodes, setEdges, addToHistory, toast]);
 
   // Handle zoom in
   const handleZoomIn = useCallback(() => {
@@ -688,9 +675,6 @@ function FlowContent({
       setNodes(prevNodes);
       setEdges(prevEdges);
 
-      if (onNodesChange) onNodesChange(prevNodes);
-      if (onEdgesChange) onEdgesChange(prevEdges);
-
       setHistory((prev) => ({
         ...prev,
         currentIndex: newIndex,
@@ -702,7 +686,7 @@ function FlowContent({
         duration: 1500,
       });
     }
-  }, [history, onNodesChange, onEdgesChange, setNodes, setEdges, toast]);
+  }, [history, setNodes, setEdges, toast]);
 
   // Handle redo
   const handleRedo = useCallback(() => {
@@ -713,9 +697,6 @@ function FlowContent({
 
       setNodes(nextNodes);
       setEdges(nextEdges);
-
-      if (onNodesChange) onNodesChange(nextNodes);
-      if (onEdgesChange) onEdgesChange(nextEdges);
 
       setHistory((prev) => ({
         ...prev,
@@ -728,7 +709,7 @@ function FlowContent({
         duration: 1500,
       });
     }
-  }, [history, onNodesChange, onEdgesChange, setNodes, setEdges, toast]);
+  }, [history, setNodes, setEdges, toast]);
 
   // Set up keyboard shortcuts
   useHotkeys("ctrl+z", handleUndo, [handleUndo]);
@@ -766,13 +747,8 @@ function FlowContent({
         addToHistory(nodes, newEdges);
         return newEdges;
       });
-
-      // Notify parent component if callback is provided
-      if (onEdgesChange) {
-        onEdgesChange(addEdge(newEdge, edges));
-      }
     },
-    [nodes, edges, onEdgesChange, setEdges, addToHistory, toast]
+    [nodes, edges, setEdges, addToHistory, toast]
   );
 
   // XYFlow uses a different approach for edge updates
@@ -822,15 +798,8 @@ function FlowContent({
       });
 
       setSelectedNode(updatedNode);
-
-      // Notify parent component if callback is provided
-      if (onNodesChange) {
-        onNodesChange(
-          nodes.map((node) => (node.id === updatedNode.id ? updatedNode : node))
-        );
-      }
     },
-    [nodes, edges, onNodesChange, setNodes, addToHistory]
+    [edges, setNodes, addToHistory, setSelectedNode]
   );
 
   // Add edge update handler
@@ -845,88 +814,9 @@ function FlowContent({
       });
 
       setSelectedEdge(updatedEdge);
-
-      // Notify parent component if callback is provided
-      if (onEdgesChange) {
-        onEdgesChange(
-          edges.map((edge) => (edge.id === updatedEdge.id ? updatedEdge : edge))
-        );
-      }
     },
-    [nodes, edges, onEdgesChange, setEdges, addToHistory]
+    [nodes, edges, setEdges, addToHistory]
   );
-
-  // Handle node selection
-  // const onNodeDoubleClick = useCallback(
-  //   (event: React.MouseEvent, node: Node) => {
-  //     setSelectedNode(node);
-  //     setShowConfigPanel(true);
-  //   },
-  //   [setSelectedNode]
-  // );
-
-  // // Add edge click handler
-  // const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
-  //   console.log("Edge clicked:", edge);
-  //   setSelectedEdge(edge);
-  //   setShowEdgeConfigPanel(true);
-  // }, []);
-
-  // // Add context menu handlers
-  // const onNodeContextMenu = useCallback(
-  //   (event: React.MouseEvent, node: Node) => {
-  //     // Prevent default context menu
-  //     event.preventDefault();
-
-  //     // Select the node
-  //     setSelectedNode(node);
-  //     // setShowConfigPanel(true);
-
-  //     // Show context menu
-  //     setContextMenu({
-  //       x: event.clientX,
-  //       y: event.clientY,
-  //       type: "node",
-  //       id: node.id,
-  //     });
-  //   },
-  //   [setSelectedNode, setShowConfigPanel, setContextMenu]
-  // );
-  // Event handlers for context menus
-  // const onEdgeContextMenu = useCallback(
-  //   (event: React.MouseEvent, edge: Edge) => {
-  //     // Prevent default context menu
-  //     event.preventDefault();
-
-  //     // Select the edge
-  //     setSelectedEdge(edge);
-  //     setShowEdgeConfigPanel(true);
-
-  //     // Show context menu
-  //     setContextMenu({
-  //       x: event.clientX,
-  //       y: event.clientY,
-  //       type: "edge",
-  //       id: edge.id,
-  //     });
-  //   },
-  //   [setSelectedEdge, setShowEdgeConfigPanel, setContextMenu]
-  // );
-
-  // const onPaneContextMenu = useCallback(
-  //   (event: React.MouseEvent) => {
-  //     // Prevent default context menu
-  //     event.preventDefault();
-
-  //     // Show context menu
-  //     setContextMenu({
-  //       x: event.clientX,
-  //       y: event.clientY,
-  //       type: "canvas",
-  //     });
-  //   },
-  //   [setContextMenu]
-  // );
 
   // Add context menu close handler
   const closeContextMenu = useCallback(() => {
@@ -1213,13 +1103,8 @@ function FlowContent({
         addToHistory(newNodes, edges);
         return newNodes;
       });
-
-      // Notify parent component if callback is provided
-      if (onNodesChange) {
-        onNodesChange([...nodes, newNode]);
-      }
     },
-    [nodes, edges, onNodesChange, reactFlowHook, setNodes, addToHistory]
+    [edges, reactFlowHook, setNodes, addToHistory]
   );
 
   // Drag highlighting: show dashed outline on valid drop
@@ -1295,9 +1180,6 @@ function FlowContent({
   useEffect(() => {
     if (onNodesChange) onNodesChange(nodes);
   }, [nodes, onNodesChange]);
-  useEffect(() => {
-    if (onEdgesChange) onEdgesChange(edges);
-  }, [edges, onEdgesChange]);
 
   // Highlight disconnected nodes
   useEffect(() => {
@@ -1528,4 +1410,4 @@ export function FlowCanvas({
 FlowCanvas.displayName = "FlowCanvas";
 
 // Export types for use in other files
-export type { Node, Edge } from '@xyflow/react';
+export type { Node, Edge } from "@xyflow/react";
