@@ -1,10 +1,4 @@
-import {
-  Position,
-  internalsSymbol,
-  type Node,
-  type XYPosition,
-  type Edge,
-} from "reactflow";
+import { Position, type Node, type XYPosition } from "@xyflow/react";
 
 // Helper function to get the center of a node
 export function getNodeCenter(node: Node): XYPosition {

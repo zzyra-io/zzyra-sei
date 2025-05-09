@@ -80,6 +80,25 @@ const SUPPORTED_CHAINS: Chain[] = [
   },
 ]
 
+// Safe wrapper to handle potential null/undefined values for wallets
+const safeWalletConnect = (projectId: string | undefined) => {
+  // Only initialize WalletConnect when we have a valid project ID
+  if (!projectId || projectId.trim() === '') {
+    // Return a dummy connector that won't crash when Object.values is called on it
+    return {
+      id: 'walletconnect-disabled',
+      name: 'WalletConnect',
+      getWallets: () => ({}),
+      connect: async () => { throw new Error('WalletConnect not configured'); }
+    };
+  }
+  
+  // Otherwise, return the real WalletConnect connector
+  return walletConnect({
+    projectId: projectId,
+  });
+};
+
 export const config = createConfig(
   getDefaultConfig({
     appName: "Zyra",
@@ -87,9 +106,7 @@ export const config = createConfig(
     appIcon: "https://zyra.io/zyra-logo.png",
     connectors: [
       injected(),
-      walletConnect({
-        projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "",
-      }),
+      safeWalletConnect(process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID)
     ],
     chains: [mainnet, polygon, arbitrum, base],
     walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "",
