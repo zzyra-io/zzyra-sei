@@ -9,6 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_blockchain_operations: {
+        Row: {
+          blockchain: string | null
+          created_at: string
+          error: string | null
+          execution_id: string
+          id: string
+          node_id: string
+          operation_type: string
+          prompt: string | null
+          result: Json | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          blockchain?: string | null
+          created_at?: string
+          error?: string | null
+          execution_id: string
+          id?: string
+          node_id: string
+          operation_type: string
+          prompt?: string | null
+          result?: Json | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          blockchain?: string | null
+          created_at?: string
+          error?: string | null
+          execution_id?: string
+          id?: string
+          node_id?: string
+          operation_type?: string
+          prompt?: string | null
+          result?: Json | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -269,6 +311,117 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      blockchain_transactions: {
+        Row: {
+          block_number: number | null
+          chain_id: number
+          created_at: string
+          data: Json | null
+          effective_gas_price: string | null
+          error: string | null
+          execution_id: string
+          gas_limit: string | null
+          gas_used: string | null
+          hash: string | null
+          id: string
+          max_fee_per_gas: string | null
+          max_priority_fee_per_gas: string | null
+          node_id: string
+          nonce: number | null
+          status: string
+          to_address: string
+          updated_at: string
+          user_id: string | null
+          value: string
+          wallet_address: string
+        }
+        Insert: {
+          block_number?: number | null
+          chain_id: number
+          created_at?: string
+          data?: Json | null
+          effective_gas_price?: string | null
+          error?: string | null
+          execution_id: string
+          gas_limit?: string | null
+          gas_used?: string | null
+          hash?: string | null
+          id?: string
+          max_fee_per_gas?: string | null
+          max_priority_fee_per_gas?: string | null
+          node_id: string
+          nonce?: number | null
+          status: string
+          to_address: string
+          updated_at?: string
+          user_id?: string | null
+          value: string
+          wallet_address: string
+        }
+        Update: {
+          block_number?: number | null
+          chain_id?: number
+          created_at?: string
+          data?: Json | null
+          effective_gas_price?: string | null
+          error?: string | null
+          execution_id?: string
+          gas_limit?: string | null
+          gas_used?: string | null
+          hash?: string | null
+          id?: string
+          max_fee_per_gas?: string | null
+          max_priority_fee_per_gas?: string | null
+          node_id?: string
+          nonce?: number | null
+          status?: string
+          to_address?: string
+          updated_at?: string
+          user_id?: string | null
+          value?: string
+          wallet_address?: string
+        }
+        Relationships: []
+      }
+      circuit_breaker_state: {
+        Row: {
+          circuit_id: string
+          created_at: string
+          failure_count: number
+          id: string
+          last_failure_time: string | null
+          last_half_open_time: string | null
+          last_success_time: string | null
+          state: string
+          success_count: number
+          updated_at: string
+        }
+        Insert: {
+          circuit_id: string
+          created_at?: string
+          failure_count?: number
+          id?: string
+          last_failure_time?: string | null
+          last_half_open_time?: string | null
+          last_success_time?: string | null
+          state?: string
+          success_count?: number
+          updated_at?: string
+        }
+        Update: {
+          circuit_id?: string
+          created_at?: string
+          failure_count?: number
+          id?: string
+          last_failure_time?: string | null
+          last_half_open_time?: string | null
+          last_success_time?: string | null
+          state?: string
+          success_count?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       custom_blocks: {
         Row: {
@@ -1151,6 +1304,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_wallets: {
+        Row: {
+          created_at: string
+          id: string
+          network_id: string
+          smart_wallet_address: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          network_id: string
+          smart_wallet_address: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          network_id?: string
+          smart_wallet_address?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       workflow_executions: {
         Row: {

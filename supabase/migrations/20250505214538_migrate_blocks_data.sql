@@ -18,7 +18,7 @@ BEGIN
         bl.name,
         COALESCE(bl.description, ''),
         COALESCE(bl.block_type, 'custom'),
-        'Logic', -- Use a known valid category to pass constraint check
+        'LOGIC', -- Use uppercase LOGIC which is the valid enum value for the category constraint
         bl.block_data,
         COALESCE(bl.is_public, true),
         '[]'::jsonb, -- Use empty JSON array for tags to avoid type issues
@@ -27,7 +27,8 @@ BEGIN
         COALESCE(bl.updated_at, NOW()),
         '1.0.0',
         COALESCE((bl.block_data->>'code')::text, ''),
-        COALESCE((bl.block_data->>'logic')::text, '')
+        COALESCE((bl.block_data->>'logic')::text, '// Default logic for migrated block
+return inputs;')
       FROM block_library bl
       WHERE 
         bl.block_data IS NOT NULL
