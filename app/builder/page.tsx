@@ -143,13 +143,14 @@ export default function BuilderPage() {
 
   // Handlers using store actions
   const handleAddBlock = useCallback(
-    (blockType) => {
+    (blockType: string) => {
       const newNode = {
         id: `${Date.now()}`,
         type: blockType,
         position: { x: 100, y: 100 },
         data: { label: `${blockType} Node` },
       };
+      console.log("newNode", newNode);
       addNode(newNode);
       setHasUnsavedChanges(true);
     },
@@ -157,7 +158,7 @@ export default function BuilderPage() {
   );
 
   const handleAddCustomBlock = useCallback(
-    (customData) => {
+    (customData: any) => {
       const newNode = {
         id: `${Date.now()}`,
         type: "custom",

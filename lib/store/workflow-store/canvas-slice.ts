@@ -12,7 +12,7 @@ const throttle = <T extends (...args: any[]) => any>(
 ): T => {
   let lastFunc: ReturnType<typeof setTimeout>;
   let lastRan: number;
-  
+
   return ((...args: Parameters<T>): ReturnType<T> => {
     if (!lastRan) {
       func(...args);
@@ -64,6 +64,7 @@ export const createCanvasSlice: StateCreator<
   addNode: (node: Node) => {
     const { nodes, addToHistory, edges } = get();
     const newNodes = [...nodes, node];
+    console.log("newNodes", newNodes);
     set(() => ({ nodes: newNodes }));
     addToHistory(newNodes, edges);
   },
@@ -84,10 +85,10 @@ export const createCanvasSlice: StateCreator<
     const newEdges = edges.filter(
       (edge) => edge.source !== nodeId && edge.target !== nodeId
     );
-    set(() => ({ 
-      nodes: newNodes, 
+    set(() => ({
+      nodes: newNodes,
       edges: newEdges,
-      selectedNode: null 
+      selectedNode: null,
     }));
     setSelectedNode(null);
     addToHistory(newNodes, newEdges);
@@ -117,9 +118,9 @@ export const createCanvasSlice: StateCreator<
   removeEdge: (edgeId: string) => {
     const { edges, addToHistory, nodes, setSelectedEdge } = get();
     const newEdges = edges.filter((edge) => edge.id !== edgeId);
-    set(() => ({ 
+    set(() => ({
       edges: newEdges,
-      selectedEdge: null 
+      selectedEdge: null,
     }));
     setSelectedEdge(null);
     addToHistory(nodes, newEdges);
