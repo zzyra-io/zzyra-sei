@@ -1,0 +1,60 @@
+# Zyra Production Deployment Checklist
+
+## Pre-Deployment
+
+### Code Quality
+- [ ] All tests passing (unit, integration, e2e)
+- [ ] Code review completed
+- [ ] Security scan completed
+- [ ] Performance testing completed
+- [ ] No critical or high-severity issues open
+
+### Database
+- [ ] Database migrations tested in staging
+- [ ] Backup of production database taken
+- [ ] Rollback scripts prepared
+
+### Configuration
+- [ ] Environment variables updated
+- [ ] Feature flags configured
+- [ ] Third-party service credentials verified
+- [ ] SSL certificates valid and not expiring soon
+
+### Documentation
+- [ ] API documentation updated
+- [ ] Release notes prepared
+- [ ] User documentation updated if needed
+
+## Deployment
+
+### Process
+- [ ] Notify team of deployment start
+- [ ] Enable maintenance mode if needed
+- [ ] Deploy database migrations
+- [ ] Deploy application updates
+- [ ] Run smoke tests
+- [ ] Verify all services healthy
+- [ ] Disable maintenance mode
+
+### Verification
+- [ ] Critical user flows working
+- [ ] Monitoring dashboards show normal activity
+- [ ] Error rates within acceptable thresholds
+- [ ] Performance metrics within expected ranges
+
+## Post-Deployment
+
+### Monitoring
+- [ ] Watch error rates for 1 hour
+- [ ] Monitor performance for unusual patterns
+- [ ] Check user feedback channels
+
+### Communication
+- [ ] Notify team of successful deployment
+- [ ] Announce to users if visible changes
+- [ ] Update status page
+
+### Documentation
+- [ ] Document any issues encountered
+- [ ] Update runbooks if needed
+- [ ] Schedule retrospective if necessary

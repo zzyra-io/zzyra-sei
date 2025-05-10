@@ -1,0 +1,165 @@
+ Builder Page (Workflow Designer)
+Current flow
+• User drags/drops blocks, connects edges, configures each node.
+• Save/Publish calls your API which enqueues a “create workflow” job.
+
+Production‑grade UX
+
+Autosave & Recovery
+– Persist the draft to local storage or Draft table on each change.
+– On reload/crash, recover position, zoom, block states.
+Real‑time Collaboration
+– Use WebSockets/Firestore (or Supabase Realtime) to broadcast edits.
+Validation & Feedback
+– Inline schema validation (via nodeConfigSchema) with red outlines/tooltips before save.
+– Disable “Publish” until the graph is acyclic and each node passes its config schema.
+Versioning & Comments
+– Keep history of published versions (Git‑like diffs).
+– Allow comments/annotations on nodes/edges for team reviews.
+Performance
+– Virtualize large graphs (>100 nodes) to keep render <16 ms.
+– Debounce expensive computations (layout, serialization).
+; 2. Execution Detail Page
+; Current flow
+; • On click of an execution row, the UI fetches workflow_executions + nested node_executions.
+; • Displays a timeline or table of node statuses.
+
+; Production‑grade UX
+
+; Summary & KPIs
+; – Top banner: total runs, success rate, avg/median duration, peak concurrency.
+; – Sparkline of executions over time (last 24 h, 7 d, 30 d).
+; Drill‑down Charts
+; – Gantt chart or swimlane: each node’s start/end times in context.
+; – Heatmap: slowest nodes, error‑prone nodes (failures per 100 runs).
+; Live Tail & Replay
+; – If an execution is running, stream incremental updates (via Supabase realtime).
+; – “Replay” mode: animate the DAG in sync with execution timestamps.
+; Contextual Logs
+; – Inline log viewer (with level filters: info, warn, error) next to each node.
+; – Link to full JSON payload or stack trace for errors.
+; Actionable Controls
+; – “Retry from failed node,” “Pause,” “Cancel.”
+; – On pause nodes: show input snapshot and allow “Resume.”
+; Accessibility & Performance
+; – Keyboard navigation through nodes/logs.
+; – Lazy‑load logs and metrics; paginate long histories.
+3. Logs Page (Execution Logs List)
+Current flow
+• Table with columns: execution ID, status, start time, duration.
+• Filter by status, sort by time/duration.
+
+Production‑grade UX
+
+Rich Filtering
+– Multi‑select status, date‑range picker, tag or workflow‑name filter.
+– Keyword search across logs or metadata.
+Sorting & Grouping
+– Group by workflow or user, expand/collapse groups.
+– Pin/favorite important runs.
+Infinite Scroll & Pagination
+– Cursor‑based pagination for large datasets.
+– “Load more” button or infinite scroll with virtualization.
+Real‑time Updates
+– Show new incoming runs at top with a “1 new execution” toast.
+– Option to auto‑refresh or manual refresh.
+Bulk Actions
+– Batch retry, batch cancel, export selected runs to CSV/JSON.
+Visual Status Indicators
+– Color‑coded rows or “pill” badges (green/info/amber/red).
+– Inline sparkline of node durations or error counts per run.
+4. Cross‑Cutting Concerns
+Observability & Alerting
+– Instrument both front‑ and back‑end with Prometheus/Grafana dashboards.
+– Alerts on failure‑rate spikes, queue backlogs, high tail latency.
+Idempotency & Exactly‑Once
+– Ensure each trigger/request has a unique idempotency key.
+– Use upserts or ON CONFLICT semantics to prevent duplicate runs.
+Back‑Pressure & Rate‑Limiting
+– Surface real‑time queue length and processing latency to users.
+– Throttle new runs if worker pool is saturated.
+Security & Multi‑Tenant
+– Row‑level security in Supabase: each user sees only their workflows/logs.
+– Audit trails: who created, who executed, who modified.
+Mobile‑Responsive & Accessibility
+– Responsive layouts for tablet/phone (collapsible sidebars, full‑screen graphs).
+– ARIA roles on tables, charts, form controls; high‐contrast mode.
+
+
+
+ Builder Page (ui/app/builder/page.tsx)
+Key Flow
+Initialization
+• Load an existing workflow (via workflowService.getWorkflow) into nodes/edges.
+• Track hasUnsavedChanges to prompt on exit.
+Editing Canvas
+• FlowCanvas drives node drag/drop and edge wiring.
+• BuilderSidebar lets you insert new blocks.
+Save / Delete
+• handleSaveWorkflow calls create or update.
+• Shows toast on success or failure.
+Execute
+• handleExecuteWorkflow ensures workflowId, then POSTs to /api/execute-workflow.
+• performExecution handles the same—sets isExecuting, calls the API, toasts an executionId.
+Utilities
+• Undo/redo/zoom/grid via WorkflowToolbar + refs.
+• Preview “dry‑run” via handlePreview, which mocks logs.
+Production‑Grade Recommendations
+Autosave & Drafts
+– Persist nodes/edges in IndexedDB or Supabase “drafts” on every change.
+– On reload, restore draft automatically.
+Schema Validation & Disable Execute
+– Before any save or execute, run nodeConfigSchema.parse on every node.
+– Disable the Execute button until all nodes pass validation.
+Optimistic UI + Rollback
+– When saving/updating, immediately show the new graph state; if the API fails, rollback and show error.
+Collaborative Editing (Future)
+– Integrate Supabase Realtime to broadcast node moves/edits to teammates in the same session.
+Performance & UX
+– Virtualize the canvas rendering for very large graphs (>200 nodes).
+– Debounce expensive operations (e.g. JSON stringification) when updating search params or saving.
+2. Execution Worker (zyra‑worker/src/workers/execution.ts)
+Key Flow
+Batch Consumption
+• processItem(batch: any[]) picks up messages from RabbitMQ.
+• Parses each to { executionId, workflowId, userId }.
+Mark Running + Fetch
+• supabase.from('workflow_executions').update({ status: 'running' }).
+• Loads the workflow definition via workflowService.getWorkflow.
+Delegate to Shared Engine
+• Calls workflowExecutionEngine.executeWorkflowDefinition(...), which:
+Inserts/updates workflow_executions row.
+Inserts all nodes as pending in node_executions.
+Executes nodes, transitions them to running → completed/failed, logs per‐node.
+Returns final { status, nodeResults, timings }.
+Finalize
+• Worker writes back status & full payload to workflow_executions.
+• Logs success or failure and acks/nacks the message.
+Production‑Grade Recommendations
+Dead‑Letter & Retry Policies
+– If a job fails due to transient error (Supabase timeout, network), requeue with back‑off.
+– After N retries, send to a dead‑letter queue and alert.
+Exactly‑Once Semantics
+– Use idempotency keys: on each message, check if executionId has already been processed.
+– Avoid double‐processing if RabbitMQ redelivers.
+Monitoring & Alerts
+– Push Prometheus metrics:
+• Queue length, processing latency, error vs success rate.
+• Label by workflowId or userId for per‑tenant SLA.
+– Set Grafana alerts on error spikes or queue backlogs.
+Graceful Shutdown & Scaling
+– Respond to SIGTERM by draining in‑flight jobs and stopping new consumption.
+– Auto‑scale worker pods based on queue backlog.
+Security & RLS
+– Ensure the service client uses Supabase Service Role keys, and row‑level security enforces multi‑tenancy.
+
+
+
+
+
+
+ ] UI always renders all nodes for the selected execution, even if some have not started.
+[ ] Node status is shown for each node (pending, running, paused, completed, failed).
+[ ] NodeExecutions are created for every node at the start of the execution (not just when a node starts running).
+[ ] API returns all nodes (with status) for an execution.
+[ ] Worker creates node_executions records for every node at the start.

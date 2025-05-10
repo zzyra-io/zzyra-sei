@@ -1,0 +1,68 @@
+Authentication
+• Present: Supabase-based login callback (app/auth/callback/route.ts), cookie/session wiring.
+• Gaps:
+– Login UI (social/OAuth provider chooser), sign-out endpoint.
+– User profile page (view/edit).
+– Refresh-token handling, session renewal hooks in front-end.
+– 2FA/MFA flows, SSO/SAML, enterprise RBA­­C.
+Billing & Subscriptions
+• Present:
+– ui/lib/services/stripe-service.ts, checkout and webhook functions under app/api/billing.
+– Supabase Edge Functions for session creation & webhook handler.
+• Gaps:
+– Plan-selection UI (pricing/ page only lists tiers, but no “manage subscription”).
+– Upgrade/downgrade, trial-management, promo-codes, cancel flows.
+– Invoicing, receipt emails, dunning logic.
+– Metered usage tracking in backend (no usage metering endpoints).
+Team & User Management
+• Present: skeleton app/teams/ pages.
+• Gaps:
+– Invite via email, accept-invite flow.
+– Roles & permissions in UI, enforcement in API (RBAC middleware).
+– Audit-log table + UI to surface actions.
+Notifications
+• Present:
+– Email send endpoint, basic notification templates table.
+– NotificationGateway pushing via WebSocket on notifications table inserts.
+• Gaps:
+– Telegram / Discord channel handlers (docs describe them but code only has email + WS).
+– User-preferences table + settings UI under settings/notifications.
+– Template management UI + CRUD API.
+– Throttling/batching, retry logic on failed deliveries.
+Workflow Builder & UX
+• Present: React Flow editor under app/workflow-builder, block catalog in components/.
+• Gaps:
+– Save/load workflow versions, draft autosave.
+– Undo/redo UI controls.
+– Error-state handling (node validation errors aren’t surfaced inline).
+– Mobile/responsive touches, accessibility (ARIA labels).
+Workflow Execution Engine
+• Present: NestJS worker with robust retry, column fixes, AI-blockchain timeouts.
+• Gaps:
+– Concurrency limits, queue scaling (no worker-pool config).
+– Dead-letter handling, poison-message alerts.
+– Execution history UI (only logs API exists, no front-end page).
+Observability & Monitoring
+• Present: Logger usage; Supabase metrics.
+• Gaps:
+– Centralized log store (e.g. ELK/Datadog), health-check endpoints.
+– Metrics dashboards (Prometheus/Grafana, PostHog events).
+– Alerting (Sentry/PagerDuty) on errors/timeouts.
+Testing & CI/CD
+• Present: Jest tests under zyra-worker/tests, basic lint/pre-commit.
+• Gaps:
+– E2E (Cypress/Playwright) for critical flows.
+– Performance/load tests for engine and UI.
+– CI pipelines enforcing migrations, lint, build, deploy to staging/prod.
+Security & Compliance
+• Present: RLS on tables, secrets via .env, basic error-handling.
+• Gaps:
+– Secret rotation management, Vault integration.
+– Data-deletion/GDPR flows in UI.
+– Security scans (Snyk, Dependabot) automation.
+Docs & Support
+• Present: thorough ui/docs/, API-specs, feature roadmap.
+• Gaps:
+– Live API docs (Swagger/OpenAPI) with SDK examples.
+– In-app “Help” center linking docs.
+– Support/contact widget in UI.

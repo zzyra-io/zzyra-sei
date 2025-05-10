@@ -1,0 +1,49 @@
+Reliability & Fault Tolerance
+[ ] Idempotency: ensure re-running a job won’t cause side-effects.
+[ ] Retry policy: configurable back-off, max attempts, jitter.
+[ ] Dead-letter queue: capture permanently failed jobs for manual review.
+[ ] Circuit breakers/fallbacks for downstream failures (DB, web3, AI).
+Scalability & Performance
+[ ] Horizontal scaling: worker statelessness, queue partitioning.
+[ ] Concurrency limits: per-worker and per-job class.
+[ ] Backpressure: auto-throttle producers when queue is full.
+[ ] Rate-limits for external APIs (Ollama, blockchain nodes).
+Observability & Monitoring
+[ ] Structured logging with correlation IDs (per workflow/run).
+[ ] Metrics (Prometheus/Grafana): job duration, success/fail counts.
+[ ] Tracing (OpenTelemetry) across engine → AI → DB → chain calls.
+[ ] Health-checks (HTTP “/healthz”): readiness & liveness probes.
+[ ] Alerting: failures above threshold, high retry rates, long-running tasks.
+Security & Compliance
+[ ] Secrets management: never commit private keys/API tokens.
+[ ] Authz/Authn: verify who can trigger/schedule workflows.
+[ ] RLS & policies on Supabase tables (node_logs, queue).
+[ ] Input validation/sanitization for user-provided payloads.
+Configuration & Environment
+[ ] Env vars (with schema validation, e.g. joi/env-schema) for endpoints, keys, limits.
+[ ] Separate configs for dev/staging/prod.
+[ ] Feature flags for toggling experimental blocks.
+Workflow Use Cases
+[ ] Synchronous “fast” tasks vs. long-running (ML inference, chain confirmations).
+[ ] Parallel vs. sequential node execution.
+[ ] Nested/sub-workflow support with status aggregation.
+[ ] Human-in-the-loop steps (pause, resume, manual approval).
+[ ] Compensation/rollback for transactional flows.
+Data Integrity & Persistence
+[ ] Transactional DB writes for state changes (Supabase).
+[ ] Versioning of workflow definitions & backward compatibility.
+[ ] Archival: purge or archive old run logs per retention policy.
+Testing & QA
+[ ] Unit tests for individual services/controllers (Jest).
+[ ] Integration tests with Supabase queue, mock AI/blockchain.
+[ ] Load/stress tests simulating realistic job volumes.
+[ ] End-to-end tests for full workflow from API → engine → DB.
+Deployment & CI/CD
+[ ] Containerization (Dockerfile) with multi-stage build.
+[ ] CI pipelines: lint, type-check, test, build image, scan for secrets.
+[ ] CD: staging rollouts, canary/progressive deployments.
+[ ] Version tagging & changelog for release tracking.
+Documentation & Onboarding
+[ ] README: setup, run, env vars, health endpoints.
+[ ] Docs folder: workflow schema, block definitions, error codes.
+[ ] API docs (Swagger/OpenAPI) for engine endpoints.

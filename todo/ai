@@ -1,0 +1,17 @@
+. Proactive Assistance & Validation:
+
+Identify Missing Information: If the AI generates a node requiring specific input (like an API key or URL) that wasn't in the prompt, highlight that node and prompt the user for the missing details.
+Auto-Validation: Run the workflow validation checks immediately after generation and clearly indicate any errors or warnings (e.g., disconnected nodes, missing required fields).
+Suggest Next Steps: Based on the generated workflow, offer suggestions for common follow-up actions (e.g., "Add error handling?" or "Notify on success?"). 3. Improved User Experience (UX) & Automation:
+
+Incremental Edits: Allow prompts that modify the existing workflow (e.g., "Change the target price to $60,000") instead of just adding new parts. (This is more complex).
+Clear Progress Indicators: Show more detailed status during generation (e.g., "Generating nodes...", "Connecting edges...").
+Visual Feedback: Clearly highlight newly added nodes/edges, perhaps with a temporary animation or glow effect.
+Auto-Layout: Automatically arrange the newly added nodes neatly on the canvas using a layout algorithm.
+Auto-Save Post-Generation: Automatically save the workflow (or create a new version) immediately after successful generation.
+Auto-Fit View: Automatically adjust the zoom/pan to ensure all nodes (especially new ones) are visible. 4. Production Readiness (Backend & Reliability):
+
+Robust API Endpoint: Ensure the /api/generate-flow endpoint has proper authentication, rate limiting, quota checks, and detailed error handling/logging. (Some of this seems commented out currently).
+Model Flexibility: Allow selection of different AI models (perhaps based on subscription).
+Cost Management: Implement monitoring for AI API usage costs.
+Security: Sanitize prompts and rigorously validate AI responses against your defined schemas to prevent errors or malicious inputs

@@ -1,0 +1,20 @@
+Additional SaaS Best Practices
+Rate limiting per user/workflow.
+Multi-tenancy: ensure all queries are scoped by user/org.
+Row Level Security (RLS): enforce at the DB level.
+Automated migrations: CI/CD pipeline should always apply and verify DB migrations.
+
+w:
+
+Use PostgreSQL transactions via a robust Node.js client like pg (not just the Supabase JS client, which has limited transaction support).
+All workflow-related inserts/updates (including logs) should happen inside a single transaction per workflow execution. 2. Strict Error Handling and Retries
+Abort and rollback the transaction on any error.
+Implement retry logic for transient errors (e.g., network blips, deadlocks).
+Log all errors with enough metadata for debugging and alerting. 3. Idempotency and Race Condition Protection
+Use unique constraints and idempotency keys where possible to prevent duplicate workflow executions/logs.
+Ensure your system is safe for concurrent requests (no race conditions). 4. Monitoring, Metrics, and Alerting
+Log all workflow and node execution outcomes (success/failure).
+Integrate with monitoring tools (e.g., PostHog, Sentry, Prometheus).
+Track metrics: execution times, error rates, throughput, etc. 5. Defensive Programming
+Validate all foreign keys before inserting.
+Never “swallow” errors—surface them to logs/monitoring and to the user if appropriate.

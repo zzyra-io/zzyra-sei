@@ -1,0 +1,42 @@
+User Flow Examples
+Scenario 1: New Team Creation
+User signs up at zyra.vercel.app
+They're redirected to onboarding where they:
+Create their first team
+Set up team preferences
+Invite team members
+The system automatically:
+Creates a tenant record
+Sets up default limits
+Creates notification preferences
+Sets up audit logging
+Scenario 2: Workflow Execution
+User creates a workflow in their team
+When they click "Run":
+Frontend checks team's execution limits
+If within limits, creates execution record
+Sends job to RabbitMQ with tenant context
+Worker picks up job and processes with tenant isolation
+Results are stored with tenant ID
+Team members get notifications based on team preferences
+Scenario 3: Team Management
+Team owner can:
+View all team members
+Manage roles (owner, admin, member)
+Set team-wide preferences
+View usage analytics
+Upgrade subscription
+Team members can:
+Switch between teams they belong to
+Access shared workflows
+View team activity
+Scenario 4: Usage Monitoring
+Team dashboard shows:
+Current usage vs limits
+Recent executions
+Team activity
+Cost projections
+Alerts are sent when:
+Approaching limits
+Unusual activity detected
+Billing issues occur
