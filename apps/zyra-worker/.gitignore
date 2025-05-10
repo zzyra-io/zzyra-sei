@@ -1,0 +1,31 @@
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+what?
+*.temp
+# Logs
+logs
+*.log
+logs/
+play/
+
+# Build files
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Turbo
+.turbo
+

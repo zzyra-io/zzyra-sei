@@ -33,7 +33,6 @@ import { EdgeConfigPanel } from "./edge-config-panel";
 
 const MemoizedCustomNode = React.memo(ImprovedCustomNode);
 const MemoizedCustomEdge = React.memo(CustomEdge);
-
 interface FlowCanvasProps {
   executionId?: string | null;
   toolbarRef?: React.RefObject<{

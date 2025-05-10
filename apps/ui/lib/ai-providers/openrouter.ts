@@ -2,9 +2,9 @@ import type { AIProvider } from "@/lib/ai-provider";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText } from "ai";
 import { z } from "zod";
-import type { Node, Edge } from "@/components/flow-canvas"; 
-import { DataType } from '@/types/custom-block'; 
-import type { AICustomBlockData } from "@/types/custom-block"; 
+import type { Node, Edge } from "@xyflow/react";
+import { DataType } from "@zyra/types";
+import type { AICustomBlockData } from "@zyra/types";
 import { generateDefiWorkflow } from "@/lib/workflow/defi-workflow-generator";
 
 // Define the schema for the workflow response
@@ -12,7 +12,7 @@ const WorkflowResponseSchema = z.object({
   nodes: z.array(
     z.object({
       id: z.string(),
-      type: z.string().optional().default("custom"), 
+      type: z.string().optional().default("custom"),
       position: z.object({
         x: z.number(),
         y: z.number(),
@@ -21,11 +21,11 @@ const WorkflowResponseSchema = z.object({
         blockType: z.string(),
         label: z.string(),
         description: z.string().optional(),
-        nodeType: z.string(), 
+        nodeType: z.string(),
         iconName: z.string(),
         isEnabled: z.boolean().optional().default(true),
         config: z.record(z.any()).optional(),
-        inputs: z.array(z.any()).optional(), 
+        inputs: z.array(z.any()).optional(),
         outputs: z.array(z.any()).optional(),
       }),
     })
@@ -37,7 +37,7 @@ const WorkflowResponseSchema = z.object({
       target: z.string(),
       sourceHandle: z.string().optional(),
       targetHandle: z.string().optional(),
-      type: z.string().optional().default("custom"), 
+      type: z.string().optional().default("custom"),
       animated: z.boolean().optional().default(false),
     })
   ),
@@ -47,7 +47,7 @@ const WorkflowResponseSchema = z.object({
 const BlockConfigFieldSchema = z.object({
   name: z.string(),
   label: z.string(),
-  type: z.enum(['string', 'number', 'boolean', 'json', 'select']),
+  type: z.enum(["string", "number", "boolean", "json", "select"]),
   defaultValue: z.any().optional(),
   options: z.array(z.string()).optional(),
   required: z.boolean().optional(),
@@ -57,11 +57,25 @@ const BlockConfigFieldSchema = z.object({
 
 // Define BlockParameterAISchema Zod schema
 const BlockParameterAISchema = z.object({
-  name: z.string().describe("The code-friendly name/identifier for the parameter."),
-  description: z.string().optional().describe("A user-friendly description of the parameter."),
-  dataType: z.nativeEnum(DataType).describe("The data type (e.g., string, number, boolean)."),
-  required: z.boolean().optional().default(true).describe("Whether the parameter is required."),
-  defaultValue: z.any().optional().describe("An optional default value for the parameter."),
+  name: z
+    .string()
+    .describe("The code-friendly name/identifier for the parameter."),
+  description: z
+    .string()
+    .optional()
+    .describe("A user-friendly description of the parameter."),
+  dataType: z
+    .nativeEnum(DataType)
+    .describe("The data type (e.g., string, number, boolean)."),
+  required: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Whether the parameter is required."),
+  defaultValue: z
+    .any()
+    .optional()
+    .describe("An optional default value for the parameter."),
 });
 
 // Define schema for custom block definition response
@@ -69,10 +83,18 @@ const CustomBlockResponseSchema = z.object({
   name: z.string(),
   description: z.string(),
   category: z.string(),
-  inputs: z.array(BlockParameterAISchema).optional().default([]).describe("Array of input parameters."),
-  outputs: z.array(BlockParameterAISchema).optional().default([]).describe("Array of output parameters."),
-  configFields: z.array(BlockConfigFieldSchema).optional().default([]), 
-  code: z.string(), 
+  inputs: z
+    .array(BlockParameterAISchema)
+    .optional()
+    .default([])
+    .describe("Array of input parameters."),
+  outputs: z
+    .array(BlockParameterAISchema)
+    .optional()
+    .default([])
+    .describe("Array of output parameters."),
+  configFields: z.array(BlockConfigFieldSchema).optional().default([]),
+  code: z.string(),
 });
 
 const openrouter = createOpenRouter({
@@ -81,7 +103,7 @@ const openrouter = createOpenRouter({
 
 export class OpenRouterProvider implements AIProvider {
   private model = openrouter("openai/gpt-4o");
-  
+
   // Method for generating any block type
   async generateBlock({
     blockType,
@@ -89,14 +111,14 @@ export class OpenRouterProvider implements AIProvider {
     name,
     description,
     additionalContext,
-    userId
+    userId,
   }: {
-    blockType: string,
-    category: string,
-    name: string,
-    description: string,
-    additionalContext?: string,
-    userId: string
+    blockType: string;
+    category: string;
+    name: string;
+    description: string;
+    additionalContext?: string;
+    userId: string;
   }): Promise<AICustomBlockData> {
     try {
       const systemPrompt = `
@@ -181,7 +203,7 @@ Base the generated fields (inputs, outputs, configFields, code) on the user's re
       if (!validationResult.success) {
         console.error(
           "Custom block AI response failed schema validation:",
-          validationResult.error.errors 
+          validationResult.error.errors
         );
         console.error("Invalid Response Data:", parsedResponse);
         throw new Error(
@@ -201,7 +223,7 @@ Base the generated fields (inputs, outputs, configFields, code) on the user's re
     }
   }
   // Method for compatibility - deprecated in favor of generateBlock
-  
+
   // Method specifically for generating DeFi block definitions
   async generateDefiBlock(
     prompt: string,
@@ -291,7 +313,7 @@ Create the block based on this user request: "${prompt}"
       if (!validationResult.success) {
         console.error(
           "DeFi block AI response failed schema validation:",
-          validationResult.error.errors 
+          validationResult.error.errors
         );
         console.error("Invalid Response Data:", parsedResponse);
         throw new Error(
@@ -300,28 +322,36 @@ Create the block based on this user request: "${prompt}"
       }
 
       // Track usage by user ID for analytics
-      console.log(`DeFi block generated for user: ${userId}, blockType: ${blockType}`);
-      
+      console.log(
+        `DeFi block generated for user: ${userId}, blockType: ${blockType}`
+      );
+
       // You could add more sophisticated analytics tracking here
       // For example, reporting to PostHog or another analytics service
       try {
         // Define a type for PostHog global variable to avoid using 'any'
         interface PostHogWindow extends Window {
           posthog?: {
-            capture: (event: string, properties: Record<string, unknown>) => void;
+            capture: (
+              event: string,
+              properties: Record<string, unknown>
+            ) => void;
           };
         }
-        
-        if (typeof window !== 'undefined' && (window as PostHogWindow).posthog) {
-          (window as PostHogWindow).posthog?.capture('defi_block_generated', {
+
+        if (
+          typeof window !== "undefined" &&
+          (window as PostHogWindow).posthog
+        ) {
+          (window as PostHogWindow).posthog?.capture("defi_block_generated", {
             userId,
             blockType,
             promptLength: prompt.length,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           });
         }
       } catch (analyticsError) {
-        console.warn('Analytics tracking error:', analyticsError);
+        console.warn("Analytics tracking error:", analyticsError);
         // Non-blocking - don't throw so we still return the block data
       }
 
@@ -340,26 +370,43 @@ Create the block based on this user request: "${prompt}"
   // Updated generateFlow method
   async generateFlow(
     prompt: string,
-    userId: string, 
+    userId: string,
     existingNodes: Node[],
     existingEdges: Edge[]
   ): Promise<{ nodes: Node[]; edges: Edge[] }> {
     // Check if this is a DeFi-specific prompt
-    const defiKeywords = ['defi', 'crypto', 'blockchain', 'token', 'swap', 'yield', 'liquidity', 'aave', 'uniswap', 'wallet', 'eth', 'bitcoin', 'btc', 'cryptocurrency'];
-    
-    const isDefiPrompt = defiKeywords.some(keyword => 
+    const defiKeywords = [
+      "defi",
+      "crypto",
+      "blockchain",
+      "token",
+      "swap",
+      "yield",
+      "liquidity",
+      "aave",
+      "uniswap",
+      "wallet",
+      "eth",
+      "bitcoin",
+      "btc",
+      "cryptocurrency",
+    ];
+
+    const isDefiPrompt = defiKeywords.some((keyword) =>
       prompt.toLowerCase().includes(keyword.toLowerCase())
     );
-    
+
     if (isDefiPrompt) {
       try {
-        console.log('Detected DeFi prompt, using specialized DeFi workflow generator');
+        console.log(
+          "Detected DeFi prompt, using specialized DeFi workflow generator"
+        );
         // Use our specialized DeFi workflow generator with userId for tracking
         return await generateDefiWorkflow(prompt, userId);
       } catch (defiError) {
-        console.error('Error generating DeFi workflow:', defiError);
+        console.error("Error generating DeFi workflow:", defiError);
         // Fall back to standard workflow generation if DeFi generation fails
-        console.log('Falling back to standard workflow generation');
+        console.log("Falling back to standard workflow generation");
       }
     }
     try {
@@ -368,8 +415,23 @@ Create the block based on this user request: "${prompt}"
         existingNodes.length > 0 || existingEdges.length > 0
           ? `
 Existing Workflow Context:
-Nodes: ${JSON.stringify(existingNodes.map(n => ({id: n.id, type: n.data.blockType, label: n.data.label})), null, 2)} 
-Edges: ${JSON.stringify(existingEdges.map(e => ({source: e.source, target: e.target})), null, 2)} 
+Nodes: ${JSON.stringify(
+              existingNodes.map((n) => ({
+                id: n.id,
+                type: n.data.blockType,
+                label: n.data.label,
+              })),
+              null,
+              2
+            )} 
+Edges: ${JSON.stringify(
+              existingEdges.map((e) => ({
+                source: e.source,
+                target: e.target,
+              })),
+              null,
+              2
+            )} 
 
 Instructions: Based on the user prompt below, enhance or add to the existing workflow. If adding nodes, try to connect them logically to the existing ones if appropriate. Generate unique IDs for new nodes/edges. Ensure the output adheres strictly to the JSON schema.
 `
@@ -535,7 +597,7 @@ Base the generated fields (inputs, outputs, configFields, code) on the user's re
       if (!validationResult.success) {
         console.error(
           "Custom block AI response failed schema validation:",
-          validationResult.error.errors 
+          validationResult.error.errors
         );
         console.error("Invalid Response Data:", parsedResponse);
         throw new Error(
@@ -564,34 +626,40 @@ Base the generated fields (inputs, outputs, configFields, code) on the user's re
     try {
       // Log user ID for tracking purposes
       console.log(`Generating content for user: ${userId}`);
-      
+
       const systemPrompt = `You are a helpful AI assistant. ${context ? `\nContext: ${context}` : ""}`;
       const { text } = await generateText({
         model: this.model,
         system: systemPrompt,
         prompt: prompt,
       });
-      
+
       // Track content generation for analytics
       try {
         interface PostHogWindow extends Window {
           posthog?: {
-            capture: (event: string, properties: Record<string, unknown>) => void;
+            capture: (
+              event: string,
+              properties: Record<string, unknown>
+            ) => void;
           };
         }
-        
-        if (typeof window !== 'undefined' && (window as PostHogWindow).posthog) {
-          (window as PostHogWindow).posthog?.capture('content_generated', {
+
+        if (
+          typeof window !== "undefined" &&
+          (window as PostHogWindow).posthog
+        ) {
+          (window as PostHogWindow).posthog?.capture("content_generated", {
             userId,
             promptLength: prompt.length,
             responseLength: text.length,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           });
         }
       } catch (analyticsError) {
-        console.warn('Analytics tracking error:', analyticsError);
+        console.warn("Analytics tracking error:", analyticsError);
       }
-      
+
       return text;
     } catch (error) {
       console.error("Error generating content with OpenRouter:", error);
