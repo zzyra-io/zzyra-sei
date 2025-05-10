@@ -1,12 +1,11 @@
-import { createServiceClient } from '@/lib/supabase/serviceClient';
+import { createServiceClient } from "@/lib/supabase/serviceClient";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/supabase";
 import { v4 as uuidv4 } from "uuid";
 import { workflowService } from "./workflow-service";
-import { getBlockType } from "@/types/workflow";
+import { getBlockType } from "@zyra/types";
 import { addExecutionJob } from "@/lib/queue/executionQueue";
-import { BlockType, blockSchemas } from '@zyra/types';
-
+import { BlockType, blockSchemas } from "@zyra/types";
 
 export type ExecutionStatus = "pending" | "running" | "completed" | "failed";
 
@@ -49,18 +48,27 @@ export class ExecutionService {
     try {
       // Insert new execution record
       const { data: record, error } = await this.supabase
-        .from('workflow_executions')
-        .insert({ workflow_id: workflowId, status: 'pending', triggered_by: null })
-        .select('id')
+        .from("workflow_executions")
+        .insert({
+          workflow_id: workflowId,
+          status: "pending",
+          triggered_by: null,
+        })
+        .select("id")
         .single();
       if (error || !record) {
-        console.error('Error creating workflow execution:', error);
-        throw new Error(error?.message || 'Failed to create execution');
+        console.error("Error creating workflow execution:", error);
+        throw new Error(error?.message || "Failed to create execution");
       }
       const executionId = record.id;
 
       // Log the start of execution
-      await this.logExecutionEvent(executionId, 'start', 'info', 'Execution started');
+      await this.logExecutionEvent(
+        executionId,
+        "start",
+        "info",
+        "Execution started"
+      );
 
       // Validate node configs against schemas
       const workflow = await workflowService.getWorkflow(workflowId);
@@ -69,7 +77,9 @@ export class ExecutionService {
         try {
           schema.parse(node.data);
         } catch (err) {
-          throw new Error(`Node ${node.id} config validation failed: ${(err as Error).message}`);
+          throw new Error(
+            `Node ${node.id} config validation failed: ${(err as Error).message}`
+          );
         }
       }
 
@@ -77,7 +87,7 @@ export class ExecutionService {
       await addExecutionJob(executionId, workflowId);
       return executionId;
     } catch (error) {
-      console.error('Error starting execution:', error);
+      console.error("Error starting execution:", error);
       throw error;
     }
   }
@@ -208,7 +218,7 @@ export class ExecutionService {
         id: execution.id,
         workflow_id: execution.workflow_id,
         status: execution.status as string,
-        started_at: execution.started_at || '',
+        started_at: execution.started_at || "",
         completed_at: execution.completed_at || undefined,
         result: execution.result,
         logs,
@@ -265,7 +275,7 @@ export class ExecutionService {
         workflow_id: e.workflow_id,
         status: e.status as string,
         // Ensure non-null started_at
-        started_at: e.started_at ?? '',
+        started_at: e.started_at ?? "",
         // Use undefined if completed_at is null
         completed_at: e.completed_at ?? undefined,
         result: e.result,

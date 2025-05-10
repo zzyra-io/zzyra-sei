@@ -11,7 +11,7 @@ import {
 } from "@xyflow/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { NodeCategory } from "@/types/workflow";
+import { NodeCategory } from "@zyra/types";
 import {
   Trash2,
   Edit2,

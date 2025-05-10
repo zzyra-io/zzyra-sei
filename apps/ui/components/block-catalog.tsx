@@ -24,11 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { BlockType } from "@zyra/types";
-import {
-  NodeCategory,
-  getCategoryColor,
-  BlockMetadata,
-} from "@/types/workflow";
+import { NodeCategory, getCategoryColor, BlockMetadata } from "@zyra/types";
 
 interface BlockCatalogProps {
   onDragStart?: (

@@ -1,6 +1,29 @@
-// ui/app/api/block-schemas/route.ts
+// ui/app/api/block-schema/route.ts
 import { NextResponse } from "next/server";
-import { BlockType, blockSchemas } from "@zyra/types";
+import { z } from "zod";
+
+// Define simple hardcoded schemas for the most common block types
+const localBlockSchemas: Record<string, z.ZodTypeAny> = {
+  WEBHOOK: z.object({
+    url: z.string().url().optional(),
+    method: z.enum(["GET", "POST"]).default("POST"),
+    headers: z.record(z.string()).optional(),
+  }),
+  EMAIL: z.object({
+    to: z.string().email(),
+    subject: z.string(),
+    body: z.string(),
+  }),
+  NOTIFICATION: z.object({
+    channel: z.enum(["email", "push", "sms", "in_app"]).default("in_app"),
+    title: z.string(),
+    message: z.string(),
+  }),
+  CUSTOM: z.object({
+    customBlockId: z.string(),
+    inputs: z.record(z.any()).optional().default({}),
+  }),
+};
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -9,20 +32,16 @@ export async function GET(request: Request) {
   try {
     // If no type provided, return all schemas
     if (!type) {
-      return NextResponse.json(blockSchemas);
+      return NextResponse.json(localBlockSchemas);
     }
 
     // Return schema for specific block type
-    // First ensure the type exists in BlockType
-    if (Object.values(BlockType).includes(type as BlockType)) {
-      const schema = blockSchemas[type as BlockType];
+    const schema = localBlockSchemas[type];
+    if (schema) {
       return NextResponse.json(schema);
-    } else {
-      return NextResponse.json(
-        { error: "Block type not found" },
-        { status: 404 }
-      );
     }
+    
+    return NextResponse.json({ error: "Schema not found" }, { status: 404 });
   } catch (error) {
     console.error("Error in block-schema API:", error);
     return NextResponse.json(

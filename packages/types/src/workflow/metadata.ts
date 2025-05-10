@@ -15,13 +15,65 @@ export interface BlockMetadata {
 }
 
 /**
+ * Shared block catalog with common metadata for all block types
+ * This serves as the single source of truth for block metadata
+ */
+export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
+  [BlockType.PRICE_MONITOR]: {
+    type: BlockType.PRICE_MONITOR,
+    label: 'Price Monitor',
+    description: 'Monitor cryptocurrency prices',
+    category: NodeCategory.TRIGGER,
+    icon: 'trending-up',
+    defaultConfig: {
+      asset: 'ETHEREUM',
+      condition: 'above',
+      targetPrice: '2000',
+      checkInterval: '5',
+    },
+  },
+  [BlockType.WEBHOOK]: {
+    type: BlockType.WEBHOOK,
+    label: 'Webhook',
+    description: 'Trigger or respond to webhook events',
+    category: NodeCategory.TRIGGER,
+    icon: 'webhook',
+    defaultConfig: {
+      url: '',
+      method: 'POST',
+      headers: {},
+    },
+  },
+  [BlockType.CUSTOM]: {
+    type: BlockType.CUSTOM,
+    label: 'Custom Block',
+    description: 'Create your custom logic block',
+    category: NodeCategory.ACTION,
+    icon: 'puzzle',
+    defaultConfig: {
+      customBlockId: '',
+      inputs: {},
+    },
+  },
+  [BlockType.EMAIL]: {
+    type: BlockType.EMAIL,
+    label: 'Email',
+    description: 'Send email notifications',
+    category: NodeCategory.ACTION,
+    icon: 'mail',
+    defaultConfig: {
+      to: '',
+      subject: '',
+      body: '',
+    },
+  },
+};
+
+/**
  * Helper function to get block metadata by type
  */
 export function getBlockMetadata(blockType: BlockType | string): BlockMetadata | null {
-  // Implementation depends on the block catalog
-  // This function is implemented in UI and worker separately
-  // but with the same signature
-  return null;
+  return BLOCK_CATALOG[blockType as string] || null;
 }
 
 /**
