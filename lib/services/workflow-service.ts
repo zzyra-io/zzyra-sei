@@ -166,6 +166,46 @@ class WorkflowService {
       throw new Error(`Failed to delete workflow: ${error.message}`);
     }
   }
+
+  async executeWorkflow(workflow: { id?: string; nodes: any[]; edges: any[] }): Promise<{ id: string }> {
+    try {
+      let workflowId = workflow.id;
+      
+      // If workflow doesn't have an ID, save it first
+      if (!workflowId) {
+        // Create a temporary workflow first
+        const newWorkflow = await this.createWorkflow({
+          name: "Temporary Workflow",
+          description: "Auto-saved before execution",
+          nodes: workflow.nodes,
+          edges: workflow.edges,
+          is_public: false,
+          tags: []  
+        });
+        workflowId = newWorkflow.id;
+      }
+      
+      // Use the API endpoint to execute the workflow
+      const response = await fetch('/api/execute-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ workflowId }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to execute workflow');
+      }
+      
+      const data = await response.json();
+      return { id: data.executionId };
+    } catch (error: any) {
+      console.error("Error executing workflow:", error);
+      throw new Error(`Failed to execute workflow: ${error.message}`);
+    }
+  }
 }
 
 export const workflowService = new WorkflowService();

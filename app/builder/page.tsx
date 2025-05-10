@@ -23,6 +23,7 @@ import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
 import { ArrowLeft, Loader2, Play, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useWorkflowExecution } from "@/hooks/use-workflow-execution";
 import { useHotkeys } from "react-hotkeys-hook";
 
 export default function BuilderPage() {
@@ -42,7 +43,6 @@ export default function BuilderPage() {
     setWorkflowName,
     setWorkflowDescription,
     setHasUnsavedChanges,
-    setExecutionId,
     isSaveDialogOpen,
     isExitDialogOpen,
     isDeleteDialogOpen,
@@ -56,7 +56,6 @@ export default function BuilderPage() {
     setSaveDialogOpen,
     setExitDialogOpen,
     setDeleteDialogOpen,
-    setExecuting,
     setRedirecting,
     setPreviewMode,
     setGenerating,
@@ -241,29 +240,12 @@ export default function BuilderPage() {
     ]
   );
 
-  const handleExecuteWorkflow = useCallback(async () => {
-    try {
-      setExecuting(true);
-      const execution = await workflowService.executeWorkflow({
-        id: workflowId,
-        nodes,
-        edges,
-      });
-      setExecutionId(execution.id);
-      toast({
-        title: "Execution started",
-        description: "Workflow execution has begun.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to execute workflow.",
-        variant: "destructive",
-      });
-    } finally {
-      setExecuting(false);
-    }
-  }, [workflowId, nodes, edges, setExecuting, setExecutionId, toast]);
+  // Use our custom hook for workflow execution
+  const { executeWorkflow } = useWorkflowExecution();
+
+  const handleExecuteWorkflow = useCallback(() => {
+    executeWorkflow();
+  }, [executeWorkflow]);
 
   const handleNlGenerate = useCallback(
     async (e) => {
@@ -354,9 +336,9 @@ export default function BuilderPage() {
     { enableOnFormTags: true }
   );
 
-  // Validation (example)
+  // Validation (example) - with null check to prevent errors during drag operations
   console.log("nodes", nodes);
-  const hasInvalidConfig = nodes.some((node) => !node.data?.isValid);
+  const hasInvalidConfig = Array.isArray(nodes) ? nodes.some((node) => !node.data?.isValid) : false;
 
   if (!isClient) {
     return <div>Loading...</div>; // Or a server-side fallback UI

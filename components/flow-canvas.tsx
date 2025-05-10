@@ -3,6 +3,7 @@
 import { useToast } from "@/components/ui/use-toast";
 import { createClient } from "@/lib/supabase/client";
 import { wouldCreateCycle } from "@/lib/workflow/cycle-detection";
+import { NodeCategory } from "@/types/workflow";
 import {
   Background,
   Connection,
@@ -16,7 +17,7 @@ import {
   applyNodeChanges,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { debounce } from "lodash";
+// Removed debounce import since we're using direct node updates
 import React, {
   useCallback,
   useEffect,
@@ -144,16 +145,41 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
 
       if (!blockType) return;
 
+      // Get the additional metadata for creating a fully configured node
+      let nodeMetadata = {};
+      try {
+        const metadataStr = event.dataTransfer.getData(
+          "application/reactflow/metadata"
+        );
+        if (metadataStr) {
+          nodeMetadata = JSON.parse(metadataStr);
+        }
+      } catch (error) {
+        console.error("Failed to parse node metadata:", error);
+      }
+
       const position = reactFlowInstance.screenToFlowPosition({
         x: event.clientX - reactFlowBounds.left,
         y: event.clientY - reactFlowBounds.top,
       });
 
+      // Create a well-formed node with proper data structure for the ImprovedCustomNode
       const newNode = {
         id: `${blockType}-${Date.now()}`,
         type: "custom",
         position,
-        data: { label: `${blockType} Node` },
+        data: {
+          blockType,
+          label: nodeMetadata.label || `${blockType} Node`,
+          nodeType: nodeMetadata.nodeType || NodeCategory.ACTION,
+          description: nodeMetadata.description || "",
+          isValid: true,
+          isEnabled: true,
+          inputCount: 1,
+          outputCount: 1,
+          status: "idle",
+          ...nodeMetadata
+        },
       };
 
       addNode(newNode);
@@ -242,9 +268,6 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
     [nodes, edges, addEdge, toast]
   );
 
-  // Debounce node updates for smoother dragging
-  const debouncedSetNodes = useMemo(() => debounce(setNodes, 50), [setNodes]);
-
   // Update toolbar actions using store state and actions
   useEffect(() => {
     if (toolbarRef && toolbarRef.current) {
@@ -303,10 +326,14 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
           nodes={nodes}
           edges={edges}
           onNodesChange={(changes) => {
-            debouncedSetNodes((nds) => applyNodeChanges(changes, nds));
+            // Apply changes directly, the store's setNodes is already throttled
+            const updatedNodes = applyNodeChanges(changes, nodes);
+            setNodes(updatedNodes);
           }}
           onEdgesChange={(changes) => {
-            setEdges((eds) => applyEdgeChanges(changes, eds));
+            // Apply changes directly, the store's setEdges is already throttled
+            const updatedEdges = applyEdgeChanges(changes, edges);
+            setEdges(updatedEdges);
           }}
           onConnect={onConnect}
           onNodeClick={(event, node) => {
@@ -322,6 +349,38 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
             setSelectedEdge(null);
             setShowConfigPanel(false);
             setShowEdgeConfigPanel(false);
+            setContextMenu(null); // Close context menu on pane click
+          }}
+          onNodeContextMenu={(event, node) => {
+            // Prevent default browser context menu
+            event.preventDefault();
+            setSelectedNode(node);
+            setContextMenu({
+              x: event.clientX,
+              y: event.clientY,
+              type: 'node',
+              id: node.id
+            });
+          }}
+          onEdgeContextMenu={(event, edge) => {
+            // Prevent default browser context menu
+            event.preventDefault();
+            setSelectedEdge(edge);
+            setContextMenu({
+              x: event.clientX,
+              y: event.clientY,
+              type: 'edge',
+              id: edge.id
+            });
+          }}
+          onPaneContextMenu={(event) => {
+            // Prevent default browser context menu
+            event.preventDefault();
+            setContextMenu({
+              x: event.clientX,
+              y: event.clientY,
+              type: 'canvas'
+            });
           }}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}

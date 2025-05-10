@@ -246,6 +246,21 @@ export function BuilderSidebar({
     blockData: Record<string, unknown>
   ) => {
     console.log("Drag started:", blockType, blockData);
+    
+    // Set the block type for the drop handler
+    event.dataTransfer.setData("application/reactflow/type", blockType);
+    
+    // Add additional metadata for node creation
+    const metadata = JSON.stringify({
+      blockType,
+      label: blockData.label || blockType,
+      nodeType: blockData.nodeType || NodeCategory.ACTION,
+      description: blockData.description || "",
+      ...blockData
+    });
+    
+    event.dataTransfer.setData("application/reactflow/metadata", metadata);
+    event.dataTransfer.effectAllowed = "move";
   };
 
   // Handle drag start for custom blocks

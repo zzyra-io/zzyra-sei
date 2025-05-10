@@ -210,7 +210,7 @@ export const ImprovedCustomNode = memo(
     const [showSuccessEffect, setShowSuccessEffect] = useState(false);
     const [animationKey, setAnimationKey] = useState(0);
     const [previousStatus, setPreviousStatus] = useState(data.status || "idle");
-    console.log("first", { data, isConnectable, selected, id });
+    // Remove excessive logging
 
     // Derive isActive from status
     const isActive = data.status === "started";
