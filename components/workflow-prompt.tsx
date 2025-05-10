@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Loader2, Settings, Sparkles } from "lucide-react";
+import { Loader2, Settings, Sparkles, FileText, Zap } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +29,11 @@ const SUGGESTION_CATEGORIES = {
     "Buy 0.1 ETH on Uniswap when gas prices are below 30 gwei",
     "Track my wallet balance and notify me when it drops below $5000",
   ],
+  defi: [
+    "Monitor my ETH and USDC balances on Base Sepolia and alert me when ETH drops below $2000",
+    "Rebalance my portfolio to maintain 60% ETH and 40% USDC when prices change by more than 5%",
+    "Optimize gas usage for my swaps on Base Sepolia and execute only during low gas periods",
+  ],
   email: [
     "Send a weekly summary of my portfolio performance every Monday at 9 AM",
     "Email my team when a new transaction over $10,000 is detected",
@@ -40,6 +45,16 @@ const SUGGESTION_CATEGORIES = {
     "Connect to Discord and post alerts when major price movements occur",
   ],
 };
+
+// Available templates
+const TEMPLATES = [
+  {
+    id: 'defi-portfolio-management',
+    name: 'DeFi Portfolio Management',
+    description: 'Automate portfolio monitoring, rebalancing, and execution on Base Sepolia',
+    category: 'defi'
+  }
+];
 
 // Chip component for suggestions
 const Chip = ({
@@ -67,6 +82,8 @@ export interface GenerationOptions {
   detailedMode: boolean;
   prefillConfig: boolean;
   domainHint?: string;
+  templateId?: string;
+  userId?: string;
 }
 
 export const WorkflowPrompt = ({
@@ -80,6 +97,8 @@ export const WorkflowPrompt = ({
   const [selectedCategory, setSelectedCategory] = useState<string>("crypto");
   const [promptSuggestions, setPromptSuggestions] = useState<string[]>([]);
   const [showExamplesPanel, setShowExamplesPanel] = useState<boolean>(false);
+  const [showTemplatesPanel, setShowTemplatesPanel] = useState<boolean>(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   // Update suggestions when category changes
   useEffect(() => {
@@ -89,12 +108,14 @@ export const WorkflowPrompt = ({
   }, [selectedCategory]);
 
   const handleGenerate = () => {
-    if (!nlPrompt.trim() || isGenerating) return;
+    if ((!nlPrompt.trim() && !selectedTemplateId) || isGenerating) return;
     
     onGenerate(nlPrompt, {
       detailedMode,
       prefillConfig,
       domainHint: detectDomain(nlPrompt),
+      templateId: selectedTemplateId,
+      userId: ''
     });
   };
 
@@ -106,6 +127,10 @@ export const WorkflowPrompt = ({
       return "crypto";
     }
     
+    if (/\b(defi|portfolio|rebalance|base sepolia|yield)\b/.test(lowerPrompt)) {
+      return "defi";
+    }
+    
     if (/\b(email|send|message|notify|alert)\b/.test(lowerPrompt)) {
       return "communication";
     }
@@ -115,29 +140,73 @@ export const WorkflowPrompt = ({
 
   const handleShowExamples = () => {
     setShowExamplesPanel(!showExamplesPanel);
+    if (showTemplatesPanel) setShowTemplatesPanel(false);
+  };
+
+  const handleShowTemplates = () => {
+    setShowTemplatesPanel(!showTemplatesPanel);
+    if (showExamplesPanel) setShowExamplesPanel(false);
+  };
+  
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId === selectedTemplateId ? '' : templateId);
   };
 
   return (
     <div className={cn("workflow-prompt-container space-y-3", className)}>
       <div className="prompt-header flex justify-between items-center">
         <h3 className="text-sm font-medium">Describe Your Workflow</h3>
-        <Button variant="ghost" size="sm" onClick={handleShowExamples}>
-          {showExamplesPanel ? "Hide Examples" : "See Examples"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={handleShowTemplates}>
+            <FileText className="h-4 w-4 mr-1" />
+            {showTemplatesPanel ? "Hide Templates" : "Templates"}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleShowExamples}>
+            {showExamplesPanel ? "Hide Examples" : "See Examples"}
+          </Button>
+        </div>
       </div>
       
       <Textarea 
         placeholder="Describe your workflow in detail (e.g., 'Monitor ETH price every hour and send email when it crosses $3000')"
         className="min-h-[80px] resize-y"
         value={nlPrompt}
-        onChange={(e) => setNlPrompt(e.target.value)}
+        onChange={(e) => {
+          setNlPrompt(e.target.value);
+          // Clear template selection when user types
+          if (selectedTemplateId) setSelectedTemplateId('');
+        }}
       />
+      
+      {showTemplatesPanel && (
+        <div className="templates-panel border rounded-md p-3 bg-muted/30">
+          <h4 className="text-sm font-medium mb-2">Available Templates</h4>
+          <div className="grid gap-2">
+            {TEMPLATES.map(template => (
+              <div 
+                key={template.id} 
+                className={`p-2 border rounded-md cursor-pointer hover:bg-accent transition-colors ${selectedTemplateId === template.id ? 'bg-accent' : ''}`}
+                onClick={() => handleSelectTemplate(template.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="font-medium">{template.name}</div>
+                  {selectedTemplateId === template.id && (
+                    <Zap className="h-4 w-4 text-primary" />
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{template.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
       {showExamplesPanel && (
         <div className="examples-panel border rounded-md p-3 bg-muted/30">
           <Tabs defaultValue="crypto" onValueChange={setSelectedCategory}>
-            <TabsList className="grid grid-cols-3 mb-2">
+            <TabsList className="grid grid-cols-4 mb-2">
               <TabsTrigger value="crypto">Crypto</TabsTrigger>
+              <TabsTrigger value="defi">DeFi</TabsTrigger>
               <TabsTrigger value="email">Email</TabsTrigger>
               <TabsTrigger value="automation">Automation</TabsTrigger>
             </TabsList>
@@ -158,7 +227,7 @@ export const WorkflowPrompt = ({
       <div className="prompt-actions flex items-center gap-2">
         <Button 
           onClick={handleGenerate} 
-          disabled={isGenerating || !nlPrompt.trim()}
+          disabled={isGenerating || (!nlPrompt.trim() && !selectedTemplateId)}
           className="flex-1"
         >
           {isGenerating ? (

@@ -126,17 +126,6 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       message: "",
     },
   },
-  [BlockType.DATABASE]: {
-    type: BlockType.DATABASE,
-    label: "Database",
-    description: "Interact with database",
-    category: NodeCategory.ACTION,
-    icon: "database",
-    defaultConfig: {
-      operation: "select",
-      table: "",
-    },
-  },
   [BlockType.WALLET]: {
     type: BlockType.WALLET,
     label: "Wallet",
@@ -148,17 +137,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       operation: "connect",
     },
   },
-  [BlockType.TRANSACTION]: {
-    type: BlockType.TRANSACTION,
-    label: "Transaction",
-    description: "Execute blockchain transaction",
-    category: NodeCategory.ACTION,
-    icon: "transaction",
-    defaultConfig: {
-      blockchain: "ethereum",
-      type: "transfer",
-    },
-  },
+
   [BlockType.CONDITION]: {
     type: BlockType.CONDITION,
     label: "Condition",
@@ -192,39 +171,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       code: "",
     },
   },
-  [BlockType.GOAT_FINANCE]: {
-    type: BlockType.GOAT_FINANCE,
-    label: "Finance Operations",
-    description: "Execute financial operations",
-    category: NodeCategory.FINANCE,
-    icon: "ai-blockchain-operations",
-    defaultConfig: {
-      operation: "balance",
-      blockchain: "ethereum",
-    },
-  },
-  [BlockType.CUSTOM]: {
-    type: BlockType.CUSTOM,
-    label: "Custom Block",
-    description: "User-defined custom block",
-    category: NodeCategory.ACTION,
-    icon: "custom-block",
-    defaultConfig: {},
-  },
-  [BlockType.LLM_PROMPT]: {
-    type: BlockType.LLM_PROMPT,
-    label: "LLM Prompt",
-    description: "Generate text via LLM",
-    category: NodeCategory.ACTION,
-    icon: "ai",
-    defaultConfig: {
-      promptTemplate: "",
-      model: "gpt-3.5-turbo",
-      temperature: 0.7,
-      maxTokens: 256,
-      stream: false,
-    },
-  },
+
   [BlockType.UNKNOWN]: {
     type: BlockType.UNKNOWN,
     label: "Unknown Block",
@@ -233,11 +180,11 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
     icon: "unknown",
     defaultConfig: {},
   },
-  
+
   // DeFi Blocks
   [BlockType.DEFI_PRICE_MONITOR]: {
     type: BlockType.DEFI_PRICE_MONITOR,
-    label: "DeFi Price Monitor",
+    label: "Price Monitor",
     description: "Monitor cryptocurrency prices",
     category: NodeCategory.FINANCE,
     icon: "chart-line",
@@ -245,12 +192,12 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       type: "price_monitor",
       assets: ["ETH", "BTC"],
       threshold: 5,
-      monitoringInterval: 15
+      monitoringInterval: 15,
     },
   },
   [BlockType.DEFI_YIELD_MONITOR]: {
     type: BlockType.DEFI_YIELD_MONITOR,
-    label: "DeFi Yield Monitor",
+    label: "Yield Monitor",
     description: "Monitor yields across protocols",
     category: NodeCategory.FINANCE,
     icon: "chart-bar",
@@ -259,7 +206,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       protocol: "aave",
       assets: ["ETH", "USDC"],
       monitoringInterval: 60,
-      yieldThreshold: 2
+      yieldThreshold: 2,
     },
   },
   [BlockType.DEFI_PORTFOLIO]: {
@@ -272,7 +219,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       type: "portfolio_balance",
       assets: ["ETH", "BTC", "USDC"],
       protocols: ["aave", "compound"],
-      monitoringInterval: 60
+      monitoringInterval: 60,
     },
   },
   [BlockType.DEFI_REBALANCE]: {
@@ -284,12 +231,12 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
     defaultConfig: {
       type: "rebalance_calculator",
       targetWeights: {
-        "ETH": 0.4,
-        "BTC": 0.3,
-        "USDC": 0.3
+        ETH: 0.4,
+        BTC: 0.3,
+        USDC: 0.3,
       },
       rebalanceThreshold: 5,
-      slippage: 0.5
+      slippage: 0.5,
     },
   },
   [BlockType.DEFI_SWAP]: {
@@ -305,7 +252,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       amount: "0.1",
       slippage: 0.5,
       gasLimit: 250000,
-      maxFee: 50
+      maxFee: 50,
     },
   },
   [BlockType.DEFI_GAS]: {
@@ -318,7 +265,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       type: "gas_optimizer",
       gasLimit: 250000,
       maxFee: 50,
-      optimizationStrategy: "gas_price"
+      optimizationStrategy: "gas_price",
     },
   },
   [BlockType.DEFI_PROTOCOL]: {
@@ -331,7 +278,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       type: "protocol_monitor",
       protocol: "aave",
       monitoringInterval: 60,
-      healthThreshold: 80
+      healthThreshold: 80,
     },
   },
   [BlockType.DEFI_YIELD_STRATEGY]: {
@@ -345,7 +292,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       strategy: "conservative",
       assets: ["USDC", "DAI"],
       protocols: ["aave", "compound"],
-      optimizationGoal: "balanced"
+      optimizationGoal: "balanced",
     },
   },
   [BlockType.DEFI_LIQUIDITY]: {
@@ -360,7 +307,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       tokenA: "ETH",
       tokenB: "USDC",
       amount: "0.1",
-      slippage: 0.5
+      slippage: 0.5,
     },
   },
   [BlockType.DEFI_POSITION]: {
@@ -374,7 +321,7 @@ export const BLOCK_CATALOG: Record<BlockType, BlockMetadata> = {
       assets: ["ETH", "BTC", "USDC"],
       protocols: ["aave", "compound"],
       riskThreshold: 70,
-      monitoringInterval: 60
+      monitoringInterval: 60,
     },
   },
 };

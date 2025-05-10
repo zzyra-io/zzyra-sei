@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Node, Edge } from '@/components/flow-canvas';
 import { BlockType, getBlockMetadata } from '@/types/workflow';
+import { BASE_SEPOLIA_CONFIG, BASE_SEPOLIA_GAS_DEFAULTS } from './base-sepolia-config';
 
 // Define the structure for the workflow generation
 interface WorkflowBlock {
@@ -44,10 +45,11 @@ const KEYWORD_TO_BLOCK_MAP: Record<string, BlockType[]> = {
 };
 
 // Asset symbols commonly found in DeFi
-const ASSET_SYMBOLS = ['ETH', 'BTC', 'USDC', 'USDT', 'DAI', 'AAVE', 'UNI', 'WBTC'];
+// Filtered to only include assets available on Base Sepolia
+const ASSET_SYMBOLS = ['ETH', 'USDC', 'DAI', 'WETH'];
 
-// DeFi protocols
-const PROTOCOLS = ['aave', 'uniswap', 'compound', 'curve', 'balancer', 'yearn'];
+// DeFi protocols available on Base Sepolia
+const PROTOCOLS = ['aave', 'uniswap'];
 
 /**
  * Parse a user prompt to extract key information
@@ -137,6 +139,11 @@ function determineRequiredBlocks(parsed: ReturnType<typeof parsePrompt>): BlockT
  * @param parsed Parsed information from the prompt
  */
 function createDefaultConfig(blockType: BlockType, parsed: ReturnType<typeof parsePrompt>): any {
+  // Always include Base Sepolia network configuration
+  const networkConfig = {
+    networkId: BASE_SEPOLIA_CONFIG.networkId,
+    rpcUrl: BASE_SEPOLIA_CONFIG.rpcUrl
+  };
   // Use extracted assets, with defaults if none found
   const assets = parsed.assets.length > 0 ? parsed.assets : ['ETH', 'USDC'];
   
@@ -148,18 +155,20 @@ function createDefaultConfig(blockType: BlockType, parsed: ReturnType<typeof par
     case BlockType.DEFI_PRICE_MONITOR:
       return {
         type: 'PRICE_MONITOR',
-        assets,
+        assets: assets.length ? assets : ['ETH'],
         threshold: 5, // 5% price change threshold
-        monitoringInterval: 60, // 60 minutes
+        monitoringInterval: 60, // 1 hour in minutes
+        ...networkConfig
       };
       
     case BlockType.DEFI_YIELD_MONITOR:
       return {
         type: 'YIELD_MONITOR',
-        protocol: protocols[0],
-        assets,
-        yieldThreshold: 3, // 3% APY minimum
-        monitoringInterval: 720, // 12 hours
+        protocol: protocols[0] || 'aave',
+        assets: assets.length ? assets : ['USDC', 'DAI'],
+        monitoringInterval: 1440, // 24 hours in minutes
+        yieldThreshold: 2, // 2% minimum yield
+        ...networkConfig
       };
       
     case BlockType.DEFI_PORTFOLIO:
@@ -169,17 +178,25 @@ function createDefaultConfig(blockType: BlockType, parsed: ReturnType<typeof par
         protocols,
         networks: ['ethereum'],
         refreshInterval: 360, // 6 hours
+        ...networkConfig
       };
       
     case BlockType.DEFI_REBALANCE:
+      const targetWeights: Record<string, number> = {};
+      const assetList = assets.length ? assets : ['ETH', 'USDC', 'DAI'];
+      
+      // Create equal target weights
+      const equalWeight = 100 / assetList.length;
+      assetList.forEach(asset => {
+        targetWeights[asset] = equalWeight;
+      });
+      
       return {
         type: 'REBALANCE_CALCULATOR',
-        targetAllocations: assets.reduce((acc, asset, index) => {
-          acc[asset] = Math.floor(100 / assets.length);
-          return acc;
-        }, {} as Record<string, number>),
-        deviationThreshold: 10, // 10% deviation triggers rebalance
-        protocols,
+        assets: assetList,
+        targetWeights,
+        rebalanceThreshold: 5, // 5% deviation threshold
+        ...networkConfig
       };
       
     case BlockType.DEFI_SWAP:
@@ -188,27 +205,30 @@ function createDefaultConfig(blockType: BlockType, parsed: ReturnType<typeof par
         sourceAsset: assets[0] || 'ETH',
         targetAsset: assets[1] || 'USDC',
         amount: '0.1',
-        slippage: 0.5, // 0.5% slippage
-        gasLimit: 250000,
-        maxFee: 50, // Gwei
-        protocol: protocols[0],
+        slippage: 0.5,
+        gasLimit: BASE_SEPOLIA_GAS_DEFAULTS.gasLimit,
+        maxFeePerGas: BASE_SEPOLIA_GAS_DEFAULTS.maxFeePerGas,
+        maxPriorityFeePerGas: BASE_SEPOLIA_GAS_DEFAULTS.maxPriorityFeePerGas,
+        ...networkConfig
       };
       
     case BlockType.DEFI_GAS:
       return {
         type: 'GAS_OPTIMIZER',
-        optimizationStrategy: 'balanced',
-        gasLimit: 250000,
-        maxFee: 50, // Gwei
-        maxWaitTime: 60, // 60 minutes max wait time
+        gasLimit: BASE_SEPOLIA_GAS_DEFAULTS.gasLimit,
+        maxFeePerGas: BASE_SEPOLIA_GAS_DEFAULTS.maxFeePerGas,
+        maxPriorityFeePerGas: BASE_SEPOLIA_GAS_DEFAULTS.maxPriorityFeePerGas,
+        optimizationStrategy: 'gas_price',
+        ...networkConfig
       };
       
     case BlockType.DEFI_PROTOCOL:
       return {
         type: 'PROTOCOL_MONITOR',
-        protocol: protocols[0],
-        healthThreshold: 80, // 80% health minimum
-        monitoringInterval: 240, // 4 hours
+        protocol: protocols[0] || 'aave',
+        monitoringInterval: 60, // 1 hour in minutes
+        healthThreshold: 80, // 80% health threshold
+        ...networkConfig
       };
       
     case BlockType.DEFI_YIELD_STRATEGY:
@@ -220,6 +240,7 @@ function createDefaultConfig(blockType: BlockType, parsed: ReturnType<typeof par
         protocols,
         rebalancingInterval: 24,
         minYieldThreshold: 3,
+        ...networkConfig
       };
       
     case BlockType.DEFI_LIQUIDITY:
@@ -230,6 +251,7 @@ function createDefaultConfig(blockType: BlockType, parsed: ReturnType<typeof par
         tokenB: assets[1] || 'USDC',
         amount: '0.1',
         slippage: 0.5,
+        ...networkConfig
       };
       
     case BlockType.DEFI_POSITION:
@@ -239,6 +261,7 @@ function createDefaultConfig(blockType: BlockType, parsed: ReturnType<typeof par
         protocols,
         riskThreshold: 70, // 70% risk threshold
         monitoringInterval: 360, // 6 hours
+        ...networkConfig
       };
       
     default:

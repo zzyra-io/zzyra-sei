@@ -2,6 +2,8 @@ import { generateFlowWithAI } from "@/lib/ai";
 import type { Node, Edge } from "@/components/flow-canvas";
 import type { GenerationOptions } from "@/components/workflow-prompt";
 import type { RefinementOptions } from "@/components/workflow-refinement";
+import { generateDefiWorkflow } from "@/lib/workflow/defi-workflow-generator";
+import { getTemplateById } from "@/lib/workflow/templates";
 
 // Cache for semantic similarity matching
 const promptCache = new Map<string, {
@@ -100,6 +102,36 @@ export async function generateWorkflow(
     
     if (options.domainHint) {
       enhancedPrompt += `\n\nThis workflow is related to ${options.domainHint} operations.`;
+    }
+    
+    // Check if we should use a template or specialized generator
+    if (options.templateId) {
+      onProgress?.('preparing', 20, []);
+      const template = getTemplateById(options.templateId);
+      
+      if (template) {
+        onProgress?.('generating', 50, []);
+        const result = template.createTemplate(options.userId || '');
+        onProgress?.('finalizing', 90, result.nodes as Partial<Node>[]);
+        onProgress?.('complete', 100);
+        return result;
+      }
+    }
+    
+    // Use specialized DeFi workflow generator for DeFi prompts
+    if (options.domainHint === 'defi' || 
+        prompt.toLowerCase().includes('defi') || 
+        prompt.toLowerCase().includes('portfolio') ||
+        prompt.toLowerCase().includes('base sepolia')) {
+      onProgress?.('preparing', 20, []);
+      onProgress?.('generating', 50, []);
+      
+      const result = await generateDefiWorkflow(prompt, options.userId);
+      
+      onProgress?.('finalizing', 90, result.nodes as Partial<Node>[]);
+      onProgress?.('complete', 100);
+      
+      return result;
     }
     
     // Update progress
