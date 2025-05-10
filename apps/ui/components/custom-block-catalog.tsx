@@ -52,7 +52,7 @@ import {
   Edit,
   Search as SearchIcon,
 } from "lucide-react";
-import { CustomBlockDefinition, LogicType } from "@/types/custom-block";
+import { CustomBlockDefinition, LogicType } from "@zyra/types";
 import { CustomBlockBuilderDialog } from "@/components/custom-block-builder-dialog";
 import { BlockType } from "@zyra/types";
 

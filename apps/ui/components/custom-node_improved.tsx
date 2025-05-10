@@ -37,7 +37,7 @@ import {
   getBlockType,
   getBlockMetadata,
   BlockType,
-} from "@/types/workflow";
+} from "@zyra/types";
 import { HandleHelper } from "@/components/handle-helper";
 
 // alias to avoid JSX member expression parsing issues

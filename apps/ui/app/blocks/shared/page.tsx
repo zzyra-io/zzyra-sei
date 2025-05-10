@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { BlockLibraryEntry } from "@/types/block-library";
+import { BlockLibraryEntry } from "@zyra/types";
 import {
   Card,
   CardContent,

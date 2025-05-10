@@ -30,7 +30,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { incrementBlockUsage } from "@/lib/block-library-api";
 import { cn } from "@/lib/utils";
-import { BlockLibraryEntry } from "@/types/block-library";
+import { BlockLibraryEntry } from "@zyra/types";
 import { NodeCategory } from "@zyra/types";
 import {
   Bookmark,
