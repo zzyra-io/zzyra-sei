@@ -211,7 +211,7 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
 
   // Render dynamic config form if schema exists and not custom
   const renderConfigComponent = () => {
-    if (schema && !isCustomBlock) {
+    if (schema && schema.shape && !isCustomBlock) {
       return (
         <div className="w-80 h-full flex flex-col bg-background border-l">
           <div className="flex items-center justify-between p-4 border-b">
@@ -220,7 +220,7 @@ export function BlockConfigPanel({ node, onUpdate, onClose }: BlockConfigPanelPr
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             <form onSubmit={handleSubmit((data) => handleConfigChange(data))}>
-              {Object.keys(schema.shape).map((key) => (
+              {schema.shape && Object.keys(schema.shape).map((key) => (
                 <div key={key} className="mb-4">
                   <Label htmlFor={key} className="mb-1">{key}</Label>
                   <Input id={key} {...register(key)} />

@@ -24,6 +24,7 @@ import { ArrowLeft, Loader2, Play, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWorkflowExecution } from "@/hooks/use-workflow-execution";
+import { ExecutionStatusPanel } from "@/components/execution-status-panel";
 import { useHotkeys } from "react-hotkeys-hook";
 
 export default function BuilderPage() {
@@ -46,7 +47,7 @@ export default function BuilderPage() {
     isSaveDialogOpen,
     isExitDialogOpen,
     isDeleteDialogOpen,
-    isExecuting,
+    // isExecuting is no longer needed as we're using isExecutionPending from the hook
     isRedirecting,
     isPreviewMode,
     isGenerating,
@@ -170,8 +171,24 @@ export default function BuilderPage() {
     [addNode, setHasUnsavedChanges]
   );
 
+  // Use our custom hook for workflow execution with WebSocket-based real-time updates
+  const { executeWorkflow, isExecuting: isExecutionPending, executionStatus, isLoadingStatus } = useWorkflowExecution();
+
+  // State to control execution panel visibility
+  const [showExecutionPanel, setShowExecutionPanel] = useState(false);
+
+  // State to track if we should execute after saving
+  const [shouldExecuteAfterSave, setShouldExecuteAfterSave] = useState(false);
+
+  // Show execution panel when execution is pending or we have a status
+  useEffect(() => {
+    if (isExecutionPending || executionStatus) {
+      setShowExecutionPanel(true);
+    }
+  }, [isExecutionPending, executionStatus, setShowExecutionPanel]);
+  
   const handleWorkflowDetailsChange = useCallback(
-    ({ name, description }) => {
+    ({ name, description }: { name: string; description: string }) => {
       setWorkflowName(name);
       setWorkflowDescription(description);
       setHasUnsavedChanges(true);
@@ -180,7 +197,7 @@ export default function BuilderPage() {
   );
 
   const handleSaveWorkflow = useCallback(
-    async (name, description, tags = [], replaceUrl = true) => {
+    async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
         if (workflowId) {
@@ -207,7 +224,7 @@ export default function BuilderPage() {
           });
           if (savedWorkflow && savedWorkflow.id) {
             setWorkflowId(savedWorkflow.id);
-            if (replaceUrl) router.replace(`/builder?id=${savedWorkflow.id}`);
+            router.replace(`/builder?id=${savedWorkflow.id}`);
             localStorage.removeItem("workflow_draft"); // Clean up if not handled by store
             toast({
               title: "Workflow saved",
@@ -215,9 +232,21 @@ export default function BuilderPage() {
             });
           }
         }
+
         setHasUnsavedChanges(false);
         setSaveDialogOpen(false);
-      } catch (error) {
+
+        // Execute the workflow if it was requested before saving
+        if (shouldExecuteAfterSave) {
+          setShouldExecuteAfterSave(false);
+          // Wait for the save to complete before executing the workflow
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          executeWorkflow();
+          setShowExecutionPanel(true);
+        }
+      } catch (error: any) {
+        // Type assertion for error
+        console.error("Error saving workflow:", error);
         toast({
           title: "Error",
           description: error.message || "Failed to save workflow.",
@@ -231,24 +260,51 @@ export default function BuilderPage() {
       workflowId,
       nodes,
       edges,
+      router,
+      toast,
       setWorkflowId,
       setHasUnsavedChanges,
       setSaveDialogOpen,
+      shouldExecuteAfterSave,
+      setShouldExecuteAfterSave,
+      executeWorkflow,
+      setShowExecutionPanel,
       setLoading,
-      router,
-      toast,
     ]
   );
 
-  // Use our custom hook for workflow execution
-  const { executeWorkflow } = useWorkflowExecution();
+  // This section has been moved to the top of the file to fix reference errors
 
   const handleExecuteWorkflow = useCallback(() => {
+    // Only execute if we have a valid workflow
+    if (nodes.length === 0) {
+      toast({
+        title: "Cannot execute",
+        description: "Workflow has no components to execute.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if workflow is saved (has an ID in the URL)
+    if (!workflowId) {
+      // Show save dialog first for unsaved workflows
+      toast({
+        title: "Save required",
+        description: "Please save your workflow before executing it.",
+      });
+      setShouldExecuteAfterSave(true); // Set flag to execute after saving
+      setSaveDialogOpen(true);
+      return;
+    }
+
+    // Execute workflow and show status panel
     executeWorkflow();
-  }, [executeWorkflow]);
+    setShowExecutionPanel(true);
+  }, [executeWorkflow, nodes, toast, workflowId, setSaveDialogOpen, setShouldExecuteAfterSave, setShowExecutionPanel]);
 
   const handleNlGenerate = useCallback(
-    async (e) => {
+    async (e: { preventDefault: () => void }) => {
       e.preventDefault();
       if (!nlPrompt.trim()) return;
       setGenerating(true);
@@ -260,14 +316,14 @@ export default function BuilderPage() {
           setNodes(newNodes);
           setEdges(newEdges);
           addToHistory(newNodes, newEdges);
-          setRecentPrompts((prev) => [nlPrompt, ...prev.slice(0, 4)]);
+          setRecentPrompts((prev: string[]) => [nlPrompt, ...prev.slice(0, 4)]);
           setHasUnsavedChanges(true);
           toast({
             title: "Workflow updated",
             description: `Added ${result.nodes.length} new blocks based on your instructions.`,
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         toast({
           title: "Error",
           description: error.message || "Failed to generate workflow.",
@@ -313,7 +369,7 @@ export default function BuilderPage() {
     "mod+e",
     (e) => {
       e.preventDefault();
-      toolbar.execute();
+      handleExecuteWorkflow();
     },
     { enableOnFormTags: true }
   );
@@ -338,7 +394,9 @@ export default function BuilderPage() {
 
   // Validation (example) - with null check to prevent errors during drag operations
   console.log("nodes", nodes);
-  const hasInvalidConfig = Array.isArray(nodes) ? nodes.some((node) => !node.data?.isValid) : false;
+  const hasInvalidConfig = Array.isArray(nodes)
+    ? nodes.some((node) => !node.data?.isValid)
+    : false;
 
   if (!isClient) {
     return <div>Loading...</div>; // Or a server-side fallback UI
@@ -381,9 +439,11 @@ export default function BuilderPage() {
             <Button
               onClick={handleExecuteWorkflow}
               className='flex items-center gap-1'
-              disabled={isExecuting || nodes.length === 0 || hasInvalidConfig}
+              disabled={
+                isExecutionPending || nodes.length === 0 || hasInvalidConfig
+              }
               aria-label='Execute workflow'>
-              {isExecuting ? (
+              {isExecutionPending ? (
                 <>
                   <Loader2 className='h-4 w-4 mr-1 animate-spin' />
                   Executing...
@@ -415,10 +475,17 @@ export default function BuilderPage() {
               onAlignHorizontal={toolbar.alignHorizontal}
               onAlignVertical={toolbar.alignVertical}
               onReset={toolbar.reset}
+              onHelp={() => {
+                toast({
+                  title: "Workflow Builder Help",
+                  description:
+                    "Use the toolbar to manage your workflow. You can undo/redo changes, zoom in/out, fit the view, toggle grid, save, execute, delete, copy, align, and reset your workflow.",
+                });
+              }}
               canUndo={toolbar.canUndo}
               canRedo={toolbar.canRedo}
               isGridVisible={toolbar.isGridVisible}
-              isExecuting={isExecuting}
+              isExecuting={isExecutionPending || false}
             />
           </div>
 
@@ -440,7 +507,20 @@ export default function BuilderPage() {
             </ResizablePanel>
             <ResizableHandle />
             <ResizablePanel defaultSize={75}>
-              <FlowCanvas executionId={executionId} />
+              <div className='relative h-full'>
+                <FlowCanvas executionId={executionId} />
+
+                {/* Execution Status Panel - displays when a workflow is being executed */}
+                {showExecutionPanel && (
+                  <div className='absolute bottom-4 right-4 z-50 w-96'>
+                    <ExecutionStatusPanel
+                      executionStatus={executionStatus || undefined}
+                      isLoadingStatus={isLoadingStatus}
+                      onClose={() => setShowExecutionPanel(false)}
+                    />
+                  </div>
+                )}
+              </div>
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>

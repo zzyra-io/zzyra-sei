@@ -236,7 +236,28 @@ export const ImprovedCustomNode = memo(
     const hasOutputs = data.outputs !== false;
 
     // Current status configuration
-    const status = data.status || "idle";
+    // Get status from execution data if available or fallback to data.status
+    let status = "idle";
+    
+    // If we have nodeStatus explicitly set on data (from execution hook)
+    if (data.nodeStatus) {
+      status = data.nodeStatus;
+    } 
+    // Legacy status from data.status
+    else if (data.status) {
+      status = data.status;
+    }
+    
+    // Execution metadata from our hook
+    const isCompleted = data.isCompleted === true;
+    const isFailed = data.isFailed === true;
+    const isExecuting = data.isExecuting === true;
+    
+    // Use execution status to override generic status
+    if (isCompleted) status = "success";
+    if (isFailed) status = "error";
+    if (isExecuting) status = "started";
+    
     const currentStatusConfig = statusConfig[status] || statusConfig.idle;
 
     // Status icon component

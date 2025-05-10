@@ -206,6 +206,41 @@ class WorkflowService {
       throw new Error(`Failed to execute workflow: ${error.message}`);
     }
   }
+  
+  /**
+   * Get the status and details of a workflow execution
+   */
+  async getExecutionStatus(executionId: string): Promise<{
+    id: string;
+    status: string;
+    current_node_id?: string;
+    execution_progress?: number;
+    nodes_completed?: string[];
+    nodes_failed?: string[];
+    nodes_pending?: string[];
+    result?: any;
+    error?: string;
+    logs?: string[];
+  }> {
+    try {
+      const response = await fetch(`/api/execute-workflow/${executionId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch execution status');
+      }
+
+      return await response.json();
+    } catch (error: any) {
+      console.error('Error fetching execution status:', error);
+      throw new Error(`Failed to fetch execution status: ${error.message}`);
+    }
+  }
 }
 
 export const workflowService = new WorkflowService();

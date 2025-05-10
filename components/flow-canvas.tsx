@@ -52,6 +52,26 @@ interface FlowCanvasProps {
     alignVertical?: (alignment: "top" | "center" | "bottom") => void;
     resetCanvas?: () => void;
   }>;
+  // Additional props for integration with builder page
+  onAddCustomBlock?: (blockType: string) => void;
+  onChangeWorkflowDetails?: (details: { name?: string; description?: string }) => void;
+  onSave?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  onExecute?: () => void;
+  onDelete?: () => void;
+  onCopy?: () => void;
+  onDuplicate?: () => void;
+  onReset?: () => void;
+  onZoomIn?: () => Promise<boolean> | undefined;
+  onZoomOut?: () => Promise<boolean> | undefined;
+  onFitView?: () => Promise<boolean> | undefined;
+  onToggleGrid?: () => void;
+  isGridVisible?: boolean;
+  isUndoDisabled?: boolean;
+  isRedoDisabled?: boolean;
+  onHelp?: () => void;
+  isExecuting?: boolean;
 }
 
 function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
@@ -423,10 +443,10 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
   );
 }
 
-export function FlowCanvas({ executionId, toolbarRef }: FlowCanvasProps) {
+export function FlowCanvas(props: FlowCanvasProps) {
   return (
     <ReactFlowProvider>
-      <FlowContent executionId={executionId} toolbarRef={toolbarRef} />
+      <FlowContent {...props} />
     </ReactFlowProvider>
   );
 }
