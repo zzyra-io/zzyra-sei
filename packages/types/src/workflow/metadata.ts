@@ -1,4 +1,4 @@
-import { BlockType } from '../index';
+import { BlockType } from './block-types';
 import { NodeCategory } from './categories';
 
 /**
@@ -105,8 +105,10 @@ export function getBlockType(data: any): BlockType {
       // Try normalized match
       const normalizedType = typeValue.toLowerCase().replace(/_/g, "-");
       for (const [enumKey, enumValue] of Object.entries(BlockType)) {
-        if (enumValue.toLowerCase().replace(/_/g, "-") === normalizedType) {
-          return enumValue as BlockType;
+        // Add proper type assertion for enumValue
+        const blockTypeValue = enumValue as string;
+        if (blockTypeValue.toLowerCase().replace(/_/g, "-") === normalizedType) {
+          return blockTypeValue as BlockType;
         }
       }
     }

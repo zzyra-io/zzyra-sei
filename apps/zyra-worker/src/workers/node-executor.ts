@@ -194,10 +194,26 @@ export class NodeExecutor {
           // Create context with logger
           // Prepare block data based on type
           const blockData = this.prepareBlockData(node, blockType);
+          
+          // Fetch the workflow information to get the workflow_id
+          const { data: execution } = await supabase
+            .from('workflow_executions')
+            .select('workflow_id')
+            .eq('id', executionId)
+            .single();
+            
+          if (!execution) {
+            throw new Error(`Could not find workflow execution with ID: ${executionId}`);
+          }
 
           const ctx: BlockExecutionContext = {
+            // Add all required properties from the BlockExecutionContext interface
+            nodeId: node.id,
             executionId,
+            workflowId: execution.workflow_id,
             userId,
+            inputs: node.data?.inputs || {},
+            config: node.data || {},
             previousOutputs,
             logger: this.executionLogger.createNodeLogger(
               supabase,

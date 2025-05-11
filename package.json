@@ -14,7 +14,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "dev:ui": "turbo run dev --filter ui",
-    "dev:worker": "turbo run dev --filter worker"
+    "dev:ui": "turbo run dev --filter zyra-web3-automation",
+    "dev:worker": "turbo run dev --filter zyra-worker"
   }
 }

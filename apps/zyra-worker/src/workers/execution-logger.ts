@@ -2,6 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { BlockExecutionContext } from '@zyra/types';
 
+// Extended logger interface with the 'log' method for compatibility
+interface ExtendedLogger {
+  log: (message: string, data?: any) => void;
+  debug: (message: string, data?: any) => void;
+  info: (message: string, data?: any) => void;
+  warn: (message: string, data?: any) => void;
+  error: (message: string, data?: any) => void;
+}
+
 import { configDotenv } from 'dotenv';
 
 
@@ -67,9 +76,13 @@ export class ExecutionLogger {
     supabase: SupabaseClient,
     executionId: string,
     nodeId: string,
-  ): BlockExecutionContext['logger'] {
+  ): ExtendedLogger {
     return {
+      // Use log for standard informational messages (same as info for compatibility)
       log: (message: string, data?: any) =>
+        this.logNodeEvent(supabase, executionId, nodeId, 'info', message, data),
+      // info is an alias for log to maintain interface compatibility
+      info: (message: string, data?: any) =>
         this.logNodeEvent(supabase, executionId, nodeId, 'info', message, data),
       error: (message: string, data?: any) =>
         this.logNodeEvent(

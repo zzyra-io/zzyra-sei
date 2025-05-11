@@ -17,7 +17,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { executionId } = params;
+    // Properly await params before destructuring
+    const executionId = params.executionId;
 
     // Get the execution record
     const { data: execution, error: execError } = await supabase
@@ -38,7 +39,7 @@ export async function GET(
       .from("node_logs")
       .select("*")
       .eq("execution_id", executionId)
-      .order("created_at", { ascending: true });
+      .order("ts", { ascending: true });
 
     if (nodeLogError) {
       console.error("Error fetching node logs:", nodeLogError);
@@ -89,7 +90,7 @@ export async function GET(
       error: execution.error,
       logs,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Unexpected error in execute-workflow/[executionId] route:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },

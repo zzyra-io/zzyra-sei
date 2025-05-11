@@ -2,7 +2,7 @@
 import { 
   NodeCategory, 
   DataType,
-  LogicType,
+  LogicType as SharedLogicType,
   BlockParameter as SharedBlockParameter,
   CustomBlockDefinition as SharedCustomBlockDefinition,
   CustomBlockData as SharedCustomBlockData,
@@ -12,11 +12,28 @@ import {
 } from "@zyra/types";
 
 // Re-export the shared types
-export { DataType, LogicType };
+export { DataType };
+
+// Extend LogicType enum with additional types needed by the worker
+export enum LogicType {
+  JAVASCRIPT = "javascript",
+  TYPESCRIPT = "typescript",
+  PYTHON = "python",
+  REST_API = "rest-api",
+  // Extended types for worker use
+  JSON_TRANSFORM = "json-transform",
+  TEMPLATE = "template",
+  CONDITION = "condition"
+}
 
 // Re-export using aliases to avoid import/export conflicts
 export type BlockParameter = SharedBlockParameter;
-export type CustomBlockDefinition = SharedCustomBlockDefinition;
+export type CustomBlockDefinition = SharedCustomBlockDefinition & {
+  // Add properties needed by worker but not in shared types
+  configFields?: any[];
+  // Add backward compatibility for logic type mapping
+  logicType: SharedLogicType | LogicType;
+};
 export type CustomBlockData = SharedCustomBlockData;
 export type ExecutionResult = SharedExecutionResult;
 
@@ -31,22 +48,26 @@ export function createCustomBlockDefinition(
   inputs: BlockParameter[] = [],
   outputs: BlockParameter[] = [],
   configFields: any[] = [], // Add configFields parameter
-  logicType: LogicType = LogicType.JAVASCRIPT,
-  logic = ""
+  logicType: SharedLogicType = SharedLogicType.JAVASCRIPT,
+  code = ""
 ): CustomBlockDefinition {
-  return {
+  // Create a base definition using the shared function
+  const baseDefinition = sharedCreateCustomBlockDefinition({
     id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     name,
     description,
     category,
     inputs,
     outputs,
-    configFields, // Include configFields in the returned object
+    code,
     logicType,
-    logic,
-    isPublic: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    isPublic: false
+  });
+  
+  // Add worker-specific properties
+  return {
+    ...baseDefinition,
+    configFields
   };
 }
 
@@ -67,15 +88,18 @@ export async function executeCustomBlockLogic(
       );
     };
 
-    switch (blockDefinition.logicType) {
-      case LogicType.JAVASCRIPT: {
+    // Convert logicType to string for switch case comparison
+    const logicTypeStr = blockDefinition.logicType.toString();
+    
+    switch (logicTypeStr) {
+      case SharedLogicType.JAVASCRIPT: {
         const asyncFunction = new Function(
           "inputs",
           "log",
           "outputs",
           `
           try {
-            ${blockDefinition.logic}
+            ${blockDefinition.code}
             return outputs;
           } catch (error) {
             throw new Error("Execution error: " + error.message);
@@ -85,9 +109,9 @@ export async function executeCustomBlockLogic(
         outputs = (await asyncFunction(inputs, log, {})) || {};
         break;
       }
-      case LogicType.JSON_TRANSFORM: {
+      case "json-transform": {
         try {
-          const template = JSON.parse(blockDefinition.logic);
+          const template = JSON.parse(blockDefinition.code);
           outputs = applyJsonTemplate(template, inputs);
         } catch (error: any) {
           throw new Error(
@@ -96,16 +120,16 @@ export async function executeCustomBlockLogic(
         }
         break;
       }
-      case LogicType.TEMPLATE: {
-        outputs = { result: applyStringTemplate(blockDefinition.logic, inputs) };
+      case "template": {
+        outputs = { result: applyStringTemplate(blockDefinition.code, inputs) };
         break;
       }
-      case LogicType.CONDITION: {
+      case "condition": {
         const condition = new Function(
           "inputs",
           `
           try {
-            return Boolean(${blockDefinition.logic});
+            return Boolean(${blockDefinition.code});
           } catch (error) {
             throw new Error("Condition error: " + error.message);
           }

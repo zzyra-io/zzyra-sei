@@ -235,6 +235,12 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
     chainId: z.number().default(1),
     walletAddress: z.string().optional(),
   }),
+  [BlockType.GOAT_FINANCE]: z.object({
+    asset: z.string(),
+    amount: z.string(),
+    strategy: z.string().optional(),
+    walletAddress: z.string().optional(),
+  }),
 };
 
 // Export the function to validate block configs

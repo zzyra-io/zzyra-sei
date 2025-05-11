@@ -184,21 +184,35 @@ const statusConfig = {
 };
 
 // Map of block types to icon components
-const blockIcons = {
-  [BlockType.PRICE_MONITOR]: DollarSign,
-  [BlockType.SCHEDULE]: Clock,
-  [BlockType.WEBHOOK]: Webhook,
-  [BlockType.EMAIL]: Mail,
-  [BlockType.NOTIFICATION]: Bell,
-  [BlockType.DATABASE]: Database,
-  [BlockType.WALLET]: Wallet,
-  [BlockType.TRANSACTION]: ArrowRight,
-  [BlockType.CONDITION]: GitBranch,
-  [BlockType.DELAY]: Clock3,
-  [BlockType.TRANSFORM]: Zap,
-  [BlockType.GOAT_FINANCE]: Coins,
-  [BlockType.CUSTOM]: Sparkles,
-  [BlockType.UNKNOWN]: MoreHorizontal,
+// Using proper typing for the icon components
+const blockIcons: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
+  // Trigger blocks
+  'price-monitor': DollarSign,
+  'schedule': Clock,
+  'webhook': Webhook,
+  
+  // Action blocks
+  'email': Mail,
+  'notification': Bell,
+  'database': Database,
+  'wallet': Wallet,
+  'transaction': ArrowRight,
+  
+  // Logic blocks
+  'condition': GitBranch,
+  'delay': Clock3,
+  'transform': Zap,
+  
+  // Finance blocks
+  'defi-price-monitor': DollarSign,
+  'ai-blockchain': Code,
+  
+  // Custom blocks
+  'goat-finance': Coins,
+  'custom': Sparkles,
+  
+  // Default/fallback
+  'unknown': MoreHorizontal,
 };
 
 export const ImprovedCustomNode = memo(
@@ -215,9 +229,10 @@ export const ImprovedCustomNode = memo(
     // Derive isActive from status
     const isActive = data.status === "started";
 
-    // Get the icon component
-    const IconComponent =
-      blockIcons[blockType] || blockIcons[BlockType.UNKNOWN];
+    // Get the icon component using the string value of blockType
+    // Safely convert blockType to string regardless of its type
+    const blockTypeString = String(blockType || '').toLowerCase();
+    const IconComponent = blockIcons[blockTypeString] || blockIcons['unknown'];
 
     // Determine node category and get appropriate colors
     const nodeCategory = data.nodeType || NodeCategory.ACTION;
