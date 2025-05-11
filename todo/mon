@@ -1,0 +1,10 @@
+zyra/
+├── apps/
+│   ├── ui/               # Next.js frontend
+│   └── zyra-worker/      # NestJS worker service
+├── packages/
+│   ├── types/            # Shared type definitions
+│   ├── blockchain/       # Shared blockchain utils (consider adding)
+│   ├── ai/               # Shared AI utilities (consider adding)
+│   └── config/           # Shared configuration (consider adding)
+└── tools/                # Build scripts & developer utilities
