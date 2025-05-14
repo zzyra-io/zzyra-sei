@@ -9,6 +9,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  reactStrictMode: true,
+  swcMinify: true,
+  transpilePackages: ["@zyra/wallet", "@zyra/types"],
   async rewrites() {
     return [
       {
@@ -27,6 +30,6 @@ const nextConfig = {
   },
   // This is required to support PostHog trailing slash API requests
   skipTrailingSlashRedirect: true,
-}
+};
 
-export default nextConfig
+export default nextConfig;

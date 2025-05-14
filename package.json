@@ -6,8 +6,8 @@
     "zod": "^3.22.2"
   },
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "./apps/*",
+    "./packages/*"
   ],
   "scripts": {
     "dev": "turbo run dev",

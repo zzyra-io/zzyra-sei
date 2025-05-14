@@ -1,6 +1,9 @@
 // Export all workflow types directly from the workflow module
 export * from './workflow';
 
+// Export wallet types for blockchain integration
+export * from './wallet';
+
 // Explicitly re-export critical types at the top level for backward compatibility
 // This ensures all import paths continue to work for both UI and worker components
 export { BlockType } from './workflow/block-types';
