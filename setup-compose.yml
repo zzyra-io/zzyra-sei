@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  postgres-zzyra:
+    image: postgres:14
+    restart: always
+    container_name: postgres-zzyra
+    environment:
+      - POSTGRES_USER=zzyra
+      - POSTGRES_PASSWORD=zzyra
+      - POSTGRES_DB=zyra
+    volumes:
+      - zzyra-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zzyra"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zzyra
+
+  pgadmin-zzyra:
+    image: dpage/pgadmin4:latest
+    restart: always
+    container_name: pgadmin-zzyra
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=zzyra
+      - PGADMIN_DEFAULT_PASSWORD=zzyra
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres-zzyra
+    networks:
+      - zzyra
+
+volumes:
+  pgadmin-data:
+  zzyra-data:
+
+networks:
+  zzyra:
+    driver: bridge
