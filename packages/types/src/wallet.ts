@@ -15,10 +15,22 @@ export enum ChainType {
  * Wallet information including address and chain details
  */
 export interface WalletInfo {
+  // Standard fields used by the wallet adapter
   address: string;
   chainType: ChainType;
   chainId: string | number;
   provider: string;
+  
+  // Database compatibility fields
+  network_id?: string;          // Maps to chain_id in database
+  smart_wallet_address?: string; // Maps to address in database
+  userInfo?: {
+    email?: string;
+    name?: string;
+    profileImage?: string;
+    oauthProvider?: string;
+    phoneNumber?: string;
+  };
 }
 
 /**

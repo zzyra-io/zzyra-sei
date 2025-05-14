@@ -12,12 +12,13 @@
     "test": "jest"
   },
   "dependencies": {
-    "magic-sdk": "^29.0.0",
     "@magic-ext/auth": "^4.3.0",
     "@magic-ext/oauth": "^14.1.0",
     "@magic-ext/solana": "^11.1.0",
     "@magic-sdk/commons": "^25.0.0",
+    "@magic-sdk/provider": "^29.0.6",
     "@solana/web3.js": "^1.87.0",
+    "magic-sdk": "^29.0.0",
     "viem": "^1.19.3"
   },
   "devDependencies": {

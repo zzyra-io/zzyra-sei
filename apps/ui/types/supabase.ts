@@ -81,54 +81,12 @@ export type Database = {
         }
         Relationships: []
       }
-      block_definitions: {
-        Row: {
-          block_type: string
-          created_at: string
-          handler_code: string | null
-          human_config: string
-          icon_name: string
-          id: string
-          json_schema: Json
-          label: string
-          node_type: string
-          ui_schema: Json | null
-          updated_at: string
-        }
-        Insert: {
-          block_type: string
-          created_at?: string
-          handler_code?: string | null
-          human_config: string
-          icon_name: string
-          id?: string
-          json_schema: Json
-          label: string
-          node_type: string
-          ui_schema?: Json | null
-          updated_at?: string
-        }
-        Update: {
-          block_type?: string
-          created_at?: string
-          handler_code?: string | null
-          human_config?: string
-          icon_name?: string
-          id?: string
-          json_schema?: Json
-          label?: string
-          node_type?: string
-          ui_schema?: Json | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       block_execution_logs: {
         Row: {
           created_at: string | null
           execution_id: string
           id: string
-          level: Database["public"]["Enums"]["log_level"]
+          level: string
           message: string
           node_id: string
           timestamp: string | null
@@ -137,7 +95,7 @@ export type Database = {
           created_at?: string | null
           execution_id: string
           id?: string
-          level: Database["public"]["Enums"]["log_level"]
+          level: string
           message: string
           node_id: string
           timestamp?: string | null
@@ -146,7 +104,7 @@ export type Database = {
           created_at?: string | null
           execution_id?: string
           id?: string
-          level?: Database["public"]["Enums"]["log_level"]
+          level?: string
           message?: string
           node_id?: string
           timestamp?: string | null
@@ -173,7 +131,7 @@ export type Database = {
           node_id: string
           outputs: Json | null
           started_at: string | null
-          status: Database["public"]["Enums"]["block_status"]
+          status: string
           workflow_execution_id: string
         }
         Insert: {
@@ -187,7 +145,7 @@ export type Database = {
           node_id: string
           outputs?: Json | null
           started_at?: string | null
-          status?: Database["public"]["Enums"]["block_status"]
+          status?: string
           workflow_execution_id: string
         }
         Update: {
@@ -201,7 +159,7 @@ export type Database = {
           node_id?: string
           outputs?: Json | null
           started_at?: string | null
-          status?: Database["public"]["Enums"]["block_status"]
+          status?: string
           workflow_execution_id?: string
         }
         Relationships: [
@@ -533,54 +491,6 @@ export type Database = {
           },
         ]
       }
-      execution_metrics: {
-        Row: {
-          created_at: string | null
-          duration_ms: number | null
-          error_count: number | null
-          execution_id: string | null
-          id: string
-          memory_usage_kb: number | null
-          node_id: string | null
-          workflow_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          duration_ms?: number | null
-          error_count?: number | null
-          execution_id?: string | null
-          id?: string
-          memory_usage_kb?: number | null
-          node_id?: string | null
-          workflow_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          duration_ms?: number | null
-          error_count?: number | null
-          execution_id?: string | null
-          id?: string
-          memory_usage_kb?: number | null
-          node_id?: string | null
-          workflow_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "execution_metrics_execution_id_fkey"
-            columns: ["execution_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_executions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "execution_metrics_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       execution_node_status: {
         Row: {
           execution_id: string
@@ -684,7 +594,6 @@ export type Database = {
       }
       node_executions: {
         Row: {
-          block_type: string
           completed_at: string
           duration_ms: number | null
           error: string | null
@@ -692,7 +601,6 @@ export type Database = {
           execution_id: string
           finished_at: string | null
           id: string
-          inputs: Json
           logs: Json | null
           node_id: string
           output: Json | null
@@ -704,7 +612,6 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          block_type?: string
           completed_at?: string
           duration_ms?: number | null
           error?: string | null
@@ -712,7 +619,6 @@ export type Database = {
           execution_id: string
           finished_at?: string | null
           id?: string
-          inputs?: Json
           logs?: Json | null
           node_id: string
           output?: Json | null
@@ -724,7 +630,6 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          block_type?: string
           completed_at?: string
           duration_ms?: number | null
           error?: string | null
@@ -732,7 +637,6 @@ export type Database = {
           execution_id?: string
           finished_at?: string | null
           id?: string
-          inputs?: Json
           logs?: Json | null
           node_id?: string
           output?: Json | null
@@ -1307,30 +1211,89 @@ export type Database = {
       }
       user_wallets: {
         Row: {
+          chain_id: string
+          chain_type: string | null
           created_at: string
           id: string
-          network_id: string
-          smart_wallet_address: string
+          metadata: Json | null
           updated_at: string
           user_id: string
+          wallet_address: string
+          wallet_type: string | null
         }
         Insert: {
+          chain_id: string
+          chain_type?: string | null
           created_at?: string
           id?: string
-          network_id: string
-          smart_wallet_address: string
+          metadata?: Json | null
           updated_at?: string
           user_id: string
+          wallet_address: string
+          wallet_type?: string | null
         }
         Update: {
+          chain_id?: string
+          chain_type?: string | null
           created_at?: string
           id?: string
-          network_id?: string
-          smart_wallet_address?: string
+          metadata?: Json | null
           updated_at?: string
           user_id?: string
+          wallet_address?: string
+          wallet_type?: string | null
         }
         Relationships: []
+      }
+      wallet_transactions: {
+        Row: {
+          amount: string
+          created_at: string | null
+          from_address: string
+          id: string
+          status: string
+          to_address: string
+          tx_hash: string
+          tx_type: string
+          updated_at: string | null
+          user_id: string
+          wallet_id: string
+        }
+        Insert: {
+          amount: string
+          created_at?: string | null
+          from_address: string
+          id?: string
+          status: string
+          to_address: string
+          tx_hash: string
+          tx_type: string
+          updated_at?: string | null
+          user_id: string
+          wallet_id: string
+        }
+        Update: {
+          amount?: string
+          created_at?: string | null
+          from_address?: string
+          id?: string
+          status?: string
+          to_address?: string
+          tx_hash?: string
+          tx_type?: string
+          updated_at?: string | null
+          user_id?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "user_wallets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workflow_executions: {
         Row: {
@@ -1468,44 +1431,6 @@ export type Database = {
         }
         Relationships: []
       }
-      workflow_versions: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          edges: Json
-          id: string
-          nodes: Json
-          version: number
-          workflow_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          edges: Json
-          id?: string
-          nodes: Json
-          version: number
-          workflow_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          edges?: Json
-          id?: string
-          nodes?: Json
-          version?: number
-          workflow_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_versions_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       workflows: {
         Row: {
           created_at: string | null
@@ -1608,6 +1533,10 @@ export type Database = {
           failure_rate: number
         }[]
       }
+      get_user_id_from_email: {
+        Args: { email_address: string }
+        Returns: string
+      }
       get_user_notification_preferences: {
         Args: { user_id_param: string }
         Returns: {
@@ -1622,6 +1551,20 @@ export type Database = {
           telegram_enabled: boolean | null
           updated_at: string | null
           user_id: string
+        }[]
+      }
+      get_wallets_by_identifier: {
+        Args: { user_identifier: string }
+        Returns: {
+          chain_id: string
+          chain_type: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          updated_at: string
+          user_id: string
+          wallet_address: string
+          wallet_type: string | null
         }[]
       }
       increment_block_usage_count: {
@@ -1659,6 +1602,17 @@ export type Database = {
       reset_monthly_execution_count: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      safe_insert_wallet: {
+        Args: {
+          user_identifier: string
+          wallet_addr: string
+          wallet_type_val: string
+          chain_type_val: string
+          chain_id_val: string
+          metadata_val?: Json
+        }
+        Returns: Json
       }
       update_user_notification_channels: {
         Args: {

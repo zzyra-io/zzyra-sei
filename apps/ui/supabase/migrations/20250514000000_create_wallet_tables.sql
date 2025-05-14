@@ -44,7 +44,31 @@ CREATE POLICY "Users can only access their own transactions"
   FOR ALL
   USING (auth.uid() = user_id);
 
--- Create index for faster queries
-CREATE INDEX idx_user_wallets_user_id ON public.user_wallets(user_id);
-CREATE INDEX idx_wallet_transactions_user_id ON public.wallet_transactions(user_id);
-CREATE INDEX idx_wallet_transactions_wallet_id ON public.wallet_transactions(wallet_id);
+-- Create indexes for faster queries only if they don't exist
+DO $$
+BEGIN
+  -- Check if idx_user_wallets_user_id index exists before creating
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes 
+    WHERE indexname = 'idx_user_wallets_user_id'
+  ) THEN
+    CREATE INDEX idx_user_wallets_user_id ON public.user_wallets(user_id);
+  END IF;
+  
+  -- Check if idx_wallet_transactions_user_id index exists before creating
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes 
+    WHERE indexname = 'idx_wallet_transactions_user_id'
+  ) THEN
+    CREATE INDEX idx_wallet_transactions_user_id ON public.wallet_transactions(user_id);
+  END IF;
+  
+  -- Check if idx_wallet_transactions_wallet_id index exists before creating
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes 
+    WHERE indexname = 'idx_wallet_transactions_wallet_id'
+  ) THEN
+    CREATE INDEX idx_wallet_transactions_wallet_id ON public.wallet_transactions(wallet_id);
+  END IF;
+END
+$$;

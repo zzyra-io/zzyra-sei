@@ -157,6 +157,12 @@ export class ZyraWallet {
    * @param supabaseClient Supabase client instance
    */
   async setStorageAdapter(supabaseClient: any): Promise<void> {
+    if (!supabaseClient) {
+      this.storageAdapter = null;
+      return;
+    }
+
+    // Initialize the appropriate storage adapter based on environment
     try {
       this.storageAdapter = await getImplementation<StorageAdapter>(
         // Browser implementation
@@ -175,9 +181,18 @@ export class ZyraWallet {
         }
       );
     } catch (error) {
-      console.error("Failed to set storage adapter:", error);
+      console.error("Failed to initialize storage adapter:", error);
       throw error;
     }
+  }
+
+  /**
+   * Get the current storage adapter
+   * 
+   * @returns The current storage adapter or null if not set
+   */
+  getStorageAdapter(): StorageAdapter | null {
+    return this.storageAdapter;
   }
 
   /**
@@ -251,21 +266,45 @@ export class ZyraWallet {
     }
 
     try {
+      // Handle OAuth callback with the wallet provider (Magic)
       const walletInfo = await (this.walletProvider as any).handleOAuthCallback(
         chainId
       );
 
-      // Save wallet to storage if storage adapter is available
-      if (this.storageAdapter && walletInfo.userInfo?.email) {
-        await this.storageAdapter.saveWallet({
-          userId: walletInfo.userInfo.email,
-          address: walletInfo.address,
-          provider: walletInfo.provider,
-          chainType: walletInfo.chainType,
-          chainId: walletInfo.chainId,
-          metadata: {
-            userInfo: walletInfo.userInfo,
-          },
+      // Magic authentication is now complete, but we need to save the wallet data
+      // Note: Actual Supabase authentication is handled in the callback page
+      const userEmail = walletInfo.userInfo?.email;
+      
+      if (userEmail && this.storageAdapter) {
+        // Instead of trying to authenticate here, we'll let the callback page handle that
+        // and just focus on saving the wallet data using our SQL functions
+        try {
+          console.log('Attempting to save wallet with email:', userEmail);
+          
+          // Our database functions will handle converting the email to UUID if needed
+          await this.storageAdapter.saveWallet({
+            userId: userEmail, 
+            address: walletInfo.address,
+            provider: walletInfo.provider,
+            chainType: walletInfo.chainType,
+            chainId: walletInfo.chainId,
+            metadata: {
+              userInfo: walletInfo.userInfo,
+            },
+          });
+          
+          console.log('Successfully saved wallet with email identifier');
+        } catch (err) {
+          console.error('Error saving wallet data:', err);
+          // Continue despite error to return the wallet info
+        }
+
+        // No additional wallet saving code needed - already handled above
+      } else {
+        console.warn('Cannot save wallet - missing required data', {
+          hasEmail: !!userEmail,
+          hasStorageAdapter: !!this.storageAdapter,
+          hasSupabaseClient: !!(this.storageAdapter && this.storageAdapter.supabaseClient)
         });
       }
 

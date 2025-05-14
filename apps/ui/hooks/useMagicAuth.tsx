@@ -53,7 +53,7 @@ interface MagicAuthMethods {
     provider: OAuthProvider,
     chainId?: number | string
   ) => Promise<void>;
-  handleOAuthCallback: (chainId?: number | string) => Promise<void>;
+  handleOAuthCallback: (provider: OAuthProvider) => Promise<void>;
   logout: () => Promise<void>;
   getMagicAuth: () => MagicLinkAuth;
 }
@@ -182,7 +182,8 @@ export function MagicAuthProvider({
     try {
       if (!magicAuth) throw new Error("Magic auth not initialized");
 
-      // Login with email
+      // Magic will handle showing UI for the email verification step
+      // The promise resolves only after the user completes the email flow
       const walletInfo = await magicAuth.loginWithMagicLink(email, chainId);
 
       // Get user data from Supabase
@@ -190,7 +191,7 @@ export function MagicAuthProvider({
         data: { user },
       } = await magicAuth.getSupabase().auth.getUser();
 
-      // Update state
+      // Update state after successful authentication
       setState({
         isLoading: false,
         isAuthenticated: true,
@@ -253,7 +254,7 @@ export function MagicAuthProvider({
       if (!magicAuth) throw new Error("Magic auth not initialized");
 
       // Start OAuth flow - this will redirect the user
-      await magicAuth.loginWithOAuth(provider.toString(), chainId);
+      await magicAuth.loginWithOAuth(provider, chainId);
 
       // Note: State update happens in handleOAuthCallback after redirect
     } catch (error) {
@@ -266,14 +267,14 @@ export function MagicAuthProvider({
     }
   };
 
-  const handleOAuthCallback = async (chainId?: number | string) => {
+  const handleOAuthCallback = async (provider: OAuthProvider) => {
     setState({ ...state, isLoading: true, error: null });
 
     try {
       if (!magicAuth) throw new Error("Magic auth not initialized");
 
       // Complete OAuth flow
-      const walletInfo = await magicAuth.handleOAuthCallback(chainId);
+      const walletInfo = await magicAuth.handleOAuthCallback(provider);
 
       // Get user data from Supabase
       const {

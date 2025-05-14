@@ -14,7 +14,7 @@ export class BrowserStorageAdapter implements StorageAdapter {
   /**
    * Supabase client instance
    */
-  private supabaseClient: any;
+  public supabaseClient: any;
   
   /**
    * Table name for wallet storage
@@ -39,22 +39,45 @@ export class BrowserStorageAdapter implements StorageAdapter {
    * @returns Saved wallet data
    */
   async saveWallet(data: WalletStorageData): Promise<any> {
-    const { data: result, error } = await this.supabaseClient
-      .from(this.tableName)
-      .upsert({
-        user_id: data.userId,
-        wallet_address: data.address,
-        wallet_type: data.provider,
-        chain_type: data.chainType,
-        chain_id: String(data.chainId),
-        metadata: data.metadata || {},
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return result;
+    try {
+      // Always get the current authenticated user from Supabase
+      const { data: authUser } = await this.supabaseClient.auth.getUser();
+      
+      // We must have a valid UUID for the database
+      if (!authUser?.user?.id) {
+        throw new Error('Cannot save wallet: No authenticated user found with valid UUID');
+      }
+      
+      const userId = authUser.user.id; // Use UUID only, never the email
+      
+      // Log for debugging
+      console.log('Saving wallet with UUID:', userId);
+      
+      // Insert/update the wallet record
+      const { data: result, error } = await this.supabaseClient
+        .from(this.tableName)
+        .upsert({
+          user_id: userId, // Only use UUID, never email
+          wallet_address: data.address,
+          wallet_type: data.provider,
+          chain_type: data.chainType,
+          chain_id: String(data.chainId),
+          metadata: data.metadata || {},
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Database error while saving wallet:', error);
+        throw error;
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error saving wallet:', error);
+      throw error;
+    }
   }
   
   /**
@@ -65,31 +88,53 @@ export class BrowserStorageAdapter implements StorageAdapter {
    * @returns Wallet data or null if not found
    */
   async getWallet(userId: string, filters?: Partial<WalletStorageData>): Promise<any> {
-    let query = this.supabaseClient
-      .from(this.tableName)
-      .select('*')
-      .eq('user_id', userId);
-    
-    if (filters?.address) {
-      query = query.eq('wallet_address', filters.address);
+    try {
+      // Always get the current authenticated user from Supabase
+      const { data: authUser } = await this.supabaseClient.auth.getUser();
+      
+      // We must have a valid UUID for the database
+      if (!authUser?.user?.id) {
+        throw new Error('Cannot get wallet: No authenticated user found with valid UUID');
+      }
+      
+      const queryUserId = authUser.user.id; // Use UUID only, never the email
+      
+      // Log for debugging
+      console.log('Getting wallet with UUID:', queryUserId);
+      
+      let query = this.supabaseClient
+        .from(this.tableName)
+        .select('*')
+        .eq('user_id', queryUserId);
+      
+      if (filters?.address) {
+        query = query.eq('wallet_address', filters.address);
+      }
+      
+      if (filters?.chainType) {
+        query = query.eq('chain_type', filters.chainType);
+      }
+      
+      if (filters?.chainId) {
+        query = query.eq('chain_id', String(filters.chainId));
+      }
+      
+      if (filters?.provider) {
+        query = query.eq('wallet_type', filters.provider);
+      }
+      
+      const { data, error } = await query.maybeSingle();
+      
+      if (error) {
+        console.error('Database error while getting wallet:', error);
+        throw error;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error getting wallet:', error);
+      throw error;
     }
-    
-    if (filters?.chainType) {
-      query = query.eq('chain_type', filters.chainType);
-    }
-    
-    if (filters?.chainId) {
-      query = query.eq('chain_id', String(filters.chainId));
-    }
-    
-    if (filters?.provider) {
-      query = query.eq('wallet_type', filters.provider);
-    }
-    
-    const { data, error } = await query.maybeSingle();
-    
-    if (error) throw error;
-    return data;
   }
   
   /**
@@ -99,13 +144,35 @@ export class BrowserStorageAdapter implements StorageAdapter {
    * @returns Array of wallet data
    */
   async listWallets(userId: string): Promise<any[]> {
-    const { data, error } = await this.supabaseClient
-      .from(this.tableName)
-      .select('*')
-      .eq('user_id', userId);
-    
-    if (error) throw error;
-    return data || [];
+    try {
+      // Always get the current authenticated user from Supabase
+      const { data: authUser } = await this.supabaseClient.auth.getUser();
+      
+      // We must have a valid UUID for the database
+      if (!authUser?.user?.id) {
+        throw new Error('Cannot list wallets: No authenticated user found with valid UUID');
+      }
+      
+      const queryUserId = authUser.user.id; // Use UUID only, never the email
+      
+      // Log for debugging
+      console.log('Listing wallets with UUID:', queryUserId);
+      
+      const { data, error } = await this.supabaseClient
+        .from(this.tableName)
+        .select('*')
+        .eq('user_id', queryUserId);
+      
+      if (error) {
+        console.error('Database error while listing wallets:', error);
+        throw error;
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error listing wallets:', error);
+      throw error;
+    }
   }
 }
 

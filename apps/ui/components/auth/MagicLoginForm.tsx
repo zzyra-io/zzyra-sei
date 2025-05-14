@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { useMagicAuth } from "@/hooks/useMagicAuth";
-import { OAuthProvider, ChainType } from "@zyra/wallet";
+import { OAuthProvider } from "@zyra/wallet";
 import { POLYGON_MUMBAI } from "@zyra/wallet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,9 +35,8 @@ interface MagicLoginFormProps {
  * Magic Login Form Component
  */
 export function MagicLoginForm({
-  defaultChainId = POLYGON_MUMBAI.id,
+  defaultChainId = POLYGON_MUMBAI.toString(),
   onSuccess,
-  redirectAfterLogin,
 }: MagicLoginFormProps) {
   // Login method state
   const [activeTab, setActiveTab] = useState("email");
@@ -45,9 +44,11 @@ export function MagicLoginForm({
   // Form states
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   // Auth context
-  const { loginWithEmail, loginWithSMS, loginWithOAuth, isLoading, error } =
+  const { loginWithEmail, loginWithSMS, loginWithOAuth, isLoading } =
     useMagicAuth();
 
   // Handle email login
@@ -55,11 +56,19 @@ export function MagicLoginForm({
     e.preventDefault();
     if (!email) return;
 
+    setLoading(true);
+    setError(null);
+
     try {
+      // Magic will handle the UI for checking email
       await loginWithEmail(email, defaultChainId);
       if (onSuccess) onSuccess();
-    } catch (error) {
-      console.error("Email login failed:", error);
+    } catch (err) {
+      // Only handle actual errors, not the pending state
+      // which is managed by Magic's UI
+      setError(err instanceof Error ? err : new Error("Login failed"));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -118,6 +127,7 @@ export function MagicLoginForm({
                     placeholder='your@email.com'
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
                     required
                   />
                 </div>
@@ -125,8 +135,8 @@ export function MagicLoginForm({
                 <Button
                   type='submit'
                   className='w-full'
-                  disabled={isLoading || !email}>
-                  {isLoading ? "Sending Magic Link..." : "Login with Email"}
+                  disabled={loading || !email}>
+                  {loading ? "Sending Magic Link..." : "Login with Email"}
                 </Button>
               </div>
             </form>

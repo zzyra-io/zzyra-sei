@@ -5,8 +5,26 @@
  */
 
 import { Magic, MagicUserMetadata } from "magic-sdk";
-import { SDKBase, InstanceWithExtensions, MagicSDKExtensionsOption } from '@magic-sdk/provider';
+import {
+  SDKBase,
+  InstanceWithExtensions,
+  MagicSDKExtensionsOption,
+} from "@magic-sdk/provider";
 import { SolanaExtension } from "@magic-ext/solana";
+
+// Define types for the methods we're using from SolanaExtension
+interface SolanaExtensionWithMethods {
+  getPublicKey(): Promise<any>;
+  transferSOL(params: { amount: number; recipient: string }): Promise<string>;
+  signMessage(message: Uint8Array): Promise<{ signature: Uint8Array }>;
+}
+
+// Define necessary interface for viem compatibility
+interface EthereumProvider {
+  request(args: { method: string; params?: any[] }): Promise<any>;
+  on(event: string, listener: (...args: any[]) => void): void;
+  removeListener(event: string, listener: (...args: any[]) => void): void;
+}
 import { OAuthExtension } from "@magic-ext/oauth";
 import { AuthExtension } from "@magic-ext/auth";
 import {
@@ -39,7 +57,10 @@ export class BrowserMagicProvider extends MagicWalletProvider {
   /**
    * Magic SDK instance
    */
-  private magic: InstanceWithExtensions<SDKBase, MagicSDKExtensionsOption<string>> | null = null;
+  private magic: InstanceWithExtensions<
+    SDKBase,
+    MagicSDKExtensionsOption<string>
+  > | null = null;
 
   /**
    * EVM wallet client
@@ -47,9 +68,23 @@ export class BrowserMagicProvider extends MagicWalletProvider {
   private evmClient: any = null;
 
   /**
+   * Supabase client for auth sync
+   */
+  private supabaseClient: any = null;
+
+  /**
    * Solana connection
    */
   private solanaConnection: Connection | null = null;
+
+  /**
+   * Set the Supabase client for authentication sync
+   *
+   * @param client Supabase client instance
+   */
+  setSupabaseClient(client: any): void {
+    this.supabaseClient = client;
+  }
 
   /**
    * Initialize the provider
@@ -70,38 +105,35 @@ export class BrowserMagicProvider extends MagicWalletProvider {
    */
   private initializeMagic(chainType: ChainType, chainId: number | string) {
     const chain = this.getChainConfig(chainId);
-    this.currentChain = chain;
 
-    // Common configuration for Magic SDK
-    // Domain allowlisting is handled on the Magic dashboard
-    // The SDK will automatically respect the allowlist settings
-    const magicOptions = {
-      // No need to specify allowlisted domains here as they're configured in the Magic dashboard
-    };
+    const config = this.getChainConfig(chainId);
 
-    if (chain.type === ChainType.EVM) {
-      const evmChain = chain as EVMChainConfig;
+    // Initialize Magic with appropriate extensions
+    // Use unknown as an intermediate type to safely cast
+    if (chainType === ChainType.EVM) {
       this.magic = new Magic(this.apiKey, {
-        ...magicOptions,
         extensions: [new OAuthExtension(), new AuthExtension()],
         network: {
-          rpcUrl: evmChain.rpcUrl,
-          chainId: evmChain.chainId,
+          rpcUrl: config.rpcUrl,
+          chainId: Number(chainId),
         },
-      });
-    } else if (chain.type === ChainType.SOLANA) {
-      const solanaChain = chain as SolanaChainConfig;
+      }) as unknown as InstanceWithExtensions<
+        SDKBase,
+        MagicSDKExtensionsOption<string>
+      >;
+    } else if (chainType === ChainType.SOLANA) {
       this.magic = new Magic(this.apiKey, {
-        ...magicOptions,
         extensions: [
-          new SolanaExtension({
-            rpcUrl: solanaChain.rpcUrl,
-          }),
           new OAuthExtension(),
           new AuthExtension(),
+          new SolanaExtension({
+            rpcUrl: config.rpcUrl,
+          }),
         ],
-      });
-      this.solanaConnection = new Connection(solanaChain.rpcUrl);
+      }) as unknown as InstanceWithExtensions<
+        SDKBase,
+        MagicSDKExtensionsOption<string>
+      >;
     }
   }
 
@@ -126,13 +158,25 @@ export class BrowserMagicProvider extends MagicWalletProvider {
     const isLoggedIn = await this.magic.user.isLoggedIn();
 
     if (!isLoggedIn) {
-      // Login with email
-      await this.magic.auth.loginWithMagicLink({ email });
+      // Login with email - this will send the magic link email
+      // Important: This method returns immediately after sending email, before user clicks the link
+      const result = await this.magic.auth.loginWithMagicLink({
+        email,
+        showUI: true, // Show Magic's loading UI while waiting for email click
+      });
+
+      // Check if we're running in a browser environment
+      if (typeof window !== "undefined") {
+        // Store email in local storage so the callback can retrieve it
+        localStorage.setItem("magicEmailAuth", email);
+      }
+
+      // Tell the caller that authentication is in progress and requires email action
+      throw new Error("EMAIL_AUTH_PENDING");
     }
 
-    // Get user info
-    const magicUser = await this.magic.user.getMetadata();
-    const userInfo = await this.getUserInfo(); // Keep this if it does more, otherwise magicUser has email etc.
+    // Get user info using the updated getUserInfo method
+    const userInfo = await this.getUserInfo();
 
     // Get wallet info based on chain type
     if (chain.type === ChainType.EVM) {
@@ -156,7 +200,9 @@ export class BrowserMagicProvider extends MagicWalletProvider {
       };
     } else if (chain.type === ChainType.SOLANA) {
       // For Solana
-      const publicKey = await (this.magic.solana as SolanaExtension).getPublicKey();
+      const publicKey = await (
+        this.magic.solana as unknown as SolanaExtensionWithMethods
+      ).getPublicKey();
 
       this.currentWallet = {
         address: publicKey.toString(),
@@ -207,8 +253,9 @@ export class BrowserMagicProvider extends MagicWalletProvider {
     const isLoggedIn = await this.magic.user.isLoggedIn();
     if (isLoggedIn) {
       // Get user info
-      const magicUser = await this.magic.user.getMetadata();
-    const userInfo = await this.getUserInfo(); // Keep this if it does more, otherwise magicUser has email etc.
+      // The API has changed - Magic SDK no longer has a getMetadata method
+      // Instead use getUserInfo which should provide the metadata
+      const userInfo = await this.getUserInfo();
 
       // Get wallet info based on chain type
       if (chain.type === ChainType.EVM) {
@@ -232,7 +279,9 @@ export class BrowserMagicProvider extends MagicWalletProvider {
           },
         };
       } else if (chain.type === ChainType.SOLANA) {
-        const publicKey = await (this.magic.solana as SolanaExtension).getPublicKey();
+        const publicKey = await (
+          this.magic.solana as unknown as SolanaExtensionWithMethods
+        ).getPublicKey();
 
         this.currentWallet = {
           address: publicKey.toString(),
@@ -273,17 +322,78 @@ export class BrowserMagicProvider extends MagicWalletProvider {
     }
 
     // Complete the OAuth login process
-    const result = await (this.magic.oauth as OAuthExtension).getRedirectResult();
+    const result = await (
+      this.magic.oauth as OAuthExtension
+    ).getRedirectResult();
 
-    // Get user info
-    const magicUser = await this.magic.user.getMetadata();
-    const userInfo = await this.getUserInfo(); // Keep this if it does more, otherwise magicUser has email etc.
+    // Define userInfo with proper interface for TypeScript
+    let userInfo: {
+      email?: string;
+      name?: string;
+      issuer?: string;
+      profileImage?: string;
+      publicAddress?: string;
+      oauthProvider?: string;
+    } = {};
+
+    try {
+      // Use the OAuth result to get basic info
+      const resultData = result.magic.userMetadata;
+
+      // For newer Magic SDK versions, use getInfo instead of getMetadata
+      try {
+        // Get user info using the getUserInfo method which should handle the API differences
+        const additionalInfo = await this.getUserInfo();
+        if (additionalInfo) {
+          userInfo = { ...userInfo, ...additionalInfo };
+        }
+      } catch (err) {
+        console.warn("Could not retrieve user info:", err);
+      }
+
+      // Use the OAuth result data if available
+      if (resultData) {
+        // Standard properties from MagicUserMetadata
+        userInfo = {
+          ...userInfo,
+          email: resultData.email || userInfo.email,
+          issuer: resultData.issuer || userInfo.issuer,
+          publicAddress: resultData.publicAddress || userInfo.publicAddress,
+        };
+
+        // Handle additional properties that might come from the OAuth provider
+        // but aren't part of the standard MagicUserMetadata type
+        const extendedData = resultData as any; // Cast to any to access potential extended properties
+
+        if (extendedData.name) {
+          userInfo.name = extendedData.name;
+        }
+
+        if (extendedData.profileImage) {
+          userInfo.profileImage = extendedData.profileImage;
+        }
+
+        // Include the OAuth provider if available
+        if (result.oauth?.provider) {
+          userInfo.oauthProvider = result.oauth.provider;
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to process OAuth result:", err);
+      // Continue with limited user metadata
+    }
 
     // Get wallet info based on chain type
     if (chain.type === ChainType.EVM) {
       const provider = await this.magic.rpcProvider;
+
+      // Type casting the Magic provider to be compatible with EthereumProvider
+      // This is necessary because RPCProviderModule has a protected 'request' property
+      // while EthereumProvider expects it to be public
+      const compatibleProvider = provider as unknown as EthereumProvider;
+
       this.evmClient = createWalletClient({
-        transport: custom(provider),
+        transport: custom(compatibleProvider),
       });
 
       const accounts = await this.evmClient.getAddresses();
@@ -291,6 +401,11 @@ export class BrowserMagicProvider extends MagicWalletProvider {
       this.currentWallet = {
         address: accounts[0],
         provider: WalletProvider.MAGIC,
+        // Use network_id instead of chainId for database compatibility
+        network_id: chain.id.toString(),
+        // Store smart_wallet_address for database compatibility
+        smart_wallet_address: accounts[0],
+        // Keep chainType and chainId for code compatibility
         chainType: ChainType.EVM,
         chainId: chain.id,
         userInfo: {
@@ -301,7 +416,9 @@ export class BrowserMagicProvider extends MagicWalletProvider {
         },
       };
     } else if (chain.type === ChainType.SOLANA) {
-      const publicKey = await (this.magic.solana as SolanaExtension).getPublicKey();
+      const publicKey = await (
+        this.magic.solana as unknown as SolanaExtensionWithMethods
+      ).getPublicKey();
 
       this.currentWallet = {
         address: publicKey.toString(),
@@ -309,6 +426,9 @@ export class BrowserMagicProvider extends MagicWalletProvider {
         chainType: ChainType.SOLANA,
         chainId: chain.id,
         publicKey: publicKey.toString(),
+        // Add database compatibility fields
+        network_id: chain.id.toString(),
+        smart_wallet_address: publicKey.toString(),
         userInfo: {
           email: userInfo?.email,
           name: userInfo?.name,
@@ -370,7 +490,9 @@ export class BrowserMagicProvider extends MagicWalletProvider {
       };
     } else if (chain.type === ChainType.SOLANA) {
       // For Solana
-      const publicKey = await (this.magic.solana as SolanaExtension).getPublicKey();
+      const publicKey = await (
+        this.magic.solana as unknown as SolanaExtensionWithMethods
+      ).getPublicKey();
 
       this.currentWallet = {
         address: publicKey.toString(),
@@ -468,7 +590,9 @@ export class BrowserMagicProvider extends MagicWalletProvider {
       const accounts = await this.evmClient.getAddresses();
       return accounts[0];
     } else if (this.currentChain?.type === ChainType.SOLANA) {
-      const publicKey = await (this.magic.solana as SolanaExtension).getPublicKey();
+      const publicKey = await (
+        this.magic.solana as unknown as SolanaExtensionWithMethods
+      ).getPublicKey();
       return publicKey.toString();
     }
 
@@ -601,10 +725,14 @@ export class BrowserMagicProvider extends MagicWalletProvider {
       }
 
       // Get sender public key
-      const publicKey = await (this.magic.solana as SolanaExtension).getPublicKey();
+      const publicKey = await (
+        this.magic.solana as unknown as SolanaExtensionWithMethods
+      ).getPublicKey();
 
       // Create and send the transaction
-      const tx = await (this.magic.solana as SolanaExtension).transferSOL({
+      const tx = await (
+        this.magic.solana as unknown as SolanaExtensionWithMethods
+      ).transferSOL({
         amount: Number(solanaParams.amount),
         recipient: solanaParams.to,
       });
@@ -620,7 +748,10 @@ export class BrowserMagicProvider extends MagicWalletProvider {
       };
     }
 
-    throw new Error(`Unsupported chain type: ${params.chainType}`);
+    // We should never reach here due to our previous chain type checks
+    // but add a type assertion for TypeScript
+    const chainType = (params as any).chainType;
+    throw new Error(`Unsupported chain type: ${chainType}`);
   }
 
   /**
@@ -655,9 +786,9 @@ export class BrowserMagicProvider extends MagicWalletProvider {
       });
     } else if (this.currentChain.type === ChainType.SOLANA) {
       // For Solana
-      const signedMessage = await (this.magic.solana as SolanaExtension).signMessage(
-        Buffer.from(message)
-      );
+      const signedMessage = await (
+        this.magic.solana as unknown as SolanaExtensionWithMethods
+      ).signMessage(Buffer.from(message));
 
       return Buffer.from(signedMessage.signature).toString("hex");
     }

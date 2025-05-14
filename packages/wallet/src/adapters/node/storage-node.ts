@@ -16,7 +16,7 @@ export class NodeStorageAdapter implements StorageAdapter {
   /**
    * Supabase client instance
    */
-  private supabaseClient: any;
+  public supabaseClient: any;
   
   /**
    * Table name for wallet storage

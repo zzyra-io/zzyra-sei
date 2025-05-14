@@ -6,7 +6,7 @@
  */
 
 import { SupabaseClient, createClient } from "@supabase/supabase-js";
-import { WalletInfo, ChainType } from "@zyra/wallet";
+import { WalletInfo, ChainType, OAuthProvider } from "@zyra/wallet";
 import { ZyraWallet } from "@zyra/wallet";
 import { config } from "@/lib/config";
 
@@ -58,28 +58,52 @@ export class MagicLinkAuth {
     chainId?: number | string
   ): Promise<WalletInfo> {
     try {
-      // First, connect with Magic Link
-      const walletInfo = await this.wallet.connect(email, chainId);
-
-      // Generate DID token for Supabase auth
+      console.log('Starting Magic Link authentication for:', email);
+      
+      // Step 1: Authenticate with Magic first
+      // This will show the Magic UI for email verification
+      console.log('Connecting to Magic wallet...');
+      const magicResult = await this.wallet.connect(email, chainId);
+      console.log('Successfully connected to Magic wallet');
+      
+      // Step 2: Get DID token from Magic for Supabase auth
+      console.log('Generating DID token...');
       const didToken = await this.generateDIDToken();
-
-      // Sign in to Supabase with Magic token
-      const { data, error } = await this.supabase.auth.signInWithIdToken({
-        provider: "magic_link",
-        token: didToken,
-        nonce: crypto.randomUUID(),
+      console.log('DID token generated successfully');
+      
+      // Step 3: Use our server-side API to handle the authentication with Supabase
+      // This improves security by keeping the token exchange away from the client
+      console.log('Calling server-side authentication API...');
+      const response = await fetch('/api/auth/magic', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ didToken }),
       });
-
-      if (error) {
-        console.error("Failed to sign in to Supabase:", error);
-        throw error;
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Server authentication error:', errorData);
+        throw new Error(errorData.error || 'Authentication failed');
       }
-
-      // Update user metadata with wallet info
-      await this.updateUserWalletMetadata(walletInfo);
-
-      return walletInfo;
+      
+      // Get the session data from the response
+      const { session } = await response.json();
+      console.log('Successfully authenticated with Supabase via server');
+      
+      // Set the session in the client
+      await this.supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+      
+      // Step 4: Update user metadata with wallet info
+      console.log('Updating user metadata...');
+      await this.updateUserWalletMetadata(magicResult);
+      console.log('User metadata updated successfully');
+      
+      return magicResult;
     } catch (error) {
       console.error("Login with Magic Link failed:", error);
       throw error;
@@ -93,11 +117,11 @@ export class MagicLinkAuth {
    * @param chainId Optional blockchain chain ID
    */
   async loginWithOAuth(
-    provider: string,
+    provider: OAuthProvider | string,
     chainId?: number | string
   ): Promise<void> {
     // Magic will handle the redirect flow automatically
-    await this.wallet.connectWithOAuth(provider as any, chainId);
+    await this.wallet.connectWithOAuth(provider, chainId);
 
     // Note: The actual auth completion happens in handleOAuthCallback
   }
@@ -105,33 +129,69 @@ export class MagicLinkAuth {
   /**
    * Handle OAuth callback after redirect
    *
-   * @param chainId Optional blockchain chain ID
+   * @param provider OAuth provider name
    * @returns Wallet info
    */
-  async handleOAuthCallback(chainId?: number | string): Promise<WalletInfo> {
+  async handleOAuthCallback(provider: OAuthProvider): Promise<WalletInfo> {
     try {
-      // Complete the OAuth flow with Magic
-      const walletInfo = await this.wallet.handleOAuthCallback(chainId);
-
-      // Generate DID token for Supabase auth
-      const didToken = await this.generateDIDToken();
-
-      // Sign in to Supabase with Magic token
-      const { data, error } = await this.supabase.auth.signInWithIdToken({
-        provider: "magic_link",
-        token: didToken,
-        nonce: crypto.randomUUID(),
-      });
-
-      if (error) {
-        console.error("Failed to sign in to Supabase:", error);
-        throw error;
+      console.log(`Processing OAuth callback for provider: ${provider}`);
+      
+      // Get the result from the OAuth login that Magic received
+      console.log('Getting OAuth redirect result from Magic...');
+      const result = await this.wallet.handleOAuthCallback();
+      console.log('Successfully received OAuth result from Magic');
+      
+      // Extract email from the walletInfo if available
+      const userEmail = result.userInfo?.email;
+      if (!userEmail) {
+        console.warn('No email found in OAuth result');
+      } else {
+        console.log(`OAuth user email: ${userEmail}`);
       }
-
+      
+      // Generate DID token for Supabase auth
+      console.log('Generating DID token...');
+      const didToken = await this.generateDIDToken();
+      console.log('DID token generated successfully');
+      
+      // Use our server-side API to handle the authentication with Supabase
+      // This improves security by keeping the token exchange away from the client
+      console.log('Calling server-side authentication API...');
+      const supabaseProvider = this.mapOAuthProviderToSupabaseProvider(provider);
+      
+      const response = await fetch('/api/auth/magic', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          didToken,
+          provider: supabaseProvider // Pass the provider information
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Server authentication error:', errorData);
+        throw new Error(errorData.error || 'Authentication failed');
+      }
+      
+      // Get the session data from the response
+      const { session } = await response.json();
+      console.log('Successfully authenticated with Supabase via server');
+      
+      // Set the session in the client
+      await this.supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+      
       // Update user metadata with wallet info
-      await this.updateUserWalletMetadata(walletInfo);
-
-      return walletInfo;
+      console.log('Updating user metadata with wallet info...');
+      await this.updateUserWalletMetadata(result);
+      console.log('User metadata updated successfully');
+      
+      return result;
     } catch (error) {
       console.error("OAuth callback handling failed:", error);
       throw error;
@@ -150,26 +210,52 @@ export class MagicLinkAuth {
     chainId?: number | string
   ): Promise<WalletInfo> {
     try {
+      console.log('Starting SMS authentication for:', phoneNumber);
+      
       // Connect with SMS via Magic
+      console.log('Connecting to Magic wallet via SMS...');
       const walletInfo = await this.wallet.connectWithSMS(phoneNumber, chainId);
+      console.log('Successfully connected to Magic wallet via SMS');
 
       // Generate DID token for Supabase auth
+      console.log('Generating DID token...');
       const didToken = await this.generateDIDToken();
+      console.log('DID token generated successfully');
 
-      // Sign in to Supabase with Magic token
-      const { data, error } = await this.supabase.auth.signInWithIdToken({
-        provider: "magic_link",
-        token: didToken,
-        nonce: crypto.randomUUID(),
+      // Use our server-side API to handle the authentication with Supabase
+      console.log('Calling server-side authentication API...');
+      const response = await fetch('/api/auth/magic', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          didToken,
+          provider: 'magic', // Always use 'magic' for SMS auth
+          phoneNumber // Include the phone number for traceability
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Server authentication error:', errorData);
+        throw new Error(errorData.error || 'Authentication failed');
+      }
+      
+      // Get the session data from the response
+      const { session } = await response.json();
+      console.log('Successfully authenticated with Supabase via server');
+      
+      // Set the session in the client
+      await this.supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
       });
 
-      if (error) {
-        console.error("Failed to sign in to Supabase:", error);
-        throw error;
-      }
-
       // Update user metadata with wallet info
+      console.log('Updating user metadata...');
       await this.updateUserWalletMetadata(walletInfo);
+      console.log('User metadata updated successfully');
 
       return walletInfo;
     } catch (error) {
@@ -217,6 +303,31 @@ export class MagicLinkAuth {
   private async generateDIDToken(): Promise<string> {
     return this.wallet.generateDIDToken();
   }
+  
+
+  
+  /**
+   * Maps OAuth provider names to the exact string Supabase expects
+   * 
+   * @param provider The OAuth provider from OAuthProvider enum
+   * @returns The provider string Supabase expects
+   */
+  private mapOAuthProviderToSupabaseProvider(provider: OAuthProvider | string): string {
+    // Map the OAuthProvider enum values to the exact strings Supabase expects
+    const providerMap: Record<string, string> = {
+      'google': 'google',
+      'facebook': 'facebook',
+      'twitter': 'twitter',
+      'github': 'github',
+      'apple': 'apple',
+      'linkedin': 'linkedin',
+      'discord': 'discord'
+    };
+    
+    // Convert provider to string safely
+    const providerString = String(provider).toLowerCase();
+    return providerMap[providerString] || providerString;
+  }
 
   /**
    * Update user metadata in Supabase with wallet info
@@ -235,11 +346,11 @@ export class MagicLinkAuth {
       }
 
       // Prepare wallet metadata
-      const walletMetadata: Record<string, any> = {
+      const walletMetadata: Record<string, string> = {
         wallet_address: walletInfo.address,
-        wallet_type: walletInfo.provider,
-        chain_type: walletInfo.chainType,
-        chain_id: walletInfo.chainId,
+        wallet_provider: walletInfo.provider,
+        wallet_chain_type: walletInfo.chainType,
+        wallet_chain_id: typeof walletInfo.chainId === 'number' ? walletInfo.chainId.toString() : (walletInfo.chainId || ""),
         last_connected: new Date().toISOString(),
       };
 

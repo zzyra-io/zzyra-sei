@@ -19,19 +19,52 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
--- Update block_executions table to use enum
-ALTER TABLE block_executions
-  ALTER COLUMN status DROP DEFAULT,
-  ALTER COLUMN status TYPE block_status USING status::block_status,
-  ALTER COLUMN status SET DEFAULT 'pending'::block_status;
+-- Apply the enum types to tables only if they exist
+DO $$ 
+DECLARE
+  table_exists boolean;
+BEGIN
+  -- Check if block_executions table exists
+  SELECT EXISTS (
+    SELECT FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+    AND table_name = 'block_executions'
+  ) INTO table_exists;
+  
+  IF table_exists THEN
+    -- Update block_executions table to use enum
+    EXECUTE 'ALTER TABLE block_executions
+      ALTER COLUMN status DROP DEFAULT,
+      ALTER COLUMN status TYPE block_status USING status::block_status,
+      ALTER COLUMN status SET DEFAULT ''pending''::block_status';
+  END IF;
 
--- Update block_execution_logs table to use enum
-ALTER TABLE block_execution_logs
-  DROP CONSTRAINT IF EXISTS block_execution_logs_level_check,
-  ALTER COLUMN level TYPE log_level USING level::log_level;
+  -- Check if block_execution_logs table exists
+  SELECT EXISTS (
+    SELECT FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+    AND table_name = 'block_execution_logs'
+  ) INTO table_exists;
+  
+  IF table_exists THEN
+    -- Update block_execution_logs table to use enum
+    EXECUTE 'ALTER TABLE block_execution_logs
+      DROP CONSTRAINT IF EXISTS block_execution_logs_level_check,
+      ALTER COLUMN level TYPE log_level USING level::log_level';
+  END IF;
 
--- Update workflow_executions table to use enum
-ALTER TABLE workflow_executions
-  ALTER COLUMN status DROP DEFAULT,
-  ALTER COLUMN status TYPE workflow_status USING status::workflow_status,
-  ALTER COLUMN status SET DEFAULT 'pending'::workflow_status;
+  -- Check if workflow_executions table exists
+  SELECT EXISTS (
+    SELECT FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+    AND table_name = 'workflow_executions'
+  ) INTO table_exists;
+  
+  IF table_exists THEN
+    -- Update workflow_executions table to use enum
+    EXECUTE 'ALTER TABLE workflow_executions
+      ALTER COLUMN status DROP DEFAULT,
+      ALTER COLUMN status TYPE workflow_status USING status::workflow_status,
+      ALTER COLUMN status SET DEFAULT ''pending''::workflow_status';
+  END IF;
+END $$;

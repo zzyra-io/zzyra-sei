@@ -79,6 +79,10 @@ export interface WalletInfo {
     name?: string;
     profileImage?: string;
   };
+  
+  // Database compatibility fields for use with Supabase
+  network_id?: string; // Maps to network_id column in database
+  smart_wallet_address?: string; // Maps to smart_wallet_address column in database
 }
 
 /**
@@ -158,8 +162,24 @@ export interface WalletStorageData {
  * Storage adapter interface
  */
 export interface StorageAdapter {
+  /**
+   * Optional Supabase client for authentication sync
+   */
+  supabaseClient?: any;
+
+  /**
+   * Save wallet data to storage
+   */
   saveWallet(data: WalletStorageData): Promise<any>;
+
+  /**
+   * Get wallet data from storage
+   */
   getWallet(userId: string, filters?: Partial<WalletStorageData>): Promise<any>;
+
+  /**
+   * List all wallets for a user
+   */
   listWallets(userId: string): Promise<any[]>;
 }
 
