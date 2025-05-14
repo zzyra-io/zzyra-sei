@@ -5,63 +5,47 @@ a Project Overview
 
 2. Monorepo Structure
    Main Parts:
-
-a. ui/ – Next.js (App Router) Front-End
-Tech: TypeScript, React, Next.js, Tailwind CSS, PostCSS
-Key Folders:
-app/: TSX pages for workflow builder, dashboard, billing, auth, and API endpoints (execution, billing, notifications, email)
-components/: Modular UI, workflow blocks, React Flow, AI integrations (Ollama), Supabase, PostHog analytics
-lib/: Services for workflow logic, execution, finance, Supabase client, web3, config
-docs/, hooks/, styles/: Documentation, custom React hooks, Tailwind/PostCSS styles
-supabase/: Database migrations, config, and functions
-migrations/: Database migration SQL files (now under ui/supabase/migrations)
-Deployment configs: Netlify, windsurf_deployment.yaml
-b. zyra-worker/ – Node.js NestJS Workflow Engine
-Tech: Node.js v20.3.0, TypeScript, NestJS
-Key Folders:
-controllers/, services/: Workflow engine, email, price calculation, Supabase queue integration
-scripts/: Sample workflows, automation scripts
-tests/: Jest-based test suites for backend logic 3. Tech Stack
-Frontend: Next.js (App Router), React, TypeScript, Tailwind CSS, PostCSS, zustand, zustand persistent storage
-Backend: Node.js, NestJS, TypeScript
-Database: Supabase (PostgreSQL), managed via migrations (ui/supabase/migrations)
-Other Integrations: Web3, Ollama (AI), PostHog (analytics), Netlify (deployment) 4. Best Practices & Production-Readiness
-a. Database
-All migrations are tracked in ui/supabase/migrations, using supabase migration new and supabase db push.
-Row-level security (RLS) and policies are enforced for tables (e.g., node_logs).
-b. Frontend
-Modular, reusable components.
-Modern UI/UX with Tailwind CSS, matching your brand and theme.
-API routes within Next.js for server-side logic.
-Environment variables managed via .env (never commit secrets).
-c. Backend
-NestJS service is decoupled for workflow execution, email, and price logic.
-Supabase is used for queueing and data persistence.
-d. Security
-RLS policies in the database.
-Secrets in .env, not in code.
-Auth checks in both frontend and backend where needed.
-e. Testing & Monitoring
-Jest for backend testing.
-PostHog for analytics.
-Logs and error handling in both UI and worker.
-f. Deployment
-Netlify for frontend deployments.
-Automated build and deploy pipelines.
-windsurf_deployment.yaml for deployment config.
-g. Developer Experience
-TypeScript for type safety.
-Clear separation between UI, logic, and data layers.
-Docs folder for onboarding and reference. 5. How to Get Started
-Run migrations:
-supabase migration up or supabase db push from ui/
-Start frontend:
-npm run dev in ui/
-Start worker:
-npm run start in zyra-worker/
-Deploy:
-Use Netlify or your configured deployment pipeline.
-I am trying to create a SAAS. It should be production ready suggest me best practices. If you get confused with the app you can look into the docs folder. In case of doing the UI part, it should match overall theme and should be visually striking, when suggesting consider UI/UX best practices as well making sure it is production ready and app with best Experience. when adding or checking a feature make sure it is fully integrated
+   Tech Stack
+   Frontend: Next.js (App Router), React, TypeScript, Tailwind CSS, PostCSS, zustand, zustand persistent storage
+   Backend: Node.js, NestJS, TypeScript
+   Database: Supabase (PostgreSQL), managed via migrations (ui/supabase/migrations)
+   Other Integrations: Web3, Ollama (AI), PostHog (analytics), Netlify (deployment) 4. Best Practices & Production-Readiness
+   a. Database
+   All migrations are tracked in ui/supabase/migrations, using supabase migration new and supabase db push.
+   Row-level security (RLS) and policies are enforced for tables (e.g., node_logs).
+   b. Frontend
+   Modular, reusable components.
+   Modern UI/UX with Tailwind CSS, matching your brand and theme.
+   API routes within Next.js for server-side logic.
+   Environment variables managed via .env (never commit secrets).
+   c. Backend
+   NestJS service is decoupled for workflow execution, email, and price logic.
+   Supabase is used for queueing and data persistence.
+   d. Security
+   RLS policies in the database.
+   Secrets in .env, not in code.
+   Auth checks in both frontend and backend where needed.
+   e. Testing & Monitoring
+   Jest for backend testing.
+   PostHog for analytics.
+   Logs and error handling in both UI and worker.
+   f. Deployment
+   Netlify for frontend deployments.
+   Automated build and deploy pipelines.
+   windsurf_deployment.yaml for deployment config.
+   g. Developer Experience
+   TypeScript for type safety.
+   Clear separation between UI, logic, and data layers.
+   Docs folder for onboarding and reference. 5. How to Get Started
+   Run migrations:
+   supabase migration up or supabase db push from ui/
+   Start frontend:
+   npm run dev in ui/
+   Start worker:
+   npm run start in zyra-worker/
+   Deploy:
+   Use Netlify or your configured deployment pipeline.
+   I am trying to create a SAAS. It should be production ready suggest me best practices. If you get confused with the app you can look into the docs folder. In case of doing the UI part, it should match overall theme and should be visually striking, when suggesting consider UI/UX best practices as well making sure it is production ready and app with best Experience. when adding or checking a feature make sure it is fully integrated
 
 Database migrations are stored under `ui/migrations` folder.
 
