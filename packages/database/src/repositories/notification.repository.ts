@@ -5,28 +5,8 @@
  * It handles notification creation, retrieval, and management.
  */
 
-// Define interfaces for notification-related types
-interface Notification {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: string;
-  read: boolean;
-  data?: any;
-  createdAt: Date;
-  updatedAt?: Date;
-}
-
-interface NotificationPreference {
-  id: string;
-  userId: string;
-  email: boolean;
-  push: boolean;
-  inApp: boolean;
-  createdAt: Date;
-  updatedAt?: Date;
-}
+import { Notification, NotificationPreference } from "@prisma/client";
+// No need for custom interfaces; use Prisma-generated types for type safety.
 import { BaseRepository } from './base.repository';
 import { PaginationParams, applyPagination, createPaginatedResult } from '../utils/pagination';
 
@@ -50,15 +30,19 @@ export interface NotificationUpdateInput {
 
 export interface NotificationPreferenceCreateInput {
   userId: string;
-  email?: boolean;
-  push?: boolean;
-  inApp?: boolean;
+  emailEnabled?: boolean;
+  pushEnabled?: boolean;
+  webhookEnabled?: boolean;
+  telegramChatId?: string;
+  discordWebhookUrl?: string;
 }
 
 export interface NotificationPreferenceUpdateInput {
-  email?: boolean;
-  push?: boolean;
-  inApp?: boolean;
+  emailEnabled?: boolean;
+  pushEnabled?: boolean;
+  webhookEnabled?: boolean;
+  telegramChatId?: string;
+  discordWebhookUrl?: string;
 }
 
 export class NotificationRepository extends BaseRepository<Notification, NotificationCreateInput, NotificationUpdateInput> {
@@ -135,7 +119,7 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
       where: { id },
       data: {
         read: true,
-        updatedAt: new Date(),
+        
       },
     });
   }
@@ -153,7 +137,7 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
       },
       data: {
         read: true,
-        updatedAt: new Date(),
+        
       },
     });
 
@@ -194,9 +178,7 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
     return this.prisma.notification.create({
       data: {
         ...data,
-        user: {
-          connect: { id: userId },
-        },
+        userId,
       },
     });
   }
@@ -222,7 +204,7 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
       }));
 
       const result = await this.prisma.notification.createMany({
-        data: notifications as any,
+        data: notifications,
       });
 
       createdCount += result.count;
@@ -253,13 +235,11 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
       where: { userId },
       update: {
         ...data,
-        updatedAt: new Date(),
+        
       },
       create: {
         ...data,
-        user: {
-          connect: { id: userId },
-        },
+        userId,
       },
     });
   }
@@ -296,19 +276,19 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
       }
 
       // Send to Telegram if enabled
-      if (preferences.enableTelegram && profile.telegramChatId) {
+      if (preferences.telegramChatId && profile.telegramChatId) {
         // This would be implemented with Telegram API integration
         // await this.sendTelegramNotification(profile.telegramChatId, title, message);
       }
 
       // Send to Discord if enabled
-      if (preferences.enableDiscord && profile.discordWebhookUrl) {
+      if (preferences.discordWebhookUrl && profile.discordWebhookUrl) {
         // This would be implemented with Discord API integration
         // await this.sendDiscordNotification(profile.discordWebhookUrl, title, message);
       }
 
       // Send to Email if enabled
-      if (preferences.enableEmail && user.email) {
+      if (preferences.emailEnabled && user.email) {
         // This would be implemented with email service integration
         // await this.sendEmailNotification(user.email, title, message);
       }

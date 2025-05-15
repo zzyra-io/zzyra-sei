@@ -79,17 +79,13 @@ export function createAccessWhereClause(userId: string, isAdmin: boolean = false
  * Log an audit event
  * @param action The action performed
  * @param tableName The table name
- * @param rowId The row ID
  * @param userId The user ID
- * @param changedData The changed data
  */
 export async function logAuditEvent(
   action: string,
   tableName: string,
-  rowId: string,
-  userId: string,
-  changedData?: any
+  userId: string
 ): Promise<void> {
   const policyService = new PolicyService();
-  await policyService.logAuditEvent(action, tableName, rowId, userId, changedData);
+  await policyService.logAuditEvent(action, tableName, userId);
 }

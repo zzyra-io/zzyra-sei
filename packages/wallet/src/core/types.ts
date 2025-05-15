@@ -1,213 +1,226 @@
 /**
- * @zyra/wallet - Core Type Definitions
+ * Core wallet types and interfaces
  *
- * This file contains all the type definitions used throughout the wallet library.
- * It's designed to be compatible with the existing @zyra/types library.
+ * This file contains the main type definitions for the wallet package,
+ * including supported chains, wallet types, and provider interfaces.
+ * Integrates Magic Link with Zyra's database models.
  */
 
+import type { WalletService } from "../services/wallet.service";
+
+// Using string type for Address since we're removing wagmi dependency
+export type Address = string;
+
 /**
- * Supported blockchain types
+ * Supported chain types
  */
 export enum ChainType {
-  EVM = "evm",
-  SOLANA = "solana",
+  ETHEREUM = "ethereum",
+  POLYGON = "polygon",
+  OPTIMISM = "optimism",
+  ARBITRUM = "arbitrum",
+  GOERLI = "goerli",
+  MUMBAI = "mumbai",
 }
 
 /**
- * Supported wallet providers
+ * Supported wallet provider types
  */
-export enum WalletProvider {
+export enum WalletType {
   MAGIC = "magic",
-  EXTERNAL = "external",
+  METAMASK = "metamask",
+  WALLET_CONNECT = "walletconnect",
+  COINBASE = "coinbase",
+  // Other wallet types can be added later
 }
 
 /**
- * Supported OAuth providers
+ * Connection status for wallet
  */
-export enum OAuthProvider {
-  GOOGLE = "google",
-  APPLE = "apple",
-  FACEBOOK = "facebook",
-  TWITTER = "twitter",
-  GITHUB = "github",
+export enum ConnectionStatus {
+  DISCONNECTED = "disconnected",
+  CONNECTING = "connecting",
+  CONNECTED = "connected",
+  ERROR = "error",
 }
 
 /**
- * Base chain configuration interface
+ * Magic Link connection options
+ */
+export interface MagicConnectionOptions {
+  email: string; // Make required to match usage in magic provider
+  phone?: string;
+  showUI?: boolean;
+}
+
+/**
+ * Options for wallet connection
+ */
+export interface ConnectionOptions {
+  chainId?: number;
+  magic?: MagicConnectionOptions;
+}
+
+/**
+ * Wallet connection result
+ */
+export interface WalletConnection {
+  address: Address;
+  chainId: number;
+  connector: any;
+  isConnected: boolean;
+  isReconnecting: boolean;
+  isConnecting: boolean;
+  status: ConnectionStatus;
+  isDisconnected: boolean;
+}
+
+/**
+ * Transaction request parameters
+ */
+export interface TransactionRequest {
+  to: Address;
+  value: bigint | string;
+  data?: string;
+  gasLimit?: bigint | string;
+  gasPrice?: bigint | string;
+  nonce?: number;
+}
+
+/**
+ * Transaction response data
+ */
+export interface TransactionResponse {
+  hash: string;
+  from: Address;
+  to: Address;
+  value: bigint | string;
+  status: "pending" | "success" | "failed";
+  blockNumber?: number;
+  timestamp?: number;
+}
+
+/**
+ * Chain configuration interface
  */
 export interface ChainConfig {
-  id: number | string;
-  name: string;
-  type: ChainType;
-  rpcUrl: string;
-  blockExplorerUrl: string;
-  symbol: string;
-  decimals: number;
-  testnet: boolean;
-}
-
-/**
- * EVM-specific chain configuration
- */
-export interface EVMChainConfig extends ChainConfig {
-  type: ChainType.EVM;
-  id: number;
-  chainId: number; // For EVM compatibility
-}
-
-/**
- * Solana-specific chain configuration
- */
-export interface SolanaChainConfig extends ChainConfig {
-  type: ChainType.SOLANA;
-  id: string;
-}
-
-/**
- * Wallet information
- */
-export interface WalletInfo {
-  address: string;
-  provider: WalletProvider;
-  chainType: ChainType;
-  chainId: number | string;
-  publicKey?: string; // For Solana
-  userInfo?: {
-    email?: string;
-    phoneNumber?: string;
-    oauthProvider?: OAuthProvider;
-    name?: string;
-    profileImage?: string;
-  };
-  
-  // Database compatibility fields for use with Supabase
-  network_id?: string; // Maps to network_id column in database
-  smart_wallet_address?: string; // Maps to smart_wallet_address column in database
-}
-
-/**
- * Wallet balance information
- */
-export interface WalletBalance {
-  formatted: string;
-  raw: string | bigint;
-  symbol: string;
-  decimals: number;
-}
-
-/**
- * Transaction parameters
- */
-export interface BaseTransactionParams {
-  chainType: ChainType;
-  chainId: number | string;
-}
-
-/**
- * EVM transaction parameters
- */
-export interface EVMTransactionParams extends BaseTransactionParams {
-  chainType: ChainType.EVM;
   chainId: number;
-  to: string;
-  value?: string | bigint;
-  data?: string;
-  gasLimit?: bigint;
-  maxFeePerGas?: bigint;
-  maxPriorityFeePerGas?: bigint;
+  name: string;
+  rpcUrl: string;
+  symbol: string;
+  decimals: number;
+  blockExplorerUrl: string;
+  getExplorerUrl: (txHash: string) => string;
+  testnet?: boolean;
 }
 
 /**
- * Solana transaction parameters
+ * Magic provider configuration
  */
-export interface SolanaTransactionParams extends BaseTransactionParams {
-  chainType: ChainType.SOLANA;
-  chainId: string;
-  to: string;
-  amount: number | bigint;
-  splToken?: string; // Optional SPL token address
+export interface MagicProviderConfig {
+  apiKey: string;
+  accentColor?: string;
+  oauthOptions?: {
+    providers: string[];
+    callbackUrl?: string;
+  };
 }
 
 /**
- * Union type for all transaction parameters
+ * Database model for user wallets
  */
-export type TransactionParams = EVMTransactionParams | SolanaTransactionParams;
-
-/**
- * Transaction result
- */
-export interface TransactionResult {
-  hash: string;
-  chainType: ChainType;
-  chainId: number | string;
-  from: string;
-  to: string;
-  value?: string;
-  timestamp: number;
-}
-
-/**
- * Wallet storage data
- */
-export interface WalletStorageData {
+export interface Wallet {
+  id: string;
   userId: string;
-  address: string;
-  provider: WalletProvider;
+  chainId: string;
+  walletAddress: string;
+  walletType: WalletType;
   chainType: ChainType;
-  chainId: number | string;
+  email?: string;
   metadata?: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /**
- * Storage adapter interface
+ * Database model for wallet transactions
  */
-export interface StorageAdapter {
-  /**
-   * Optional Supabase client for authentication sync
-   */
-  supabaseClient?: any;
-
-  /**
-   * Save wallet data to storage
-   */
-  saveWallet(data: WalletStorageData): Promise<any>;
-
-  /**
-   * Get wallet data from storage
-   */
-  getWallet(userId: string, filters?: Partial<WalletStorageData>): Promise<any>;
-
-  /**
-   * List all wallets for a user
-   */
-  listWallets(userId: string): Promise<any[]>;
+export interface WalletTransaction {
+  id: string;
+  userId: string;
+  walletId: string;
+  txHash: string;
+  txType: string;
+  fromAddress: Address;
+  toAddress: Address;
+  amount: string;
+  status: "pending" | "success" | "failed";
+  createdAt: Date;
+  updatedAt: Date;
 }
 
+/**
+ * Wallet context state for React context
+ */
 /**
  * Wallet provider interface
+ * This interface defines the methods that must be implemented by all wallet providers
  */
 export interface WalletProviderInterface {
-  initialize(options?: any): Promise<void>;
-  connect(email: string, chainId?: number | string): Promise<WalletInfo>;
-  connectWithOAuth(
-    provider: OAuthProvider,
-    chainId?: number | string
-  ): Promise<WalletInfo>;
-  connectWithSMS(
-    phoneNumber: string,
-    chainId?: number | string
-  ): Promise<WalletInfo>;
-  handleOAuthCallback(chainId?: number | string): Promise<WalletInfo>;
-  generateDIDToken(): Promise<string>;
-  getUserInfo(): Promise<any>;
+  connect(options?: ConnectionOptions): Promise<WalletConnection | null>;
   disconnect(): Promise<void>;
-  isConnected(): Promise<boolean>;
-  getAddress(): Promise<string | null>;
-  getBalance(
-    address: string,
-    chainId?: number | string
-  ): Promise<WalletBalance>;
-  sendTransaction(params: TransactionParams): Promise<TransactionResult>;
+  getAccounts(): Promise<Address[]>;
   signMessage(message: string): Promise<string>;
-  switchChain(chainId: number | string): Promise<void>;
+  sendTransaction(
+    transaction: TransactionRequest
+  ): Promise<TransactionResponse>;
+  isConnected(): boolean;
+  getChainId(): Promise<number>;
+  getConnection(): WalletConnection | null;
+}
+
+/**
+ * Wallet context state for React context
+ */
+export interface WalletContextState {
+  // States from wagmi/useAccount can be used directly in components:
+  // address?: Address;
+  // isConnected?: boolean; // from wagmi
+  // isConnecting?: boolean; // from wagmi (for the connector itself)
+  // isReconnecting?: boolean; // from wagmi
+  // isDisconnected?: boolean; // from wagmi
+  // status?: "connected" | "reconnecting" | "connecting" | "disconnected"; // from wagmi
+  // chainId?: number; // from wagmi
+
+  // Application-specific state and service:
+  walletService: WalletService | null; // Instance of our WalletService for DB operations
+  persistedWallet: Wallet | null; // The wallet profile loaded from our database for the connected account (using Wallet type from this file)
+  isLoadingPersistedWallet: boolean; // True when fetching wallet data from our DB
+  // list of all persisted wallets for the user, could be useful
+  persistedWallets: Wallet[];
+  // Application specific error, e.g., DB operation error
+  appError: Error | null;
+
+  // Functions that might interact with WalletService and wagmi state:
+  // This function would be called after wagmi successfully connects.
+  // It uses wagmi's connected address and chainId to save/update in DB via WalletService.
+  syncWalletWithDb: (wagmiWallet: {
+    address: string;
+    chainId: number;
+    connectorId?: string; // e.g. 'magic', 'metaMask' from wagmi
+  }) => Promise<void>;
+
+  // Clears app-level persisted wallet state
+  clearPersistedWallet: () => void;
+
+  // Example of a function that uses WalletService
+  fetchUserPersistedWallets: (userId: string) => Promise<Wallet[]>;
+
+  // userId might be managed here or in a separate auth context
+  // For now, assume WalletProvider handles it or receives it.
+  userId?: string;
+  setAppUserId?: (userId: string) => void; // If WalletProvider manages userId for the service
+
+  // Wagmi actions like connect, disconnect, sign, sendTransaction are used directly via wagmi hooks in components.
+  // We no longer provide connectMagic, disconnect etc. directly from this context if wagmi handles them.
 }

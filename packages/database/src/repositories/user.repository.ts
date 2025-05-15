@@ -1,12 +1,12 @@
 /**
  * User Repository
- * 
+ *
  * This repository provides database operations for users.
  * It handles user management, authentication, and profile operations.
  */
 
-import { Prisma, User, Profile, UserWallet } from '@prisma/client';
-import { BaseRepository } from './base.repository';
+import { Prisma, User, Profile, UserWallet } from "@prisma/client";
+import { BaseRepository } from "./base.repository";
 
 // Type definitions for user operations
 export type UserCreateInput = Prisma.UserCreateInput;
@@ -22,8 +22,12 @@ export type UserWithProfileAndWallets = User & {
   userWallets: UserWallet[];
 };
 
-export class UserRepository extends BaseRepository<User, UserCreateInput, UserUpdateInput> {
-  protected tableName = 'users';
+export class UserRepository extends BaseRepository<
+  User,
+  UserCreateInput,
+  UserUpdateInput
+> {
+  protected tableName = "users";
   protected model = this.prisma.user;
 
   /**
@@ -45,7 +49,9 @@ export class UserRepository extends BaseRepository<User, UserCreateInput, UserUp
    * @param walletAddress The wallet address to find
    * @returns The user or null
    */
-  async findByWalletAddress(walletAddress: string): Promise<UserWithWallets | null> {
+  async findByWalletAddress(
+    walletAddress: string
+  ): Promise<UserWithWallets | null> {
     const wallet = await this.prisma.userWallet.findFirst({
       where: { walletAddress },
       include: {
@@ -68,7 +74,9 @@ export class UserRepository extends BaseRepository<User, UserCreateInput, UserUp
    * @param userId The user ID
    * @returns The user with profile and wallets or null
    */
-  async findWithProfileAndWallets(userId: string): Promise<UserWithProfileAndWallets | null> {
+  async findWithProfileAndWallets(
+    userId: string
+  ): Promise<UserWithProfileAndWallets | null> {
     return this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -85,8 +93,8 @@ export class UserRepository extends BaseRepository<User, UserCreateInput, UserUp
    * @returns The created user with profile
    */
   async createWithProfile(
-    userData: Omit<UserCreateInput, 'profile'>,
-    profileData: Omit<Prisma.ProfileCreateInput, 'user'>
+    userData: Omit<UserCreateInput, "profile">,
+    profileData: Omit<Prisma.ProfileCreateInput, "user">
   ): Promise<UserWithProfile> {
     return this.prisma.user.create({
       data: {
@@ -109,7 +117,7 @@ export class UserRepository extends BaseRepository<User, UserCreateInput, UserUp
    */
   async updateProfile(
     userId: string,
-    profileData: Omit<Prisma.ProfileUpdateInput, 'user'>
+    profileData: Omit<Prisma.ProfileUpdateInput, "user">
   ): Promise<UserWithProfile> {
     // Check if profile exists
     const profile = await this.prisma.profile.findUnique({
@@ -127,7 +135,7 @@ export class UserRepository extends BaseRepository<User, UserCreateInput, UserUp
       await this.prisma.profile.create({
         data: {
           id: userId,
-          ...profileData as any,
+          ...(profileData as any),
         },
       });
     }
@@ -148,7 +156,7 @@ export class UserRepository extends BaseRepository<User, UserCreateInput, UserUp
    */
   async addWallet(
     userId: string,
-    walletData: Omit<Prisma.UserWalletCreateInput, 'user'>
+    walletData: Omit<Prisma.UserWalletCreateInput, "user">
   ): Promise<UserWallet> {
     return this.prisma.userWallet.create({
       data: {

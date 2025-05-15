@@ -1,12 +1,18 @@
 /**
  * Execution Repository
- * 
+ *
  * This repository provides database operations for workflow executions.
  * It handles execution tracking, node execution, and execution logs.
  */
 
-import { Prisma, WorkflowExecution, NodeExecution, ExecutionLog, WorkflowStatus } from '@prisma/client';
-import { BaseRepository } from './base.repository';
+import {
+  Prisma,
+  WorkflowExecution,
+  NodeExecution,
+  ExecutionLog,
+  WorkflowStatus,
+} from "@prisma/client";
+import { BaseRepository } from "./base.repository";
 
 // Type definitions for execution operations
 export type ExecutionCreateInput = Prisma.WorkflowExecutionCreateInput;
@@ -16,8 +22,12 @@ export type ExecutionWithNodes = WorkflowExecution & {
   executionLogs: ExecutionLog[];
 };
 
-export class ExecutionRepository extends BaseRepository<WorkflowExecution, ExecutionCreateInput, ExecutionUpdateInput> {
-  protected tableName = 'workflow_executions';
+export class ExecutionRepository extends BaseRepository<
+  WorkflowExecution,
+  ExecutionCreateInput,
+  ExecutionUpdateInput
+> {
+  protected tableName = "workflow_executions";
   protected model = this.prisma.workflowExecution;
 
   /**
@@ -26,11 +36,14 @@ export class ExecutionRepository extends BaseRepository<WorkflowExecution, Execu
    * @param limit The maximum number of executions to return
    * @returns An array of executions
    */
-  async findByWorkflowId(workflowId: string, limit = 10): Promise<WorkflowExecution[]> {
+  async findByWorkflowId(
+    workflowId: string,
+    limit = 10
+  ): Promise<WorkflowExecution[]> {
     return this.prisma.workflowExecution.findMany({
       where: { workflowId },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
       take: limit,
     });
@@ -46,7 +59,7 @@ export class ExecutionRepository extends BaseRepository<WorkflowExecution, Execu
     return this.prisma.workflowExecution.findMany({
       where: { userId },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
       take: limit,
       include: {
@@ -70,12 +83,12 @@ export class ExecutionRepository extends BaseRepository<WorkflowExecution, Execu
       include: {
         nodeExecutions: {
           orderBy: {
-            startedAt: 'asc',
+            startedAt: "asc",
           },
         },
         executionLogs: {
           orderBy: {
-            timestamp: 'asc',
+            timestamp: "asc",
           },
         },
       },
@@ -129,7 +142,10 @@ export class ExecutionRepository extends BaseRepository<WorkflowExecution, Execu
       updatedAt: new Date(),
     };
 
-    if (status === WorkflowStatus.completed || status === WorkflowStatus.failed) {
+    if (
+      status === WorkflowStatus.completed ||
+      status === WorkflowStatus.failed
+    ) {
       data.finishedAt = new Date();
     }
 
@@ -153,7 +169,7 @@ export class ExecutionRepository extends BaseRepository<WorkflowExecution, Execu
    */
   async addLog(
     executionId: string,
-    level: 'info' | 'error' | 'warn',
+    level: "info" | "error" | "warn",
     message: string,
     metadata?: any
   ): Promise<ExecutionLog> {
@@ -186,7 +202,7 @@ export class ExecutionRepository extends BaseRepository<WorkflowExecution, Execu
           connect: { id: executionId },
         },
         nodeId,
-        status: 'pending',
+        status: "pending",
         startedAt: new Date(),
         completedAt: new Date(), // Will be updated when completed
       },
@@ -213,16 +229,16 @@ export class ExecutionRepository extends BaseRepository<WorkflowExecution, Execu
       updatedAt: now,
     };
 
-    if (status === 'completed' || status === 'failed') {
+    if (status === "completed" || status === "failed") {
       data.finishedAt = now;
       data.completedAt = now;
-      
+
       // Calculate duration in milliseconds
       const nodeExecution = await this.prisma.nodeExecution.findUnique({
         where: { id },
         select: { startedAt: true },
       });
-      
+
       if (nodeExecution) {
         const startTime = new Date(nodeExecution.startedAt).getTime();
         const endTime = now.getTime();
@@ -256,7 +272,7 @@ export class ExecutionRepository extends BaseRepository<WorkflowExecution, Execu
         status: WorkflowStatus.pending,
       },
       orderBy: {
-        createdAt: 'asc',
+        createdAt: "asc",
       },
       take: limit,
     });
@@ -268,7 +284,10 @@ export class ExecutionRepository extends BaseRepository<WorkflowExecution, Execu
    * @param workerId The worker ID
    * @returns The locked execution
    */
-  async lockExecution(id: string, workerId: string): Promise<WorkflowExecution> {
+  async lockExecution(
+    id: string,
+    workerId: string
+  ): Promise<WorkflowExecution> {
     return this.prisma.workflowExecution.update({
       where: { id },
       data: {

@@ -8,7 +8,7 @@ services:
     environment:
       - POSTGRES_USER=zzyra
       - POSTGRES_PASSWORD=zzyra
-      - POSTGRES_DB=zyra
+      - POSTGRES_DB=zzyra
     volumes:
       - zzyra-data:/var/lib/postgresql/data
     ports:

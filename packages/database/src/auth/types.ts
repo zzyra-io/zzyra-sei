@@ -1,10 +1,10 @@
 /**
  * Authentication Types
- * 
+ *
  * This module defines types for the authentication system.
  */
 
-import { User, Profile } from '@prisma/client';
+import { User, Profile, UserWallet } from "@prisma/client";
 
 /**
  * JWT Payload structure
@@ -36,6 +36,7 @@ export interface Session {
  */
 export type AuthUser = User & {
   profile?: Profile | null;
+  userWallets?: UserWallet[];
 };
 
 /**
@@ -72,10 +73,10 @@ export interface RefreshToken {
  */
 export class AuthError extends Error {
   code: string;
-  
+
   constructor(message: string, code: string) {
     super(message);
     this.code = code;
-    this.name = 'AuthError';
+    this.name = "AuthError";
   }
 }

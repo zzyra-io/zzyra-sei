@@ -1,14 +1,14 @@
 /**
  * Migration Utilities
- * 
+ *
  * This module provides utilities for migrating data from Supabase to Prisma.
  * It includes functions for exporting data from Supabase and importing it into Prisma.
  */
 
-import { createClient } from '@supabase/supabase-js';
-import prisma from '../client';
-import { PrismaClient } from '@prisma/client';
-import { BlockType } from '@zyra/types';
+import { createClient } from "@supabase/supabase-js";
+import prisma from "../client";
+import { PrismaClient } from "@prisma/client";
+import { BlockType } from "@zyra/types";
 
 /**
  * Supabase migration configuration
@@ -100,7 +100,7 @@ export class MigrationService {
    */
   async migrateUsers(): Promise<void> {
     const progress: MigrationProgress = {
-      table: 'users',
+      table: "users",
       total: 0,
       processed: 0,
       success: 0,
@@ -109,7 +109,9 @@ export class MigrationService {
 
     try {
       // Get users from Supabase auth.users table
-      const { data: users, error } = await this.supabase.from('auth.users').select('*');
+      const { data: users, error } = await this.supabase
+        .from("auth.users")
+        .select("*");
 
       if (error) throw error;
 
@@ -119,7 +121,7 @@ export class MigrationService {
       // Process users in batches
       for (let i = 0; i < users.length; i += this.batchSize) {
         const batch = users.slice(i, i + this.batchSize);
-        
+
         await Promise.all(
           batch.map(async (user: any) => {
             try {
@@ -160,7 +162,7 @@ export class MigrationService {
    */
   async migrateProfiles(): Promise<void> {
     const progress: MigrationProgress = {
-      table: 'profiles',
+      table: "profiles",
       total: 0,
       processed: 0,
       success: 0,
@@ -169,7 +171,9 @@ export class MigrationService {
 
     try {
       // Get profiles from Supabase
-      const { data: profiles, error } = await this.supabase.from('profiles').select('*');
+      const { data: profiles, error } = await this.supabase
+        .from("profiles")
+        .select("*");
 
       if (error) throw error;
 
@@ -179,7 +183,7 @@ export class MigrationService {
       // Process profiles in batches
       for (let i = 0; i < profiles.length; i += this.batchSize) {
         const batch = profiles.slice(i, i + this.batchSize);
-        
+
         await Promise.all(
           batch.map(async (profile: any) => {
             try {
@@ -191,13 +195,19 @@ export class MigrationService {
                   avatarUrl: profile.avatar_url,
                   subscriptionTier: profile.subscription_tier,
                   subscriptionStatus: profile.subscription_status,
-                  subscriptionExpiresAt: profile.subscription_expires_at ? new Date(profile.subscription_expires_at) : null,
+                  subscriptionExpiresAt: profile.subscription_expires_at
+                    ? new Date(profile.subscription_expires_at)
+                    : null,
                   monthlyExecutionQuota: profile.monthly_execution_quota,
                   monthlyExecutionCount: profile.monthly_execution_count,
                   stripeCustomerId: profile.stripe_customer_id,
                   stripeSubscriptionId: profile.stripe_subscription_id,
-                  updatedAt: profile.updated_at ? new Date(profile.updated_at) : new Date(),
-                  lastSeenAt: profile.last_seen_at ? new Date(profile.last_seen_at) : new Date(),
+                  updatedAt: profile.updated_at
+                    ? new Date(profile.updated_at)
+                    : new Date(),
+                  lastSeenAt: profile.last_seen_at
+                    ? new Date(profile.last_seen_at)
+                    : new Date(),
                   monthlyExecutionsUsed: profile.monthly_executions_used,
                   telegramChatId: profile.telegram_chat_id,
                   discordWebhookUrl: profile.discord_webhook_url,
@@ -207,16 +217,24 @@ export class MigrationService {
                   email: profile.email,
                   fullName: profile.full_name,
                   avatarUrl: profile.avatar_url,
-                  subscriptionTier: profile.subscription_tier || 'free',
-                  subscriptionStatus: profile.subscription_status || 'inactive',
-                  subscriptionExpiresAt: profile.subscription_expires_at ? new Date(profile.subscription_expires_at) : null,
+                  subscriptionTier: profile.subscription_tier || "free",
+                  subscriptionStatus: profile.subscription_status || "inactive",
+                  subscriptionExpiresAt: profile.subscription_expires_at
+                    ? new Date(profile.subscription_expires_at)
+                    : null,
                   monthlyExecutionQuota: profile.monthly_execution_quota || 100,
                   monthlyExecutionCount: profile.monthly_execution_count || 0,
                   stripeCustomerId: profile.stripe_customer_id,
                   stripeSubscriptionId: profile.stripe_subscription_id,
-                  createdAt: profile.created_at ? new Date(profile.created_at) : new Date(),
-                  updatedAt: profile.updated_at ? new Date(profile.updated_at) : new Date(),
-                  lastSeenAt: profile.last_seen_at ? new Date(profile.last_seen_at) : new Date(),
+                  createdAt: profile.created_at
+                    ? new Date(profile.created_at)
+                    : new Date(),
+                  updatedAt: profile.updated_at
+                    ? new Date(profile.updated_at)
+                    : new Date(),
+                  lastSeenAt: profile.last_seen_at
+                    ? new Date(profile.last_seen_at)
+                    : new Date(),
                   monthlyExecutionsUsed: profile.monthly_executions_used || 0,
                   telegramChatId: profile.telegram_chat_id,
                   discordWebhookUrl: profile.discord_webhook_url,
@@ -244,7 +262,7 @@ export class MigrationService {
    */
   async migrateWorkflows(): Promise<void> {
     const progress: MigrationProgress = {
-      table: 'workflows',
+      table: "workflows",
       total: 0,
       processed: 0,
       success: 0,
@@ -253,7 +271,9 @@ export class MigrationService {
 
     try {
       // Get workflows from Supabase
-      const { data: workflows, error } = await this.supabase.from('workflows').select('*');
+      const { data: workflows, error } = await this.supabase
+        .from("workflows")
+        .select("*");
 
       if (error) throw error;
 
@@ -263,7 +283,7 @@ export class MigrationService {
       // Process workflows in batches
       for (let i = 0; i < workflows.length; i += this.batchSize) {
         const batch = workflows.slice(i, i + this.batchSize);
-        
+
         await Promise.all(
           batch.map(async (workflow: any) => {
             try {
@@ -279,7 +299,9 @@ export class MigrationService {
                   definition: workflow.definition,
                   version: workflow.version,
                   createdBy: workflow.created_by,
-                  updatedAt: workflow.updated_at ? new Date(workflow.updated_at) : new Date(),
+                  updatedAt: workflow.updated_at
+                    ? new Date(workflow.updated_at)
+                    : new Date(),
                 },
                 create: {
                   id: workflow.id,
@@ -290,8 +312,12 @@ export class MigrationService {
                   edges: workflow.edges,
                   isPublic: workflow.is_public,
                   tags: workflow.tags,
-                  createdAt: workflow.created_at ? new Date(workflow.created_at) : new Date(),
-                  updatedAt: workflow.updated_at ? new Date(workflow.updated_at) : new Date(),
+                  createdAt: workflow.created_at
+                    ? new Date(workflow.created_at)
+                    : new Date(),
+                  updatedAt: workflow.updated_at
+                    ? new Date(workflow.updated_at)
+                    : new Date(),
                   definition: workflow.definition,
                   version: workflow.version,
                   createdBy: workflow.created_by,

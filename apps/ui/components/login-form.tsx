@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { ChainType, ZyraWallet } from "@zyra/wallet";
 import { ArrowRight, ExternalLink, Loader2, Mail, Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createMagicAuth } from "../lib/magic-auth";
 
 export function LoginForm() {
   const { supabase } = useSupabase();
@@ -28,11 +28,9 @@ export function LoginForm() {
     setIsLoading(true);
 
     try {
-      // Use signInWithOtp instead of signInWithMagicLink
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          // Don't include redirectTo in the options to avoid the hash fragment issue
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
@@ -71,53 +69,24 @@ export function LoginForm() {
     setIsLoading(true);
 
     try {
-      // Get Magic publishable key from environment
-      const magicPublishableKey = process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY;
+      const magicAuth = createMagicAuth();
 
-      if (!magicPublishableKey) {
-        throw new Error("Magic publishable key not configured");
-      }
-
-      // Create a ZyraWallet instance with the existing Supabase client
-      const wallet = new ZyraWallet(magicPublishableKey, {
-        supabaseClient: supabase,
-      });
-
-      // Initialize the wallet
-      await wallet.initialize();
-
-      // Connect using Magic Link
-      await wallet.connect(email, "84532"); // Base Sepolia chain ID
-
-      // Generate DID token for Supabase authentication
-      const didToken = await wallet.generateDIDToken();
-
-      // Sign in to Supabase with the token
-      const { error } = await supabase.auth.signInWithIdToken({
-        provider: "magic",
-        token: didToken,
-      });
-
-      if (error) {
-        throw error;
-      }
+      await magicAuth.loginWithMagicLink(email);
 
       setIsSent(true);
       toast({
-        title: "Magic link sent",
+        title: "Check your email",
         description:
-          "Check your email for the login link - after login your wallet will be automatically created",
+          "A login link has been sent to your email by Magic. Please check your inbox to complete sign-in.",
       });
-
-      // Note: The actual wallet creation happens during the connect process
     } catch (error) {
-      console.error("Wallet connection error:", error);
+      console.error("Wallet connection / Magic Link login error:", error);
       toast({
-        title: "Connection failed",
+        title: "Connection Failed",
         description:
           error instanceof Error
             ? error.message
-            : "Failed to connect wallet. Please try again.",
+            : "Failed to initiate wallet connection. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -137,10 +106,14 @@ export function LoginForm() {
       if (data?.url) {
         router.push(data.url);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      let message = "An unknown error occurred.";
+      if (error instanceof Error) {
+        message = error.message;
+      }
       toast({
         title: "Google login failed",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
       console.error("Google login error:", error);
@@ -172,7 +145,7 @@ export function LoginForm() {
             <div className='space-y-2'>
               <h3 className='text-lg font-medium'>Check your email</h3>
               <p className='text-sm text-muted-foreground'>
-                We've sent a magic link to {email}
+                We&apos;ve sent a magic link to {email}
               </p>
             </div>
             <Button
@@ -241,11 +214,11 @@ export function LoginForm() {
             {isLoading ? (
               <>
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                Connecting wallet...
+                Connecting with Magic...
               </>
             ) : (
               <>
-                Connect Magic Wallet
+                Connect with Magic Link
                 <Wallet className='ml-2 h-4 w-4' />
               </>
             )}

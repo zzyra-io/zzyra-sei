@@ -11,7 +11,7 @@ import {
   useContext,
   ReactNode,
 } from "react";
-import { MagicLinkAuth, createMagicAuth } from "@/lib/supabase/magic-auth";
+import { MagicLinkAuth, createMagicAuth } from "@/lib/magic-auth";
 import { WalletInfo, OAuthProvider, ChainType } from "@zyra/wallet";
 import { useRouter } from "next/navigation";
 

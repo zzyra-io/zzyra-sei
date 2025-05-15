@@ -6,26 +6,30 @@
 
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { MagicAuthProvider } from "@/hooks/useMagicAuth";
 import { MagicLoginForm } from "@/components/auth/MagicLoginForm";
-import Link from "next/link";
-import { LoginForm } from "@/components/login-form";
-import { WelcomeSteps } from "@/components/onboarding/welcome-steps";
 import { Logo } from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WelcomeSteps } from "@/components/onboarding/welcome-steps";
+import { useMagicAuth } from "@/hooks/useMagicAuth";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 /**
  * Login Page Component
  */
 export default function LoginPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const { isAuthenticated, isLoading: isAuthLoading } = useMagicAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !isAuthLoading) {
+      router.push("/dashboard");
+    }
+  }, [isAuthenticated, isAuthLoading, router]);
 
   const handleLoginSuccess = () => {
-    setLoading(true);
     router.push("/dashboard");
   };
 
@@ -55,15 +59,13 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <MagicAuthProvider redirectTo='/login'>
-              {loading ? (
-                <div className='flex justify-center items-center py-8'>
-                  <div className='animate-spin h-12 w-12 border-4 border-primary rounded-full border-t-transparent'></div>
-                </div>
-              ) : (
-                <MagicLoginForm onSuccess={handleLoginSuccess} />
-              )}
-            </MagicAuthProvider>
+            {isAuthLoading ? (
+              <div className='flex justify-center items-center py-8'>
+                <div className='animate-spin h-12 w-12 border-4 border-primary rounded-full border-t-transparent'></div>
+              </div>
+            ) : (
+              <MagicLoginForm onSuccess={handleLoginSuccess} />
+            )}
 
             <p className='px-8 text-center text-sm text-muted-foreground'>
               By continuing, you agree to our{" "}

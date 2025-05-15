@@ -8,6 +8,9 @@
 // Export Prisma client
 export { default as prisma } from './client';
 
+// Export all types
+export * from './types';
+
 // Export repositories
 export * from './repositories/base.repository';
 export * from './repositories/user.repository';

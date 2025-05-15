@@ -91,7 +91,7 @@ model UserWallet {
   id                   String        @id @default(uuid())
   userId               String        @map("user_id")
   chainId              String        @map("chain_id")
-  walletAddress        String        @map("wallet_address")
+  walletAddress        String        @map("wallet_address") @unique
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @default(now()) @map("updated_at")
   walletType           String?       @map("wallet_type")

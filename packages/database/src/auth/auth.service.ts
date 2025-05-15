@@ -1,15 +1,21 @@
 /**
  * Authentication Service
- * 
+ *
  * This service provides authentication functionality for the Zyra platform.
  * It integrates with the JWT service and user repository to manage user authentication.
  */
 
-import { User } from '@prisma/client';
-import { JwtService } from './jwt.service';
-import { AuthError, AuthResult, JwtPayload, MagicAuthPayload, Session } from './types';
-import { UserRepository } from '../repositories/user.repository';
-import { BlockType } from '@zyra/types';
+import { User } from "@prisma/client";
+import { JwtService } from "./jwt.service";
+import {
+  AuthError,
+  AuthResult,
+  JwtPayload,
+  MagicAuthPayload,
+  Session,
+} from "./types";
+import { UserRepository } from "../repositories/user.repository";
+import { BlockType } from "@zyra/types";
 
 export class AuthService {
   private jwtService: JwtService;
@@ -43,7 +49,10 @@ export class AuthService {
     const expiresAt = decodedToken?.exp || 0;
 
     // Get user with profile
-    const userWithProfile = await this.userRepository.findWithProfileAndWallets(user.id);
+    const userWithProfile = await this.userRepository.findWithProfileAndWallets(
+      user.id
+    );
+    if (!userWithProfile) throw new Error("User not found or missing wallets");
 
     // Update last seen
     if (userWithProfile?.profile) {
@@ -62,8 +71,13 @@ export class AuthService {
       expiresAt,
     };
 
+    // Ensure user has the required shape for AuthUser
     return {
-      user: userWithProfile || user,
+      user: {
+        ...user,
+        profile: userWithProfile?.profile || null,
+        userWallets: userWithProfile?.userWallets || [],
+      },
       session,
     };
   }
@@ -77,12 +91,15 @@ export class AuthService {
     try {
       // Verify DID token with Magic (this would be implemented separately)
       // const userInfo = await verifyMagicToken(payload.didToken);
-      
+
       // For now, we'll assume the token is valid and contains the email
       const email = payload.email;
-      
+
       if (!email) {
-        throw new AuthError('Email is required for Magic Link authentication', 'auth/invalid-email');
+        throw new AuthError(
+          "Email is required for Magic Link authentication",
+          "auth/invalid-email"
+        );
       }
 
       // Find or create user
@@ -94,8 +111,8 @@ export class AuthService {
           { email },
           {
             email,
-            subscriptionTier: 'free',
-            subscriptionStatus: 'inactive',
+            subscriptionTier: "free",
+            subscriptionStatus: "inactive",
             monthlyExecutionQuota: 100,
             monthlyExecutionCount: 0,
           }
@@ -109,8 +126,8 @@ export class AuthService {
         throw error;
       }
       throw new AuthError(
-        'Failed to authenticate with Magic Link',
-        'auth/magic-link-failed'
+        "Failed to authenticate with Magic Link",
+        "auth/magic-link-failed"
       );
     }
   }
@@ -132,26 +149,33 @@ export class AuthService {
       let user = await this.userRepository.findByWalletAddress(walletAddress);
 
       if (!user) {
-        // Create new user
-        user = await this.userRepository.create({});
-        
-        // Add wallet
-        await this.userRepository.addWallet(user.id, {
-          walletAddress,
-          chainId,
-          chainType,
-        });
-        
-        // Create profile
-        await this.userRepository.updateProfile(user.id, {
-          subscriptionTier: 'free',
-          subscriptionStatus: 'inactive',
-          monthlyExecutionQuota: 100,
-          monthlyExecutionCount: 0,
-        });
-        
-        // Reload user with profile and wallets
-        user = await this.userRepository.findWithProfileAndWallets(user.id);
+        // Create new user with empty data and initialize with empty wallet array
+        const newUser = await this.userRepository.create({});
+        user = { ...newUser, userWallets: [] };
+
+        if (user) {
+          // Add wallet
+          await this.userRepository.addWallet(user.id, {
+            walletAddress,
+            chainId,
+            chainType,
+          });
+
+          // Create profile
+          await this.userRepository.updateProfile(user.id, {
+            subscriptionTier: "free",
+            subscriptionStatus: "inactive",
+            monthlyExecutionQuota: 100,
+            monthlyExecutionCount: 0,
+          });
+
+          // Reload user with profile and wallets
+          const updatedUser =
+            await this.userRepository.findWithProfileAndWallets(user.id);
+          if (updatedUser) {
+            user = updatedUser;
+          }
+        }
       }
 
       // Create session
@@ -161,8 +185,8 @@ export class AuthService {
         throw error;
       }
       throw new AuthError(
-        'Failed to authenticate with wallet',
-        'auth/wallet-auth-failed'
+        "Failed to authenticate with wallet",
+        "auth/wallet-auth-failed"
       );
     }
   }
@@ -179,7 +203,9 @@ export class AuthService {
       if (!result) return null;
 
       // Get user
-      const user = await this.userRepository.findWithProfileAndWallets(result.refreshToken.userId);
+      const user = await this.userRepository.findWithProfileAndWallets(
+        result.refreshToken.userId
+      );
       if (!user) return null;
 
       // Calculate expiration time

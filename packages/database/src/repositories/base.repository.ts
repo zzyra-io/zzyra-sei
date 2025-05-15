@@ -1,13 +1,17 @@
 /**
  * Base Repository
- * 
+ *
  * This is the base repository class that all repositories should extend.
  * It provides common CRUD operations for all repositories with policy enforcement.
  */
 
-import { PrismaClient } from '@prisma/client';
-import prisma from '../client';
-import { PolicyContext, PolicyResult, PolicyService } from '../policies/policy.service';
+import { Prisma, PrismaClient } from "@prisma/client";
+import prisma from "../client";
+import {
+  PolicyContext,
+  PolicyResult,
+  PolicyService,
+} from "../policies/policy.service";
 
 /**
  * Access denied error class
@@ -15,7 +19,7 @@ import { PolicyContext, PolicyResult, PolicyService } from '../policies/policy.s
 export class AccessDeniedError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'AccessDeniedError';
+    this.name = "AccessDeniedError";
   }
 }
 
@@ -40,7 +44,7 @@ export abstract class BaseRepository<T, CreateInput, UpdateInput> {
     this.options = {
       auditEnabled: true,
       policyEnabled: true,
-      ...options
+      ...options,
     };
   }
 
@@ -60,20 +64,23 @@ export abstract class BaseRepository<T, CreateInput, UpdateInput> {
    */
   protected checkPolicyResult(result: PolicyResult): void {
     if (!result.allowed) {
-      throw new AccessDeniedError(result.message || 'Access denied');
+      throw new AccessDeniedError(result.message || "Access denied");
     }
   }
 
   /**
    * Log an audit event
    * @param action The action performed
-   * @param rowId The row ID
+   * @param rowId The row ID (used for context but not sent to audit log)
    * @param userId The user ID
-   * @param changedData The changed data
    */
-  protected async logAudit(action: string, rowId: string, userId: string, changedData?: any): Promise<void> {
+  protected async logAudit(
+    action: string,
+    rowId: string,
+    userId: string
+  ): Promise<void> {
     if (this.options.auditEnabled) {
-      await this.policyService.logAuditEvent(action, this.tableName, rowId, userId, changedData);
+      await this.policyService.logAuditEvent(action, this.tableName, userId);
     }
   }
 
@@ -170,7 +177,7 @@ export abstract class BaseRepository<T, CreateInput, UpdateInput> {
 
     // Log audit event if enabled and userId is provided
     if (userId && this.options.auditEnabled) {
-      await this.logAudit('CREATE', entity.id, userId, data);
+      await this.logAudit("CREATE", entity.id, userId);
     }
 
     return entity;
@@ -195,7 +202,9 @@ export abstract class BaseRepository<T, CreateInput, UpdateInput> {
     // Check if user has access to this entity
     const entity = await this.findById(id, userId);
     if (!entity) {
-      throw new AccessDeniedError('Entity not found or you do not have permission to update it');
+      throw new AccessDeniedError(
+        "Entity not found or you do not have permission to update it"
+      );
     }
 
     // Update the entity
@@ -205,7 +214,7 @@ export abstract class BaseRepository<T, CreateInput, UpdateInput> {
     });
 
     // Log audit event
-    await this.logAudit('UPDATE', id, userId, data);
+    await this.logAudit("UPDATE", id, userId);
 
     return updatedEntity;
   }
@@ -227,7 +236,9 @@ export abstract class BaseRepository<T, CreateInput, UpdateInput> {
     // Check if user has access to this entity
     const entity = await this.findById(id, userId);
     if (!entity) {
-      throw new AccessDeniedError('Entity not found or you do not have permission to delete it');
+      throw new AccessDeniedError(
+        "Entity not found or you do not have permission to delete it"
+      );
     }
 
     // Delete the entity
@@ -236,7 +247,7 @@ export abstract class BaseRepository<T, CreateInput, UpdateInput> {
     });
 
     // Log audit event
-    await this.logAudit('DELETE', id, userId);
+    await this.logAudit("DELETE", id, userId);
 
     return deletedEntity;
   }
@@ -247,36 +258,36 @@ export abstract class BaseRepository<T, CreateInput, UpdateInput> {
    * @param action The audit action
    * @param rowId The row ID
    * @param userId The user ID
-   * @param data The data to log
    * @returns The result of the operation
    */
   protected async executeWithTransaction<R>(
-    operation: (tx: PrismaClient) => Promise<R>,
+    operation: (tx: Prisma.TransactionClient) => Promise<R>,
     action: string,
     rowId: string,
-    userId: string,
-    data?: any
+    userId: string
   ): Promise<R> {
-    return this.prisma.$transaction(async (tx: PrismaClient) => {
-      // Perform the operation
-      const result = await operation(tx);
+    return await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        // Perform the operation
+        const result = await operation(tx);
 
-      // Log audit event if enabled
-      if (this.options.auditEnabled) {
-        await tx.auditLog.create({
-          data: {
-            action,
-            tableName: this.tableName,
-            rowId,
-            userId,
-            changedData: data,
-            timestamp: new Date(),
-          },
-        });
+        // Log audit event if enabled
+        if (this.options.auditEnabled) {
+          await tx.auditLog.create({
+            data: {
+              action,
+              resource: this.tableName,
+              resourceId: rowId,
+              userId,
+              metadata: {},
+              createdAt: new Date(),
+            },
+          });
+        }
+
+        return result;
       }
-
-      return result;
-    });
+    );
   }
 
   /**

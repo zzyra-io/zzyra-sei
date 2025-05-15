@@ -1,15 +1,15 @@
 /**
  * Authentication Middleware
- * 
+ *
  * This module provides middleware functions for authenticating API requests.
  * It integrates with the JWT authentication system and injects user context.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { JwtService } from '../auth/jwt.service';
-import { AuthService } from '../auth/auth.service';
-import { PolicyContext } from '../policies/policy.service';
-import { createPolicyContext } from '../policies/policy-utils';
+import { NextRequest, NextResponse } from "next/server";
+import { JwtService } from "../auth/jwt.service";
+import { AuthService } from "../auth/auth.service";
+import { PolicyContext } from "../policies/policy.service";
+import { createPolicyContext } from "../policies/policy-utils";
 
 // Initialize services
 const jwtService = new JwtService();
@@ -22,10 +22,7 @@ const authService = new AuthService();
  * @returns The error response
  */
 function authError(message: string, status: number = 401) {
-  return NextResponse.json(
-    { error: message },
-    { status }
-  );
+  return NextResponse.json({ error: message }, { status });
 }
 
 /**
@@ -35,17 +32,17 @@ function authError(message: string, status: number = 401) {
  */
 function extractToken(req: NextRequest): string | null {
   // Check for Authorization header
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
+  const authHeader = req.headers.get("Authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
     return authHeader.substring(7);
   }
-  
+
   // Check for token in cookies
-  const tokenCookie = req.cookies.get('token');
+  const tokenCookie = req.cookies.get("token");
   if (tokenCookie) {
     return tokenCookie.value;
   }
-  
+
   return null;
 }
 
@@ -57,7 +54,7 @@ function extractToken(req: NextRequest): string | null {
 export async function verifyAuth(req: NextRequest): Promise<string | null> {
   const token = extractToken(req);
   if (!token) return null;
-  
+
   return authService.verifySession(token);
 }
 
@@ -68,21 +65,21 @@ export async function verifyAuth(req: NextRequest): Promise<string | null> {
  */
 export async function authMiddleware(req: NextRequest) {
   const userId = await verifyAuth(req);
-  
+
   if (!userId) {
-    return authError('Unauthorized: Invalid or missing token');
+    return authError("Unauthorized: Invalid or missing token");
   }
-  
+
   // Add user ID to request headers
   const requestHeaders = new Headers(req.headers);
-  requestHeaders.set('x-user-id', userId);
-  
+  requestHeaders.set("x-user-id", userId);
+
   // Create policy context and add admin status to headers
   const context = await createPolicyContext(userId);
   if (context.isAdmin) {
-    requestHeaders.set('x-user-admin', 'true');
+    requestHeaders.set("x-user-admin", "true");
   }
-  
+
   // Continue to the next middleware or API route
   return NextResponse.next({
     request: {
@@ -97,7 +94,7 @@ export async function authMiddleware(req: NextRequest) {
  * @returns The user ID or null
  */
 export function getUserId(req: NextRequest): string | null {
-  return req.headers.get('x-user-id');
+  return req.headers.get("x-user-id");
 }
 
 /**
@@ -105,12 +102,14 @@ export function getUserId(req: NextRequest): string | null {
  * @param req The request object
  * @returns The policy context or null
  */
-export async function getPolicyContext(req: NextRequest): Promise<PolicyContext | null> {
+export async function getPolicyContext(
+  req: NextRequest
+): Promise<PolicyContext | null> {
   const userId = getUserId(req);
   if (!userId) return null;
-  
-  const isAdmin = req.headers.get('x-user-admin') === 'true';
-  
+
+  const isAdmin = req.headers.get("x-user-admin") === "true";
+
   // Create a basic context with the information we have
   return {
     userId,
@@ -126,7 +125,7 @@ export async function getPolicyContext(req: NextRequest): Promise<PolicyContext 
 export async function getUser(req: NextRequest) {
   const userId = getUserId(req);
   if (!userId) return null;
-  
+
   return authService.getUserById(userId);
 }
 
@@ -139,31 +138,31 @@ export function expressAuthMiddleware() {
     // Extract token from request
     const authHeader = req.headers.authorization;
     let token = null;
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
       token = authHeader.substring(7);
     } else if (req.cookies && req.cookies.token) {
       token = req.cookies.token;
     }
-    
+
     if (!token) {
-      return res.status(401).json({ error: 'Unauthorized: Missing token' });
+      return res.status(401).json({ error: "Unauthorized: Missing token" });
     }
-    
+
     // Verify token
     const userId = authService.verifySession(token);
-    
+
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+      return res.status(401).json({ error: "Unauthorized: Invalid token" });
     }
-    
+
     // Add user ID to request
     req.userId = userId;
-    
+
     // Create policy context and add to request
     const context = await createPolicyContext(userId);
     req.policyContext = context;
-    
+
     // Continue to the next middleware
     next();
   };
