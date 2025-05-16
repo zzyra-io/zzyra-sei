@@ -71,9 +71,22 @@ export class MagicAuth {
    */
   constructor(config: MagicAuthConfig) {
     this.config = config;
-    this.magic = new Magic(config.magicPublishableKey, {
-      extensions: [new OAuthExtension(), new WebAuthnExtension()],
+    
+    // Log the config being used (redact the key)
+    console.log("MagicAuth: Initializing with config:", {
+      keyAvailable: !!config.magicPublishableKey,
+      keyPrefix: config.magicPublishableKey ? config.magicPublishableKey.substring(0, 5) + "..." : "none"
     });
+    
+    try {
+      this.magic = new Magic(config.magicPublishableKey, {
+        extensions: [new OAuthExtension(), new WebAuthnExtension()],
+      });
+      console.log("MagicAuth: Magic SDK initialized successfully");
+    } catch (error) {
+      console.error("MagicAuth: Failed to initialize Magic SDK:", error);
+      throw error;
+    }
   }
 
   /**
@@ -103,11 +116,8 @@ export class MagicAuth {
         error.code === RPCErrorCode.UserAlreadyLoggedIn
       ) {
         console.warn("MagicAuth: User already logged in with Magic.");
-        // Optionally, could try to get existing DID token if SDK allows
-        // or just let the caller (NextAuth) handle this state.
       }
-      // NextAuth will typically handle the error presentation to the user.
-      throw error; // Re-throw for the caller (NextAuth authorize callback) to handle
+      throw error;
     }
   }
 
@@ -122,7 +132,7 @@ export class MagicAuth {
     );
     const magicLoginOptions: OAuthRedirectConfiguration = {
       provider: provider,
-      redirectURI: window.location.origin + "/api/auth/callback/magic-oauth",
+      redirectURI: window.location.origin + "/callback",
     };
     await this.magic.oauth2.loginWithRedirect(magicLoginOptions);
   }
@@ -136,16 +146,15 @@ export class MagicAuth {
     try {
       console.log(`MagicAuth: Processing OAuth callback...`);
       const result: OAuthRedirectResult =
-        await this.magic.oauth2.getRedirectResult();
+        await this.magic.oauth2.getRedirectResult({});
       console.log(
         "MagicAuth: Successfully received OAuth result from Magic",
         result
       );
-      // The caller (NextAuth callback handler) will use result.magic.idToken
       return result;
     } catch (error) {
       console.error("MagicAuth: OAuth callback handling failed:", error);
-      throw error; // Re-throw for the caller to handle
+      throw error;
     }
   }
 
@@ -155,10 +164,16 @@ export class MagicAuth {
    * @param phoneNumber User's phone number
    * @returns DID token or relevant Magic data
    */
-  async loginWithSMS(phoneNumber: string): Promise<string | null> {
+  async loginWithSMS(
+    phoneNumber: string,
+    options?: LoginWithSmsConfiguration
+  ): Promise<string | null> {
     try {
       console.log("MagicAuth: Starting SMS authentication for:", phoneNumber);
-      const smsLoginOptions: LoginWithSmsConfiguration = { phoneNumber };
+      const smsLoginOptions: LoginWithSmsConfiguration = {
+        phoneNumber,
+        ...(options || {}),
+      };
       const didToken = await this.magic.auth.loginWithSMS(smsLoginOptions);
       console.log(
         "MagicAuth: Successfully authenticated with Magic via SMS, got DID token"
@@ -177,12 +192,12 @@ export class MagicAuth {
    */
   async isLoggedIn(): Promise<boolean> {
     try {
-      return await this.magic.user.isLoggedIn();
+      console.log("MagicAuth: Checking if user is logged in...");
+      const isLoggedIn = await this.magic.user.isLoggedIn();
+      console.log(`MagicAuth: User is ${isLoggedIn ? "" : "not "} logged in`);
+      return isLoggedIn;
     } catch (error) {
-      console.error(
-        "MagicAuth: Error checking login status with Magic:",
-        error
-      );
+      console.error("MagicAuth: Error checking if user is logged in:", error);
       return false;
     }
   }
@@ -204,8 +219,6 @@ export class MagicAuth {
       }
     } catch (error) {
       console.error("MagicAuth: Magic logout failed:", error);
-      // Don't re-throw necessarily, as NextAuth logout might still proceed.
-      // Caller should be aware if Magic logout fails.
     }
   }
 
@@ -215,7 +228,7 @@ export class MagicAuth {
   async getUserMetadata(): Promise<MagicUserMetadata | null> {
     try {
       if (await this.magic.user.isLoggedIn()) {
-        return await this.magic.user.getMetadata();
+        return await this.magic.user.getInfo();
       }
       return null;
     } catch (error) {
@@ -235,7 +248,6 @@ export class MagicAuth {
   }
 }
 
-// Factory function for creating MagicAuth instance
 let magicAuthInstance: MagicAuth | null = null;
 
 export const createMagicAuth = (): MagicAuth => {
@@ -246,7 +258,7 @@ export const createMagicAuth = (): MagicAuth => {
   const magicPublishableKey = process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY;
   if (!magicPublishableKey) {
     throw new Error(
-      "Missing NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY in environment."
+      "Missing NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY in environment. This is required to initialize Magic SDK."
     );
   }
 
@@ -256,8 +268,4 @@ export const createMagicAuth = (): MagicAuth => {
 
   magicAuthInstance = new MagicAuth(config);
   return magicAuthInstance;
-};
-
-export const useMagicAuth = () => {
-  return createMagicAuth();
 };

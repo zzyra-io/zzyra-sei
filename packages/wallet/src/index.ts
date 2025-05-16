@@ -50,6 +50,9 @@ export {
   DEFAULT_CONNECTION_OPTIONS,
 } from "./core/constants";
 
+// Export Wagmi config and query client
+export { createWagmiConfig, queryClient } from "./config/wagmi.config";
+
 /**
  * This package provides:
  *

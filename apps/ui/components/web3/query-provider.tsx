@@ -1,12 +1,13 @@
-"use client"
+"use client";
 
-import type { FC, PropsWithChildren } from "react"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { WagmiProvider } from "wagmi"
-import { config } from "@/components/web3/web3-provider"
-import { ConnectKitProvider } from "connectkit"
+import type { FC, PropsWithChildren } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { WagmiProvider } from "wagmi";
+import { createWagmiConfig, queryClient } from "@zyra/wallet";
+import { ConnectKitProvider } from "connectkit";
 
-const queryClient = new QueryClient()
+// Create a basic config without Magic for non-auth pages
+const config = createWagmiConfig(undefined, false);
 
 const QueryProvider: FC<PropsWithChildren> = ({ children }) => {
   return (
@@ -15,7 +16,7 @@ const QueryProvider: FC<PropsWithChildren> = ({ children }) => {
         <ConnectKitProvider>{children}</ConnectKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
-  )
-}
+  );
+};
 
-export default QueryProvider
+export default QueryProvider;

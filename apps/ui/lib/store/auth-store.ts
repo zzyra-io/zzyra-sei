@@ -48,25 +48,63 @@ export const useAuthStore = create<AuthState>()(
       error: null,
       
       loginWithEmail: async (email, chainId) => {
+        // Track if the request was aborted
+        let isAborted = false;
+        
+        // Create an AbortController to handle timeouts
+        const controller = new AbortController();
+        const signal = controller.signal;
+        
+        // Set a timeout to abort the request after 15 seconds
+        const timeoutId = setTimeout(() => {
+          isAborted = true;
+          controller.abort();
+          console.warn('Auth request timed out after 15 seconds');
+          set({
+            error: new Error('Authentication timed out. Please try again.'),
+            isLoading: false,
+          });
+        }, 15000);
+        
         try {
+          console.log(`Auth Store: Starting email login for ${email}`);
           set({ isLoading: true, error: null });
           
           // Initialize wallet if not already initialized
+          console.log('Auth Store: Initializing wallet...');
           await wallet.initialize();
           
           // Connect with Magic Link
-          const walletInfo = await wallet.connect(email, chainId);
+          console.log('Auth Store: Connecting with Magic Link...');
+          const walletInfo = await Promise.race([
+            wallet.connect(email, chainId),
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Magic Link connection timed out')), 10000);
+            })
+          ]);
+          
+          if (isAborted) return; // Don't continue if request was aborted
           
           // Generate DID token for authentication
-          const didToken = await wallet.generateDIDToken();
+          console.log('Auth Store: Generating DID token...');
+          const didToken = await Promise.race([
+            wallet.generateDIDToken(),
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('DID token generation timed out')), 8000);
+            })
+          ]);
+          
+          if (isAborted) return; // Don't continue if request was aborted
           
           // Call API to authenticate with the server
+          console.log('Auth Store: Calling login API...');
           const response = await fetch("/api/auth/login", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({ email, didToken }),
+            signal, // Add the abort signal to the fetch request
           });
           
           const authResult = await response.json();
@@ -76,6 +114,7 @@ export const useAuthStore = create<AuthState>()(
           }
           
           const user = authResult.user;
+          console.log('Auth Store: Login successful!', { userId: user.id });
           
           // Update state
           set({
@@ -85,12 +124,24 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
           });
         } catch (error) {
-          console.error('Login with email failed:', error);
-          set({
-            error: error instanceof Error ? error : new Error('Login failed'),
-            isLoading: false,
-          });
+          // Check if the error was caused by the abort controller
+          if (error.name === 'AbortError') {
+            console.error('Login request was aborted due to timeout');
+          } else {
+            console.error('Login with email failed:', error);
+          }
+          
+          // Only update state if the request wasn't manually aborted
+          if (!isAborted) {
+            set({
+              error: error instanceof Error ? error : new Error('Login failed'),
+              isLoading: false,
+            });
+          }
           throw error;
+        } finally {
+          // Clear the timeout to prevent memory leaks
+          clearTimeout(timeoutId);
         }
       },
       

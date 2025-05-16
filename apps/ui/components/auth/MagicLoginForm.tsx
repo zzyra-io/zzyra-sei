@@ -1,6 +1,6 @@
 /**
- * Magic Login Form Component
- *
+ * Magic Login Form
+ * 
  * A form component for Magic Link authentication with email, SMS, or OAuth providers.
  */
 
@@ -9,55 +9,47 @@ import { useState } from "react";
 import { useMagicAuth } from "@/hooks/useMagicAuth"; // New hook
 import { OAuthProvider } from "@/lib/magic-auth-types"; // Corrected import
 import { CHAIN_IDS } from "@zyra/wallet"; // Corrected import for chain constants
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 /**
  * Magic Login Form Props
  */
 interface MagicLoginFormProps {
-  defaultChainId?: number | string;
   onSuccess?: () => void;
-  redirectAfterLogin?: string; // This prop might not be needed if redirection is handled by the page
 }
 
 /**
  * Magic Login Form Component
  */
-export function MagicLoginForm({
-  defaultChainId = CHAIN_IDS.MUMBAI.toString(),
-  onSuccess,
-}: MagicLoginFormProps) {
-  // Login method state
-  const [activeTab, setActiveTab] = useState("email");
-
-  // Form states
-  const [email, setEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  // Local loading and error state for the form itself
+export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
+  // Initialize state for form
+  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [activeTab, setActiveTab] = useState<string>('email');
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<Error | null>(null);
+
+  // No longer need the isMounted state since we're using direct form loading state
 
   // Auth hook
   const {
     loginWithEmail,
     loginWithSMS,
     loginWithOAuth,
-    isLoading: isAuthLoading, // isLoading from useMagicAuth indicates ongoing auth process
-    error: authError, // error from useMagicAuth
+    // We're not using isAuthLoading anymore to prevent button disabling issues
+    error: authError,
   } = useMagicAuth();
-
+  
+  // Use the first chainId from wallet constants as default
+  const defaultChainId = CHAIN_IDS.ETH_GOERLI;
+  
   // Handle email login
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,19 +58,29 @@ export function MagicLoginForm({
     setFormLoading(true);
     setFormError(null);
 
+    // Add timeout protection to prevent indefinite loading state
+    const loginTimeout = setTimeout(() => {
+      setFormLoading(false);
+      setFormError(new Error("Login request timed out. Please try again."));
+    }, 10000); // 10 second timeout
+
     try {
+      console.log("MagicLoginForm: Starting email login for", email);
       await loginWithEmail(email, String(defaultChainId));
       // onSuccess callback is still useful for page-level actions like navigation
+      clearTimeout(loginTimeout);
       if (onSuccess) onSuccess();
     } catch (err) {
+      console.error("MagicLoginForm: Email login failed:", err);
       setFormError(
-        err instanceof Error ? err : new Error("Email login failed")
+        err instanceof Error ? err : new Error("Email login failed. Please check your connection and try again.")
       );
     } finally {
+      clearTimeout(loginTimeout);
       setFormLoading(false);
     }
   };
-
+  
   // Handle SMS login
   const handleSMSLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +105,7 @@ export function MagicLoginForm({
     setFormLoading(true);
     setFormError(null);
     try {
-      await loginWithOAuth(provider, String(defaultChainId));
+      await loginWithOAuth(provider);
       // OAuth typically involves a redirect, so onSuccess might be called
       // on the redirect callback page or based on auth state change.
       // If onSuccess is provided, it can be called, but navigation might be tricky here.
@@ -115,12 +117,13 @@ export function MagicLoginForm({
       console.error(`${provider} login failed:`, err);
     } finally {
       // For OAuth, loading might persist until redirect or failure
-      // setFormLoading(false); // Might not be needed if page redirects
+      setFormLoading(false); // Added to ensure loading state is reset
     }
   };
 
-  // Determine combined loading state
-  const isLoading = formLoading || isAuthLoading;
+  // Determine combined loading state - only use formLoading to control button state
+  // This prevents buttons from being disabled due to background auth checks
+  const isLoading = formLoading;
 
   // Determine combined error state
   const displayError = formError || authError;
@@ -162,14 +165,19 @@ export function MagicLoginForm({
                   />
                 </div>
 
-                <Button
-                  type='submit'
-                  className='w-full'
-                  disabled={isLoading || !email}>
-                  {isLoading && activeTab === "email"
-                    ? "Sending Magic Link..."
-                    : "Login with Email"}
-                </Button>
+                {formLoading ? (
+                  <Button disabled className="w-full">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending Magic Link...
+                  </Button>
+                ) : (
+                  <Button
+                    type='submit'
+                    className='w-full'
+                    disabled={!email}>
+                    Login with Email
+                  </Button>
+                )}
               </div>
             </form>
           </TabsContent>
@@ -191,14 +199,19 @@ export function MagicLoginForm({
                   />
                 </div>
 
-                <Button
-                  type='submit'
-                  className='w-full'
-                  disabled={isLoading || !phoneNumber}>
-                  {isLoading && activeTab === "sms"
-                    ? "Sending Code..."
-                    : "Login with SMS"}
-                </Button>
+                {formLoading ? (
+                  <Button disabled className="w-full">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending SMS...
+                  </Button>
+                ) : (
+                  <Button
+                    type='submit'
+                    className='w-full'
+                    disabled={!phoneNumber}>
+                    Login with SMS
+                  </Button>
+                )}
               </div>
             </form>
           </TabsContent>
@@ -206,48 +219,61 @@ export function MagicLoginForm({
           {/* Social Login */}
           <TabsContent value='social'>
             <div className='space-y-4'>
-              <Button
-                type='button'
-                className='w-full'
-                variant='outline'
-                onClick={() => handleOAuthLogin(OAuthProvider.GOOGLE)}
-                disabled={isLoading}>
-                {isLoading && activeTab === "social"
-                  ? "Connecting..."
-                  : "Continue with Google"}
-              </Button>
+              {formLoading ? (
+                <Button disabled className="w-full">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Connecting...
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type='button'
+                    className='w-full'
+                    variant='outline'
+                    onClick={() => handleOAuthLogin(OAuthProvider.GOOGLE)}>
+                    Continue with Google
+                  </Button>
 
-              <Button
-                type='button'
-                className='w-full'
-                variant='outline'
-                onClick={() => handleOAuthLogin(OAuthProvider.APPLE)}
-                disabled={isLoading}>
-                {isLoading && activeTab === "social"
-                  ? "Connecting..."
-                  : "Continue with Apple"}
-              </Button>
+                  <Button
+                    type='button'
+                    className='w-full'
+                    variant='outline'
+                    onClick={() => handleOAuthLogin(OAuthProvider.APPLE)}>
+                    Continue with Apple
+                  </Button>
 
-              <Button
-                type='button'
-                className='w-full'
-                variant='outline'
-                onClick={() => handleOAuthLogin(OAuthProvider.GITHUB)}
-                disabled={isLoading}>
-                {isLoading && activeTab === "social"
-                  ? "Connecting..."
-                  : "Continue with GitHub"}
-              </Button>
+                  <Button
+                    type='button'
+                    className='w-full'
+                    variant='outline'
+                    onClick={() => handleOAuthLogin(OAuthProvider.GITHUB)}>
+                    Continue with GitHub
+                  </Button>
+                </>
+              )}
             </div>
           </TabsContent>
         </Tabs>
 
         {/* Error display */}
-        {displayError && (
-          <Alert variant='destructive' className='mt-4'>
+        {displayError ? (
+          <Alert variant="destructive" className="mt-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Authentication Error</AlertTitle>
             <AlertDescription>{displayError.message}</AlertDescription>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-2" 
+              onClick={() => {
+                setFormError(null);
+                setEmail(""); // Clear email field to encourage trying again
+              }}
+            >
+              Try Again
+            </Button>
           </Alert>
-        )}
+        ) : null}
       </CardContent>
 
       <CardFooter className='flex flex-col space-y-2'>

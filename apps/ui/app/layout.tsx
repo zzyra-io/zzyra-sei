@@ -5,16 +5,12 @@ import "@/styles/flow-components.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
 import { Toaster } from "@/components/ui/toaster";
-import { Web3Provider } from "@/components/web3/web3-provider";
-import { FinanceProvider } from "@/lib/finance/finance-context";
 import { SkipLink } from "@/components/a11y/skip-link";
-import QueryProvider from "@/components/web3/query-provider";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { NotificationToastContainer } from "@/components/NotificationToast";
 import { NotificationSocketProvider } from "@/components/notification/notification-socket-provider";
 import { FloatingParticles } from "@/components/floating-particles";
-
-// Removed ReactQueryProvider; QueryProvider now handles React Query and Wagmi/ConnectKit
+import { ZyraProviders } from "../components/zyra-providers";
 
 const inter = Space_Grotesk({
   subsets: ["latin"],
@@ -37,29 +33,25 @@ export default function RootLayout({
     <html lang='en' suppressHydrationWarning className={inter.variable}>
       <body className='min-h-screen bg-background font-sans antialiased'>
         <PostHogProvider>
-          <QueryProvider>
-            <SkipLink />
-            <AuthProvider>
+          <SkipLink />
+          <AuthProvider>
+            <ZyraProviders>
               <ThemeProvider
                 attribute='class'
                 defaultTheme='system'
                 enableSystem
                 disableTransitionOnChange>
                 <NotificationSocketProvider>
-                  <Web3Provider>
-                    <FinanceProvider>
-                      <div className='fixed inset-0 pointer-events-none z-0'>
-                        <FloatingParticles />
-                      </div>
-                      <main id='main-content'>{children}</main>
-                      <Toaster />
-                      <NotificationToastContainer />
-                    </FinanceProvider>
-                  </Web3Provider>
+                  <div className='fixed inset-0 pointer-events-none z-0'>
+                    <FloatingParticles />
+                  </div>
+                  <main id='main-content'>{children}</main>
+                  <Toaster />
+                  <NotificationToastContainer />
                 </NotificationSocketProvider>
               </ThemeProvider>
-            </AuthProvider>
-          </QueryProvider>
+            </ZyraProviders>
+          </AuthProvider>
         </PostHogProvider>
       </body>
     </html>

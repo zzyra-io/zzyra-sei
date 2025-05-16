@@ -1,7 +1,7 @@
 /**
- * Magic Link + Supabase Authentication Hook
+ * Magic Link Authentication Hook
  *
- * Provides a React hook for using Magic Link authentication with Supabase
+ * Provides a React hook for using Magic Link authentication
  */
 
 import {
@@ -11,26 +11,18 @@ import {
   useContext,
   ReactNode,
 } from "react";
-import { MagicLinkAuth, createMagicAuth } from "@/lib/magic-auth";
-import { WalletInfo, OAuthProvider, ChainType } from "@zyra/wallet";
+import { MagicAuth, createMagicAuth } from "@/lib/magic-auth";
+import { OAuthProvider } from "@/lib/magic-auth-types";
+import { ChainType } from "@zyra/wallet";
+import { type MagicUserMetadata } from "magic-sdk";
 import { useRouter } from "next/navigation";
 
-// Define Supabase user type
-interface SupabaseUser {
-  id: string;
-  app_metadata: Record<string, any>;
-  user_metadata: {
-    wallets?: Record<
-      string,
-      {
-        chain_type: string;
-        chain_id: string | number;
-      }
-    >;
-    [key: string]: any;
-  };
-  aud: string;
-  [key: string]: any;
+// Define WalletInfo interface locally
+interface WalletInfo {
+  address: string;
+  provider: string;
+  chainType: ChainType;
+  chainId: string | number | null;
 }
 
 // Auth context state
@@ -38,7 +30,7 @@ interface MagicAuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   wallet: WalletInfo | null;
-  user: SupabaseUser | null; // Supabase user
+  user: MagicUserMetadata | null; // Use MagicUserMetadata instead of SupabaseUser
   error: Error | null;
 }
 
@@ -49,13 +41,10 @@ interface MagicAuthMethods {
     phoneNumber: string,
     chainId?: number | string
   ) => Promise<void>;
-  loginWithOAuth: (
-    provider: OAuthProvider,
-    chainId?: number | string
-  ) => Promise<void>;
-  handleOAuthCallback: (provider: OAuthProvider) => Promise<void>;
+  loginWithOAuth: (provider: OAuthProvider) => Promise<void>;
+  handleOAuthCallback: () => Promise<void>; // Remove provider parameter as it's not used
   logout: () => Promise<void>;
-  getMagicAuth: () => MagicLinkAuth;
+  getMagicAuth: () => MagicAuth;
 }
 
 // Combined context type
@@ -90,14 +79,14 @@ interface MagicAuthProviderProps {
 /**
  * Magic Auth Provider component
  *
- * Wraps the application with Magic Link + Supabase authentication context
+ * Wraps the application with Magic Link authentication context
  */
 export function MagicAuthProvider({
   children,
   redirectTo = "/login",
 }: MagicAuthProviderProps) {
   // State
-  const [magicAuth, setMagicAuth] = useState<MagicLinkAuth | null>(null);
+  const [magicAuth, setMagicAuth] = useState<MagicAuth | null>(null);
   const [state, setState] = useState<MagicAuthState>({
     isLoading: true,
     isAuthenticated: false,
@@ -108,47 +97,57 @@ export function MagicAuthProvider({
 
   const router = useRouter();
 
-  // Initialize Magic Auth
+  // Initialize Magic Auth - with improved error handling and timeouts
   useEffect(() => {
+    const isMounted = true; // For cleanup in case component unmounts during initialization
+
+    // Add a timeout to prevent infinite loading state
+    const loadingTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.warn("Magic auth initialization timed out");
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: new Error("Authentication initialization timed out"),
+        }));
+      }
+    }, 10000); // 10 second timeout
+
     async function initialize() {
       try {
-        // Create and initialize Magic auth
+        console.log("Initializing Magic auth...");
+        // Create Magic auth instance
         const auth = createMagicAuth();
-        await auth.initialize();
+        if (!isMounted) return;
         setMagicAuth(auth);
 
         // Check if user is already logged in
+        console.log("Checking if user is logged in...");
         const isLoggedIn = await auth.isLoggedIn();
 
-        if (isLoggedIn) {
-          // Get Supabase user data
-          const {
-            data: { user },
-          } = await auth.getSupabase().auth.getUser();
+        if (isLoggedIn && isMounted) {
+          console.log("User is logged in, fetching metadata...");
+          // Get user metadata directly from Magic
+          const userMetadata = await auth.getUserMetadata();
 
-          // Get wallet info
-          const wallet = await auth.getWallet().getAddress();
+          // Create wallet info object if we have user data
+          let walletInfo: WalletInfo | null = null;
+          if (userMetadata?.publicAddress) {
+            walletInfo = {
+              address: userMetadata.publicAddress,
+              provider: "magic",
+              chainType: ChainType.ETHEREUM,
+              chainId: null,
+            };
+          }
 
-          // Safely access user metadata - use string indexing for safety
-          const walletEntry = user?.user_metadata?.wallets
-            ? user.user_metadata.wallets[wallet as string]
-            : undefined;
-
-          const chainType = walletEntry?.chain_type || ChainType.EVM;
-          const chainId = walletEntry?.chain_id || null;
+          if (!isMounted) return;
 
           setState({
             isLoading: false,
             isAuthenticated: true,
-            wallet: wallet
-              ? ({
-                  address: wallet,
-                  provider: "magic",
-                  chainType,
-                  chainId,
-                } as WalletInfo)
-              : null,
-            user,
+            wallet: walletInfo,
+            user: userMetadata,
             error: null,
           });
         } else {
@@ -162,17 +161,24 @@ export function MagicAuthProvider({
         }
       } catch (error) {
         console.error("Failed to initialize Magic auth:", error);
-        setState({
-          isLoading: false,
-          isAuthenticated: false,
-          wallet: null,
-          user: null,
-          error: error instanceof Error ? error : new Error("Unknown error"),
-        });
+        if (isMounted) {
+          setState({
+            isLoading: false,
+            isAuthenticated: false,
+            wallet: null,
+            user: null,
+            error: error instanceof Error ? error : new Error("Unknown error"),
+          });
+        }
       }
     }
 
     initialize();
+
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      clearTimeout(loadingTimeout);
+    };
   }, []);
 
   // Auth methods
@@ -182,21 +188,29 @@ export function MagicAuthProvider({
     try {
       if (!magicAuth) throw new Error("Magic auth not initialized");
 
-      // Magic will handle showing UI for the email verification step
-      // The promise resolves only after the user completes the email flow
-      const walletInfo = await magicAuth.loginWithMagicLink(email, chainId);
+      // Get DID token from Magic
+      await magicAuth.loginWithMagicLink(email);
 
-      // Get user data from Supabase
-      const {
-        data: { user },
-      } = await magicAuth.getSupabase().auth.getUser();
+      // Get user metadata directly from Magic
+      const userMetadata = await magicAuth.getUserMetadata();
+
+      // Create wallet info object
+      let walletInfo: WalletInfo | null = null;
+      if (userMetadata?.publicAddress) {
+        walletInfo = {
+          address: userMetadata.publicAddress,
+          provider: "magic",
+          chainType: ChainType.ETHEREUM,
+          chainId: chainId || null,
+        };
+      }
 
       // Update state after successful authentication
       setState({
         isLoading: false,
         isAuthenticated: true,
         wallet: walletInfo,
-        user,
+        user: userMetadata,
         error: null,
       });
     } catch (error) {
@@ -219,19 +233,28 @@ export function MagicAuthProvider({
       if (!magicAuth) throw new Error("Magic auth not initialized");
 
       // Login with SMS
-      const walletInfo = await magicAuth.loginWithSMS(phoneNumber, chainId);
+      await magicAuth.loginWithSMS(phoneNumber);
 
-      // Get user data from Supabase
-      const {
-        data: { user },
-      } = await magicAuth.getSupabase().auth.getUser();
+      // Get user metadata directly from Magic
+      const userMetadata = await magicAuth.getUserMetadata();
+
+      // Create wallet info object
+      let walletInfo: WalletInfo | null = null;
+      if (userMetadata?.publicAddress) {
+        walletInfo = {
+          address: userMetadata.publicAddress,
+          provider: "magic",
+          chainType: ChainType.ETHEREUM,
+          chainId: chainId || null,
+        };
+      }
 
       // Update state
       setState({
         isLoading: false,
         isAuthenticated: true,
         wallet: walletInfo,
-        user,
+        user: userMetadata,
         error: null,
       });
     } catch (error) {
@@ -244,17 +267,14 @@ export function MagicAuthProvider({
     }
   };
 
-  const loginWithOAuth = async (
-    provider: OAuthProvider,
-    chainId?: number | string
-  ) => {
+  const loginWithOAuth = async (provider: OAuthProvider) => {
     setState({ ...state, isLoading: true, error: null });
 
     try {
       if (!magicAuth) throw new Error("Magic auth not initialized");
 
       // Start OAuth flow - this will redirect the user
-      await magicAuth.loginWithOAuth(provider, chainId);
+      await magicAuth.loginWithOAuth(provider);
 
       // Note: State update happens in handleOAuthCallback after redirect
     } catch (error) {
@@ -267,30 +287,39 @@ export function MagicAuthProvider({
     }
   };
 
-  const handleOAuthCallback = async (provider: OAuthProvider) => {
+  const handleOAuthCallback = async () => {
+    // Remove provider parameter
     setState({ ...state, isLoading: true, error: null });
 
     try {
       if (!magicAuth) throw new Error("Magic auth not initialized");
 
       // Complete OAuth flow
-      const walletInfo = await magicAuth.handleOAuthCallback(provider);
+      const result = await magicAuth.handleOAuthCallback();
 
-      // Get user data from Supabase
-      const {
-        data: { user },
-      } = await magicAuth.getSupabase().auth.getUser();
+      // Get user metadata from result or directly from Magic
+      const userMetadata =
+        result.magic.userMetadata || (await magicAuth.getUserMetadata());
+
+      // Create wallet info object
+      let walletInfo: WalletInfo | null = null;
+      if (userMetadata?.publicAddress) {
+        walletInfo = {
+          address: userMetadata.publicAddress,
+          provider: "magic",
+          chainType: ChainType.ETHEREUM,
+          chainId: null, // This can be customized if needed
+        };
+      }
 
       // Update state
       setState({
         isLoading: false,
         isAuthenticated: true,
         wallet: walletInfo,
-        user,
+        user: userMetadata,
         error: null,
       });
-
-      // No need to return walletInfo to match the type declaration
     } catch (error) {
       console.error("OAuth callback handling failed:", error);
       setState({
@@ -358,7 +387,7 @@ export function MagicAuthProvider({
 }
 
 /**
- * Custom hook to use Magic Link + Supabase authentication
+ * Custom hook to use Magic Link authentication
  *
  * @returns MagicAuthContextType with auth state and methods
  */

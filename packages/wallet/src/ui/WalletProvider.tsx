@@ -11,7 +11,7 @@ import React, {
   useMemo,
   PropsWithChildren,
 } from "react";
-import { useAccount, useConnect } from "wagmi"; // Import wagmi hooks
+import { useAccount, useConnect, useConfig } from "wagmi"; // Added useConfig
 
 import { WalletContext } from "../contexts/WalletContext";
 import { WalletService } from "../services/wallet.service";
@@ -42,6 +42,13 @@ class TransactionError extends Error {
   }
 }
 
+class WagmiContextError extends Error {
+  constructor(message = "WagmiProvider not found") {
+    super(message);
+    this.name = "WagmiContextError";
+  }
+}
+
 // Define a minimal type for the user object expected from an auth provider (like useMagicAuth)
 interface AppUser {
   id: string;
@@ -60,12 +67,14 @@ interface WalletProviderProps extends PropsWithChildren {
   isExternalAuthLoading?: boolean; // Loading state of the external auth system
 }
 
+
 /**
  * Wallet Provider Component
  *
  * This component provides the wallet service to all child components.
  * It integrates with Magic Link for wallet connections and transactions.
  */
+
 export const WalletProvider: React.FC<WalletProviderProps> = ({
   children,
   // magicApiKey, // Removed
@@ -73,6 +82,28 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
   externalUser,
   isExternalAuthLoading,
 }) => {
+  // State to track Wagmi config availability
+  const [wagmiConfigAvailable, setWagmiConfigAvailable] = useState(false);
+  
+  // Try to access the Wagmi config using the useConfig hook directly inside the component body
+  // This is safe as it's called directly at the component level, not conditionally
+  try {
+    // Just trying to access useConfig() is enough to check if WagmiProvider is available
+    // We don't actually need to store the result
+    useConfig();
+    // If we get here, it means useConfig() didn't throw an error
+    wagmiConfigAvailable || setWagmiConfigAvailable(true);
+  } catch (e) {
+    // Only log the error on client side and only once
+    if (typeof window !== 'undefined' && !wagmiConfigAvailable) {
+      console.error(
+        "⚠️ WagmiProvider not found. Make sure WalletProvider is used inside WagmiProvider.",
+        e instanceof Error ? e.message : String(e)
+      );
+    }
+    // Continue with limited functionality
+  }
+
   const [walletService, setWalletService] = useState<WalletService | null>(
     null
   );
@@ -84,6 +115,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
     useState<boolean>(false);
   const [appError, setAppError] = useState<Error | null>(null);
   const [appUserId, setAppUserId] = useState<string | undefined>(initialUserId);
+
+  // Log diagnostic information on mount
+  useEffect(() => {
+    console.log("WalletProvider mounted. Wagmi available:", wagmiConfigAvailable);
+    if (externalUser) {
+      console.log("External user available:", !!externalUser.id);
+    }
+  }, [wagmiConfigAvailable, externalUser]);
 
   // Initialize WalletService once
   useEffect(() => {
@@ -113,8 +152,16 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
     }
   }, [externalUser, isExternalAuthLoading, appUserId, initialUserId]);
 
-  // Wagmi account state
-  const { address, isConnected, chain, connector } = useAccount();
+  // Only access Wagmi hooks if Wagmi Provider is available
+  const accountData = wagmiConfigAvailable ? useAccount() : { 
+    address: undefined, 
+    isConnected: false, 
+    chain: undefined, 
+    connector: undefined 
+  };
+  
+  // Destructure account data
+  const { address, isConnected, chain, connector } = accountData;
 
   // Helper to derive WalletType from wagmi connector ID
   const getWalletTypeFromConnectorId = (connectorId?: string): WalletType => {
@@ -232,24 +279,26 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
 
   // Effect to react to wagmi connection changes
   useEffect(() => {
-    if (isConnected && address && chain) {
+    // Only sync if Wagmi is available and connected
+    if (wagmiConfigAvailable && isConnected && address && chain) {
       syncWalletWithDb({
         address,
         chainId: chain.id,
         connectorId: connector?.id,
       });
-    } else {
+    } else if (wagmiConfigAvailable) {
       // Wagmi disconnected or address/chain not available
       clearPersistedWalletState();
     }
   }, [
+    wagmiConfigAvailable,
     isConnected,
     address,
     chain,
     connector?.id,
     syncWalletWithDb,
     clearPersistedWalletState,
-  ]); // Added connector for connectorId
+  ]); // Added connector for connectorId and wagmiConfigAvailable
 
   const fetchUserPersistedWallets = useCallback(
     async (userIdToFetch: string): Promise<CoreWallet[]> => {

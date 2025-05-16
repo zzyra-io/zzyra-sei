@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMagicAuth } from "@/hooks/useMagicAuth";
-import { OAuthProvider } from "@zyra/wallet";
+import { OAuthProvider } from "@/lib/magic-auth-types";
 
 // Default OAuth provider to use if none is detected
 const DEFAULT_PROVIDER = OAuthProvider.GOOGLE;
@@ -20,7 +20,12 @@ const DEFAULT_PROVIDER = OAuthProvider.GOOGLE;
  */
 export default function OAuthCallbackPage() {
   const router = useRouter();
-  const { handleOAuthCallback, isLoading, error: authError, isAuthenticated } = useMagicAuth();
+  const {
+    handleOAuthCallback,
+    isLoading,
+    error: authError,
+    isAuthenticated,
+  } = useMagicAuth();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(true);
 
@@ -28,29 +33,29 @@ export default function OAuthCallbackPage() {
     async function completeOAuthFlow() {
       try {
         setIsProcessing(true);
-        
+
         // Detect which provider was used from URL or localStorage
         // (Provider info might be stored in localStorage during the login initiation)
         let provider = DEFAULT_PROVIDER;
-        
+
         // Check if we have the provider stored in localStorage
-        const storedProvider = localStorage.getItem('oauthProvider');
+        const storedProvider = localStorage.getItem("oauthProvider");
         if (storedProvider) {
           // No need for try/catch when just assigning a value
           provider = storedProvider as OAuthProvider;
-          console.log('Using provider from localStorage:', provider);
+          console.log("Using provider from localStorage:", provider);
         }
-        
-        // Use our updated handleOAuthCallback method which properly integrates 
+
+        // Use our updated handleOAuthCallback method which properly integrates
         // Magic Link with Supabase
-        await handleOAuthCallback(provider);
-        
+        await handleOAuthCallback();
+
         // Clear any stored provider
-        localStorage.removeItem('oauthProvider');
-        
+        localStorage.removeItem("oauthProvider");
+
         // The useMagicAuth hook will update the authentication state
         setIsProcessing(false);
-        
+
         // Redirect to dashboard on success
         router.push("/dashboard");
       } catch (err) {
@@ -74,7 +79,12 @@ export default function OAuthCallbackPage() {
         {error || authError ? (
           <div className='text-red-500 mb-4'>
             <h2 className='text-xl font-bold mb-2'>Authentication Error</h2>
-            <p>{error || (authError instanceof Error ? authError.message : 'Authentication failed')}</p>
+            <p>
+              {error ||
+                (authError instanceof Error
+                  ? authError.message
+                  : "Authentication failed")}
+            </p>
             <p className='mt-4 text-sm'>Redirecting to login page...</p>
           </div>
         ) : isProcessing || isLoading ? (
