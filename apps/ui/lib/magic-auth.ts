@@ -8,29 +8,42 @@ import { Magic } from "magic-sdk";
 import { OAuthExtension } from "@magic-ext/oauth2";
 import { OAuthProvider } from "./magic-auth-types";
 
+// Re-export types for convenience
+import type { MagicUserMetadata } from "magic-sdk";
+export type { MagicUserMetadata };
+
+/**
+ * Configuration for Magic Auth
+ */
+export interface MagicAuthConfig {
+  magicPublishableKey: string;
+}
+
 /**
  * MagicAuth Class
  *
  * Minimal wrapper around the Magic SDK
  */
 export class MagicAuth {
-  private magic: Magic;
+  private magic;
 
-  constructor() {
-    const apiKey = process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY;
-    if (!apiKey) {
+  constructor(config: MagicAuthConfig) {
+    if (!config.magicPublishableKey) {
       throw new Error("Magic API key is required");
     }
 
-    this.magic = new Magic(apiKey, {
+    // Initialize Magic with required extensions
+    this.magic = new Magic(config.magicPublishableKey, {
       extensions: [new OAuthExtension()],
     });
+
+    console.log("Magic initialized with OAuth extension");
   }
 
   /**
    * Get Magic instance
    */
-  getMagic(): Magic {
+  getMagic() {
     return this.magic;
   }
 
@@ -45,24 +58,85 @@ export class MagicAuth {
    * Login with email
    */
   async loginWithEmail(email: string): Promise<void> {
-    await this.magic.auth.loginWithMagicLink({ email });
+    await this.magic.auth.loginWithMagicLink({
+      email,
+      showUI: true,
+    });
+  }
+  
+  /**
+   * Login with SMS (phone number)
+   */
+  async loginWithSMS(phoneNumber: string): Promise<string | null> {
+    try {
+      console.log(`MagicAuth: Starting SMS login for ${phoneNumber}`);
+      
+      // Time out after 60 seconds
+      const timeoutPromise = new Promise<string>((_, reject) => {
+        setTimeout(() => reject(new Error("SMS login timed out")), 60000);
+      });
+      
+      // Configure SMS login options
+      const smsLoginOptions = {
+        phoneNumber,
+        showUI: true,
+      };
+      
+      // Race against timeout
+      const didToken = await Promise.race([
+        this.magic.auth.loginWithSMS(smsLoginOptions),
+        timeoutPromise,
+      ]);
+      
+      console.log("MagicAuth: Successfully authenticated with Magic via SMS");
+      return didToken;
+    } catch (error) {
+      console.error("MagicAuth: Login with SMS failed:", error);
+      throw error;
+    }
   }
 
   /**
    * Login with OAuth provider (Google, Apple, etc.)
    */
   async loginWithOAuth(provider: OAuthProvider): Promise<void> {
-    await this.magic.oauth.loginWithRedirect({
-      provider,
-      redirectURI: window.location.origin + "/callback",
-    });
+    try {
+      console.log(`MagicAuth: Logging in with OAuth provider ${provider}`);
+
+      // Magic OAuth extension is exposed as oauth2 not oauth
+      console.log("Magic instance properties:", Object.keys(this.magic));
+      console.log("OAuth extension:", this.magic.oauth2);
+
+      if (!this.magic.oauth2) {
+        throw new Error(
+          "OAuth extension not initialized properly - oauth2 property missing"
+        );
+      }
+
+      await this.magic.oauth2.loginWithRedirect({
+        provider,
+        redirectURI:
+          "https://auth.magic.link/v1/oauth2/2RZJeTIaH2Q7lLWycJ3PZ5WjAM53Q4rL7VZlfxSxlRo=/callback",
+        loginHint: "",
+      });
+
+      console.log(`MagicAuth: OAuth redirect initiated for ${provider}`);
+    } catch (error) {
+      console.error(`MagicAuth: OAuth login failed with ${provider}:`, error);
+      throw error;
+    }
   }
 
   /**
    * Handle OAuth callback
    */
   async handleOAuthCallback() {
-    return this.magic.oauth.getRedirectResult();
+    if (!this.magic.oauth2) {
+      throw new Error(
+        "OAuth extension not initialized properly - oauth2 property missing"
+      );
+    }
+    return this.magic.oauth2.getRedirectResult({});
   }
 
   /**
@@ -156,7 +230,7 @@ export class MagicAuth {
   /**
    * Get the Magic instance
    */
-  getMagicInstance(): Magic<[OAuthExtension, WebAuthnExtension]> {
+  getMagicInstance() {
     return this.magic;
   }
 

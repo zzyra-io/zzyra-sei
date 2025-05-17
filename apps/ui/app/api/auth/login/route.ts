@@ -5,7 +5,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { AuthService } from "@zyra/database";
+import { AuthService, MagicAuthPayload } from "@zyra/database";
 import { NextRequest, NextResponse } from "next/server";
 
 // Create a single PrismaClient instance for this route
@@ -14,7 +14,7 @@ const authService = new AuthService(prisma);
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, didToken } = body;
+    const { email, didToken, isOAuth, oauthProvider, oauthUserInfo } = body;
 
     if (!email || !didToken) {
       return NextResponse.json(
@@ -23,16 +23,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("Login route: Received email and DID token", {
+    console.log("Login route: Received authentication data", {
       email,
-      didToken,
+      didToken: didToken ? "[PRESENT]" : "[MISSING]",
+      isOAuth,
+      oauthProvider,
+      hasOAuthUserInfo: !!oauthUserInfo
     });
 
-    // Authenticate with Magic Link
-    const result = await authService.authenticateWithMagic({
+    // Create a properly typed payload
+    const magicPayload: MagicAuthPayload = {
       email,
       didToken,
-    });
+      isOAuth,
+      oauthProvider,
+      oauthUserInfo,
+    };
+
+    // Authenticate with Magic Link
+    const result = await authService.authenticateWithMagic(magicPayload);
 
     // Extract session and user data from the result
     const { session, user } = result;

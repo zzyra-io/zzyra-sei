@@ -22,8 +22,10 @@ export class AuthService {
   private jwtService: JwtService;
   private userRepository: UserRepository;
   private magicService: MagicService | null = null;
+  private prisma: PrismaClient;
 
   constructor(prismaClient?: PrismaClient) {
+    this.prisma = prismaClient || new PrismaClient();
     this.jwtService = new JwtService();
     this.userRepository = new UserRepository(prismaClient);
     
@@ -169,6 +171,22 @@ export class AuthService {
       const email = payload.email;
       console.log("AuthService: Using email for authentication:", email);
       
+      // Detect if this is an OAuth login
+      const isOAuth = payload.isOAuth === true;
+      const oauthProvider = payload.oauthProvider || "unknown";
+      const oauthUserInfo = payload.oauthUserInfo;
+      
+      if (isOAuth) {
+        console.log(`AuthService: Processing OAuth login from provider: ${oauthProvider}`);
+        if (oauthUserInfo) {
+          console.log("OAuth user info available:", {
+            name: oauthUserInfo.name,
+            email: oauthUserInfo.email,
+            hasProfilePicture: !!oauthUserInfo.picture
+          });
+        }
+      }
+      
       // Find user
       let user;
       try {
@@ -186,16 +204,45 @@ export class AuthService {
       if (!user) {
         console.log("Creating new user with email:", email);
         try {
-          user = await this.userRepository.createWithProfile(
-            { email },
-            {
-              email,
-              subscriptionTier: "free",
-              subscriptionStatus: "inactive",
-              monthlyExecutionQuota: 100,
-              monthlyExecutionCount: 0,
+          // Prepare user data - include OAuth info if available
+          const userData: { email: string; authProvider?: string } = { email };
+          
+          // Prepare profile data
+          const profileData: any = {
+            email,
+            subscriptionTier: "free",
+            subscriptionStatus: "inactive",
+            monthlyExecutionQuota: 100,
+            monthlyExecutionCount: 0,
+          };
+          
+          // Enhance with OAuth information if available
+          if (isOAuth && oauthUserInfo) {
+            // Add OAuth provider information
+            userData.authProvider = oauthProvider;
+            
+            // Add name from OAuth if available
+            if (oauthUserInfo.name) {
+              profileData.name = oauthUserInfo.name;
             }
+            
+            // Add profile picture from OAuth if available
+            if (oauthUserInfo.picture) {
+              profileData.avatarUrl = oauthUserInfo.picture;
+            }
+            
+            console.log(`Creating new user with OAuth ${oauthProvider} data`, { 
+              provider: oauthProvider,
+              hasName: !!profileData.name,
+              hasAvatar: !!profileData.avatarUrl
+            });
+          }
+          
+          user = await this.userRepository.createWithProfile(
+            userData,
+            profileData
           );
+          
           console.log("New user created:", user?.id);
         } catch (createError) {
           console.error("Error creating new user:", createError);
@@ -203,6 +250,43 @@ export class AuthService {
             "Failed to create new user account", 
             "auth/user-creation-failed"
           );
+        }
+      } else if (isOAuth && oauthUserInfo) {
+        // User exists but might need profile updates from OAuth
+        try {
+          console.log(`Updating existing user with OAuth data from ${oauthProvider}`);
+          
+          // Get user profile
+          const profile = await this.prisma.profile.findFirst({
+            where: { user: { id: user.id } }
+          });
+          
+          if (profile) {
+            // Only update if fields are empty or missing
+            const updates: { fullName?: string; avatarUrl?: string } = {};
+            
+            // Add name if not set
+            if (oauthUserInfo.name && (!profile.fullName || profile.fullName === '')) {
+              updates.fullName = oauthUserInfo.name;
+            }
+            
+            // Add avatar if not set
+            if (oauthUserInfo.picture && (!profile.avatarUrl || profile.avatarUrl === '')) {
+              updates.avatarUrl = oauthUserInfo.picture;
+            }
+            
+            // Apply updates if needed
+            if (Object.keys(updates).length > 0) {
+              await this.prisma.profile.update({
+                where: { id: profile.id },
+                data: updates
+              });
+              console.log("Updated user profile with OAuth data", { fields: Object.keys(updates) });
+            }
+          }
+        } catch (updateError) {
+          // Log but don't fail authentication
+          console.error("Error updating user profile with OAuth data:", updateError);
         }
       }
       

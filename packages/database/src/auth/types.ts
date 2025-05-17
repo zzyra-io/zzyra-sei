@@ -46,6 +46,9 @@ export interface MagicAuthPayload {
   didToken: string;
   provider?: string;
   email?: string;
+  isOAuth?: boolean;
+  oauthProvider?: string;
+  oauthUserInfo?: Record<string, any>;
 }
 
 /**
@@ -54,18 +57,6 @@ export interface MagicAuthPayload {
 export interface AuthResult {
   user: AuthUser;
   session: Session;
-}
-
-/**
- * Refresh token data
- */
-export interface RefreshToken {
-  id: string;
-  userId: string;
-  token: string;
-  expiresAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 /**

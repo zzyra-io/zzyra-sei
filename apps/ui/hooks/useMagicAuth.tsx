@@ -411,7 +411,35 @@ export function MagicAuthProvider({
     try {
       if (!magicAuth) throw new Error("Magic auth not initialized");
       console.log(`Starting OAuth login with provider: ${provider}`);
+      
+      // Store the provider in session storage for the callback page
+      sessionStorage.setItem("MAGIC_OAUTH_PROVIDER", provider);
+      
+      // Setup message listener for popup completion
+      const handleAuthMessage = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'MAGIC_OAUTH_SUCCESS') {
+          console.log('Received OAuth success message from popup');
+          window.removeEventListener('message', handleAuthMessage);
+          // We'll handle authentication completion in the main flow
+        } else if (event.data && event.data.type === 'MAGIC_OAUTH_ERROR') {
+          console.error('Received OAuth error message from popup:', event.data.error);
+          setState({
+            ...state,
+            isLoading: false,
+            error: new Error(event.data.error || 'OAuth authentication failed'),
+            authStatus: '',
+          });
+          window.removeEventListener('message', handleAuthMessage);
+        }
+      };
+      
+      window.addEventListener('message', handleAuthMessage);
+      
+      // Start OAuth flow
       await magicAuth.loginWithOAuth(provider);
+      
+      // The flow will continue in handleOAuthCallback once redirected
+      // or when the popup is closed successfully
     } catch (error) {
       console.error("OAuth Login Error:", error);
       setState({
@@ -436,9 +464,40 @@ export function MagicAuthProvider({
 
       // Complete the OAuth flow
       console.log("Handling OAuth callback...");
-      await magicAuth.handleOAuthCallback();
-
-      // Get user metadata
+      
+      // Check if this is a popup flow
+      const isInPopup = window.opener && window.opener !== window;
+      console.log("Is in popup window:", isInPopup);
+      
+      // Handle OAuth callback based on window type
+      let result;
+      try {
+        result = await magicAuth.handleOAuthCallback();
+        console.log("OAuth callback result:", result);
+      } catch (callbackErr) {
+        // If in popup, we might need to handle errors differently
+        console.error("Error in OAuth callback:", callbackErr);
+        if (isInPopup) {
+          // In popup, we'll let the parent window handle this
+          throw callbackErr;
+        } else {
+          // Main window, we need to handle this error
+          throw new Error(`OAuth callback failed: ${callbackErr.message || 'Unknown error'}`);
+        }
+      }
+      
+      // Get provider information from the OAuth result
+      // Note: The structure might vary based on the provider and Magic version
+      const provider = result?.oauth?.provider || 
+                      new URLSearchParams(window.location.search).get('provider') || 
+                      "unknown";
+      
+      // UserInfo will contain provider-specific user data
+      const userInfo = result?.oauth?.userInfo;
+      
+      console.log(`OAuth authentication completed with provider: ${provider}`);
+      
+      // Get user metadata - this should include OAuth data now
       const userMetadata = await magicAuth.getUserMetadata();
       if (!userMetadata || !userMetadata.email) {
         throw new Error("Could not retrieve user metadata from Magic");
@@ -459,6 +518,9 @@ export function MagicAuthProvider({
         body: JSON.stringify({
           email: userMetadata.email,
           didToken,
+          isOAuth: true,
+          oauthProvider: provider,
+          oauthUserInfo: userInfo,
         }),
       });
 

@@ -34,9 +34,5 @@ export function AuthGate({ children }: AuthGateProps) {
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return <>{children}</>;
 }
