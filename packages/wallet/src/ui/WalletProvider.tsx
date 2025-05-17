@@ -66,11 +66,6 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
   externalUserId,
   isExternalAuthLoading,
 }) => {
-  console.log("WalletProviderLocal props:", {
-    initialUserId,
-    externalUserId,
-    isExternalAuthLoading,
-  });
   useConfig(); // Ensure config is available, used by useAccount
 
   const [walletService, setWalletService] = useState<WalletService | null>(
@@ -91,13 +86,6 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
   }, [appUserId]);
 
   useEffect(() => {
-    console.log(
-      "WalletProviderLocal mounted. Initial appUserId state:",
-      initialUserId
-    );
-  }, [initialUserId]);
-
-  useEffect(() => {
     const service = new WalletService();
     setWalletService(service);
   }, []);
@@ -106,7 +94,6 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
     if (initialUserId) {
       if (appUserIdRef.current !== initialUserId) {
         setAppUserId(initialUserId);
-        console.log("AppUserId set from initialUserId prop:", initialUserId);
       }
       return; // initialUserId takes precedence
     }
@@ -116,22 +103,18 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
       if (externalUserId) {
         if (appUserIdRef.current !== externalUserId) {
           setAppUserId(externalUserId);
-          console.log("AppUserId set from externalUserId:", externalUserId);
         }
       } else {
         // External user logged out or ID not available, and no initialUserId provided
         if (appUserIdRef.current !== undefined) {
           setAppUserId(undefined);
-          console.log(
-            "AppUserId cleared (no initialUserId, externalUserId is null/undefined)."
-          );
         }
       }
     }
   }, [initialUserId, externalUserId, isExternalAuthLoading]);
 
   const accountData = useAccount();
-  console.log("accountData from useAccount:", accountData);
+
   const { address, isConnected, chain, connector } = accountData;
 
   const memoizedConnectorId = useMemo(() => connector?.id, [connector?.id]);
@@ -184,7 +167,6 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
     setPersistedWallet(null);
     setPersistedWallets([]);
     setAppError(null);
-    console.log("Cleared persisted wallet state.");
   }, []);
 
   const syncWalletWithDb = useCallback(
@@ -219,9 +201,7 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
         const allUserWallets =
           await walletService.getUserPersistedWallets(appUserId);
         setPersistedWallets(allUserWallets);
-        console.log("Wallet synced with DB:", dbWallet);
       } catch (e: any) {
-        console.error("Error syncing wallet with DB:", e);
         setAppError(e instanceof Error ? e : new Error(String(e.message || e)));
         setPersistedWallet(null);
       } finally {
@@ -238,19 +218,12 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
 
   useEffect(() => {
     if (isConnected && address && memoizedChainId !== undefined) {
-      console.log(
-        "Attempting to sync wallet with DB due to connection change.",
-        { address, memoizedChainId, memoizedConnectorId }
-      );
       syncWalletWithDb({
         address,
         chainId: memoizedChainId,
         connectorId: memoizedConnectorId,
       });
     } else {
-      console.log(
-        "Clearing persisted wallet state due to disconnection or missing data."
-      );
       clearPersistedWalletState();
     }
   }, [

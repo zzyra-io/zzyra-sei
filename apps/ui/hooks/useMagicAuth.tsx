@@ -187,7 +187,6 @@ export function MagicAuthProvider({
     }
 
     initialize();
-
     // Cleanup function to prevent state updates after unmount
     return () => {
       clearTimeout(loadingTimeout);

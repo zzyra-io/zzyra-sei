@@ -5,14 +5,8 @@
  * Integrates with @zyra/wallet for Magic Link authentication.
  */
 
-import { useState, useEffect } from "react";
-import { useMagicAuth } from "@/hooks/useMagicAuth";
-import { OAuthProvider } from "@/lib/magic-auth-types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
@@ -20,8 +14,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMagicAuth } from "@/hooks/useMagicAuth";
+import { OAuthProvider } from "@/lib/magic-auth-types";
 import { Loader2 } from "lucide-react";
-import { EmailPendingView } from "./EmailPendingView";
+import { useEffect, useState } from "react";
 
 /**
  * Magic Login Form Props
@@ -41,7 +40,6 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
   const [activeTab, setActiveTab] = useState<string>("email");
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<Error | null>(null);
-  const [showEmailPending, setShowEmailPending] = useState(false);
 
   // Magic auth hook for direct authentication
   const {
@@ -73,10 +71,6 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
 
       // Use Magic Auth directly
       await loginWithEmail(email);
-
-      // If the login is successful, show the pending email screen
-      setShowEmailPending(true);
-      console.log("Magic Link email sent successfully");
     } catch (err) {
       console.error("MagicLoginForm: Email login failed:", err);
       setFormError(
@@ -86,12 +80,9 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
               "Email login failed. Please check your connection and try again."
             )
       );
-      setShowEmailPending(false);
     } finally {
       // Keep loading state active while email is pending
-      if (!showEmailPending) {
-        setFormLoading(false);
-      }
+      setFormLoading(false);
     }
   };
 
@@ -139,58 +130,11 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
     }
   };
 
-  // Handle Magic Link email resend
-  const handleResendEmail = () => {
-    // Re-trigger the login process
-    if (email) {
-      handleEmailLogin({ preventDefault: () => {} } as React.FormEvent);
-    }
-  };
-
-  // Handle cancellation of email login
-  const handleCancelEmailLogin = () => {
-    setShowEmailPending(false);
-    setFormLoading(false);
-  };
-
   // Determine loading state
   const isLoading = formLoading || isMagicAuthLoading;
 
   // Determine error state
   const displayError = formError || authError;
-
-  // If showing the email pending view
-  if (showEmailPending) {
-    return (
-      <Card className='w-full max-w-md mx-auto'>
-        <CardHeader>
-          <CardTitle>Check Your Email</CardTitle>
-          <CardDescription>
-            We&apos;ve sent a magic link to your email
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EmailPendingView email={email} onCancel={handleCancelEmailLogin} />
-          <div className='mt-4 text-center'>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={handleResendEmail}
-              disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  Sending...
-                </>
-              ) : (
-                "Resend Magic Link"
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className='w-full max-w-md mx-auto'>

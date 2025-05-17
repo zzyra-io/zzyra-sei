@@ -106,14 +106,6 @@ export class MagicAuth {
         `MagicAuth: Attempting login with Magic Link for email: ${email}`
       );
 
-      // Set a timeout to avoid indefinite waiting
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(
-          () => reject(new Error("Magic Link authentication timed out")),
-          60000
-        ); // 1 minute timeout
-      });
-
       // Configure login options according to Magic docs
       const loginOptions = {
         email,
@@ -123,10 +115,7 @@ export class MagicAuth {
       };
 
       // Race against timeout
-      const didToken = await Promise.race([
-        this.magic.auth.loginWithMagicLink(loginOptions),
-        timeoutPromise,
-      ]);
+      const didToken = await this.magic.auth.loginWithMagicLink(loginOptions);
 
       console.log("MagicAuth: Successfully received DID token from Magic");
       return didToken;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMagicAuth } from "@/hooks/useMagicAuth";
+import { MagicAuthProvider, useMagicAuth } from "@/hooks/useMagicAuth";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { WalletProvider, createWagmiConfig, queryClient } from "@zyra/wallet";
 // import { ConnectKitProvider } from "connectkit"; // ConnectKitProvider not used in this snippet
@@ -58,7 +58,7 @@ export function ZyraProviders({ children }: ZyraProvidersProps) {
       // initialUserId is not passed, so WalletProviderLocal will rely on externalUserId
       externalUserId={externalUserId} // Pass the string ID
       isExternalAuthLoading={isAuthLoading}>
-      {children}
+      <MagicAuthProvider>{children}</MagicAuthProvider>
     </WalletProvider>
   );
 }

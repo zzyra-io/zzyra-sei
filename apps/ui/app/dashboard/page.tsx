@@ -2,6 +2,7 @@
 
 import { AuthGate } from "@/components/auth-gate";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { DashboardMetricsCards } from "@/components/dashboard-metrics";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,31 +23,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { WorkflowCard } from "@/components/workflow-card";
-import { workflowService } from "@/lib/services/workflow-service";
 import {
   dashboardAnalyticsService,
   type DashboardMetrics,
 } from "@/lib/services/dashboard-analytics-service";
-import { DashboardMetricsCards } from "@/components/dashboard-metrics";
+import { workflowService } from "@/lib/services/workflow-service";
 import type { WorkflowSummary } from "@/lib/supabase/schema";
+import { motion, MotionConfig } from "framer-motion";
 import {
+  Activity,
   ArrowUpDown,
+  ChevronDown,
   Clock,
   LayoutGrid,
   List,
   PlusCircle,
+  RefreshCw,
   Search,
   Star,
-  RefreshCw,
-  Filter,
-  ChevronDown,
   X,
-  Activity,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence, MotionConfig } from "framer-motion";
-import { cn } from "@/lib/utils";
 
 type SortOption = "newest" | "oldest" | "name" | "last-run";
 type ViewMode = "grid" | "list";
