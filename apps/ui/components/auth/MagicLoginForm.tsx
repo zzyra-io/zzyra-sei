@@ -48,7 +48,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
   } = useMagicAuth();
   
   // Use the first chainId from wallet constants as default
-  const defaultChainId = CHAIN_IDS.ETH_GOERLI;
+  const defaultChainId = CHAIN_IDS.GOERLI;
   
   // Handle email login
   const handleEmailLogin = async (e: React.FormEvent) => {
