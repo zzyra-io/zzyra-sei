@@ -5,7 +5,7 @@
  * It integrates with the JWT service, Magic service, and user repository to manage user authentication.
  */
 
-import { User } from "@prisma/client";
+import { PrismaClient, User } from "@prisma/client";
 import { JwtService } from "./jwt.service";
 import { MagicService, getMagicService } from "./magic.service";
 import {
@@ -23,9 +23,9 @@ export class AuthService {
   private userRepository: UserRepository;
   private magicService: MagicService | null = null;
 
-  constructor() {
+  constructor(prismaClient?: PrismaClient) {
     this.jwtService = new JwtService();
-    this.userRepository = new UserRepository();
+    this.userRepository = new UserRepository(prismaClient);
     
     try {
       this.magicService = getMagicService();
@@ -127,52 +127,108 @@ export class AuthService {
     try {
       console.log("AuthService: Starting Magic authentication");
       
+      // Validate required parameters
       if (!payload.didToken) {
+        console.error("DID token is missing");
         throw new AuthError(
           "DID token is required for Magic Link authentication",
           "auth/missing-token"
         );
       }
       
+      if (!payload.email) {
+        console.error("Email is missing");
+        throw new AuthError(
+          "Email is required for Magic Link authentication",
+          "auth/missing-email"
+        );
+      }
+      
       // Verify DID token with Magic Admin SDK
       if (!this.magicService) {
+        console.error("Magic service is not available");
         throw new AuthError(
           "Magic service is not available",
           "auth/service-unavailable"
         );
       }
-      const userInfo = await this.magicService.validateToken(payload.didToken);
       
-      // Use verified email from Magic
-      const email = userInfo.email;
+      try {
+        // Basic validation of DID token
+        await this.magicService.validateToken(payload.didToken);
+        console.log("DID token validation successful");
+      } catch (validationError) {
+        console.error("DID token validation failed:", validationError);
+        throw new AuthError(
+          "Failed to validate Magic Link token", 
+          "auth/invalid-token"
+        );
+      }
       
-      console.log("AuthService: Magic token verified for email:", email);
+      // Use the email from the payload
+      const email = payload.email;
+      console.log("AuthService: Using email for authentication:", email);
       
-      // If an email was provided in the payload, verify it matches the token
-      if (payload.email && payload.email !== email) {
-        console.warn(`AuthService: Email mismatch - payload: ${payload.email}, token: ${email}`);
+      // Find user
+      let user;
+      try {
+        user = await this.userRepository.findByEmail(email);
+        console.log("User lookup result:", user ? "Found" : "Not found");
+      } catch (dbError) {
+        console.error("Error finding user:", dbError);
+        throw new AuthError(
+          "Database error while looking up user", 
+          "auth/database-error"
+        );
       }
 
-      // Find or create user
-      let user = await this.userRepository.findByEmail(email);
-
+      // Create user if not found
       if (!user) {
-        // Create new user
-        user = await this.userRepository.createWithProfile(
-          { email },
-          {
-            email,
-            subscriptionTier: "free",
-            subscriptionStatus: "inactive",
-            monthlyExecutionQuota: 100,
-            monthlyExecutionCount: 0,
-          }
+        console.log("Creating new user with email:", email);
+        try {
+          user = await this.userRepository.createWithProfile(
+            { email },
+            {
+              email,
+              subscriptionTier: "free",
+              subscriptionStatus: "inactive",
+              monthlyExecutionQuota: 100,
+              monthlyExecutionCount: 0,
+            }
+          );
+          console.log("New user created:", user?.id);
+        } catch (createError) {
+          console.error("Error creating new user:", createError);
+          throw new AuthError(
+            "Failed to create new user account", 
+            "auth/user-creation-failed"
+          );
+        }
+      }
+      
+      // Verify user exists before proceeding
+      if (!user) {
+        console.error("User is null after find/create operations");
+        throw new AuthError(
+          "User account could not be accessed or created", 
+          "auth/user-not-found"
         );
       }
 
       // Create session
-      return this.createSession(user);
+      try {
+        const result = await this.createSession(user);
+        console.log("Session created successfully for user:", user.id);
+        return result;
+      } catch (sessionError) {
+        console.error("Error creating session:", sessionError);
+        throw new AuthError(
+          "Failed to create authentication session", 
+          "auth/session-creation-failed"
+        );
+      }
     } catch (error) {
+      console.error("Authentication error:", error);
       if (error instanceof AuthError) {
         throw error;
       }

@@ -675,6 +675,18 @@ model AuditLog {
   @@index([action])
 }
 
+model RefreshToken {
+  id                   String        @id @default(uuid())
+  userId               String        @map("user_id")
+  token                String        @unique
+  expiresAt            DateTime      @map("expires_at")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  
+  @@map("refresh_tokens")
+  @@index([userId])
+}
+
 model UsageLog {
   id                   String        @id @default(uuid())
   userId               String        @map("user_id")

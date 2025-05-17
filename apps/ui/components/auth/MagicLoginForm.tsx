@@ -115,8 +115,9 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
     try {
       console.log(`MagicLoginForm: Starting OAuth login with ${provider}`);
 
-      // Save provider in localStorage for OAuth callback handling
-      localStorage.setItem("oauthProvider", provider);
+      // Save provider in sessionStorage for OAuth callback handling
+      // Using sessionStorage for consistency with magic-auth.ts implementation
+      sessionStorage.setItem("MAGIC_OAUTH_PROVIDER", provider);
 
       // Use the OAuth provider from Magic Auth
       await loginWithOAuth(provider);

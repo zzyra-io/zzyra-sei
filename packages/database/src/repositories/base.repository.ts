@@ -38,8 +38,9 @@ export abstract class BaseRepository<T, CreateInput, UpdateInput> {
   protected abstract tableName: string;
   protected options: BaseRepositoryOptions;
 
-  constructor(options: BaseRepositoryOptions = {}) {
-    this.prisma = prisma;
+  constructor(prismaClient?: PrismaClient, options: BaseRepositoryOptions = {}) {
+    // Use the provided client or fall back to the default
+    this.prisma = prismaClient || prisma;
     this.policyService = new PolicyService();
     this.options = {
       auditEnabled: true,

@@ -218,7 +218,7 @@ export function MagicAuthProvider({
         isLoading: true,
         authStatus: "Sending magic link email...",
       });
-      await magicAuth.loginWithMagicLink(email);
+      await magicAuth.loginWithEmail(email);
       console.log("User authenticated with Magic Link");
 
       // Step 2: Generate a DID token for authentication with backend

@@ -10,10 +10,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMagicAuth } from "@/hooks/useMagicAuth";
-import { OAuthProvider } from "@/lib/magic-auth-types";
-
-// Default OAuth provider to use if none is detected
-const DEFAULT_PROVIDER = OAuthProvider.GOOGLE;
 
 /**
  * OAuth Callback Handler
@@ -33,29 +29,14 @@ export default function OAuthCallbackPage() {
     async function completeOAuthFlow() {
       try {
         setIsProcessing(true);
-
-        // Detect which provider was used from URL or localStorage
-        // (Provider info might be stored in localStorage during the login initiation)
-        let provider = DEFAULT_PROVIDER;
-
-        // Check if we have the provider stored in localStorage
-        const storedProvider = localStorage.getItem("oauthProvider");
-        if (storedProvider) {
-          // No need for try/catch when just assigning a value
-          provider = storedProvider as OAuthProvider;
-          console.log("Using provider from localStorage:", provider);
-        }
-
-        // Use our updated handleOAuthCallback method which properly integrates
-        // Magic Link with Supabase
+        
+        // Let Magic Link handle the OAuth callback
         await handleOAuthCallback();
-
-        // Clear any stored provider
-        localStorage.removeItem("oauthProvider");
-
-        // The useMagicAuth hook will update the authentication state
+        
+        // Clean up
+        sessionStorage.removeItem("MAGIC_OAUTH_PROVIDER");
         setIsProcessing(false);
-
+        
         // Redirect to dashboard on success
         router.push("/dashboard");
       } catch (err) {
