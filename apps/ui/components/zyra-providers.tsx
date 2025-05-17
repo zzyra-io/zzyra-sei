@@ -1,10 +1,10 @@
 "use client";
 
 import { MagicAuthProvider, useMagicAuth } from "@/hooks/useMagicAuth";
-import { QueryClientProvider } from "@tanstack/react-query";
 import { WalletProvider, createWagmiConfig, queryClient } from "@zyra/wallet";
+import { ConnectKitProvider } from "connectkit";
 // import { ConnectKitProvider } from "connectkit"; // ConnectKitProvider not used in this snippet
-import { useEffect, useState, useMemo, PropsWithChildren } from "react";
+import { PropsWithChildren, useEffect, useMemo, useState } from "react";
 // import { WagmiProvider } from "wagmi"; // WagmiProvider is used within WalletProvider from @zyra/wallet
 
 type ZyraProvidersProps = PropsWithChildren;

@@ -62,6 +62,10 @@ export default function SettingsPage() {
     isLoading: isMagicAuthLoading,
   } = useMagicAuth();
   const { address, connector, isConnected, chain } = useAccount();
+  console.log("address", address);
+  console.log("connector", connector);
+  console.log("isConnected", isConnected);
+  console.log("chain", chain);
   const {
     connect,
     connectors,

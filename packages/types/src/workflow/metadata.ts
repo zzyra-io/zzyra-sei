@@ -104,7 +104,7 @@ export function getBlockType(data: any): BlockType {
       
       // Try normalized match
       const normalizedType = typeValue.toLowerCase().replace(/_/g, "-");
-      for (const [enumKey, enumValue] of Object.entries(BlockType)) {
+      for (const [, enumValue] of Object.entries(BlockType)) {
         // Add proper type assertion for enumValue
         const blockTypeValue = enumValue as string;
         if (blockTypeValue.toLowerCase().replace(/_/g, "-") === normalizedType) {

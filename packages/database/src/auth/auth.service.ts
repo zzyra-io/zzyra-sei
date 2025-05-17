@@ -285,13 +285,6 @@ export class AuthService {
     }
   }
 
-  /**
-   * Sign out a user
-   * @param userId The user ID
-   */
-  async signOut(userId: string): Promise<void> {
-    await this.jwtService.invalidateAllTokens(userId);
-  }
   
   /**
    * Logout a user by token

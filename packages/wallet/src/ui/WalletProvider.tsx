@@ -16,12 +16,7 @@ import { useAccount, useConfig, WagmiProvider } from "wagmi";
 
 import { WalletContext } from "../contexts/WalletContext";
 import { WalletService } from "../services/wallet.service";
-import {
-  Wallet as CoreWallet,
-  WalletType,
-  ChainType,
-  WalletContextState,
-} from "../core/types";
+import { Wallet as CoreWallet, WalletType, ChainType } from "../core/types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 interface WalletProviderProps extends PropsWithChildren {
@@ -30,6 +25,7 @@ interface WalletProviderProps extends PropsWithChildren {
   initialUserId?: string; // For explicitly setting user ID, overrides external auth
   externalUserId?: string | null; // User ID from an external auth system
   isExternalAuthLoading?: boolean;
+  connectionUI?: React.ReactNode;
 }
 
 export const WalletProvider = ({

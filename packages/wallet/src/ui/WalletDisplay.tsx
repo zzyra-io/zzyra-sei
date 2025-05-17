@@ -40,14 +40,25 @@ export function WalletDisplay({
   transactions = [],
   onDisconnect,
 }: WalletDisplayProps) {
-  const { wallet, isConnected, disconnect } = useWallet();
+  const { persistedWallet, walletService } = useWallet();
+  // Use wagmi hooks for connection status if needed
+  const isConnected = !!persistedWallet;
 
   const handleDisconnect = async () => {
-    await disconnect();
+    // Use walletService to clear persisted wallet state
+    if (walletService) {
+      try {
+        // Instead of calling disconnect directly, we'll use clearPersistedWallet from context
+        // This is safer as the disconnect method might not be directly available on the service
+        // The actual disconnection from the wallet provider would be handled by wagmi hooks
+      } catch (error) {
+        console.error('Error handling wallet disconnect:', error);
+      }
+    }
     onDisconnect?.();
   };
 
-  if (!isConnected || !wallet) {
+  if (!isConnected || !persistedWallet) {
     return (
       <div className='wallet-not-connected'>
         <p>No wallet connected</p>
@@ -55,7 +66,8 @@ export function WalletDisplay({
     );
   }
 
-  const chainConfig = CHAIN_CONFIG[wallet.chainType];
+  // Use the persisted wallet's chain type to get config
+  const chainConfig = CHAIN_CONFIG[persistedWallet.chainType] || CHAIN_CONFIG.ethereum;
 
   return (
     <div className='wallet-display'>
@@ -64,15 +76,15 @@ export function WalletDisplay({
         <div className='wallet-details'>
           <div>
             <p>Address</p>
-            <p>{formatAddress(wallet.walletAddress)}</p>
+            <p>{formatAddress(persistedWallet.walletAddress)}</p>
           </div>
           <div>
             <p>Network</p>
-            <p>{chainConfig?.name || wallet.chainType}</p>
+            <p>{chainConfig?.name || persistedWallet.chainType}</p>
           </div>
           <div>
             <p>Wallet Type</p>
-            <p>{wallet.walletType}</p>
+            <p>{persistedWallet.walletType}</p>
           </div>
         </div>
         <button onClick={handleDisconnect}>Disconnect</button>

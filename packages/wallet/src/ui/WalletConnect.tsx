@@ -3,7 +3,7 @@
  *
  * React component for connecting to wallets using wagmi and Magic
  */
-import React, { useState } from "react";
+import { useState } from "react";
 import { useConnect, useAccount, useDisconnect, useConfig } from "wagmi";
 import { useWallet } from "../hooks/useWallet";
 
