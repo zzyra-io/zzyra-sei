@@ -2,11 +2,12 @@
  * Authentication Service
  *
  * This service provides authentication functionality for the Zyra platform.
- * It integrates with the JWT service and user repository to manage user authentication.
+ * It integrates with the JWT service, Magic service, and user repository to manage user authentication.
  */
 
 import { User } from "@prisma/client";
 import { JwtService } from "./jwt.service";
+import { MagicService, getMagicService } from "./magic.service";
 import {
   AuthError,
   AuthResult,
@@ -20,10 +21,51 @@ import { BlockType } from "@zyra/types";
 export class AuthService {
   private jwtService: JwtService;
   private userRepository: UserRepository;
+  private magicService: MagicService | null = null;
 
   constructor() {
     this.jwtService = new JwtService();
     this.userRepository = new UserRepository();
+    
+    try {
+      this.magicService = getMagicService();
+    } catch (error) {
+      console.warn("Magic Service initialization failed, some auth features may be limited", error);
+    }
+  }
+
+  /**
+   * Signs out a user by invalidating all their tokens
+   * @param userId The ID of the user to sign out
+   */
+  async signOut(userId: string): Promise<void> {
+    try {
+      console.log(`AuthService: Signing out user with ID: ${userId}`);
+      
+      // Invalidate all JWT tokens for this user
+      await this.jwtService.invalidateAllTokens(userId);
+      
+      console.log(`AuthService: User ${userId} signed out successfully`);
+    } catch (error) {
+      console.error(`AuthService: Failed to sign out user ${userId}:`, error);
+      throw new AuthError(
+        "Failed to sign out user",
+        "auth/logout-failed"
+      );
+    }
+  }
+
+  /**
+   * Generate JWT token for user
+   * @param user The user to generate a token for
+   * @returns The JWT token
+   */
+  private generateToken(user: User): string {
+    const payload: JwtPayload = {
+      userId: user.id,
+      email: user.email || undefined,
+    };
+    return this.jwtService.generateToken(payload);
   }
 
   /**
@@ -32,14 +74,8 @@ export class AuthService {
    * @returns The session information
    */
   async createSession(user: User): Promise<AuthResult> {
-    // Create JWT payload
-    const payload: JwtPayload = {
-      userId: user.id,
-      email: user.email || undefined,
-    };
-
     // Generate JWT token
-    const accessToken = this.jwtService.generateToken(payload);
+    const accessToken = this.generateToken(user);
 
     // Generate refresh token
     const refreshToken = await this.jwtService.generateRefreshToken(user.id);
@@ -89,17 +125,32 @@ export class AuthService {
    */
   async authenticateWithMagic(payload: MagicAuthPayload): Promise<AuthResult> {
     try {
-      // Verify DID token with Magic (this would be implemented separately)
-      // const userInfo = await verifyMagicToken(payload.didToken);
-
-      // For now, we'll assume the token is valid and contains the email
-      const email = payload.email;
-
-      if (!email) {
+      console.log("AuthService: Starting Magic authentication");
+      
+      if (!payload.didToken) {
         throw new AuthError(
-          "Email is required for Magic Link authentication",
-          "auth/invalid-email"
+          "DID token is required for Magic Link authentication",
+          "auth/missing-token"
         );
+      }
+      
+      // Verify DID token with Magic Admin SDK
+      if (!this.magicService) {
+        throw new AuthError(
+          "Magic service is not available",
+          "auth/service-unavailable"
+        );
+      }
+      const userInfo = await this.magicService.validateToken(payload.didToken);
+      
+      // Use verified email from Magic
+      const email = userInfo.email;
+      
+      console.log("AuthService: Magic token verified for email:", email);
+      
+      // If an email was provided in the payload, verify it matches the token
+      if (payload.email && payload.email !== email) {
+        console.warn(`AuthService: Email mismatch - payload: ${payload.email}, token: ${email}`);
       }
 
       // Find or create user
@@ -240,6 +291,26 @@ export class AuthService {
    */
   async signOut(userId: string): Promise<void> {
     await this.jwtService.invalidateAllTokens(userId);
+  }
+  
+  /**
+   * Logout a user by token
+   * @param token The user's JWT token
+   */
+  async logoutUser(token: string): Promise<void> {
+    try {
+      // Verify the token to get the user ID
+      const payload = this.jwtService.verifyToken(token);
+      if (!payload?.userId) {
+        throw new Error("Invalid token");
+      }
+      
+      // Invalidate all tokens for this user
+      await this.jwtService.invalidateAllTokens(payload.userId);
+    } catch (error) {
+      console.error("Failed to logout user:", error);
+      throw new AuthError("Failed to logout", "auth/logout-failed");
+    }
   }
 
   /**

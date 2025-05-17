@@ -1,0 +1,8 @@
+Standardize Magic SDK usage across your codebase
+Implement proper DID token verification in the backend
+Align AuthResult type structure between frontend and backend
+Fix session management and cookie handling
+Add detailed logging throughout the authentication flow
+Implement proper error feedback in the UI
+Complete the Prisma migration by removing all Supabase references
+Add proper redirect handling for OAuth flows
