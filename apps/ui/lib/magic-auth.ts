@@ -71,13 +71,15 @@ export class MagicAuth {
    */
   constructor(config: MagicAuthConfig) {
     this.config = config;
-    
+
     // Log the config being used (redact the key)
     console.log("MagicAuth: Initializing with config:", {
       keyAvailable: !!config.magicPublishableKey,
-      keyPrefix: config.magicPublishableKey ? config.magicPublishableKey.substring(0, 5) + "..." : "none"
+      keyPrefix: config.magicPublishableKey
+        ? config.magicPublishableKey.substring(0, 5) + "..."
+        : "none",
     });
-    
+
     try {
       this.magic = new Magic(config.magicPublishableKey, {
         extensions: [new OAuthExtension(), new WebAuthnExtension()],
@@ -103,26 +105,29 @@ export class MagicAuth {
       console.log(
         `MagicAuth: Attempting login with Magic Link for email: ${email}`
       );
-      
+
       // Set a timeout to avoid indefinite waiting
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Magic Link authentication timed out")), 60000); // 1 minute timeout
+        setTimeout(
+          () => reject(new Error("Magic Link authentication timed out")),
+          60000
+        ); // 1 minute timeout
       });
-      
+
       // Configure login options according to Magic docs
       const loginOptions = {
         email,
         showUI: true, // Show Magic UI for better UX
         redirectURI: window.location.origin + "/callback", // Ensure redirect works properly
-        ...(options || {})
+        ...(options || {}),
       };
-      
+
       // Race against timeout
       const didToken = await Promise.race([
         this.magic.auth.loginWithMagicLink(loginOptions),
-        timeoutPromise
+        timeoutPromise,
       ]);
-      
+
       console.log("MagicAuth: Successfully received DID token from Magic");
       return didToken;
     } catch (error) {
@@ -136,7 +141,10 @@ export class MagicAuth {
         try {
           return await this.generateDIDToken();
         } catch (tokenError) {
-          console.error("Failed to generate token for logged-in user:", tokenError);
+          console.error(
+            "Failed to generate token for logged-in user:",
+            tokenError
+          );
         }
       }
       throw error;
@@ -152,21 +160,24 @@ export class MagicAuth {
     console.log(
       `MagicAuth: Attempting to login with OAuth provider: ${provider}`
     );
-    
+
     try {
       // Configure OAuth login options according to Magic docs
       const magicLoginOptions: OAuthRedirectConfiguration = {
         provider: provider,
         redirectURI: window.location.origin + "/callback", // Make sure callback route exists
       };
-      
+
       // Start the OAuth flow with redirect
       await this.magic.oauth2.loginWithRedirect(magicLoginOptions);
       console.log(`MagicAuth: Redirecting to ${provider} OAuth flow...`);
     } catch (error: unknown) {
       console.error(`MagicAuth: OAuth login with ${provider} failed:`, error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to start OAuth login with ${provider}: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new Error(
+        `Failed to start OAuth login with ${provider}: ${errorMessage}`
+      );
     }
   }
 
@@ -203,25 +214,28 @@ export class MagicAuth {
   ): Promise<string | null> {
     try {
       console.log("MagicAuth: Starting SMS authentication for:", phoneNumber);
-      
+
       // Set a timeout to avoid indefinite waiting
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("SMS authentication timed out")), 60000); // 1 minute timeout
+        setTimeout(
+          () => reject(new Error("SMS authentication timed out")),
+          60000
+        ); // 1 minute timeout
       });
-      
+
       // Configure SMS login options
       const smsLoginOptions: LoginWithSmsConfiguration = {
         phoneNumber,
         showUI: true, // Show Magic UI for better UX
         ...(options || {}),
       };
-      
+
       // Race against timeout
       const didToken = await Promise.race([
         this.magic.auth.loginWithSMS(smsLoginOptions),
-        timeoutPromise
+        timeoutPromise,
       ]);
-      
+
       console.log(
         "MagicAuth: Successfully authenticated with Magic via SMS, got DID token"
       );
@@ -237,7 +251,10 @@ export class MagicAuth {
         try {
           return await this.generateDIDToken();
         } catch (tokenError) {
-          console.error("Failed to generate token for logged-in user:", tokenError);
+          console.error(
+            "Failed to generate token for logged-in user:",
+            tokenError
+          );
         }
       }
       throw error;
@@ -309,7 +326,7 @@ export class MagicAuth {
   /**
    * Generate a DID token for authentication with backend
    * This is used for authenticating with the Prisma backend
-   * 
+   *
    * @param lifespan Optional lifespan for the token in seconds (default: 7 days)
    * @returns DID token string if successful, null otherwise
    */
@@ -330,6 +347,7 @@ let magicAuthInstance: MagicAuth | null = null;
 
 export const createMagicAuth = (): MagicAuth => {
   if (magicAuthInstance) {
+    console.log("magicAuthInstance", magicAuthInstance);
     return magicAuthInstance;
   }
 

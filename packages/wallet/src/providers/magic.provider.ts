@@ -68,8 +68,10 @@ export class MagicProvider extends BaseWalletProvider {
       }
 
       // Log in with Magic Link
+      // @ts-ignore - Adding redirectURI to match app configuration
       await this.magic.auth.loginWithMagicLink({
         email: connectionOptions.magic.email as string,
+        redirectURI: window.location.origin + "/callback",
       });
 
       // Get user metadata

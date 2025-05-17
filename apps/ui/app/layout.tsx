@@ -34,8 +34,8 @@ export default function RootLayout({
       <body className='min-h-screen bg-background font-sans antialiased'>
         <PostHogProvider>
           <SkipLink />
-          <AuthProvider>
-            <ZyraProviders>
+          <ZyraProviders>
+            <AuthProvider>
               <ThemeProvider
                 attribute='class'
                 defaultTheme='system'
@@ -50,8 +50,8 @@ export default function RootLayout({
                   <NotificationToastContainer />
                 </NotificationSocketProvider>
               </ThemeProvider>
-            </ZyraProviders>
-          </AuthProvider>
+            </AuthProvider>
+          </ZyraProviders>
         </PostHogProvider>
       </body>
     </html>

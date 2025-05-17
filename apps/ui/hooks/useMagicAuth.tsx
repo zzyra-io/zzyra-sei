@@ -127,6 +127,7 @@ export function MagicAuthProvider({
         console.log("Initializing Magic auth...");
         // Create Magic auth instance
         const auth = createMagicAuth();
+        console.log("auth", auth);
         if (!isMounted) return;
         setMagicAuth(auth);
 
@@ -195,7 +196,12 @@ export function MagicAuthProvider({
 
   // Auth methods
   const loginWithEmail = async (email: string, chainId?: number | string) => {
-    setState({ ...state, isLoading: true, error: null, authStatus: 'Preparing authentication...' });
+    setState({
+      ...state,
+      isLoading: true,
+      error: null,
+      authStatus: "Preparing authentication...",
+    });
 
     try {
       // Step 0: Ensure Magic SDK is initialized
@@ -208,13 +214,21 @@ export function MagicAuthProvider({
       // Step 1: Authenticate with Magic Link (sends the magic link email)
       // This will trigger Magic's UI and wait for user to click the link
       console.log(`Starting Magic Link login flow for email: ${email}`);
-      setState({ ...state, isLoading: true, authStatus: 'Sending magic link email...' });
+      setState({
+        ...state,
+        isLoading: true,
+        authStatus: "Sending magic link email...",
+      });
       await magicAuth.loginWithMagicLink(email);
       console.log("User authenticated with Magic Link");
 
       // Step 2: Generate a DID token for authentication with backend
       console.log("Generating DID token for backend authentication");
-      setState({ ...state, isLoading: true, authStatus: 'Generating secure token...' });
+      setState({
+        ...state,
+        isLoading: true,
+        authStatus: "Generating secure token...",
+      });
       const didToken = await magicAuth.generateDIDToken();
       if (!didToken) {
         const error = new Error("Failed to generate authentication token");
@@ -224,7 +238,11 @@ export function MagicAuthProvider({
 
       // Step 3: Authenticate with Prisma backend API
       console.log("Authenticating with backend API");
-      setState({ ...state, isLoading: true, authStatus: 'Completing authentication...' });
+      setState({
+        ...state,
+        isLoading: true,
+        authStatus: "Completing authentication...",
+      });
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -236,7 +254,8 @@ export function MagicAuthProvider({
       // Handle API error responses with user-friendly messages
       if (!response.ok) {
         const errorData = await response.json();
-        const errorMessage = errorData.error || "Failed to authenticate with backend";
+        const errorMessage =
+          errorData.error || "Failed to authenticate with backend";
         const error = new Error(errorMessage);
         setState({ ...state, error, isLoading: false, authStatus: "" });
         throw error;
@@ -252,7 +271,11 @@ export function MagicAuthProvider({
       // Step 5: Get user metadata directly from Magic
       // This includes blockchain wallet info that might not be in our DB yet
       console.log("Retrieving user metadata from Magic");
-      setState({ ...state, isLoading: true, authStatus: 'Retrieving user information...' });
+      setState({
+        ...state,
+        isLoading: true,
+        authStatus: "Retrieving user information...",
+      });
       const userMetadata = await magicAuth.getUserMetadata();
 
       // Step 6: Create wallet info object
@@ -275,7 +298,7 @@ export function MagicAuthProvider({
         error: null,
         authStatus: "",
       });
-      
+
       console.log("Email authentication complete, user is authenticated");
     } catch (error) {
       console.error("Login with email failed:", error);
@@ -312,7 +335,7 @@ export function MagicAuthProvider({
       // Step 3: Get user metadata to retrieve email or identifier
       console.log("Retrieving user metadata from Magic");
       const userMetadata = await magicAuth.getUserMetadata();
-      
+
       if (!userMetadata) {
         throw new Error("Failed to retrieve user metadata from Magic");
       }
@@ -324,16 +347,18 @@ export function MagicAuthProvider({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           phoneNumber,
           email: userMetadata?.email, // Include email if available
-          didToken 
+          didToken,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to authenticate with backend");
+        throw new Error(
+          errorData.error || "Failed to authenticate with backend"
+        );
       }
 
       // Step 5: Parse API response
@@ -363,7 +388,7 @@ export function MagicAuthProvider({
         error: null,
         authStatus: "",
       });
-      
+
       console.log("SMS authentication complete, user is authenticated");
     } catch (error) {
       console.error("Login with SMS failed:", error);
@@ -377,7 +402,12 @@ export function MagicAuthProvider({
   };
 
   const loginWithOAuth = async (provider: OAuthProvider) => {
-    setState({ ...state, isLoading: true, error: null, authStatus: "Preparing OAuth login..." });
+    setState({
+      ...state,
+      isLoading: true,
+      error: null,
+      authStatus: "Preparing OAuth login...",
+    });
 
     try {
       if (!magicAuth) throw new Error("Magic auth not initialized");
@@ -395,28 +425,33 @@ export function MagicAuthProvider({
   };
 
   const handleOAuthCallback = async () => {
-    setState({ ...state, isLoading: true, error: null, authStatus: "Processing OAuth login..." });
+    setState({
+      ...state,
+      isLoading: true,
+      error: null,
+      authStatus: "Processing OAuth login...",
+    });
 
     try {
       if (!magicAuth) throw new Error("Magic auth not initialized");
-      
+
       // Complete the OAuth flow
       console.log("Handling OAuth callback...");
       await magicAuth.handleOAuthCallback();
-      
+
       // Get user metadata
       const userMetadata = await magicAuth.getUserMetadata();
       if (!userMetadata || !userMetadata.email) {
         throw new Error("Could not retrieve user metadata from Magic");
       }
       console.log("Got metadata from Magic:", userMetadata);
-      
+
       // Generate DID token for authentication with backend
       const didToken = await magicAuth.generateDIDToken();
       if (!didToken) {
         throw new Error("Failed to generate DID token");
       }
-      
+
       // Authenticate with backend
       setState({ ...state, authStatus: "Verifying authentication..." });
       const response = await fetch("/api/auth/login", {
@@ -427,15 +462,17 @@ export function MagicAuthProvider({
           didToken,
         }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to authenticate with backend");
+        throw new Error(
+          errorData.error || "Failed to authenticate with backend"
+        );
       }
-      
+
       // Get user data from backend
       await response.json(); // We don't need to use this directly as we have metadata from Magic
-      
+
       // Create wallet info object
       let walletInfo: WalletInfo | null = null;
       if (userMetadata?.publicAddress) {
@@ -446,7 +483,7 @@ export function MagicAuthProvider({
           chainId: null, // OAuth flow doesn't specify a chain ID
         };
       }
-      
+
       // Update state
       setState({
         isLoading: false,
@@ -456,28 +493,34 @@ export function MagicAuthProvider({
         error: null,
         authStatus: "",
       });
-      
+
       console.log("OAuth authentication complete, user is authenticated");
     } catch (error) {
       console.error("OAuth callback handling failed:", error);
       setState({
         ...state,
         isLoading: false,
-        error: error instanceof Error ? error : new Error("OAuth callback failed"),
+        error:
+          error instanceof Error ? error : new Error("OAuth callback failed"),
         authStatus: "",
       });
     }
   };
 
   const logout = async () => {
-    setState({ ...state, isLoading: true, error: null, authStatus: "Logging out..." });
+    setState({
+      ...state,
+      isLoading: true,
+      error: null,
+      authStatus: "Logging out...",
+    });
 
     try {
       if (!magicAuth) throw new Error("Magic auth not initialized");
-      
+
       // Logout from Magic SDK
       await magicAuth.logout();
-      
+
       // Call our API to clear server-side session
       console.log("Logging out from backend API...");
       await fetch("/api/auth/logout", {

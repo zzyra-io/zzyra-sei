@@ -10,99 +10,68 @@ import React, {
   useCallback,
   useMemo,
   PropsWithChildren,
+  useRef,
 } from "react";
-import { useAccount, useConnect, useConfig } from "wagmi"; // Added useConfig
+import { useAccount, useConfig, WagmiProvider } from "wagmi";
 
 import { WalletContext } from "../contexts/WalletContext";
 import { WalletService } from "../services/wallet.service";
 import {
-  Wallet as CoreWallet, // CoreWallet is our DB model representation
+  Wallet as CoreWallet,
   WalletType,
   ChainType,
   WalletContextState,
 } from "../core/types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-/**
- * Custom errors for wallet operations
- */
-class NotConnectedError extends Error {
-  constructor() {
-    super("Wallet not connected");
-    this.name = "NotConnectedError";
-  }
-}
-
-class TransactionError extends Error {
-  code: string;
-
-  constructor(message: string, code: string) {
-    super(message);
-    this.name = "TransactionError";
-    this.code = code;
-  }
-}
-
-class WagmiContextError extends Error {
-  constructor(message = "WagmiProvider not found") {
-    super(message);
-    this.name = "WagmiContextError";
-  }
-}
-
-// Define a minimal type for the user object expected from an auth provider (like useMagicAuth)
-interface AppUser {
-  id: string;
-  [key: string]: any; // Allow other properties
-}
-
-/**
- * Props for WalletProvider component
- */
 interface WalletProviderProps extends PropsWithChildren {
-  // magicApiKey is no longer directly used by WalletProvider if WalletService doesn't need it
-  // and wagmi's DedicatedWalletConnector is configured at WagmiConfig level.
-  // magicApiKey: string;
-  initialUserId?: string;
-  externalUser?: AppUser | null; // User object from an external auth system (e.g., useMagicAuth().user)
-  isExternalAuthLoading?: boolean; // Loading state of the external auth system
+  wagmiConfig: any;
+  queryClient: QueryClient;
+  initialUserId?: string; // For explicitly setting user ID, overrides external auth
+  externalUserId?: string | null; // User ID from an external auth system
+  isExternalAuthLoading?: boolean;
 }
 
-
-/**
- * Wallet Provider Component
- *
- * This component provides the wallet service to all child components.
- * It integrates with Magic Link for wallet connections and transactions.
- */
-
-export const WalletProvider: React.FC<WalletProviderProps> = ({
+export const WalletProvider = ({
   children,
-  // magicApiKey, // Removed
+  wagmiConfig,
+  queryClient,
   initialUserId,
-  externalUser,
+  externalUserId,
+  isExternalAuthLoading,
+}: WalletProviderProps) => {
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <WalletProviderLocal
+          initialUserId={initialUserId}
+          externalUserId={externalUserId}
+          isExternalAuthLoading={isExternalAuthLoading}>
+          {children}
+        </WalletProviderLocal>
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
+};
+
+interface WalletProviderLocalProps extends PropsWithChildren {
+  initialUserId?: string;
+  externalUserId?: string | null;
+  isExternalAuthLoading?: boolean;
+}
+
+export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
+  children,
+  initialUserId,
+  externalUserId,
   isExternalAuthLoading,
 }) => {
-  // State to track Wagmi config availability
-  const [wagmiConfigAvailable, setWagmiConfigAvailable] = useState(false);
-  
-  // Try to access the Wagmi config using the useConfig hook directly inside the component body
-  // This is safe as it's called directly at the component level, not conditionally
-  try {
-    // Just trying to access useConfig() is enough to check if WagmiProvider is available
-    // We don't actually need to store the result
-    useConfig();
-    // If we get here, it means useConfig() didn't throw an error
-    wagmiConfigAvailable || setWagmiConfigAvailable(true);
-  } catch (e) {
-    // Only log the error on client side and only once
-    if (typeof window !== 'undefined' && !wagmiConfigAvailable) {
-      console.error(
-        "⚠️ WagmiProvider not found. Make sure WalletProvider is used inside WagmiProvider.",
-        e instanceof Error ? e.message : String(e)
-      );
-    }
-    // Continue with limited functionality
-  }
+  console.log("WalletProviderLocal props:", {
+    initialUserId,
+    externalUserId,
+    isExternalAuthLoading,
+  });
+  useConfig(); // Ensure config is available, used by useAccount
 
   const [walletService, setWalletService] = useState<WalletService | null>(
     null
@@ -115,81 +84,84 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
     useState<boolean>(false);
   const [appError, setAppError] = useState<Error | null>(null);
   const [appUserId, setAppUserId] = useState<string | undefined>(initialUserId);
+  const appUserIdRef = useRef(appUserId);
 
-  // Log diagnostic information on mount
   useEffect(() => {
-    console.log("WalletProvider mounted. Wagmi available:", wagmiConfigAvailable);
-    if (externalUser) {
-      console.log("External user available:", !!externalUser.id);
-    }
-  }, [wagmiConfigAvailable, externalUser]);
+    appUserIdRef.current = appUserId;
+  }, [appUserId]);
 
-  // Initialize WalletService once
+  useEffect(() => {
+    console.log(
+      "WalletProviderLocal mounted. Initial appUserId state:",
+      initialUserId
+    );
+  }, [initialUserId]);
+
   useEffect(() => {
     const service = new WalletService();
     setWalletService(service);
   }, []);
 
-  // Effect to set appUserId from externalUser (e.g., from useMagicAuth)
   useEffect(() => {
-    if (!isExternalAuthLoading && externalUser?.id) {
-      if (appUserId !== externalUser.id) {
-        // Set only if different or not set
-        setAppUserId(externalUser.id);
-        console.log(
-          "ZyraWalletProvider: appUserId set from externalUser:",
-          externalUser.id
-        );
+    if (initialUserId) {
+      if (appUserIdRef.current !== initialUserId) {
+        setAppUserId(initialUserId);
+        console.log("AppUserId set from initialUserId prop:", initialUserId);
       }
-    } else if (!isExternalAuthLoading && !externalUser && !initialUserId) {
-      // External user logged out, and no initialUserId was overriding
-      if (appUserId) {
-        setAppUserId(undefined);
-        console.log(
-          "ZyraWalletProvider: appUserId cleared due to externalUser logout."
-        );
+      return; // initialUserId takes precedence
+    }
+
+    // If no initialUserId, use externalUserId
+    if (!isExternalAuthLoading) {
+      if (externalUserId) {
+        if (appUserIdRef.current !== externalUserId) {
+          setAppUserId(externalUserId);
+          console.log("AppUserId set from externalUserId:", externalUserId);
+        }
+      } else {
+        // External user logged out or ID not available, and no initialUserId provided
+        if (appUserIdRef.current !== undefined) {
+          setAppUserId(undefined);
+          console.log(
+            "AppUserId cleared (no initialUserId, externalUserId is null/undefined)."
+          );
+        }
       }
     }
-  }, [externalUser, isExternalAuthLoading, appUserId, initialUserId]);
+  }, [initialUserId, externalUserId, isExternalAuthLoading]);
 
-  // Only access Wagmi hooks if Wagmi Provider is available
-  const accountData = wagmiConfigAvailable ? useAccount() : { 
-    address: undefined, 
-    isConnected: false, 
-    chain: undefined, 
-    connector: undefined 
-  };
-  
-  // Destructure account data
+  const accountData = useAccount();
+  console.log("accountData from useAccount:", accountData);
   const { address, isConnected, chain, connector } = accountData;
 
-  // Helper to derive WalletType from wagmi connector ID
-  const getWalletTypeFromConnectorId = (connectorId?: string): WalletType => {
-    if (!connectorId) return WalletType.METAMASK; // Default or throw error
-    switch (connectorId.toLowerCase()) {
-      case "magic":
-      case "magiclink": // Common variations
-        return WalletType.MAGIC;
-      case "metamask":
-      case "injected": // MetaMask is often an injected provider
-        return WalletType.METAMASK;
-      case "walletconnect":
-        return WalletType.WALLET_CONNECT;
-      case "coinbasewallet":
-        return WalletType.COINBASE;
-      default:
-        console.warn(
-          `Unknown connector ID: ${connectorId}, defaulting WalletType.`
-        );
-        // Fallback to a generic type or handle as an error based on requirements
-        return WalletType.METAMASK; // Or a new WalletType.OTHER
-    }
-  };
+  const memoizedConnectorId = useMemo(() => connector?.id, [connector?.id]);
+  const memoizedChainId = useMemo(() => chain?.id, [chain?.id]);
 
-  // Helper to derive ChainType from wagmi chain ID
-  const getChainTypeFromChainId = (wagmiChainId?: number): ChainType => {
-    if (wagmiChainId === undefined) return ChainType.ETHEREUM; // Default or throw
-    switch (wagmiChainId) {
+  const getWalletTypeFromConnectorId = useCallback(
+    (id?: string): WalletType => {
+      if (!id) return WalletType.METAMASK;
+      switch (id.toLowerCase()) {
+        case "magic":
+        case "magiclink":
+          return WalletType.MAGIC;
+        case "metamask":
+        case "injected":
+          return WalletType.METAMASK;
+        case "walletconnect":
+          return WalletType.WALLET_CONNECT;
+        case "coinbasewallet":
+          return WalletType.COINBASE;
+        default:
+          console.warn(`Unknown connector ID: ${id}`);
+          return WalletType.METAMASK;
+      }
+    },
+    []
+  );
+
+  const getChainTypeFromChainId = useCallback((id?: number): ChainType => {
+    if (id === undefined) return ChainType.ETHEREUM;
+    switch (id) {
       case 1:
         return ChainType.ETHEREUM;
       case 5:
@@ -202,40 +174,31 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         return ChainType.OPTIMISM;
       case 42161:
         return ChainType.ARBITRUM;
-      // Add more mappings as needed
       default:
-        console.warn(
-          `Unknown chain ID: ${wagmiChainId}, defaulting ChainType.`
-        );
-        return ChainType.ETHEREUM; // Or handle as an error
+        console.warn(`Unknown chain ID: ${id}`);
+        return ChainType.ETHEREUM;
     }
-  };
-
-  const setUserIdForApp = useCallback((id: string) => {
-    setAppUserId(id);
   }, []);
 
   const clearPersistedWalletState = useCallback(() => {
     setPersistedWallet(null);
-    setPersistedWallets([]); // Clear list of all wallets for user too
+    setPersistedWallets([]);
     setAppError(null);
-    // Should not clear appUserId unless intended
+    console.log("Cleared persisted wallet state.");
   }, []);
 
-  // Sync with DB when wagmi connection status changes or appUserId is set
   const syncWalletWithDb = useCallback(
-    async (wagmiWallet: {
+    async (walletData: {
       address: string;
       chainId: number;
       connectorId?: string;
     }) => {
       if (!walletService) {
-        setAppError(new Error("WalletService not ready for sync."));
+        setAppError(new Error("WalletService not ready."));
         return;
       }
       if (!appUserId) {
-        setAppError(new Error("User ID not set. Cannot sync wallet with DB."));
-        // Potentially clear persistedWallet if user disconnects or logs out
+        setAppError(new Error("User ID not set for DB sync."));
         setPersistedWallet(null);
         return;
       }
@@ -243,28 +206,24 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
       setIsLoadingPersistedWallet(true);
       setAppError(null);
       try {
-        // Determine WalletType and ChainType based on wagmi connection
-        const walletType = getWalletTypeFromConnectorId(
-          wagmiWallet.connectorId
-        );
-        const chainType = getChainTypeFromChainId(wagmiWallet.chainId);
-
+        const walletType = getWalletTypeFromConnectorId(walletData.connectorId);
+        const chainType = getChainTypeFromChainId(walletData.chainId);
         const dbWallet = await walletService.saveOrUpdateWallet(
           appUserId,
-          wagmiWallet.address,
-          wagmiWallet.chainId,
+          walletData.address,
+          walletData.chainId,
           walletType,
           chainType
         );
         setPersistedWallet(dbWallet);
-        // Optionally fetch all wallets for the user now
         const allUserWallets =
           await walletService.getUserPersistedWallets(appUserId);
         setPersistedWallets(allUserWallets);
+        console.log("Wallet synced with DB:", dbWallet);
       } catch (e: any) {
         console.error("Error syncing wallet with DB:", e);
         setAppError(e instanceof Error ? e : new Error(String(e.message || e)));
-        setPersistedWallet(null); // Clear if sync fails
+        setPersistedWallet(null);
       } finally {
         setIsLoadingPersistedWallet(false);
       }
@@ -277,33 +236,36 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
     ]
   );
 
-  // Effect to react to wagmi connection changes
   useEffect(() => {
-    // Only sync if Wagmi is available and connected
-    if (wagmiConfigAvailable && isConnected && address && chain) {
+    if (isConnected && address && memoizedChainId !== undefined) {
+      console.log(
+        "Attempting to sync wallet with DB due to connection change.",
+        { address, memoizedChainId, memoizedConnectorId }
+      );
       syncWalletWithDb({
         address,
-        chainId: chain.id,
-        connectorId: connector?.id,
+        chainId: memoizedChainId,
+        connectorId: memoizedConnectorId,
       });
-    } else if (wagmiConfigAvailable) {
-      // Wagmi disconnected or address/chain not available
+    } else {
+      console.log(
+        "Clearing persisted wallet state due to disconnection or missing data."
+      );
       clearPersistedWalletState();
     }
   }, [
-    wagmiConfigAvailable,
     isConnected,
     address,
-    chain,
-    connector?.id,
+    memoizedChainId,
+    memoizedConnectorId,
     syncWalletWithDb,
     clearPersistedWalletState,
-  ]); // Added connector for connectorId and wagmiConfigAvailable
+  ]);
 
   const fetchUserPersistedWallets = useCallback(
     async (userIdToFetch: string): Promise<CoreWallet[]> => {
       if (!walletService) {
-        setAppError(new Error("WalletService not available."));
+        setAppError(new Error("WalletService not available for fetch."));
         return [];
       }
       setIsLoadingPersistedWallet(true);
@@ -311,8 +273,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         const wallets =
           await walletService.getUserPersistedWallets(userIdToFetch);
         setPersistedWallets(wallets);
-        // If the current appUserId matches, and a primary/current persistedWallet isn't set, set it from this list?
-        // Or this is purely to populate the list.
         return wallets;
       } catch (e: any) {
         setAppError(e instanceof Error ? e : new Error(String(e.message || e)));
@@ -324,7 +284,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
     [walletService]
   );
 
-  const contextValue = useMemo<WalletContextState>(
+  const contextValue = useMemo(
     () => ({
       walletService,
       persistedWallet,
@@ -336,9 +296,10 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
       fetchUserPersistedWallets,
       userId: appUserId,
       setAppUserId: (id: string) => {
+        // Warn if initialUserId was set and context tries to override, though current flow doesn't set initialUserId from ZyraProviders
         if (initialUserId) {
           console.warn(
-            "ZyraWalletProvider: initialUserId was provided, setAppUserId call might be overridden or unexpected."
+            "Context setAppUserId called when initialUserId was provided."
           );
         }
         setAppUserId(id);
