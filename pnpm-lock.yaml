@@ -35,6 +35,9 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.0.1
         version: 5.0.1(react-hook-form@7.56.4(react@19.1.0))
+      '@magic-ext/oauth':
+        specifier: ^23.0.7
+        version: 23.0.7
       '@magic-ext/oauth2':
         specifier: ^11.0.6
         version: 11.0.6
@@ -44,6 +47,9 @@ importers:
       '@magic-sdk/types':
         specifier: ^24.18.2
         version: 24.18.2
+      '@magiclabs/wagmi-connector':
+        specifier: ^2.2.4
+        version: 2.2.4(@netlify/blobs@8.2.0)(@tanstack/query-core@5.76.0)(@types/react@19.0.0)(bufferutil@4.0.9)(immer@10.1.1)(localforage@1.10.0)(react@19.1.0)(typescript@5.8.3)(use-sync-external-store@1.4.0(react@19.1.0))(utf-8-validate@5.0.10)(viem@2.29.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.24.4))(zod@3.24.4)
       '@openrouter/ai-sdk-provider':
         specifier: ^0.4.5
         version: 0.4.5(zod@3.24.4)
@@ -149,9 +155,6 @@ importers:
       '@zyra/types':
         specifier: workspace:*
         version: link:../../packages/types
-      '@zyra/wallet':
-        specifier: workspace:*
-        version: link:../../packages/wallet
       ai:
         specifier: ^4.3.13
         version: 4.3.15(react@19.1.0)(zod@3.24.4)
@@ -289,10 +292,10 @@ importers:
         version: 3.24.4
       zustand:
         specifier: ^5.0.4
-        version: 5.0.4(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.5.0(react@19.1.0))
+        version: 5.0.4(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.4.0(react@19.1.0))
       zustand-persist:
         specifier: ^0.4.0
-        version: 0.4.0(react@19.1.0)(zustand@5.0.4(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.5.0(react@19.1.0)))
+        version: 0.4.0(react@19.1.0)(zustand@5.0.4(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.4.0(react@19.1.0)))
     devDependencies:
       '@types/amqplib':
         specifier: ^0.10.7
@@ -13080,6 +13083,48 @@ snapshots:
 
   '@magic-sdk/types@24.18.2': {}
 
+  '@magiclabs/wagmi-connector@2.2.4(@netlify/blobs@8.2.0)(@tanstack/query-core@5.76.0)(@types/react@19.0.0)(bufferutil@4.0.9)(immer@10.1.1)(localforage@1.10.0)(react@19.1.0)(typescript@5.8.3)(use-sync-external-store@1.4.0(react@19.1.0))(utf-8-validate@5.0.10)(viem@2.29.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.24.4))(zod@3.24.4)':
+    dependencies:
+      '@changesets/cli': 2.29.4
+      '@magic-ext/oauth': 23.0.7
+      '@magic-sdk/provider': 29.0.6(localforage@1.10.0)
+      '@wagmi/connectors': 5.8.2(@netlify/blobs@8.2.0)(@types/react@19.0.0)(@wagmi/core@2.17.2(@tanstack/query-core@5.76.0)(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(typescript@5.8.3)(use-sync-external-store@1.4.0(react@19.1.0))(viem@2.29.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.24.4)))(bufferutil@4.0.9)(react@19.1.0)(typescript@5.8.3)(utf-8-validate@5.0.10)(viem@2.29.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.24.4))(zod@3.24.4)
+      '@wagmi/core': 2.17.2(@tanstack/query-core@5.76.0)(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(typescript@5.8.3)(use-sync-external-store@1.4.0(react@19.1.0))(viem@2.29.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.24.4))
+      localforage: 1.10.0
+      magic-sdk: 29.0.6
+      tsc-esm-fix: 2.20.27
+      viem: 2.29.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.24.4)
+    transitivePeerDependencies:
+      - '@azure/app-configuration'
+      - '@azure/cosmos'
+      - '@azure/data-tables'
+      - '@azure/identity'
+      - '@azure/keyvault-secrets'
+      - '@azure/storage-blob'
+      - '@capacitor/preferences'
+      - '@deno/kv'
+      - '@netlify/blobs'
+      - '@planetscale/database'
+      - '@react-native-async-storage/async-storage'
+      - '@tanstack/query-core'
+      - '@types/react'
+      - '@upstash/redis'
+      - '@vercel/blob'
+      - '@vercel/kv'
+      - aws4fetch
+      - bufferutil
+      - db0
+      - encoding
+      - immer
+      - ioredis
+      - react
+      - supports-color
+      - typescript
+      - uploadthing
+      - use-sync-external-store
+      - utf-8-validate
+      - zod
+
   '@magiclabs/wagmi-connector@2.2.4(@netlify/blobs@8.2.0)(@tanstack/query-core@5.76.0)(@types/react@19.1.4)(bufferutil@4.0.9)(immer@10.1.1)(localforage@1.10.0)(react@19.1.0)(typescript@5.8.3)(use-sync-external-store@1.5.0(react@19.1.0))(utf-8-validate@5.0.10)(viem@2.29.4(bufferutil@4.0.9)(typescript@5.8.3)(utf-8-validate@5.0.10)(zod@3.24.4))(zod@3.24.4)':
     dependencies:
       '@changesets/cli': 2.29.4
@@ -16255,7 +16300,7 @@ snapshots:
       debug: 4.4.0(supports-color@9.4.0)
       globby: 11.1.0
       is-glob: 4.0.3
-      semver: 7.7.1
+      semver: 7.7.2
       tsutils: 3.21.0(typescript@5.8.3)
     optionalDependencies:
       typescript: 5.8.3
@@ -25219,10 +25264,10 @@ snapshots:
 
   zod@3.24.4: {}
 
-  zustand-persist@0.4.0(react@19.1.0)(zustand@5.0.4(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.5.0(react@19.1.0))):
+  zustand-persist@0.4.0(react@19.1.0)(zustand@5.0.4(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.4.0(react@19.1.0))):
     dependencies:
       react: 19.1.0
-      zustand: 5.0.4(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.5.0(react@19.1.0))
+      zustand: 5.0.4(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.4.0(react@19.1.0))
 
   zustand@4.5.7(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0):
     dependencies:
@@ -25254,12 +25299,12 @@ snapshots:
       react: 19.1.0
       use-sync-external-store: 1.5.0(react@19.1.0)
 
-  zustand@5.0.4(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.5.0(react@19.1.0)):
+  zustand@5.0.4(@types/react@19.0.0)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.4.0(react@19.1.0)):
     optionalDependencies:
       '@types/react': 19.0.0
       immer: 10.1.1
       react: 19.1.0
-      use-sync-external-store: 1.5.0(react@19.1.0)
+      use-sync-external-store: 1.4.0(react@19.1.0)
 
   zustand@5.0.4(@types/react@19.1.4)(immer@10.1.1)(react@19.1.0)(use-sync-external-store@1.5.0(react@19.1.0)):
     optionalDependencies:

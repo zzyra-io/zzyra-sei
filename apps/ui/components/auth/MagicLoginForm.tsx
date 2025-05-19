@@ -19,9 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OAuthProvider } from "@/lib/magic-auth-types";
-import { useMagicAuth } from "@zyra/wallet";
 import { useEffect, useState } from "react";
-import { useWalletContext } from "@zyra/wallet/ui/WalletProvider";
+import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
 
 /**
  * Magic Login Form Props
@@ -153,7 +152,6 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
 
   return (
     <Card className='w-full max-w-md mx-auto'>
-     
       <CardHeader>
         <CardTitle>Login with Magic Link</CardTitle>
         <CardDescription>

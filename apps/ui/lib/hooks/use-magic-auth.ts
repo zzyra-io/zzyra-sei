@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useWalletContext } from "../ui/WalletProvider";
 import { OAuthProvider } from "@magic-ext/oauth2";
-import type { MagicUserMetadata } from "magic-sdk";
+import { useMagic } from "../magic-provider";
 
 export type LoginResponse = {
   success: boolean;
@@ -17,7 +16,7 @@ export type LoginResponse = {
  * both Magic SDK and your backend authentication system
  */
 export const useMagicAuth = () => {
-  const { magicInstance } = useWalletContext();
+  const { magic:magicInstance } = useMagic();
   const queryClient = useQueryClient();
 
   // Login with email - complete flow including backend authentication
@@ -334,6 +333,10 @@ export const useMagicAuth = () => {
       getUserMetadata,
       loginWithSMS,
       checkAuthStatus,
+      error,
+      isAuthenticated,
+      isLoading,
+      user,
     ]
   );
 };

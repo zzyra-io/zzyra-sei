@@ -1,16 +1,16 @@
-import type React from "react";
-import { Space_Grotesk } from "next/font/google";
-import "./globals.css";
-import "@/styles/flow-components.css";
-import { ThemeProvider } from "@/components/theme-provider";
-import { AuthProvider } from "@/components/auth-provider";
-import { Toaster } from "@/components/ui/toaster";
 import { SkipLink } from "@/components/a11y/skip-link";
-import { PostHogProvider } from "@/components/PostHogProvider";
-import { NotificationToastContainer } from "@/components/NotificationToast";
-import { NotificationSocketProvider } from "@/components/notification/notification-socket-provider";
+import { AuthProvider } from "@/components/auth-provider";
 import { FloatingParticles } from "@/components/floating-particles";
-import { ZyraProviders } from "../components/zyra-providers";
+import { NotificationSocketProvider } from "@/components/notification/notification-socket-provider";
+import { NotificationToastContainer } from "@/components/NotificationToast";
+import { PostHogProvider } from "@/components/PostHogProvider";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/toaster";
+import "@/styles/flow-components.css";
+import { Space_Grotesk } from "next/font/google";
+import type React from "react";
+import { WagmiProviders } from "../components/wagmi-providers";
+import "./globals.css";
 
 const inter = Space_Grotesk({
   subsets: ["latin"],
@@ -34,7 +34,7 @@ export default function RootLayout({
       <body className='min-h-screen bg-background font-sans antialiased'>
         <PostHogProvider>
           <SkipLink />
-          <ZyraProviders>
+          <WagmiProviders>
             <AuthProvider>
               <ThemeProvider
                 attribute='class'
@@ -51,7 +51,7 @@ export default function RootLayout({
                 </NotificationSocketProvider>
               </ThemeProvider>
             </AuthProvider>
-          </ZyraProviders>
+          </WagmiProviders>
         </PostHogProvider>
       </body>
     </html>

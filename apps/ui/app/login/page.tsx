@@ -10,6 +10,7 @@ import { MagicLoginForm } from "@/components/auth/MagicLoginForm";
 import { Logo } from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
 import { WelcomeSteps } from "@/components/onboarding/welcome-steps";
+import {  ConnectKitButton } from "connectkit";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 

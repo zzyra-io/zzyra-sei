@@ -2,10 +2,10 @@
 
 import type React from "react";
 
-import { useMagicAuth } from "@zyra/wallet";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
 
 interface AuthGateProps {
   children: React.ReactNode;

@@ -13,6 +13,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { NotificationBell } from "./NotificationBell";
+import { ConnectKitButton } from "connectkit";
 
 export function DashboardHeader() {
   const pathname = usePathname();
@@ -99,6 +100,7 @@ export function DashboardHeader() {
           <NotificationBell />
 
           {/* Theme Toggle */}
+          <ConnectKitButton showAvatar={true} showBalance={true} />
           <ModeToggle />
 
           {/* User Menu */}
