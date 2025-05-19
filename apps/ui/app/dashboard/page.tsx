@@ -188,25 +188,25 @@ export default function DashboardPage() {
 
   const handleCreateNew = () => router.push("/builder");
 
-  const handleDatabaseSetup = async () => {
-    try {
-      // Placeholder: Implement actual database setup logic here
-      await workflowService.initializeDatabase(); // Assume this exists
-      setTableExists(true);
-      fetchWorkflows();
-      toast({
-        title: "Database Setup Complete",
-        description: "Workflows are now available.",
-      });
-    } catch (err) {
-      console.error("Error setting up database:", err);
-      toast({
-        title: "Setup Failed",
-        description: "Could not set up the database. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
+  // const handleDatabaseSetup = async () => {
+  //   try {
+  //     // Placeholder: Implement actual database setup logic here
+  //     await workflowService.initializeDatabase(); // Assume this exists
+  //     setTableExists(true);
+  //     fetchWorkflows();
+  //     toast({
+  //       title: "Database Setup Complete",
+  //       description: "Workflows are now available.",
+  //     });
+  //   } catch (err) {
+  //     console.error("Error setting up database:", err);
+  //     toast({
+  //       title: "Setup Failed",
+  //       description: "Could not set up the database. Please try again.",
+  //       variant: "destructive",
+  //     });
+  //   }
+  // };
 
   const toggleFavorite = async (id: string, isFavorite: boolean) => {
     const previousWorkflows = [...workflows];

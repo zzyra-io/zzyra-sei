@@ -1,13 +1,20 @@
-import { useContext } from "react";
-import { WalletContext } from "../contexts/WalletContext";
-import type { WalletContextState } from "../core/types";
+// import { Web3 } from "web3";
+// import { useEffect, useState } from "react";
+// import { useMagic } from "../providers/magic-provider";
 
-export const useWallet = (): WalletContextState => {
-  const context = useContext(WalletContext);
+// const useWallet = () => {
+//   const { magic } = useMagic();
+//   const [web3, setWeb3] = useState<Web3 | null>(null);
 
-  if (context === undefined) {
-    throw new Error("useWallet must be used within a WalletProvider");
-  }
+//   useEffect(() => {
+//     if (magic) {
+//       setWeb3(new Web3((magic as any).rpcProvider));
+//     } else {
+//       console.log("Magic is not initialized");
+//     }
+//   }, [magic]);
 
-  return context;
-};
+//   return web3;
+// };
+
+// export default useWallet;

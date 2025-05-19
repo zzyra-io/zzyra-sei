@@ -10,8 +10,6 @@ import { MagicLoginForm } from "@/components/auth/MagicLoginForm";
 import { Logo } from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
 import { WelcomeSteps } from "@/components/onboarding/welcome-steps";
-import { useMagicAuth } from "@/hooks/useMagicAuth";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -20,7 +18,7 @@ import { useRouter } from "next/navigation";
  */
 export default function LoginPage() {
   const router = useRouter();
-  const { error } = useMagicAuth();
+  
 
   const handleLoginSuccess = () => {
     router.push("/dashboard");
@@ -54,13 +52,13 @@ export default function LoginPage() {
 
             <MagicLoginForm onSuccess={handleLoginSuccess} />
 
-            {error && (
+            {/* {error && (
               <Alert variant='destructive' className='mb-4'>
                 <AlertDescription>
                   Authentication error: {error.message}. Please log in again.
                 </AlertDescription>
               </Alert>
-            )}
+            )} */}
 
             <p className='px-8 text-center text-sm text-muted-foreground'>
               By continuing, you agree to our{" "}

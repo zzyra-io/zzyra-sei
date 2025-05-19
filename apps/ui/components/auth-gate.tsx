@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useMagicAuth } from "@/hooks/useMagicAuth";
+import { useMagicAuth } from "@zyra/wallet";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -12,7 +12,13 @@ interface AuthGateProps {
 }
 
 export function AuthGate({ children }: AuthGateProps) {
-  const { isLoading: isAuthLoading, isAuthenticated } = useMagicAuth();
+  const { 
+    isLoading: isAuthLoading, 
+    isAuthenticated,
+    error,
+    checkAuth,
+    getUserMetadata
+  } = useMagicAuth();
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
 
@@ -20,12 +26,32 @@ export function AuthGate({ children }: AuthGateProps) {
     setIsClient(true);
   }, []);
 
+  // Initialize authentication check when component mounts
   useEffect(() => {
-    if (isClient && !isAuthLoading && !isAuthenticated) {
-      router.push("/login");
+    if (isClient) {
+      // Call checkAuth and getUserMetadata when component mounts
+      checkAuth.mutate();
+      
+      if (isAuthenticated) {
+        getUserMetadata.mutate();
+      }
     }
-  }, [isAuthenticated, isAuthLoading, router, isClient]);
+  }, [isClient, checkAuth, getUserMetadata, isAuthenticated]);
 
+  // Handle authentication state changes
+  useEffect(() => {
+    if (isClient && !isAuthLoading) {
+      if (!isAuthenticated) {
+        router.push("/login");
+      } else if (error) {
+        // Handle authentication errors
+        console.error("Auth error:", error);
+        router.push("/login?error=auth_failed");
+      }
+    }
+  }, [isAuthenticated, isAuthLoading, error, router, isClient]);
+
+  // Show different loading states based on what's happening
   if (isAuthLoading || !isClient) {
     return (
       <div className='flex h-screen w-full items-center justify-center'>
@@ -34,5 +60,12 @@ export function AuthGate({ children }: AuthGateProps) {
     );
   }
 
-  return <>{children}</>;
+  // Only render children if authenticated
+  if (isAuthenticated) {
+    return <>{children}</>;
+  }
+
+  // This is a fallback that should rarely be seen
+  // as the useEffect should redirect unauthenticated users
+  return null;
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { MagicAuthProvider, useMagicAuth } from "@/hooks/useMagicAuth";
 import { WalletProvider, createWagmiConfig, queryClient } from "@zyra/wallet";
-import { ConnectKitProvider } from "connectkit";
-// import { ConnectKitProvider } from "connectkit"; // ConnectKitProvider not used in this snippet
+import { QueryClientProvider } from "@tanstack/react-query";
 import { PropsWithChildren, useEffect, useMemo, useState } from "react";
-// import { WagmiProvider } from "wagmi"; // WagmiProvider is used within WalletProvider from @zyra/wallet
+import type { MagicUserMetadata } from "magic-sdk";
+import { useTheme } from "next-themes";
+// Use any for Magic type due to compatibility issues with the Magic SDK types
+// The Magic SDK types don't perfectly match the runtime objects
 
 type ZyraProvidersProps = PropsWithChildren;
 
@@ -21,44 +22,71 @@ type WagmiConfigType = ReturnType<typeof createWagmiConfig>;
 
 // This wrapper ensures we only render the web3 providers on the client
 export function ZyraProviders({ children }: ZyraProvidersProps) {
-  // Track if we're in the browser
   const [mounted, setMounted] = useState(false);
   const magicApiKey = process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY;
-  const prefersDarkMode = false;
+  const { systemTheme } = useTheme();
+  const prefersDarkMode = systemTheme === "dark";
   const [wagmiConfig, setWagmiConfig] = useState<WagmiConfigType | null>(null);
-  const { user, isLoading: isAuthLoading } = useMagicAuth();
+
+  // Avoid using auth store during SSR or initial render
+  const [authState] = useState<{
+    user: MagicUserMetadata | null;
+    isLoading: boolean;
+    isAuthenticated: boolean;
+    initialized: boolean; // Track if we've successfully initialized auth
+  }>({
+    user: null,
+    isLoading: false, // Default to not loading to avoid flickering
+    isAuthenticated: false, // Default to not authenticated on SSR
+    initialized: true, // Initialize as true since we're not using auth state management here
+  });
 
   // externalUserId is now a string or null, derived directly from user.issuer
-  const externalUserId = useMemo(() => user?.issuer ?? null, [user?.issuer]);
+  const externalUserId = useMemo(
+    () => authState.user?.issuer ?? null,
+    [authState.user?.issuer]
+  );
 
-  // Initialize config only once on client-side
   useEffect(() => {
-    if (mounted && !wagmiConfig && magicApiKey) {
-      // Ensure magicApiKey is present
-      const config = createWagmiConfig(magicApiKey, prefersDarkMode);
-      setWagmiConfig(config);
+    setMounted(true); // Set mounted after first render on client
+
+    if (magicApiKey) {
+      try {
+        const config = createWagmiConfig(magicApiKey, prefersDarkMode);
+        setWagmiConfig(config);
+      } catch (error) {
+        console.error("Error initializing Wagmi config:", error);
+      }
+    } else {
+      console.warn(
+        "NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY is not set. Wallet functionality may be limited."
+      );
     }
-  }, [mounted, wagmiConfig, magicApiKey, prefersDarkMode]);
+  }, [magicApiKey, prefersDarkMode]); // Dependencies for wagmiConfig initialization
 
-  // Only run on client-side
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // During SSR, just render children without any providers
-  if (!mounted || !wagmiConfig) {
-    return <>{children}</>;
+  // If not mounted, render a minimal tree with QueryClientProvider to avoid content flash
+  // or errors before client-side effects run and wagmiConfig is ready.
+  if (!mounted) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        {null} {/* Or a global loading spinner if appropriate */}
+      </QueryClientProvider>
+    );
   }
 
-  // On client-side, use the ClientOnlyProviders
+  // Now mounted. Render WalletProvider, passing wagmiConfig (which might still be null initially).
+  // WalletProvider will need to handle the null wagmiConfig case gracefully.
   return (
-    <WalletProvider
-      wagmiConfig={wagmiConfig}
-      queryClient={queryClient}
-      // initialUserId is not passed, so WalletProviderLocal will rely on externalUserId
-      externalUserId={externalUserId} // Pass the string ID
-      isExternalAuthLoading={isAuthLoading}>
-      <MagicAuthProvider>{children}</MagicAuthProvider>
-    </WalletProvider>
+    <QueryClientProvider client={queryClient}>
+      <WalletProvider
+        wagmiConfig={wagmiConfig} // This can be null initially
+        // queryClient prop for WalletProvider is kept for now, can be removed if WalletProvider no longer uses it directly
+        queryClient={queryClient} 
+        externalUserId={externalUserId}
+        isExternalAuthLoading={authState.isLoading}>
+        {children}
+      </WalletProvider>
+    </QueryClientProvider>
   );
+
 }

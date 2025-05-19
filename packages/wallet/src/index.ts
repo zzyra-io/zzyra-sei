@@ -17,7 +17,8 @@ export { WalletDisplay } from "./ui/WalletDisplay";
 export { WalletConnect } from "./ui/WalletConnect";
 
 // Export hooks
-export { useWallet } from "./hooks/useWallet";
+// export { useWallet } from "./hooks/useWallet";
+export { useMagicAuth } from "./hooks/useMagicAuth";
 
 // Export services
 export { WalletService } from "./services/wallet.service";

@@ -6,7 +6,9 @@
  * Integrates Magic Link with Zyra's database models.
  */
 
+import { OAuthExtension } from "@magic-ext/oauth2";
 import type { WalletService } from "../services/wallet.service";
+import { Magic } from "magic-sdk";
 
 // Using string type for Address since we're removing wagmi dependency
 export type Address = string;
@@ -179,6 +181,10 @@ export interface WalletProviderInterface {
   getConnection(): WalletConnection | null;
 }
 
+export type MagicInstance = Magic & {
+  oauth2: OAuthExtension;
+};
+
 /**
  * Wallet context state for React context
  */
@@ -223,4 +229,6 @@ export interface WalletContextState {
 
   // Wagmi actions like connect, disconnect, sign, sendTransaction are used directly via wagmi hooks in components.
   // We no longer provide connectMagic, disconnect etc. directly from this context if wagmi handles them.
+
+  magicInstance: MagicInstance | null;
 }

@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Wallet Provider
  *
@@ -11,13 +13,23 @@ import React, {
   useMemo,
   PropsWithChildren,
   useRef,
+  useContext,
 } from "react";
 import { useAccount, useConfig, WagmiProvider } from "wagmi";
 
 import { WalletContext } from "../contexts/WalletContext";
 import { WalletService } from "../services/wallet.service";
-import { Wallet as CoreWallet, WalletType, ChainType } from "../core/types";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  Wallet as CoreWallet,
+  WalletType,
+  ChainType,
+  MagicInstance,
+  WalletContextState,
+} from "../core/types";
+import { QueryClient } from "@tanstack/react-query";
+import { Magic } from "magic-sdk";
+import { OAuthExtension } from "@magic-ext/oauth2";
+import { getChainId, getNetworkUrl } from "../utils";
 
 interface WalletProviderProps extends PropsWithChildren {
   wagmiConfig: any;
@@ -31,21 +43,35 @@ interface WalletProviderProps extends PropsWithChildren {
 export const WalletProvider = ({
   children,
   wagmiConfig,
-  queryClient,
+  // queryClient, // No longer needed as prop if QCP is ancestor
   initialUserId,
   externalUserId,
   isExternalAuthLoading,
 }: WalletProviderProps) => {
+  // If wagmiConfig is not yet available (e.g., during initial render from ZyraProviders),
+  // render WalletProviderLocal directly without WagmiProvider.
+  // WalletProviderLocal and its children (like useMagicAuth) should still function
+  // as QueryClientProvider is now an ancestor from ZyraProviders.
+  // Hooks from wagmi itself might not work until wagmiConfig is ready.
+  if (!wagmiConfig) {
+    return (
+      <WalletProviderLocal
+        initialUserId={initialUserId}
+        externalUserId={externalUserId}
+        isExternalAuthLoading={isExternalAuthLoading}>
+        {children}
+      </WalletProviderLocal>
+    );
+  }
+
   return (
     <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <WalletProviderLocal
-          initialUserId={initialUserId}
-          externalUserId={externalUserId}
-          isExternalAuthLoading={isExternalAuthLoading}>
-          {children}
-        </WalletProviderLocal>
-      </QueryClientProvider>
+      <WalletProviderLocal
+        initialUserId={initialUserId}
+        externalUserId={externalUserId}
+        isExternalAuthLoading={isExternalAuthLoading}>
+        {children}
+      </WalletProviderLocal>
     </WagmiProvider>
   );
 };
@@ -76,6 +102,27 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
   const [appError, setAppError] = useState<Error | null>(null);
   const [appUserId, setAppUserId] = useState<string | undefined>(initialUserId);
   const appUserIdRef = useRef(appUserId);
+  const [magicInstance, setMagicInstance] = useState<MagicInstance | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY && !magicInstance) {
+      const instance = new Magic(
+        process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY as string,
+        {
+          network: {
+            rpcUrl: getNetworkUrl(),
+            chainId: getChainId(),
+          },
+          extensions: [new OAuthExtension()],
+        }
+      );
+      console.log("Magic instance created:", instance);
+
+      setMagicInstance(instance as MagicInstance);
+    }
+  }, [magicInstance]);
 
   useEffect(() => {
     appUserIdRef.current = appUserId;
@@ -194,8 +241,9 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
           chainType
         );
         setPersistedWallet(dbWallet);
-        const allUserWallets =
-          await walletService.getUserPersistedWallets(appUserId);
+        const allUserWallets = await walletService.getUserPersistedWallets(
+          appUserId
+        );
         setPersistedWallets(allUserWallets);
       } catch (e: any) {
         setAppError(e instanceof Error ? e : new Error(String(e.message || e)));
@@ -239,8 +287,9 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
       }
       setIsLoadingPersistedWallet(true);
       try {
-        const wallets =
-          await walletService.getUserPersistedWallets(userIdToFetch);
+        const wallets = await walletService.getUserPersistedWallets(
+          userIdToFetch
+        );
         setPersistedWallets(wallets);
         return wallets;
       } catch (e: any) {
@@ -264,6 +313,7 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
       clearPersistedWallet: clearPersistedWalletState,
       fetchUserPersistedWallets,
       userId: appUserId,
+      magicInstance,
       setAppUserId: (id: string) => {
         // Warn if initialUserId was set and context tries to override, though current flow doesn't set initialUserId from ZyraProviders
         if (initialUserId) {
@@ -285,6 +335,7 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
       fetchUserPersistedWallets,
       appUserId,
       initialUserId,
+      magicInstance,
     ]
   );
 
@@ -293,4 +344,12 @@ export const WalletProviderLocal: React.FC<WalletProviderLocalProps> = ({
       {children}
     </WalletContext.Provider>
   );
+};
+
+export const useWalletContext = () => {
+  const context = useContext(WalletContext);
+  if (!context) {
+    throw new Error("useWalletContext must be used within a WalletProvider");
+  }
+  return context as WalletContextState;
 };

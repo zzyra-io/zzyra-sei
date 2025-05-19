@@ -26,7 +26,9 @@
     "@zyra/database": "workspace:^",
     "magic-sdk": "^29.0.6",
     "viem": "^2.8.5",
-    "wagmi": "^2.5.7"
+    "wagmi": "^2.5.7",
+    "web3": "^4.16.0",
+    "zustand": "^5.0.4"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

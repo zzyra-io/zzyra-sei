@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMagicAuth } from "@/hooks/useMagicAuth";
+import { useMagicAuth } from "@/hooks/useMagicAuthStore";
 
 /**
  * OAuth Callback Handler
@@ -29,40 +29,55 @@ export default function OAuthCallbackPage() {
     async function completeOAuthFlow() {
       try {
         setIsProcessing(true);
-        
+
         // Check if this is a popup window
         const isPopup = window.opener && window.opener !== window;
         console.log("OAuth Callback: Is popup window?", isPopup);
-        
+
         if (isPopup) {
           console.log("OAuth Callback: Handling popup flow");
           // For popup flow, we want to close this window after handling the callback
           // The parent window will handle the rest of the authentication flow
-          
+
           try {
             // Let Magic Link handle the OAuth callback
             const result = await handleOAuthCallback();
-            
+
             // Notify the parent window of successful authentication
-            if (window.opener && typeof window.opener.postMessage === 'function') {
+            if (
+              window.opener &&
+              typeof window.opener.postMessage === "function"
+            ) {
               console.log("Sending successful OAuth message to parent window");
-              window.opener.postMessage({ 
-                type: 'MAGIC_OAUTH_SUCCESS',
-                provider: new URLSearchParams(window.location.search).get('provider') || 'unknown'
-              }, '*');
+              window.opener.postMessage(
+                {
+                  type: "MAGIC_OAUTH_SUCCESS",
+                  provider:
+                    new URLSearchParams(window.location.search).get(
+                      "provider"
+                    ) || "unknown",
+                },
+                "*"
+              );
             }
-            
+
             // Clean up
             sessionStorage.removeItem("MAGIC_OAUTH_PROVIDER");
-            
+
             // Close the popup window
             console.log("Authentication successful. Closing popup window...");
             setTimeout(() => window.close(), 500); // Short delay to ensure message is sent
           } catch (popupErr) {
             console.error("Failed to complete popup OAuth flow:", popupErr);
             // Try to notify the parent window about the error, if possible
-            if (window.opener && typeof window.opener.postMessage === 'function') {
-              window.opener.postMessage({ type: 'MAGIC_OAUTH_ERROR', error: 'Authentication failed' }, '*');
+            if (
+              window.opener &&
+              typeof window.opener.postMessage === "function"
+            ) {
+              window.opener.postMessage(
+                { type: "MAGIC_OAUTH_ERROR", error: "Authentication failed" },
+                "*"
+              );
             }
             setError("Authentication failed in popup. Please try again.");
             setTimeout(() => window.close(), 3000); // Close after showing error
@@ -71,11 +86,11 @@ export default function OAuthCallbackPage() {
           console.log("OAuth Callback: Handling redirect flow");
           // Standard redirect flow
           await handleOAuthCallback();
-          
+
           // Clean up
           sessionStorage.removeItem("MAGIC_OAUTH_PROVIDER");
           setIsProcessing(false);
-          
+
           // Redirect to dashboard on success
           router.push("/dashboard");
         }

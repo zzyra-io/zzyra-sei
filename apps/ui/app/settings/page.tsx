@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { useSupabase } from "@/components/auth-provider";
-import { useMagicAuth } from "@/hooks/useMagicAuth";
+import { useMagicAuth } from "@/hooks/useMagicAuthStore";
 import { useWallet } from "@zyra/wallet";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import {

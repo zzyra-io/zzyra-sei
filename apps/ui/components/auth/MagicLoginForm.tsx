@@ -7,6 +7,7 @@
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react"; // Added for loading indicator
 import {
   Card,
   CardContent,
@@ -17,10 +18,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useMagicAuth } from "@/hooks/useMagicAuth";
 import { OAuthProvider } from "@/lib/magic-auth-types";
-import { Loader2 } from "lucide-react";
+import { useMagicAuth } from "@zyra/wallet";
 import { useEffect, useState } from "react";
+import { useWalletContext } from "@zyra/wallet/ui/WalletProvider";
 
 /**
  * Magic Login Form Props
@@ -49,7 +50,10 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
     isLoading: isMagicAuthLoading,
     isAuthenticated,
     error: authError,
+    isInitialized: isMagicInitialized
   } = useMagicAuth();
+
+  console.log('loginWith', loginWithEmail.data,loginWithEmail.error)
 
   // Check for authentication success
   useEffect(() => {
@@ -70,7 +74,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
       console.log("MagicLoginForm: Starting Magic Link login for", email);
 
       // Use Magic Auth directly
-      await loginWithEmail(email);
+      await loginWithEmail.mutateAsync(email);
     } catch (err) {
       console.error("MagicLoginForm: Email login failed:", err);
       setFormError(
@@ -98,7 +102,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
       console.log("MagicLoginForm: Starting SMS login for", phoneNumber);
 
       // Use Magic Auth directly
-      await loginWithSMS(phoneNumber);
+      await loginWithSMS.mutateAsync({phoneNumber});
     } catch (err) {
       setFormError(err instanceof Error ? err : new Error("SMS login failed"));
       console.error("SMS login failed:", err);
@@ -120,7 +124,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
       sessionStorage.setItem("MAGIC_OAUTH_PROVIDER", provider);
 
       // Use the OAuth provider from Magic Auth
-      await loginWithOAuth(provider);
+      await loginWithOAuth.mutateAsync({provider});
     } catch (err) {
       setFormError(
         err instanceof Error ? err : new Error(`${provider} login failed`)
@@ -137,8 +141,19 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
   // Determine error state
   const displayError = formError || authError;
 
+
+  if (!isMagicInitialized) {
+    return (
+      <div className='flex flex-col items-center justify-center p-4'>
+        <Loader2 className='mr-2 h-8 w-8 animate-spin text-primary' />
+        <p className='mt-2 text-sm text-muted-foreground'>Initializing authentication...</p>
+      </div>
+    );
+  }
+
   return (
     <Card className='w-full max-w-md mx-auto'>
+     
       <CardHeader>
         <CardTitle>Login with Magic Link</CardTitle>
         <CardDescription>
@@ -183,7 +198,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 <Button
                   type='submit'
                   className='w-full'
-                  disabled={!email || isLoading}>
+                  disabled={!email || isLoading || !isMagicInitialized}>
                   {isLoading ? (
                     <>
                       <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -217,7 +232,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 <Button
                   type='submit'
                   className='w-full'
-                  disabled={!phoneNumber || isLoading}>
+                  disabled={!phoneNumber || isLoading || !isMagicInitialized}>
                   {isLoading ? (
                     <>
                       <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -239,8 +254,8 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 className='w-full'
                 variant='outline'
                 onClick={() => handleOAuthLogin(OAuthProvider.GOOGLE)}
-                disabled={isLoading}>
-                {isLoading ? (
+                disabled={isMagicAuthLoading || !isMagicInitialized}>
+                {isMagicAuthLoading ? (
                   <>
                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                     Connecting...
@@ -255,8 +270,8 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 className='w-full'
                 variant='outline'
                 onClick={() => handleOAuthLogin(OAuthProvider.APPLE)}
-                disabled={isLoading}>
-                {isLoading ? (
+                disabled={isMagicAuthLoading || !isMagicInitialized}>
+                {isMagicAuthLoading ? (
                   <>
                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                     Connecting...

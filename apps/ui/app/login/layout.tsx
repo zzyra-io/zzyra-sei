@@ -1,8 +1,9 @@
-import { AuthGate } from "@/components/auth-gate";
+"use client";
+
 import React from "react";
 
 const layout = ({ children }: { children: React.ReactNode }) => {
-  return <AuthGate>{children}</AuthGate>;
+  return <>{children}</>;
 };
 
 export default layout;

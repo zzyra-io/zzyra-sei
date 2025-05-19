@@ -4,9 +4,29 @@ import { baseSepolia, mainnet, polygonAmoy } from "wagmi/chains";
 import { QueryClient } from "@tanstack/react-query";
 import { dedicatedWalletConnector } from "@magiclabs/wagmi-connector";
 import { injected } from "wagmi/connectors";
+import { getNetworkUrl, getChainId } from "../utils";
 
 // Create a new query client for React Query
-export const queryClient = new QueryClient();
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 60 * 1000, // 1 hour
+    },
+    mutations: {
+      onError(error, variables, context) {
+        console.error("Mutation error:", error);
+      },
+    },
+    dehydrate: {
+      shouldDehydrateQuery: () => true,
+    },
+    hydrate: {
+      deserializeData(data) {
+        return data;
+      },
+    },
+  },
+});
 
 // Create wagmi config with Magic connector
 export function createWagmiConfig(
@@ -27,8 +47,8 @@ export function createWagmiConfig(
           isDarkMode,
           magicSdkConfiguration: {
             network: {
-              rpcUrl: mainnet.rpcUrls.default.http[0],
-              chainId: mainnet.id,
+              rpcUrl: getNetworkUrl(),
+              chainId: getChainId(),
             },
           },
         },
