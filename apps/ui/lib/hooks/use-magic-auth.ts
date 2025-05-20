@@ -242,7 +242,20 @@ export const useMagicAuth = () => {
       }
 
       try {
-        return await magicInstance.user.isLoggedIn();
+        // Get the cached auth state if available to prevent repeated calls
+        const cachedAuthState = queryClient.getQueryData<boolean>(["authState"]);
+        if (cachedAuthState !== undefined) {
+          console.log("Using cached auth state:", cachedAuthState);
+          return cachedAuthState;
+        }
+        
+        // Otherwise check with Magic SDK
+        const isLoggedIn = await magicInstance.user.isLoggedIn();
+        
+        // Cache the result
+        queryClient.setQueryData(["authState"], isLoggedIn);
+        console.log("Fresh auth check result:", isLoggedIn);
+        return isLoggedIn;
       } catch (error) {
         console.error("Error checking login status:", error);
         return false;
@@ -294,7 +307,9 @@ export const useMagicAuth = () => {
     getUserMetadata.status === "pending" ||
     checkAuthStatus.status === "pending";
 
-  const isAuthenticated = checkAuth.data === true;
+  // Get authentication state from cache first, then from mutation result
+  const cachedAuthState = queryClient.getQueryData<boolean>(["authState"]);
+  const isAuthenticated = cachedAuthState !== undefined ? cachedAuthState : checkAuth.data === true;
 
   const user = getUserMetadata.data;
 

@@ -9,7 +9,6 @@ import {
   useState,
 } from "react";
 import { getChainId, getNetworkUrl } from "./utils/network";
-import { useMagicAuth } from "./hooks/use-magic-auth";
 
 export type Magic = MagicBase<OAuthExtension[]>;
 

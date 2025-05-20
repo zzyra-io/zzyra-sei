@@ -114,22 +114,22 @@ export const NotificationToastContainer: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchNotifications = async () => {
-    try {
-      const res = await fetch("/api/notifications");
-      if (!res.ok) return;
+  // const fetchNotifications = async () => {
+  //   try {
+  //     const res = await fetch("/api/notifications");
+  //     if (!res.ok) return;
 
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        // Only show the 3 most recent notifications
-        setNotifications(data.slice(0, 3));
-      }
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  //     const data = await res.json();
+  //     if (Array.isArray(data) && data.length > 0) {
+  //       // Only show the 3 most recent notifications
+  //       setNotifications(data.slice(0, 3));
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching notifications:", error);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const markAsRead = async (id: string) => {
     try {
@@ -144,12 +144,12 @@ export const NotificationToastContainer: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchNotifications();
-    // Poll for new notifications every 15 seconds
-    const interval = setInterval(fetchNotifications, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  // useEffect(() => {
+  //   fetchNotifications();
+  //   // Poll for new notifications every 15 seconds
+  //   const interval = setInterval(fetchNotifications, 15000);
+  //   return () => clearInterval(interval);
+  // }, []);
 
   if (loading || notifications.length === 0) return null;
 

@@ -4,7 +4,7 @@ import type React from "react";
 
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
 
 interface AuthGateProps {
@@ -12,46 +12,66 @@ interface AuthGateProps {
 }
 
 export function AuthGate({ children }: AuthGateProps) {
-  const { 
-    isLoading: isAuthLoading, 
+  const {
+    isLoading: isAuthLoading,
     isAuthenticated,
     error,
     checkAuth,
-    getUserMetadata
+    getUserMetadata,
   } = useMagicAuth();
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
+  const authCheckInitiated = useRef(false);
+  const redirectInitiated = useRef(false);
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isLoginPage = currentPath === '/login';
 
+  // Set client-side flag once
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Initialize authentication check when component mounts
+  // Run auth check only once when component mounts
   useEffect(() => {
-    if (isClient) {
-      // Call checkAuth and getUserMetadata when component mounts
+    if (isClient && !authCheckInitiated.current) {
+      console.log('Initiating auth check');
+      authCheckInitiated.current = true;
       checkAuth.mutate();
-      
-      if (isAuthenticated) {
-        getUserMetadata.mutate();
-      }
     }
-  }, [isClient, checkAuth, getUserMetadata, isAuthenticated]);
+  }, [isClient, checkAuth]);
 
-  // Handle authentication state changes
+  // Get user metadata only when authenticated and not already loading
   useEffect(() => {
-    if (isClient && !isAuthLoading) {
-      if (!isAuthenticated) {
-        router.push("/login");
+    if (isClient && isAuthenticated && !isAuthLoading && getUserMetadata.status !== 'pending') {
+      console.log('Getting user metadata');
+      getUserMetadata.mutate();
+    }
+  }, [isClient, isAuthenticated, isAuthLoading, getUserMetadata]);
+
+  // Handle redirects only once per auth state change
+  useEffect(() => {
+    if (!isClient || isAuthLoading) return;
+
+    // Only handle redirects if we haven't already initiated one for this auth state
+    if (!redirectInitiated.current) {
+      if (!isAuthenticated && !isLoginPage) {
+        console.log('Redirecting to login page');
+        redirectInitiated.current = true;
+        router.push('/login');
       } else if (error) {
-        // Handle authentication errors
-        console.error("Auth error:", error);
-        router.push("/login?error=auth_failed");
+        console.error('Auth error:', error);
+        redirectInitiated.current = true;
+        router.push('/login?error=auth_failed');
       }
     }
-  }, [isAuthenticated, isAuthLoading, error, router, isClient]);
 
-  // Show different loading states based on what's happening
+    // Reset redirect flag when auth state changes
+    return () => {
+      redirectInitiated.current = false;
+    };
+  }, [isAuthenticated, isAuthLoading, error, router, isClient, isLoginPage]);
+
+  // Show loading state
   if (isAuthLoading || !isClient) {
     return (
       <div className='flex h-screen w-full items-center justify-center'>
@@ -60,12 +80,11 @@ export function AuthGate({ children }: AuthGateProps) {
     );
   }
 
-  // Only render children if authenticated
-  if (isAuthenticated) {
+  // Only render children if authenticated or on login page
+  if (isAuthenticated || isLoginPage) {
     return <>{children}</>;
   }
 
   // This is a fallback that should rarely be seen
-  // as the useEffect should redirect unauthenticated users
   return null;
 }
