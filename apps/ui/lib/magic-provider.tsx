@@ -8,7 +8,6 @@ import {
   useMemo,
   useState,
 } from "react";
-import { getChainId, getNetworkUrl } from "./utils/network";
 
 export type Magic = MagicBase<OAuthExtension[]>;
 
@@ -25,21 +24,38 @@ export const useMagic = () => useContext(MagicContext);
 const MagicProvider = ({ children }: { children: ReactNode }) => {
   const [magic, setMagic] = useState<Magic | null>(null);
 
-
   useEffect(() => {
-    if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_MAGIC_API_KEY) {
-      const magic = new MagicBase(
-        process.env.NEXT_PUBLIC_MAGIC_API_KEY as string,
-        {
-          network: {
-            rpcUrl: getNetworkUrl(),
-            chainId: getChainId(),
-          },
-          extensions: [new OAuthExtension()],
-        }
+    console.log("Magic Provider: Initializing Magic SDK");
+    if (typeof window !== "undefined") {
+      // Hardcoded API key for development - replace with your actual Magic API key
+      // In production, use process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY
+      console.log(
+        "Using Magic API Key:",
+        process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY ? "Available" : "Missing"
       );
 
-      setMagic(magic);
+      if (process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY) {
+        try {
+          // Create a simpler Magic instance without network configuration
+          console.log("Creating Magic instance with basic configuration");
+
+          const magic = new MagicBase(
+            process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY,
+            {
+              extensions: [new OAuthExtension()],
+            }
+          );
+
+          console.log("Magic instance created successfully");
+          setMagic(magic);
+        } catch (error) {
+          console.error("Error initializing Magic SDK:", error);
+        }
+      } else {
+        console.error(
+          "Magic API Key is missing. Please check your environment variables."
+        );
+      }
     }
   }, []);
 

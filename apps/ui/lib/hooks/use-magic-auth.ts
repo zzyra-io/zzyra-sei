@@ -233,27 +233,35 @@ export const useMagicAuth = () => {
     },
   });
 
-  // Check if user is logged in
+  // Check if user is logged in - simplified to avoid infinite loops
   const checkAuth = useMutation({
     mutationKey: ["checkAuth"],
     mutationFn: async (): Promise<boolean> => {
       if (!magicInstance) {
+        console.log("checkAuth: Magic instance not available");
         return false;
       }
 
       try {
-        // Get the cached auth state if available to prevent repeated calls
-        const cachedAuthState = queryClient.getQueryData<boolean>(["authState"]);
-        if (cachedAuthState !== undefined) {
-          console.log("Using cached auth state:", cachedAuthState);
-          return cachedAuthState;
+        // Use a static flag to prevent multiple checks in the same session
+        // This helps avoid infinite loops during development
+        const STORAGE_KEY = "MAGIC_AUTH_CHECKED";
+        const hasChecked = sessionStorage.getItem(STORAGE_KEY);
+        const cachedState = sessionStorage.getItem("MAGIC_AUTH_STATE");
+        
+        if (hasChecked && cachedState) {
+          console.log("Using cached auth state from session storage:", cachedState);
+          return cachedState === "true";
         }
         
         // Otherwise check with Magic SDK
+        console.log("Performing fresh auth check with Magic SDK");
         const isLoggedIn = await magicInstance.user.isLoggedIn();
         
-        // Cache the result
-        queryClient.setQueryData(["authState"], isLoggedIn);
+        // Store the result in session storage
+        sessionStorage.setItem(STORAGE_KEY, "true");
+        sessionStorage.setItem("MAGIC_AUTH_STATE", isLoggedIn.toString());
+        
         console.log("Fresh auth check result:", isLoggedIn);
         return isLoggedIn;
       } catch (error) {
@@ -307,9 +315,11 @@ export const useMagicAuth = () => {
     getUserMetadata.status === "pending" ||
     checkAuthStatus.status === "pending";
 
-  // Get authentication state from cache first, then from mutation result
-  const cachedAuthState = queryClient.getQueryData<boolean>(["authState"]);
-  const isAuthenticated = cachedAuthState !== undefined ? cachedAuthState : checkAuth.data === true;
+  // Get authentication state from session storage first, then from mutation result
+  // This is more reliable than using React Query cache during development
+  const cachedAuthState = typeof window !== 'undefined' ? 
+    sessionStorage.getItem("MAGIC_AUTH_STATE") === "true" : false;
+  const isAuthenticated = cachedAuthState || checkAuth.data === true;
 
   const user = getUserMetadata.data;
 

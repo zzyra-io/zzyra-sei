@@ -6,6 +6,7 @@ import { useTheme } from "next-themes";
 import { WagmiProvider } from "wagmi";
 import { createWagmiConfig } from "@/lib/utils/wagmi.config";
 import { ConnectKitProvider } from "connectkit";
+import MagicProvider from "@/lib/magic-provider";
 
 type ZyraProvidersProps = PropsWithChildren;
 
@@ -24,17 +25,13 @@ export function WagmiProviders({ children }: ZyraProvidersProps) {
   const { systemTheme } = useTheme();
   const prefersDarkMode = systemTheme === "dark";
 
- 
   // Now mounted. Render WalletProvider, passing wagmiConfig (which might still be null initially).
   // WalletProvider will need to handle the null wagmiConfig case gracefully.
   return (
     <WagmiProvider config={createWagmiConfig(magicApiKey, prefersDarkMode)}>
       <QueryClientProvider client={new QueryClient()}>
-        <ConnectKitProvider
-          theme="auto"
-          
-        >
-        {children}
+        <ConnectKitProvider theme='auto'>
+          <MagicProvider>{children}</MagicProvider>
         </ConnectKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

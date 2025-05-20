@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OAuthProvider } from "@/lib/magic-auth-types";
 import { useEffect, useState } from "react";
 import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
+import { useMagic } from "@/lib/magic-provider";
 
 /**
  * Magic Login Form Props
@@ -49,14 +50,13 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
     isLoading: isMagicAuthLoading,
     isAuthenticated,
     error: authError,
-    isInitialized: isMagicInitialized
   } = useMagicAuth();
-
-  console.log('loginWith', loginWithEmail.data,loginWithEmail.error)
+  const { magic } = useMagic();
 
   // Check for authentication success
   useEffect(() => {
     if (isAuthenticated && onSuccess) {
+      console.log("Authentication successful, redirecting...");
       onSuccess();
     }
   }, [isAuthenticated, onSuccess]);
@@ -72,8 +72,18 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
     try {
       console.log("MagicLoginForm: Starting Magic Link login for", email);
 
-      // Use Magic Auth directly
-      await loginWithEmail.mutateAsync(email);
+      // Validate email format
+      if (!email.includes("@") || !email.includes(".")) {
+        throw new Error("Please enter a valid email address");
+      }
+
+      // Use Magic Auth directly with more detailed logging
+      console.log("Calling loginWithEmail.mutateAsync with email:", email);
+      const result = await loginWithEmail.mutateAsync(email);
+      console.log("Login result:", result);
+
+      // If we get here, the login was successful
+      console.log("Magic Link login successful");
     } catch (err) {
       console.error("MagicLoginForm: Email login failed:", err);
       setFormError(
@@ -84,7 +94,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
             )
       );
     } finally {
-      // Keep loading state active while email is pending
+      // Set loading state to false when the login process completes
       setFormLoading(false);
     }
   };
@@ -101,7 +111,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
       console.log("MagicLoginForm: Starting SMS login for", phoneNumber);
 
       // Use Magic Auth directly
-      await loginWithSMS.mutateAsync({phoneNumber});
+      await loginWithSMS.mutateAsync({ phoneNumber });
     } catch (err) {
       setFormError(err instanceof Error ? err : new Error("SMS login failed"));
       console.error("SMS login failed:", err);
@@ -123,7 +133,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
       sessionStorage.setItem("MAGIC_OAUTH_PROVIDER", provider);
 
       // Use the OAuth provider from Magic Auth
-      await loginWithOAuth.mutateAsync({provider});
+      await loginWithOAuth.mutateAsync({ provider });
     } catch (err) {
       setFormError(
         err instanceof Error ? err : new Error(`${provider} login failed`)
@@ -140,13 +150,26 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
   // Determine error state
   const displayError = formError || authError;
 
-
-  if (!isMagicInitialized) {
+  // Show a more detailed loading state
+  if (!magic) {
     return (
-      <div className='flex flex-col items-center justify-center p-4'>
-        <Loader2 className='mr-2 h-8 w-8 animate-spin text-primary' />
-        <p className='mt-2 text-sm text-muted-foreground'>Initializing authentication...</p>
-      </div>
+      <Card className='w-full max-w-md mx-auto'>
+        <CardHeader>
+          <CardTitle>Login with Magic Link</CardTitle>
+          <CardDescription>Secure, passwordless authentication</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className='flex flex-col items-center justify-center p-4'>
+            <Loader2 className='h-8 w-8 animate-spin text-primary' />
+            <p className='mt-2 text-sm text-muted-foreground'>
+              Initializing authentication...
+            </p>
+            <p className='mt-1 text-xs text-muted-foreground'>
+              This may take a moment. Please wait.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -196,7 +219,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 <Button
                   type='submit'
                   className='w-full'
-                  disabled={!email || isLoading || !isMagicInitialized}>
+                  disabled={!email || isLoading || !magic}>
                   {isLoading ? (
                     <>
                       <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -230,7 +253,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 <Button
                   type='submit'
                   className='w-full'
-                  disabled={!phoneNumber || isLoading || !isMagicInitialized}>
+                  disabled={!phoneNumber || isLoading || !magic}>
                   {isLoading ? (
                     <>
                       <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -252,7 +275,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 className='w-full'
                 variant='outline'
                 onClick={() => handleOAuthLogin(OAuthProvider.GOOGLE)}
-                disabled={isMagicAuthLoading || !isMagicInitialized}>
+                disabled={isMagicAuthLoading || !magic}>
                 {isMagicAuthLoading ? (
                   <>
                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -268,7 +291,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 className='w-full'
                 variant='outline'
                 onClick={() => handleOAuthLogin(OAuthProvider.APPLE)}
-                disabled={isMagicAuthLoading || !isMagicInitialized}>
+                disabled={isMagicAuthLoading || !magic}>
                 {isMagicAuthLoading ? (
                   <>
                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />

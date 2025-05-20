@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       didToken: didToken ? "[PRESENT]" : "[MISSING]",
       isOAuth,
       oauthProvider,
-      hasOAuthUserInfo: !!oauthUserInfo
+      hasOAuthUserInfo: !!oauthUserInfo,
     });
 
     // Create a properly typed payload
