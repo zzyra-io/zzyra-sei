@@ -36,17 +36,17 @@ export function middleware(request: NextRequest) {
   }
 
   // 3. For non-public paths, check for authentication token
-  const token = request.cookies.get("token")?.value;
+  // const token = request.cookies.get("token")?.value;
 
-  if (!token) {
-    // If no token and trying to access a private page, redirect to login
-    // Preserve search params if any (e.g., for redirecting back after login)
-    const loginUrl = new URL("/login", request.url);
-    if (pathname !== "/") { // Avoid adding callback for root if it's a private dashboard
-      loginUrl.searchParams.set("callbackUrl", pathname);
-    }
-    return NextResponse.redirect(loginUrl);
-  }
+  // if (!token) {
+  //   // If no token and trying to access a private page, redirect to login
+  //   // Preserve search params if any (e.g., for redirecting back after login)
+  //   const loginUrl = new URL("/login", request.url);
+  //   if (pathname !== "/") { // Avoid adding callback for root if it's a private dashboard
+  //     loginUrl.searchParams.set("callbackUrl", pathname);
+  //   }
+  //   return NextResponse.redirect(loginUrl);
+  // }
 
   // 4. (Optional but Recommended) Token Validation:
   // At this point, a token exists. For higher security, you should validate it.

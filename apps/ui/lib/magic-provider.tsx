@@ -13,16 +13,22 @@ export type Magic = MagicBase<OAuthExtension[]>;
 
 type MagicContextType = {
   magic: Magic | null;
+  isAuthenticated: boolean;
+  isInitializing: boolean;
 };
 
 const MagicContext = createContext<MagicContextType>({
   magic: null,
+  isAuthenticated: false,
+  isInitializing: false,
 });
 
 export const useMagic = () => useContext(MagicContext);
 
 const MagicProvider = ({ children }: { children: ReactNode }) => {
   const [magic, setMagic] = useState<Magic | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     console.log("Magic Provider: Initializing Magic SDK");
@@ -35,8 +41,9 @@ const MagicProvider = ({ children }: { children: ReactNode }) => {
       );
 
       if (process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY) {
+        setIsInitializing(true);
         try {
-          // Create a simpler Magic instance without network configuration
+            // Create a simpler Magic instance without network configuration
           console.log("Creating Magic instance with basic configuration");
 
           const magic = new MagicBase(
@@ -48,8 +55,10 @@ const MagicProvider = ({ children }: { children: ReactNode }) => {
 
           console.log("Magic instance created successfully");
           setMagic(magic);
+          setIsInitializing(false);
         } catch (error) {
           console.error("Error initializing Magic SDK:", error);
+          setIsInitializing(false);
         }
       } else {
         console.error(
@@ -59,14 +68,30 @@ const MagicProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  useEffect(() => {
+    if (magic) {
+      magic.user.isLoggedIn().then((isLoggedIn) => {
+        setIsAuthenticated(isLoggedIn);
+      });
+    }
+  }, [magic]);
+
   const value = useMemo(() => {
     return {
       magic,
+      isAuthenticated,
+      isInitializing,
     };
-  }, [magic]);
+  }, [magic, isAuthenticated, isInitializing]);
 
   return (
-    <MagicContext.Provider value={value}>{children}</MagicContext.Provider>
+    <MagicContext.Provider value={value}>
+      {isInitializing ? (
+        <div>Loading...</div>
+      ) : (
+        children
+      )}
+    </MagicContext.Provider>
   );
 };
 

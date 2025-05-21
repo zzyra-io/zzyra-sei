@@ -45,8 +45,6 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
   // Magic auth hook for direct authentication
   const {
     loginWithEmail,
-    loginWithSMS,
-    loginWithOAuth,
     isLoading: isMagicAuthLoading,
     isAuthenticated,
     error: authError,
@@ -100,49 +98,49 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
   };
 
   // Handle SMS login
-  const handleSMSLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phoneNumber || formLoading) return;
+  // const handleSMSLogin = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   if (!phoneNumber || formLoading) return;
 
-    setFormLoading(true);
-    setFormError(null);
+  //   setFormLoading(true);
+  //   setFormError(null);
 
-    try {
-      console.log("MagicLoginForm: Starting SMS login for", phoneNumber);
+  //   try {
+  //     console.log("MagicLoginForm: Starting SMS login for", phoneNumber);
 
-      // Use Magic Auth directly
-      await loginWithSMS.mutateAsync({ phoneNumber });
-    } catch (err) {
-      setFormError(err instanceof Error ? err : new Error("SMS login failed"));
-      console.error("SMS login failed:", err);
-    } finally {
-      setFormLoading(false);
-    }
-  };
+  //     // Use Magic Auth directly
+  //     await loginWithSMS.mutateAsync({ phoneNumber });
+  //   } catch (err) {
+  //     setFormError(err instanceof Error ? err : new Error("SMS login failed"));
+  //     console.error("SMS login failed:", err);
+  //   } finally {
+  //     setFormLoading(false);
+  //   }
+  // };
 
   // Handle OAuth login
-  const handleOAuthLogin = async (provider: OAuthProvider) => {
-    setFormLoading(true);
-    setFormError(null);
+  // const handleOAuthLogin = async (provider: OAuthProvider) => {
+  //   setFormLoading(true);
+  //   setFormError(null);
 
-    try {
-      console.log(`MagicLoginForm: Starting OAuth login with ${provider}`);
+  //   try {
+  //     console.log(`MagicLoginForm: Starting OAuth login with ${provider}`);
 
-      // Save provider in sessionStorage for OAuth callback handling
-      // Using sessionStorage for consistency with magic-auth.ts implementation
-      sessionStorage.setItem("MAGIC_OAUTH_PROVIDER", provider);
+  //     // Save provider in sessionStorage for OAuth callback handling
+  //     // Using sessionStorage for consistency with magic-auth.ts implementation
+  //     sessionStorage.setItem("MAGIC_OAUTH_PROVIDER", provider);
 
-      // Use the OAuth provider from Magic Auth
-      await loginWithOAuth.mutateAsync({ provider });
-    } catch (err) {
-      setFormError(
-        err instanceof Error ? err : new Error(`${provider} login failed`)
-      );
-      console.error(`${provider} login failed:`, err);
-    } finally {
-      setFormLoading(false);
-    }
-  };
+  //     // Use the OAuth provider from Magic Auth
+  //     await loginWithOAuth.mutateAsync({ provider });
+  //   } catch (err) {
+  //     setFormError(
+  //       err instanceof Error ? err : new Error(`${provider} login failed`)
+  //     );
+  //     console.error(`${provider} login failed:`, err);
+  //   } finally {
+  //     setFormLoading(false);
+  //   }
+  // };
 
   // Determine loading state
   const isLoading = formLoading || isMagicAuthLoading;
@@ -235,7 +233,10 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
 
           {/* SMS Login */}
           <TabsContent value='sms'>
-            <form onSubmit={handleSMSLogin}>
+            <form
+              onSubmit={() => {
+                console.log("handleSMSLogin not implemented");
+              }}>
               <div className='space-y-4'>
                 <div className='space-y-2'>
                   <Label htmlFor='phone'>Phone Number</Label>
@@ -274,7 +275,9 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 type='button'
                 className='w-full'
                 variant='outline'
-                onClick={() => handleOAuthLogin(OAuthProvider.GOOGLE)}
+                onClick={() => {
+                  console.log("handleOAuthLogin not implemented");
+                }}
                 disabled={isMagicAuthLoading || !magic}>
                 {isMagicAuthLoading ? (
                   <>
@@ -290,7 +293,9 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 type='button'
                 className='w-full'
                 variant='outline'
-                onClick={() => handleOAuthLogin(OAuthProvider.APPLE)}
+                onClick={() => {
+                  console.log("handleOAuthLogin not implemented");
+                }}
                 disabled={isMagicAuthLoading || !magic}>
                 {isMagicAuthLoading ? (
                   <>
@@ -306,7 +311,9 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 type='button'
                 className='w-full'
                 variant='outline'
-                onClick={() => handleOAuthLogin(OAuthProvider.GITHUB)}
+                onClick={() => {
+                  console.log("handleOAuthLogin not implemented");
+                }}
                 disabled={isLoading}>
                 {isLoading ? (
                   <>

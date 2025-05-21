@@ -8,6 +8,7 @@
 
 import { MagicLoginForm } from "@/components/auth/MagicLoginForm";
 import { Logo } from "@/components/logo";
+import MagicConnectButton from "@/components/magic-connect";
 import { ModeToggle } from "@/components/mode-toggle";
 import { WelcomeSteps } from "@/components/onboarding/welcome-steps";
 import Link from "next/link";
@@ -48,8 +49,8 @@ export default function LoginPage() {
                 Sign in to your account to continue building workflows
               </p>
             </div>
-
-            <MagicLoginForm onSuccess={handleLoginSuccess} />
+<MagicConnectButton/>
+            {/* <MagicLoginForm onSuccess={handleLoginSuccess} /> */}
 
             {/* {error && (
               <Alert variant='destructive' className='mb-4'>

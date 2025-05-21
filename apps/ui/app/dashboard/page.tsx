@@ -257,8 +257,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <AuthGate>
-      <MotionConfig
+        <MotionConfig
         transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1.0] }}>
         <div className='flex min-h-screen flex-col bg-gradient-to-b from-background to-muted/30'>
           <DashboardHeader />
@@ -556,6 +555,5 @@ export default function DashboardPage() {
           </motion.main>
         </div>
       </MotionConfig>
-    </AuthGate>
   );
 }
