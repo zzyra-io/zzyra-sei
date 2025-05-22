@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { getChainId, getNetworkUrl } from "./utils/network";
 
 export type Magic = MagicBase<OAuthExtension[]>;
 
@@ -50,8 +51,15 @@ const MagicProvider = ({ children }: { children: ReactNode }) => {
             process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY,
             {
               extensions: [new OAuthExtension()],
+              network: {
+
+                chainId: getChainId(),
+                rpcUrl: getNetworkUrl(),
+              }
             }
           );
+          magic.preload().then(() => console.log('Magic <iframe> loaded.'));
+
 
           console.log("Magic instance created successfully");
           setMagic(magic);

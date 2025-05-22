@@ -52,6 +52,7 @@ export function ProtectedRoute({
       }
     }
   }, [isClient, isAuthenticated, isInitializing, router, redirectPath]);
+    
 
   if (!isClient || isLoading) {
     return fallback;

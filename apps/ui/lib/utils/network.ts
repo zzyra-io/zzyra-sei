@@ -14,7 +14,7 @@ export enum Network {
 
 export const getNetworkUrl = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.ETHEREUM_SEPOLIA;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
   
   switch (network) {
     case Network.POLYGON:
@@ -43,7 +43,7 @@ export const getNetworkUrl = () => {
 
 export const getChainId = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.ETHEREUM_SEPOLIA;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
 
   switch (network) {
     case Network.POLYGON:
@@ -72,7 +72,7 @@ export const getChainId = () => {
 
 export const getNetworkToken = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.ETHEREUM_SEPOLIA;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
 
   switch (network) {
     case Network.POLYGON_AMOY:
@@ -96,7 +96,7 @@ export const getNetworkToken = () => {
 
 export const getFaucetUrl = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.ETHEREUM_SEPOLIA;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
 
   switch (network) {
     case Network.POLYGON_AMOY:
@@ -124,7 +124,7 @@ export const getFaucetUrl = () => {
 
 export const getNetworkName = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.ETHEREUM_SEPOLIA;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
 
   switch (network) {
     case Network.POLYGON:
@@ -153,7 +153,7 @@ export const getNetworkName = () => {
 
 export const getBlockExplorer = (address: string) => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.ETHEREUM_SEPOLIA;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
 
   switch (network) {
     case Network.POLYGON:
@@ -182,7 +182,7 @@ export const getBlockExplorer = (address: string) => {
 
 export const isEip1559Supported = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.ETHEREUM_SEPOLIA;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
 
   switch (network) {
     case Network.ETHEREUM_SEPOLIA:

@@ -49,8 +49,8 @@ export default function LoginPage() {
                 Sign in to your account to continue building workflows
               </p>
             </div>
-<MagicConnectButton/>
-            {/* <MagicLoginForm onSuccess={handleLoginSuccess} /> */}
+            {/* <MagicConnectButton/> */}
+            <MagicLoginForm onSuccess={handleLoginSuccess} />
 
             {/* {error && (
               <Alert variant='destructive' className='mb-4'>
