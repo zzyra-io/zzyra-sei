@@ -25,7 +25,6 @@ import {
   Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSupabase } from "@/components/auth-provider";
 import { HeroAnimation } from "@/components/hero-animation";
 import { FeatureCard } from "@/components/feature-card";
 import { WorkflowPreview } from "@/components/workflow-preview";
@@ -37,9 +36,10 @@ import { StatsCounterGroup } from "@/components/stats-counter";
 import { TrustBadges } from "@/components/trust-badges";
 import { PartnerLogos } from "@/components/partner-logos";
 import { CountdownTimer } from "@/components/countdown-timer";
+import { useSession } from "next-auth/react";
 
 export default function HomePage() {
-  const { session } = useSupabase();
+  const { data: session } = useSession();
   const [scrollY, setScrollY] = useState(0);
   const [showInteractiveDemo, setShowInteractiveDemo] = useState(false);
 

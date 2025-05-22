@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { LogOut, Settings, User } from "lucide-react";
-import { useSupabase } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,15 +12,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
+import { signOut, useSession } from "next-auth/react";
 
 export function UserMenu() {
-  const { supabase, session } = useSupabase();
+  const { data: session } = useSession();
   const router = useRouter();
   const { toast } = useToast();
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();
+      await signOut();
       router.push("/login");
     } catch (error) {
       toast({
