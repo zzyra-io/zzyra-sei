@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
+
 
 // Define public paths that do not require authentication
 const PUBLIC_PATHS = [
@@ -14,7 +16,7 @@ const PUBLIC_PATHS = [
 // Define paths for static assets and specific API patterns that might be public or handled differently
 const STATIC_ASSET_PATTERN = /\.(jpg|jpeg|png|webp|svg|ico|css|js)$/;
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const response = NextResponse.next(); // Start with a pass-through response
 
@@ -35,27 +37,8 @@ export function middleware(request: NextRequest) {
     return response; // Allow access to public paths
   }
 
-  // 3. For non-public paths, check for authentication token
-  // const token = request.cookies.get("token")?.value;
-
-  // if (!token) {
-  //   // If no token and trying to access a private page, redirect to login
-  //   // Preserve search params if any (e.g., for redirecting back after login)
-  //   const loginUrl = new URL("/login", request.url);
-  //   if (pathname !== "/") { // Avoid adding callback for root if it's a private dashboard
-  //     loginUrl.searchParams.set("callbackUrl", pathname);
-  //   }
-  //   return NextResponse.redirect(loginUrl);
-  // }
-
-  // 4. (Optional but Recommended) Token Validation:
-  // At this point, a token exists. For higher security, you should validate it.
-  // This might involve a quick API call to a /api/auth/verify endpoint or using a JWT library
-  // if the secret is available to the middleware (not always recommended for edge functions).
-  // If validation fails, redirect to login.
-  // For simplicity, this example proceeds if a token is present.
-
-  // 5. If token exists (and optionally validated), allow access
+ 
+  // 4. If token exists and is valid, allow access
   // For private API routes, you might set different cache headers or no-cache
   if (pathname.startsWith("/api/")) {
     response.headers.set("Cache-Control", "private, no-store, no-cache, must-revalidate, proxy-revalidate");

@@ -94,11 +94,7 @@ const MagicProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <MagicContext.Provider value={value}>
-      {isInitializing ? (
-        <div>Loading...</div>
-      ) : (
-        children
-      )}
+      {children}
     </MagicContext.Provider>
   );
 };

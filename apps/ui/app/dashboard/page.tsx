@@ -1,6 +1,5 @@
 "use client";
 
-import { AuthGate } from "@/components/auth-gate";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { DashboardMetricsCards } from "@/components/dashboard-metrics";
 import { EmptyState } from "@/components/empty-state";
@@ -226,35 +225,6 @@ export default function DashboardPage() {
     }
   };
 
-  if (!tableExists) {
-    return (
-      <AuthGate>
-        <div className='flex min-h-screen flex-col'>
-          <DashboardHeader />
-          <main className='flex-1 bg-muted/30 px-4 py-6 sm:px-6 lg:px-8'>
-            <div className='mx-auto max-w-7xl'>
-              <div className='mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center'>
-                <h1 className='text-2xl font-bold tracking-tight'>
-                  My Workflows
-                </h1>
-              </div>
-              <EmptyState
-                title='Database Setup Required'
-                description='The workflows table does not exist. Please set up the database to continue.'
-                action={
-                  <Button
-                    onClick={handleDatabaseSetup}
-                    aria-label='Set up database'>
-                    Set Up Database
-                  </Button>
-                }
-              />
-            </div>
-          </main>
-        </div>
-      </AuthGate>
-    );
-  }
 
   return (
         <MotionConfig

@@ -1,5 +1,5 @@
 import { SkipLink } from "@/components/a11y/skip-link";
-import { AuthProvider } from "@/components/auth-provider";
+import { Providers } from "@/components/providers";
 import { FloatingParticles } from "@/components/floating-particles";
 import { NotificationSocketProvider } from "@/components/notification/notification-socket-provider";
 import { NotificationToastContainer } from "@/components/NotificationToast";
@@ -35,7 +35,7 @@ export default function RootLayout({
         <PostHogProvider>
           <SkipLink />
           <WagmiProviders>
-            <AuthProvider>
+            <Providers>
               <ThemeProvider
                 attribute='class'
                 defaultTheme='system'
@@ -50,7 +50,7 @@ export default function RootLayout({
                   <NotificationToastContainer />
                 </NotificationSocketProvider>
               </ThemeProvider>
-            </AuthProvider>
+            </Providers>
           </WagmiProviders>
         </PostHogProvider>
       </body>

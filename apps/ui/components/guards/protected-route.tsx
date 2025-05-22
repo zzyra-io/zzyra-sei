@@ -4,6 +4,7 @@ import type React from "react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMagic } from "@/lib/magic-provider";
+import { useNextAuthSession } from "@/hooks/useNextAuthSession";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -22,21 +23,29 @@ export function ProtectedRoute({
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated,isInitializing } = useMagic();
+  
+  // Get authentication state from both Magic Link and NextAuth.js
+  const { isAuthenticated: isMagicAuthenticated, isInitializing: isMagicInitializing } = useMagic();
+  const { isAuthenticated: isNextAuthAuthenticated, isLoading: isNextAuthLoading } = useNextAuthSession();
+  
+  // Combined authentication state - simplified to prevent loops
+  // We prioritize Magic authentication since that's your primary system
+  const isAuthenticated = isMagicAuthenticated;
+  const isAuthLoading = isMagicInitializing;
 
   // Set client-side flag and handle authentication check
   useEffect(() => {
     try {
       setIsClient(true);
-      setIsLoading(isInitializing);
+      setIsLoading(isAuthLoading);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
     }
-  }, [isInitializing]);
+  }, [isAuthLoading]);
 
   // Handle unauthenticated users with redirect
   useEffect(() => {
-    if (isClient && !isAuthenticated && !isInitializing) {
+    if (isClient && !isAuthenticated && !isAuthLoading) {
       try {
         // Store current path for post-login redirect
         if (typeof window !== "undefined") {
@@ -51,7 +60,17 @@ export function ProtectedRoute({
         router.push(redirectPath); // Fallback to redirectPath on error
       }
     }
-  }, [isClient, isAuthenticated, isInitializing, router, redirectPath]);
+  }, [isClient, isAuthenticated, isAuthLoading, router, redirectPath]);
+  
+  console.log("ProtectedRoute auth state:", {
+    isClient,
+    isMagicAuthenticated,
+    isNextAuthAuthenticated,
+    isAuthenticated,
+    isMagicInitializing,
+    isNextAuthLoading,
+    isAuthLoading
+  });
     
 
   if (!isClient || isLoading) {
