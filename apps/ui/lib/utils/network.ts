@@ -10,11 +10,12 @@ export enum Network {
   ZKSYNC = "zksync",
   ZKSYNC_SEPOLIA = "zksync-sepolia",
   SONIC_TESTNET = "sonic-blaze",
+  BASE_SEPOLIA = "base-sepolia",
 }
 
 export const getNetworkUrl = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
   
   switch (network) {
     case Network.POLYGON:
@@ -33,6 +34,8 @@ export const getNetworkUrl = () => {
       return "https://mainnet.era.zksync.io";
     case Network.ZKSYNC_SEPOLIA:
       return "https://zksync-era-sepolia.blockpi.network/v1/rpc/public";
+    case Network.BASE_SEPOLIA:
+      return "https://base-sepolia.g.alchemy.com/v2/fYFybLQFR9Zr2GCRcgALmAktStFKr0i0";
     // case Network.SONIC_TESTNET:
     //   return sonic_blaze_rpc;
     default:
@@ -43,7 +46,7 @@ export const getNetworkUrl = () => {
 
 export const getChainId = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
 
   switch (network) {
     case Network.POLYGON:
@@ -56,6 +59,8 @@ export const getChainId = () => {
       return 324;
     case Network.ZKSYNC_SEPOLIA:
       return 300;
+    case Network.BASE_SEPOLIA:
+      return 84531;
     case Network.ETHEREUM:
       return 1;
     case Network.ETHERLINK:
@@ -72,7 +77,7 @@ export const getChainId = () => {
 
 export const getNetworkToken = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
 
   switch (network) {
     case Network.POLYGON_AMOY:
@@ -82,6 +87,7 @@ export const getNetworkToken = () => {
     case Network.ETHEREUM_SEPOLIA:
     case Network.ZKSYNC:
     case Network.ZKSYNC_SEPOLIA:
+    case Network.BASE_SEPOLIA:
       return "ETH";
     case Network.ETHERLINK:
     case Network.ETHERLINK_TESTNET:
@@ -96,7 +102,7 @@ export const getNetworkToken = () => {
 
 export const getFaucetUrl = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
 
   switch (network) {
     case Network.POLYGON_AMOY:
@@ -107,6 +113,8 @@ export const getFaucetUrl = () => {
       return "https://faucet.etherlink.com/";
     case Network.ZKSYNC_SEPOLIA:
       return "https://faucet.quicknode.com/ethereum/sepolia";
+    case Network.BASE_SEPOLIA:
+      return "https://faucet.base.org/";
     case Network.SONIC_TESTNET:
       return "https://faucet.testnet.soniclabs.com";
     case Network.POLYGON:
@@ -124,7 +132,7 @@ export const getFaucetUrl = () => {
 
 export const getNetworkName = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
 
   switch (network) {
     case Network.POLYGON:
@@ -143,6 +151,8 @@ export const getNetworkName = () => {
       return "zkSync (Mainnet)";
     case Network.ZKSYNC_SEPOLIA:
       return "zkSync (Sepolia)";
+    case Network.BASE_SEPOLIA:
+      return "Base Sepolia";
     case Network.SONIC_TESTNET:
       return "Sonic (Blaze Testnet)";
     default:
@@ -153,7 +163,7 @@ export const getNetworkName = () => {
 
 export const getBlockExplorer = (address: string) => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
 
   switch (network) {
     case Network.POLYGON:
@@ -172,6 +182,8 @@ export const getBlockExplorer = (address: string) => {
       return `https://explorer.zksync.io/address/${address}`;
     case Network.ZKSYNC_SEPOLIA:
       return `https://sepolia.explorer.zksync.io/address/${address}`;
+    case Network.BASE_SEPOLIA:
+      return `https://sepolia.explorer.zksync.io/address/${address}`;
     case Network.SONIC_TESTNET:
       return `https://explorer.testnet.soniclabs.com/address/${address}`;
     default:
@@ -182,7 +194,7 @@ export const getBlockExplorer = (address: string) => {
 
 export const isEip1559Supported = () => {
   // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.POLYGON_AMOY;
+  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
 
   switch (network) {
     case Network.ETHEREUM_SEPOLIA:
@@ -190,6 +202,7 @@ export const isEip1559Supported = () => {
       return true;
     case Network.ZKSYNC:
     case Network.ZKSYNC_SEPOLIA:
+    case Network.BASE_SEPOLIA:
     case Network.POLYGON:
     case Network.POLYGON_AMOY:
     case Network.ETHERLINK:

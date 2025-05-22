@@ -30,7 +30,7 @@ export function WagmiProviders({ children }: ZyraProvidersProps) {
   return (
     <WagmiProvider config={createWagmiConfig(magicApiKey, prefersDarkMode)}>
       <QueryClientProvider client={new QueryClient()}>
-        <ConnectKitProvider theme='auto'>
+        <ConnectKitProvider theme={systemTheme as any}>
           <MagicProvider>{children}</MagicProvider>
         </ConnectKitProvider>
       </QueryClientProvider>
