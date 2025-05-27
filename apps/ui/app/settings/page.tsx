@@ -10,9 +10,10 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
-import { useSupabase } from "@/components/auth-provider";
-import { useMagicAuth } from "@/hooks/useMagicAuthStore";
-import { useWallet } from "@zyra/wallet";
+import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { useUpdateUserProfile } from "@/hooks/useUpdateUserProfile";
+import { useUserUsage } from "@/hooks/useUserUsage";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import {
   BadgeCheck,
@@ -36,9 +37,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { NotificationPreferencesForm } from "@/components/settings/notification-preferences-form";
+import WalletInfoProfile from "@/components/wallet-info-profile";
 
 export default function SettingsPage() {
-  const { supabase, session } = useSupabase();
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -48,14 +49,30 @@ export default function SettingsPage() {
   const [darkMode, setDarkMode] = useState(false);
   const [telegramHandle, setTelegramHandle] = useState("");
   const [discordWebhook, setDiscordWebhook] = useState("");
-  const [subscriptionTier, setSubscriptionTier] = useState("");
-  const [subscriptionStatus, setSubscriptionStatus] = useState("");
+  const [subscriptionTier, setSubscriptionTier] = useState("free");
+  const [subscriptionStatus, setSubscriptionStatus] = useState("inactive");
   const [subscriptionExpiresAt, setSubscriptionExpiresAt] = useState<
     string | null
   >(null);
-  const [monthlyExecutionQuota, setMonthlyExecutionQuota] = useState(0);
+  const [monthlyExecutionQuota, setMonthlyExecutionQuota] = useState(100);
   const [monthlyExecutionsUsed, setMonthlyExecutionsUsed] = useState(0);
-  const [usageLoading, setUsageLoading] = useState(false);
+
+  // Fetch user profile using React Query hook
+  const {
+    profile,
+    isLoading: profileIsLoading,
+    refetch: refetchProfile,
+  } = useUserProfile();
+
+  // Fetch usage data using React Query hook
+  const {
+    usage,
+    isLoading: usageLoading,
+    refetch: refetchUsage,
+  } = useUserUsage();
+
+  // Update profile mutation
+  const { updateProfile } = useUpdateUserProfile();
 
   const {
     isAuthenticated: isMagicAuthenticated,
@@ -73,115 +90,40 @@ export default function SettingsPage() {
     status: connectStatus,
   } = useConnect();
   const { disconnect, status: disconnectStatus } = useDisconnect();
-  const {
-    persistedWallet,
-    isLoadingPersistedWallet,
-    appError: walletAppError,
-  } = useWallet();
+  // Use wagmi hooks for wallet functionality instead of useWallet
 
   const isConnectingWagmi = connectStatus === "pending";
   const isDisconnectingWagmi = disconnectStatus === "pending";
 
+  // Update local state when profile data is loaded
   useEffect(() => {
-    if (session?.user) {
-      setEmail(session.user.email || "");
-
-      // Fetch usage data
-      const fetchUsage = async () => {
-        setUsageLoading(true);
-        try {
-          // Get the monthly executions from the profile data
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("monthly_executions_used")
-            .eq("id", session.user.id)
-            .maybeSingle();
-
-          if (error) throw error;
-
-          if (data) {
-            setMonthlyExecutionsUsed(data.monthly_executions_used || 0);
-          }
-        } catch (error) {
-          console.error("Error fetching usage data:", error);
-          toast({
-            title: "Error",
-            description: "Failed to load usage data",
-            variant: "destructive",
-          });
-        } finally {
-          setUsageLoading(false);
-        }
-      };
-
-      // Fetch user profile
-      const fetchProfile = async () => {
-        try {
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .maybeSingle();
-          console.log("Profile data:", data);
-          if (error) throw error;
-          // If no profile exists, create one
-          if (!data) {
-            await supabase.from("profiles").insert({
-              id: session.user.id,
-              full_name: name,
-              email_notifications: emailNotifications,
-              telegram_handle: telegramHandle,
-              discord_webhook: discordWebhook,
-              dark_mode: darkMode,
-              updated_at: new Date().toISOString(),
-            });
-            return; // defaults already set
-          }
-
-          if (data) {
-            setName(data.full_name || "");
-            setEmailNotifications(data.email_notifications !== false);
-            setTelegramHandle(data.telegram_handle || "");
-            setDiscordWebhook(data.discord_webhook || "");
-            setSubscriptionTier(data.subscription_tier || "free");
-            setSubscriptionStatus(data.subscription_status || "");
-            setSubscriptionExpiresAt(data.subscription_expires_at);
-            setMonthlyExecutionQuota(data.monthly_execution_quota || 0);
-            setMonthlyExecutionsUsed(data.monthly_executions_used || 0);
-            setDarkMode(data.dark_mode !== false);
-          }
-        } catch (error) {
-          console.error("Error fetching profile:", error);
-        }
-      };
-
-      fetchProfile();
-      fetchUsage();
+    if (profile) {
+      setName(profile.full_name || "");
+      setEmailNotifications(profile.email_notifications !== false);
+      setTelegramHandle(profile.telegram_handle || "");
+      setDiscordWebhook(profile.discord_webhook || "");
+      setSubscriptionTier(profile.subscription_tier || "free");
+      setSubscriptionStatus(profile.subscription_status || "inactive");
+      setSubscriptionExpiresAt(profile.subscription_expires_at);
+      setDarkMode(profile.dark_mode !== false);
     }
-  }, [
-    session,
-    supabase,
-    darkMode,
-    discordWebhook,
-    emailNotifications,
-    name,
-    telegramHandle,
-    toast,
-  ]);
+  }, [profile]);
 
+  // Update local state when usage data is loaded
   useEffect(() => {
-    if (session?.user) {
-      setUsageLoading(true);
-      fetch("/api/usage")
-        .then((res) => res.json())
-        .then(({ monthly_execution_quota, monthly_executions_used }) => {
-          setMonthlyExecutionQuota(monthly_execution_quota);
-          setMonthlyExecutionsUsed(monthly_executions_used);
-        })
-        .catch(console.error)
-        .finally(() => setUsageLoading(false));
+    if (usage) {
+      setMonthlyExecutionQuota(usage.monthly_execution_quota || 100);
+      setMonthlyExecutionsUsed(usage.monthly_executions_used || 0);
     }
-  }, [session]);
+  }, [usage]);
+
+  // Set user email from Magic Auth
+  const { user } = useMagicAuth();
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -202,22 +144,38 @@ export default function SettingsPage() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.from("profiles").upsert({
-        id: session?.user.id,
-        full_name: name,
-        email_notifications: emailNotifications,
-        telegram_handle: telegramHandle,
-        discord_webhook: discordWebhook,
-        dark_mode: darkMode,
-        updated_at: new Date().toISOString(),
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully.",
-      });
+      // Use the updateProfile mutation from the hook
+      updateProfile(
+        {
+          full_name: name,
+          email_notifications: emailNotifications,
+          telegram_handle: telegramHandle,
+          discord_webhook: discordWebhook,
+          dark_mode: darkMode,
+        },
+        {
+          onSuccess: () => {
+            toast({
+              title: "Profile updated",
+              description: "Your profile has been updated successfully.",
+            });
+            // Refetch profile and usage data
+            refetchProfile();
+            refetchUsage();
+          },
+          onError: (error: Error) => {
+            toast({
+              title: "Update failed",
+              description: error.message || "Failed to update profile.",
+              variant: "destructive",
+            });
+            console.error("Profile update error:", error);
+          },
+          onSettled: () => {
+            setIsLoading(false);
+          },
+        }
+      );
     } catch (error: unknown) {
       let errorMessage = "Failed to update profile.";
       if (error instanceof Error) {
@@ -229,7 +187,6 @@ export default function SettingsPage() {
         variant: "destructive",
       });
       console.error("Profile update error:", error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -254,25 +211,11 @@ export default function SettingsPage() {
     return "bg-emerald-500";
   };
 
-  if (isMagicAuthLoading) {
+  // Show loading state when authentication or profile data is loading
+  if (isMagicAuthLoading || profileIsLoading) {
     return (
       <div className='flex min-h-screen items-center justify-center'>
         <Loader2 className='h-12 w-12 animate-spin' />
-      </div>
-    );
-  }
-
-  if (!isMagicAuthenticated) {
-    return (
-      <div className='container mx-auto px-4 py-8'>
-        <h1 className='text-2xl font-bold mb-4'>Settings</h1>
-        <p>
-          Please{" "}
-          <a href='/login' className='underline'>
-            log in
-          </a>{" "}
-          to access settings.
-        </p>
       </div>
     );
   }
@@ -572,7 +515,8 @@ export default function SettingsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className='p-6'>
-                  {isConnected ? (
+                  <WalletInfoProfile />
+                  {/* {isConnected ? (
                     <div className='space-y-4'>
                       <div className='space-y-2'>
                         <p>
@@ -587,37 +531,27 @@ export default function SettingsPage() {
                         </p>
                       </div>
                       <Separator className='my-4' />
-                      {isLoadingPersistedWallet ? (
-                        <p>Loading application wallet data...</p>
-                      ) : persistedWallet ? (
-                        <div className='space-y-2'>
-                          <h4 className='font-medium'>
-                            Application Wallet Details
-                          </h4>
-                          <p>
-                            <strong>Wallet ID:</strong> {persistedWallet.id}
-                          </p>
-                          <p>
-                            <strong>Type:</strong> {persistedWallet.walletType}
-                          </p>
-                          <p>
-                            <strong>Chain Type:</strong>{" "}
-                            {persistedWallet.chainType}
-                          </p>
-                        </div>
-                      ) : (
+                      <div className='space-y-2'>
+                        <h4 className='font-medium'>
+                          Wallet Connection Status
+                        </h4>
                         <p>
-                          No application-specific wallet data found for this
-                          connected account. It will be created/synced on the
-                          next relevant action.
+                          <strong>Status:</strong>{" "}
+                          {isConnected ? "Connected" : "Disconnected"}
                         </p>
-                      )}
-                      {walletAppError && (
-                        <p className='text-red-500'>
-                          Error loading app wallet data:{" "}
-                          {walletAppError.message}
-                        </p>
-                      )}
+                        {address && (
+                          <p>
+                            <strong>Address:</strong> {address.substring(0, 8)}
+                            ...{address.substring(address.length - 6)}
+                          </p>
+                        )}
+                        {chain && (
+                          <p>
+                            <strong>Network:</strong> {chain.name} (ID:{" "}
+                            {chain.id})
+                          </p>
+                        )}
+                      </div>
                       <Button
                         onClick={() => disconnect()}
                         disabled={isDisconnectingWagmi}
@@ -658,7 +592,7 @@ export default function SettingsPage() {
                         </p>
                       )}
                     </div>
-                  )}
+                  )} */}
                 </CardContent>
               </Card>
             </TabsContent>

@@ -60,15 +60,18 @@ export function createWagmiConfig(
   // Always add injected connector
   activeConnectors.push(injected());
 
-    return createConfig(getDefaultConfig({
+  return createConfig(
+    getDefaultConfig({
       appName: "Zzyra",
       walletConnectProjectId: "",
-    chains,
-    transports: {
-      [mainnet.id]: http(),
-      [polygonAmoy.id]: http(),
-      [baseSepolia.id]: http(),
-    },
-    connectors: activeConnectors, // use the conditionally populated list
-  }));
+      syncConnectedChain: true,
+      chains,
+      transports: {
+        [mainnet.id]: http(),
+        [polygonAmoy.id]: http(),
+        [baseSepolia.id]: http(),
+      },
+      connectors: activeConnectors, // use the conditionally populated list
+    })
+  );
 }
