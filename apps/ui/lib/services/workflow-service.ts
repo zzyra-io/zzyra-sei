@@ -1,19 +1,22 @@
-import { createServiceClient } from '@/lib/supabase/serviceClient';
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/supabase";
 import { v4 as uuidv4 } from "uuid";
 
 export interface Workflow {
   id: string;
-  user_id: string;
+  userId: string; // Changed from user_id to match Prisma schema
+  user_id?: string; // For backward compatibility
   name: string;
   description: string;
   nodes: any[];
   edges: any[];
-  is_public: boolean;
+  isPublic: boolean; // Changed from is_public to match Prisma schema
+  is_public?: boolean; // For backward compatibility
   tags: string[];
-  created_at: string;
-  updated_at: string;
+  createdAt: string; // Changed from created_at to match Prisma schema
+  created_at?: string; // For backward compatibility
+  updatedAt: string; // Changed from updated_at to match Prisma schema
+  updated_at?: string; // For backward compatibility
+  version?: number; // Added to match Prisma schema
+  definition?: any; // Added to match Prisma schema
 }
 
 // Utility: detect cycles in workflow graph
@@ -45,18 +48,19 @@ function detectCycle(nodes: any[], edges: any[]): boolean {
 class WorkflowService {
   async getWorkflows(): Promise<Workflow[]> {
     try {
-      // Use service-role client for worker context; bypass RLS/auth
-      const supabase: SupabaseClient<Database> = createServiceClient();
-      const { data, error } = await supabase
-        .from("workflows")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const response = await fetch('/api/workflows', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) {
-        throw new Error(`Error fetching workflows: ${error.message}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch workflows');
       }
 
-      return data || [];
+      return await response.json();
     } catch (error: any) {
       console.error("Error fetching workflows:", error);
       throw new Error(`Failed to fetch workflows: ${error.message}`);
@@ -65,18 +69,19 @@ class WorkflowService {
 
   async getWorkflow(id: string): Promise<Workflow> {
     try {
-      const supabase: SupabaseClient<Database> = createServiceClient();
-      const { data, error } = await supabase
-        .from("workflows")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const response = await fetch(`/api/workflows/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) {
-        throw new Error(`Error fetching workflow: ${error.message}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch workflow');
       }
 
-      return data;
+      return await response.json();
     } catch (error: any) {
       console.error("Error fetching workflow:", error);
       throw new Error(`Failed to fetch workflow: ${error.message}`);
@@ -85,15 +90,23 @@ class WorkflowService {
 
   async createWorkflow(workflow: Partial<Workflow>): Promise<Workflow> {
     try {
-      const supabase: SupabaseClient<Database> = createServiceClient();
+      // Transform property names to match Prisma schema
       const newWorkflow = {
         ...workflow,
         id: uuidv4(),
         nodes: workflow.nodes || [],
         edges: workflow.edges || [],
         tags: workflow.tags || [],
-        is_public: workflow.is_public || false,
+        isPublic: workflow.isPublic ?? workflow.is_public ?? false,
+        // Use Prisma-style naming for properties
+        userId: workflow.userId ?? workflow.user_id,
       };
+      
+      // Remove legacy property names
+      delete newWorkflow.user_id;
+      delete newWorkflow.is_public;
+      delete newWorkflow.created_at;
+      delete newWorkflow.updated_at;
 
       // cycle detection
       const nodes = newWorkflow.nodes || []
@@ -102,17 +115,20 @@ class WorkflowService {
         throw new Error("Workflow contains a cycle; please remove loops before saving.")
       }
 
-      const { data, error } = await supabase
-        .from("workflows")
-        .insert(newWorkflow)
-        .select()
-        .single();
+      const response = await fetch('/api/workflows', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newWorkflow),
+      });
 
-      if (error) {
-        throw new Error(`Error creating workflow: ${error.message}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create workflow');
       }
 
-      return data;
+      return await response.json();
     } catch (error: any) {
       console.error("Error creating workflow:", error);
       throw new Error(`Failed to create workflow: ${error.message}`);
@@ -124,14 +140,19 @@ class WorkflowService {
     workflow: Partial<Workflow>
   ): Promise<Workflow> {
     try {
-      const supabase: SupabaseClient<Database> = createServiceClient();
-      const { data, error } = await supabase
-        .from("workflows")
-        .update(workflow)
-        .eq("id", id)
-        .select("*")
-        .single();
-
+      // Transform property names to match Prisma schema
+      const updateData = {
+        ...workflow,
+        isPublic: workflow.isPublic ?? workflow.is_public,
+        userId: workflow.userId ?? workflow.user_id,
+      };
+      
+      // Remove legacy property names
+      delete updateData.user_id;
+      delete updateData.is_public;
+      delete updateData.created_at;
+      delete updateData.updated_at;
+      
       // cycle detection for updated graph
       if (workflow.nodes && workflow.edges) {
         if (detectCycle(workflow.nodes, workflow.edges)) {
@@ -139,11 +160,20 @@ class WorkflowService {
         }
       }
 
-      if (error) {
-        throw new Error(`Error updating workflow: ${error.message}`);
+      const response = await fetch(`/api/workflows/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update workflow');
       }
 
-      return data;
+      return await response.json();
     } catch (error: any) {
       console.error("Error updating workflow:", error);
       throw new Error(`Failed to update workflow: ${error.message}`);
@@ -152,14 +182,16 @@ class WorkflowService {
 
   async deleteWorkflow(id: string): Promise<void> {
     try {
-      const supabase: SupabaseClient<Database> = createServiceClient();
-      const { error } = await supabase
-        .from("workflows")
-        .delete()
-        .eq("id", id);
+      const response = await fetch(`/api/workflows/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) {
-        throw new Error(`Error deleting workflow: ${error.message}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete workflow');
       }
     } catch (error: any) {
       console.error("Error deleting workflow:", error);
@@ -179,7 +211,7 @@ class WorkflowService {
           description: "Auto-saved before execution",
           nodes: workflow.nodes,
           edges: workflow.edges,
-          is_public: false,
+          isPublic: false, // Updated to camelCase
           tags: []  
         });
         workflowId = newWorkflow.id;
@@ -213,11 +245,16 @@ class WorkflowService {
   async getExecutionStatus(executionId: string): Promise<{
     id: string;
     status: string;
-    current_node_id?: string;
-    execution_progress?: number;
-    nodes_completed?: string[];
-    nodes_failed?: string[];
-    nodes_pending?: string[];
+    currentNodeId?: string; // Changed from snake_case to camelCase
+    current_node_id?: string; // For backward compatibility
+    executionProgress?: number; // Changed from snake_case to camelCase
+    execution_progress?: number; // For backward compatibility
+    nodesCompleted?: string[]; // Changed from snake_case to camelCase
+    nodes_completed?: string[]; // For backward compatibility
+    nodesFailed?: string[]; // Changed from snake_case to camelCase
+    nodes_failed?: string[]; // For backward compatibility
+    nodesPending?: string[]; // Changed from snake_case to camelCase
+    nodes_pending?: string[]; // For backward compatibility
     result?: any;
     error?: string;
     logs?: string[];

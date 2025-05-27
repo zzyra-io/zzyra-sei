@@ -1,64 +1,93 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-
-// Define public paths that do not require authentication
 const PUBLIC_PATHS = [
   "/login",
-  "/auth/callback", // If you have an OAuth callback page
-  // Add other public paths like marketing pages, /api/auth routes, etc.
-  // Ensure API routes for login/logout are public
+  "/auth/callback",
   "/api/auth/login",
-  "/api/auth/logout", // if you have one
-  "/api/health", // example public API endpoint
+  "/api/auth/logout",
+  "/api/auth/signin",
+  "/api/auth/callback",
+  "/api/health",
 ];
 
-// Define paths for static assets and specific API patterns that might be public or handled differently
-const STATIC_ASSET_PATTERN = /\.(jpg|jpeg|png|webp|svg|ico|css|js)$/;
+const GUEST_PATHS = ["/login"];
+const STATIC_ASSET_REGEX = /\.(?:jpg|jpeg|png|webp|svg|ico|css|js)$/i;
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const response = NextResponse.next(); // Start with a pass-through response
+export async function middleware(req: NextRequest) {
+  const { pathname, origin, searchParams } = req.nextUrl;
+  const response = NextResponse.next();
 
-  // 1. Handle Caching for Static Assets (can be public)
-  if (STATIC_ASSET_PATTERN.test(pathname)) {
+  // Handle static assets
+  if (STATIC_ASSET_REGEX.test(pathname)) {
     response.headers.set("Cache-Control", "public, max-age=604800, immutable");
-    return response; // Static assets don't need auth checks
+    return response;
   }
 
-  // 2. Check if the path is public
+  // Allow public paths
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
-
   if (isPublicPath) {
-    // For public API routes, you might still want specific caching
     if (pathname.startsWith("/api/")) {
-      response.headers.set("Cache-Control", "public, max-age=300, s-maxage=600");
+      response.headers.set(
+        "Cache-Control",
+        "public, max-age=300, s-maxage=600"
+      );
     }
-    return response; // Allow access to public paths
+    return response;
   }
 
- 
-  // 4. If token exists and is valid, allow access
-  // For private API routes, you might set different cache headers or no-cache
+  // Get session token
+  const cookieName =
+    process.env.NODE_ENV === "production"
+      ? "__Secure-next-auth.session-token"
+      : "next-auth.session-token";
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+    cookieName,
+  });
+  console.log("Middleware: Pathname:", pathname, "Token:", token);
+
+  // Handle guest routes
+  const isGuestPath = GUEST_PATHS.includes(pathname);
+  if (isGuestPath && token?.sub) {
+    const callbackUrl =
+      searchParams.get("callbackUrl") || `${origin}/dashboard`;
+    try {
+      const redirectUrl = new URL(callbackUrl, origin);
+      if (
+        redirectUrl.origin === origin &&
+        !GUEST_PATHS.includes(redirectUrl.pathname)
+      ) {
+        return NextResponse.redirect(redirectUrl);
+      }
+    } catch {
+      // Invalid callbackUrl
+    }
+    return NextResponse.redirect(new URL("/dashboard", origin));
+  }
+
+  // Handle private routes
+  if (!token?.sub) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const loginUrl = new URL("/login", origin);
+    loginUrl.searchParams.set("callbackUrl", req.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Set cache headers for private API routes
   if (pathname.startsWith("/api/")) {
-    response.headers.set("Cache-Control", "private, no-store, no-cache, must-revalidate, proxy-revalidate");
+    response.headers.set(
+      "Cache-Control",
+      "private, no-store, no-cache, must-revalidate"
+    );
   }
 
   return response;
 }
 
-// Specify paths to run the middleware on
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - Files with extensions (jpg, jpeg, png, etc.) are handled by the STATIC_ASSET_PATTERN check
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.).*)",
-    // Include API routes explicitly if not covered by the general matcher or if specific handling is needed early
-    // However, the general matcher above should cover them. If you face issues, you can add "/api/:path*" explicitly.
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.*$).*)"],
 };

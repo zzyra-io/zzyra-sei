@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { WorkflowRepository } from "@zyra/database";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 // Initialize repositories
 const workflowRepository = new WorkflowRepository();

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { WorkflowRepository } from "@zyra/database";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 // Initialize repositories
 const workflowRepository = new WorkflowRepository();
@@ -9,6 +9,8 @@ const workflowRepository = new WorkflowRepository();
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
+
+    console.log("session", session);
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -42,6 +44,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
+    console.log("session", session);
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

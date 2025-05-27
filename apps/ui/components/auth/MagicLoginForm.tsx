@@ -22,6 +22,7 @@ import { OAuthProvider } from "@/lib/magic-auth-types";
 import { useEffect, useState } from "react";
 import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
 import { useMagic } from "@/lib/magic-provider";
+import { useSession } from "next-auth/react";
 
 /**
  * Magic Login Form Props
@@ -48,15 +49,15 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
     // isLoading and isAuthenticated are now primarily from useMagic()
     error: authError, // This is error from loginWithEmail mutation
   } = useMagicAuth();
-  const { magic, isAuthenticated, isInitializing } = useMagic(); // Get auth state from provider
+  const { data: session, status } = useSession();
 
-  // Check for authentication success
+  // // Check for authentication success
   useEffect(() => {
-    if (isAuthenticated && onSuccess) {
+    if (status === "authenticated" && onSuccess) {
       console.log("Authentication successful, redirecting...");
       onSuccess();
     }
-  }, [isAuthenticated, onSuccess]);
+  }, [status, onSuccess]);
 
   // Handle email login with Magic Link
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -141,13 +142,13 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
   // };
 
   // Determine loading state
-  const isLoading = formLoading || isInitializing;
+  const isLoading = formLoading;
 
   // Determine error state
   const displayError = formError || authError;
 
   // Show a more detailed loading state
-  if (!magic) {
+  if (status !== "authenticated") {
     return (
       <Card className='w-full max-w-md mx-auto'>
         <CardHeader>
@@ -207,7 +208,9 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                     placeholder='your@email.com'
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    disabled={loginWithEmail.isPending || isInitializing}
+                    disabled={
+                      loginWithEmail.isPending || status === "authenticated"
+                    }
                     required
                   />
                 </div>
@@ -218,8 +221,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                   disabled={
                     !email ||
                     loginWithEmail.isPending ||
-                    isInitializing ||
-                    !magic
+                    status === "authenticated"
                   }>
                   {isLoading ? (
                     <>
@@ -249,7 +251,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                     placeholder='+1 (555) 123-4567'
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
-                    disabled={isInitializing} // Assuming SMS login would have its own mutation.isPending
+                    disabled={status === "authenticated"} // Assuming SMS login would have its own mutation.isPending
                     required
                   />
                 </div>
@@ -257,7 +259,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 <Button
                   type='submit'
                   className='w-full'
-                  disabled={!phoneNumber || isInitializing || !magic}>
+                  disabled={!phoneNumber || status === "authenticated"}>
                   {isLoading ? (
                     <>
                       <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -281,8 +283,8 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 onClick={() => {
                   console.log("handleOAuthLogin not implemented");
                 }}
-                disabled={isInitializing || !magic}>
-                {isInitializing ? (
+                disabled={status === "authenticated"}>
+                {status === "authenticated" ? (
                   <>
                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                     Connecting...
@@ -299,8 +301,8 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 onClick={() => {
                   console.log("handleOAuthLogin not implemented");
                 }}
-                disabled={isInitializing || !magic}>
-                {isInitializing ? (
+                disabled={status === "authenticated"}>
+                {status === "authenticated" ? (
                   <>
                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                     Connecting...
@@ -317,8 +319,8 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
                 onClick={() => {
                   console.log("handleOAuthLogin not implemented");
                 }}
-                disabled={isInitializing}>
-                {isInitializing ? (
+                disabled={status === "authenticated"}>
+                {status === "authenticated" ? (
                   <>
                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                     Connecting...

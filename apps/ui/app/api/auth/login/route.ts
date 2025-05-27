@@ -1,20 +1,23 @@
-/**
- * Magic Link Authentication API Route
- *
- * Handles authentication with Magic Link and Prisma
- */
-
 import { prisma } from "@/lib/prisma";
 import { AuthService, MagicAuthPayload } from "@zyra/database";
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { encode } from "next-auth/jwt";
+import { authOptions } from "@/lib/auth";
 
-// Create a single PrismaClient instance for this route
 const authService = new AuthService(prisma);
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, didToken, isOAuth, oauthProvider, oauthUserInfo } = body;
+    const {
+      email,
+      didToken,
+      isOAuth,
+      oauthProvider,
+      oauthUserInfo,
+      callbackUrl,
+    } = body;
 
     if (!email || !didToken) {
       return NextResponse.json(
@@ -29,9 +32,10 @@ export async function POST(req: NextRequest) {
       isOAuth,
       oauthProvider,
       hasOAuthUserInfo: !!oauthUserInfo,
+      callbackUrl,
     });
 
-    // Create a properly typed payload
+    // Authenticate with Magic Link
     const magicPayload: MagicAuthPayload = {
       email,
       didToken,
@@ -39,17 +43,14 @@ export async function POST(req: NextRequest) {
       oauthProvider,
       oauthUserInfo,
     };
+    const { session, user } = await authService.authenticateWithMagic(
+      magicPayload
+    );
+    console.log("Auth Result:", { user, session });
 
-    // Authenticate with Magic Link
-    const result = await authService.authenticateWithMagic(magicPayload);
-
-    // Extract session and user data from the result
-    const { session, user } = result;
-    console.log("Login route: Authentication result", { session, user });
-
-    if (!session || !session.accessToken) {
+    if (!session || !session.accessToken || !user) {
       console.error(
-        "Login route: Authentication successful but no session tokens returned"
+        "Login route: Authentication successful but no session tokens or user returned"
       );
       return NextResponse.json(
         { error: "Authentication failed: Invalid session" },
@@ -57,45 +58,92 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create response object
-    const response = NextResponse.next();
+    // Create NextAuth JWT
+    const token = {
+      sub: user.id,
+      email: user.email || "",
+      name: user.email ? user.email.split("@")[0] : "User",
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      expiresAt: session.expiresAt,
+    };
 
-    // Set cookies with standardized names
-    response.cookies.set({
+    // Encode the session token
+    const sessionToken = await encode({
+      token,
+      secret: process.env.NEXTAUTH_SECRET!,
+      maxAge: authOptions.session?.maxAge || 30 * 24 * 60 * 60,
+    });
+    console.log("Encoded Session Token:", sessionToken);
+
+    // Set cookies
+    const cookieStore = await cookies();
+    const cookieName =
+      process.env.NODE_ENV === "production"
+        ? "__Secure-next-auth.session-token"
+        : "next-auth.session-token";
+    cookieStore.set({
+      name: cookieName,
+      value: sessionToken,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60,
+    });
+
+    cookieStore.set({
       name: "token",
       value: session.accessToken,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 24, // 1 day in seconds
+      maxAge: 60 * 60 * 24,
     });
 
     if (session.refreshToken) {
-      response.cookies.set({
+      cookieStore.set({
         name: "refresh_token",
         value: session.refreshToken,
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        sameSite: "strict",
         path: "/",
-        maxAge: 60 * 60 * 24 * 7, // 7 days in seconds
+        maxAge: 60 * 60 * 24 * 7,
       });
     }
 
-    // Create a sanitized session object that doesn't expose tokens
-    const safeSession = {
-      expiresAt: session.expiresAt,
-      user: session.user,
-      // Explicitly omit tokens
-    };
+    // Clean callbackUrl
+    let finalCallbackUrl = "/dashboard";
+    try {
+      const url = new URL(
+        callbackUrl || req.headers.get("referer") || "",
+        req.nextUrl.origin
+      );
+      if (!url.pathname.startsWith("/login")) {
+        finalCallbackUrl = url.toString();
+      }
+    } catch {
+      // Use default if invalid
+    }
 
-    // Return the response with the sanitized data
-    return NextResponse.json({
-      session: safeSession,
+    // Create response
+    const response = NextResponse.json({
+      session: {
+        expiresAt: session.expiresAt,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.email ? user.email.split("@")[0] : "User",
+        },
+      },
       user,
       success: true,
+      callbackUrl: finalCallbackUrl,
     });
+
+    return response;
   } catch (error) {
     console.error("Login error:", error);
     const errorMessage =
