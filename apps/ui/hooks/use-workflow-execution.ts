@@ -1,12 +1,11 @@
 "use client";
 
-import { useSupabase } from "@/components/auth-provider";
 import { useToast } from "@/components/ui/use-toast";
-import { workflowService } from "@/lib/services/workflow-service";
 import { useWorkflowStore } from "@/lib/store/workflow-store";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { type Edge, type Node } from "@xyflow/react";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Define types for execution status
 export type ExecutionStatus = {
@@ -37,25 +36,51 @@ export type WorkflowExecutionParams = {
 export function useWorkflowExecution() {
   const { nodes, edges, workflowId, updateNode } = useWorkflowStore();
   const { toast } = useToast();
-
-  // Supabase client for realtime
-  const { supabase } = useSupabase();
+  const queryClient = useQueryClient();
 
   // State for tracking execution
   const [executionId, setExecutionId] = useState<string | null>(null);
-  const [executionStatus, setExecutionStatus] =
-    useState<ExecutionStatus | null>(null);
+
+  // Use React Query to fetch execution status
+  const { data: executionStatus, isLoading: isLoadingStatus } = useQuery({
+    queryKey: ["executionStatus", executionId],
+    queryFn: async () => {
+      if (!executionId) return null;
+
+      const response = await fetch(`/api/execute-workflow/${executionId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch execution status");
+      }
+
+      const data = await response.json();
+      return data as ExecutionStatus;
+    },
+    enabled: !!executionId,
+    refetchInterval: (query) => {
+      const data = query.state.data as ExecutionStatus | null;
+      // Stop polling when execution is complete or failed
+      if (data && (data.status === "completed" || data.status === "failed")) {
+        return false;
+      }
+      // Poll every 2 seconds while execution is in progress
+      return 2000;
+    },
+  });
 
   // Use React Query for mutation to execute workflow
   const { mutateAsync: executeWorkflowMutation, isPending } = useMutation({
     mutationFn: async () => {
-      // Reset execution status first
+      // Reset execution ID first
       setExecutionId(null);
-      setExecutionStatus(null);
 
       // Check if workflow exists and has required fields
+      if (!workflowId && (!nodes.length || !edges.length)) {
+        throw new Error("Cannot execute an empty workflow");
+      }
+
+      // For unsaved workflows, show a warning
       if (!workflowId) {
-        // For unsaved workflows, we can still execute them but with a warning
         console.warn(
           "Executing unsaved workflow - a temporary workflow will be created"
         );
@@ -68,66 +93,39 @@ export function useWorkflowExecution() {
         });
       }
 
-      // For saved workflows, extract necessary workflow structure for execution
+      // Prepare workflow execution data
       const workflowExecutionData = {
-        workflowId: workflowId,
-        nodes: nodes.map((node) => ({
-          id: node.id,
-          type: node.type,
-          data: node.data,
-          position: node.position,
-        })),
-        edges: edges.map((edge) => ({
-          id: edge.id,
-          source: edge.source,
-          sourceHandle: edge.sourceHandle,
-          target: edge.target,
-          targetHandle: edge.targetHandle,
-        })),
+        workflowId,
       };
 
       // Call the execution API
       try {
-        console.log("Executing workflow with data:", workflowExecutionData);
-        const executionResponse = await workflowService.executeWorkflow(
-          workflowExecutionData
-        );
-        console.log("Execution response:", executionResponse);
+        console.log("Executing workflow:", workflowId || "(unsaved)");
+        const response = await fetch("/api/execute-workflow", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(workflowExecutionData),
+        });
 
-        if (executionResponse?.id) {
-          setExecutionId(executionResponse.id);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to execute workflow");
+        }
 
-          // Get initial status to display while WebSocket connects
-          const initialStatus = await workflowService.getExecutionStatus(
-            executionResponse.id
-          );
+        const data = await response.json();
+        console.log("Execution response:", data);
 
-          // Ensure we have a valid status type
-          if (initialStatus) {
-            const validStatus = [
-              "pending",
-              "running",
-              "completed",
-              "failed",
-            ].includes(initialStatus.status)
-              ? (initialStatus.status as
-                  | "pending"
-                  | "running"
-                  | "completed"
-                  | "failed")
-              : "running";
+        if (data?.executionId) {
+          setExecutionId(data.executionId);
 
-            const typedStatus: ExecutionStatus = {
-              ...initialStatus,
-              status: validStatus,
-            };
+          // Immediately trigger a query for the execution status
+          queryClient.invalidateQueries({
+            queryKey: ["executionStatus", data.executionId],
+          });
 
-            setExecutionStatus(typedStatus);
-          } else {
-            setExecutionStatus(null);
-          }
-
-          return executionResponse;
+          return data;
         } else {
           throw new Error("Failed to start workflow execution");
         }
@@ -146,99 +144,8 @@ export function useWorkflowExecution() {
     },
   });
 
-  // Subscribe to WebSocket updates when executionId changes
-  useEffect(() => {
-    if (!executionId || !supabase) return;
-
-    console.log(
-      `Setting up WebSocket subscription for execution: ${executionId}`
-    );
-
-    // Create a channel for this execution
-    const channelName = `execution-${executionId}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "workflow_executions",
-          filter: `id=eq.${executionId}`,
-        },
-        (payload) => {
-          console.log("Received execution update:", payload);
-          if (payload.new) {
-            // Define a type for the raw payload data
-            interface RawExecutionStatus {
-              id: string;
-              status: string;
-              node_statuses?: Record<string, string>;
-              current_node_id?: string;
-              current_node?: string;
-              started_at?: string;
-              completed_at?: string;
-              execution_progress?: number;
-              execution_time?: number;
-              error?: string;
-              nodes_completed?: string[];
-              nodes_failed?: string[];
-              nodes_pending?: string[];
-              logs?: string[];
-              [key: string]: any; // For any other properties
-            }
-
-            // Ensure we have a valid status type
-            const newStatus = payload.new as RawExecutionStatus;
-            const validStatus = [
-              "pending",
-              "running",
-              "completed",
-              "failed",
-            ].includes(newStatus.status)
-              ? (newStatus.status as
-                  | "pending"
-                  | "running"
-                  | "completed"
-                  | "failed")
-              : "running";
-
-            const status: ExecutionStatus = {
-              id: newStatus.id,
-              status: validStatus,
-              node_statuses: newStatus.node_statuses || {},
-              current_node_id: newStatus.current_node_id,
-              current_node: newStatus.current_node,
-              started_at: newStatus.started_at,
-              completed_at: newStatus.completed_at,
-              execution_progress: newStatus.execution_progress,
-              execution_time: newStatus.execution_time,
-              error: newStatus.error,
-              nodes_completed: newStatus.nodes_completed || [],
-              nodes_failed: newStatus.nodes_failed || [],
-              nodes_pending: newStatus.nodes_pending || [],
-              logs: newStatus.logs || [],
-            };
-
-            console.log("Setting execution status:", status);
-            setExecutionStatus(status);
-          }
-        }
-      );
-    
-    // Subscribe to the channel
-    channel.subscribe((status) => {
-      console.log(`Subscription status for ${channelName}:`, status);
-    });
-
-    // Cleanup function to unsubscribe
-    return () => {
-      console.log(`Cleaning up WebSocket subscription for: ${executionId}`);
-      supabase.removeChannel(channel);
-    };
-  }, [executionId, supabase]);
-
-  // No longer needed - direct updates via WebSocket subscription
+  // React Query handles status updates via polling
+  // No WebSocket subscription needed
 
   // Update node statuses based on execution status
   useEffect(() => {
@@ -374,6 +281,6 @@ export function useWorkflowExecution() {
     executeWorkflow,
     isExecuting: isPending,
     executionStatus,
-    isLoadingStatus: isPending,
+    isLoadingStatus,
   };
 }

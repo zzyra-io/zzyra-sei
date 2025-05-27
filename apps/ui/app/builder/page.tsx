@@ -172,7 +172,12 @@ export default function BuilderPage() {
   );
 
   // Use our custom hook for workflow execution with WebSocket-based real-time updates
-  const { executeWorkflow, isExecuting: isExecutionPending, executionStatus, isLoadingStatus } = useWorkflowExecution();
+  const {
+    executeWorkflow,
+    isExecuting: isExecutionPending,
+    executionStatus,
+    isLoadingStatus,
+  } = useWorkflowExecution();
 
   // State to control execution panel visibility
   const [showExecutionPanel, setShowExecutionPanel] = useState(false);
@@ -186,7 +191,7 @@ export default function BuilderPage() {
       setShowExecutionPanel(true);
     }
   }, [isExecutionPending, executionStatus, setShowExecutionPanel]);
-  
+
   const handleWorkflowDetailsChange = useCallback(
     ({ name, description }: { name: string; description: string }) => {
       setWorkflowName(name);
@@ -301,7 +306,15 @@ export default function BuilderPage() {
     // Execute workflow and show status panel
     executeWorkflow();
     setShowExecutionPanel(true);
-  }, [executeWorkflow, nodes, toast, workflowId, setSaveDialogOpen, setShouldExecuteAfterSave, setShowExecutionPanel]);
+  }, [
+    executeWorkflow,
+    nodes,
+    toast,
+    workflowId,
+    setSaveDialogOpen,
+    setShouldExecuteAfterSave,
+    setShowExecutionPanel,
+  ]);
 
   const handleNlGenerate = useCallback(
     async (e: { preventDefault: () => void }) => {
@@ -403,7 +416,7 @@ export default function BuilderPage() {
   }
 
   return (
-    <AuthGate>
+    <>
       <div className='flex flex-col h-screen'>
         {/* Header */}
         <div className='border-b p-4 flex justify-between items-center bg-background'>
@@ -642,6 +655,6 @@ export default function BuilderPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AuthGate>
+    </>
   );
 }

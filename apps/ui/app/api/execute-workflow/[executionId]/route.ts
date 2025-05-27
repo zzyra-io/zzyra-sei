@@ -1,97 +1,111 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { ExecutionRepository } from "@zyra/database";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
+// Initialize repositories
+const executionRepository = new ExecutionRepository();
 
 export const runtime = "nodejs";
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { executionId: string } }
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
+    // Get session using Next Auth
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Properly await params before destructuring
+    const userId = session.user.id;
     const executionId = params.executionId;
 
-    // Get the execution record
-    const { data: execution, error: execError } = await supabase
-      .from("workflow_executions")
-      .select("*")
-      .eq("id", executionId)
-      .single();
+    // Get the execution with nodes and logs using the repository
+    const executionWithDetails = await executionRepository.findWithNodesAndLogs(
+      executionId
+    );
 
-    if (execError || !execution) {
+    if (!executionWithDetails) {
       return NextResponse.json(
         { error: "Execution not found" },
         { status: 404 }
       );
     }
 
-    // Get the node execution logs
-    const { data: nodeLogs, error: nodeLogError } = await supabase
-      .from("node_logs")
-      .select("*")
-      .eq("execution_id", executionId)
-      .order("ts", { ascending: true });
-
-    if (nodeLogError) {
-      console.error("Error fetching node logs:", nodeLogError);
+    // Make sure the user has access to this execution
+    if (executionWithDetails.userId !== userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Process node logs to get nodes completed, failed, and pending
+    // Process node executions to get nodes completed, failed, and pending
     const nodesCompleted: string[] = [];
     const nodesFailed: string[] = [];
     const nodesPending: string[] = [];
     const logs: string[] = [];
 
     // Find the current node being executed
-    let currentNodeId = null;
+    let currentNodeId: string | null = null;
 
-    if (nodeLogs) {
-      nodeLogs.forEach((log) => {
-        if (log.status === "completed") {
-          nodesCompleted.push(log.node_id);
-        } else if (log.status === "failed") {
-          nodesFailed.push(log.node_id);
-        } else if (log.status === "running") {
-          currentNodeId = log.node_id;
-        } else if (log.status === "pending") {
-          nodesPending.push(log.node_id);
-        }
-
-        if (log.message) {
-          logs.push(`[${log.node_id}] ${log.status}: ${log.message}`);
+    if (
+      executionWithDetails.nodeExecutions &&
+      executionWithDetails.nodeExecutions.length > 0
+    ) {
+      executionWithDetails.nodeExecutions.forEach((nodeExec) => {
+        if (nodeExec.status === "completed") {
+          nodesCompleted.push(nodeExec.nodeId);
+        } else if (nodeExec.status === "failed") {
+          nodesFailed.push(nodeExec.nodeId);
+        } else if (nodeExec.status === "running") {
+          currentNodeId = nodeExec.nodeId;
+        } else if (nodeExec.status === "pending") {
+          nodesPending.push(nodeExec.nodeId);
         }
       });
     }
 
-    // Calculate progress percentage
-    const totalNodes = execution.nodes ? execution.nodes.length : 0;
-    const executionProgress = totalNodes > 0 
-      ? Math.round((nodesCompleted.length / totalNodes) * 100) 
-      : 0;
+    // Process execution logs
+    if (
+      executionWithDetails.executionLogs &&
+      executionWithDetails.executionLogs.length > 0
+    ) {
+      executionWithDetails.executionLogs.forEach((log) => {
+        if (log.message) {
+          logs.push(`[${log.level}] ${log.message}`);
+        }
+      });
+    }
+
+    // Get the workflow to determine total nodes for progress calculation
+    const workflow = await executionWithDetails.workflow;
+    const workflowNodes = workflow ? workflow.nodes || [] : [];
+
+    // Calculate progress percentage based on completed nodes
+    const totalNodes = Array.isArray(workflowNodes) ? workflowNodes.length : 0;
+    const executionProgress =
+      totalNodes > 0
+        ? Math.round((nodesCompleted.length / totalNodes) * 100)
+        : 0;
 
     return NextResponse.json({
-      id: execution.id,
-      status: execution.status,
+      id: executionWithDetails.id,
+      status: executionWithDetails.status,
       current_node_id: currentNodeId,
       execution_progress: executionProgress,
       nodes_completed: nodesCompleted,
       nodes_failed: nodesFailed,
       nodes_pending: nodesPending,
-      result: execution.result || {},
-      error: execution.error,
+      result: executionWithDetails.output || {},
+      error: executionWithDetails.error,
       logs,
     });
   } catch (error: unknown) {
-    console.error("Unexpected error in execute-workflow/[executionId] route:", error);
+    console.error(
+      "Unexpected error in execute-workflow/[executionId] route:",
+      error
+    );
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
