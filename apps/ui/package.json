@@ -57,7 +57,7 @@
     "@uiw/codemirror-theme-vscode": "^4.23.12",
     "@uiw/react-codemirror": "^4.23.12",
     "@xyflow/react": "^12.6.0",
-    "@zyra/database": "workspace:^",
+    "@zyra/database": "workspace:*",
     "@zyra/types": "workspace:*",
     "ai": "^4.3.13",
     "amqplib": "^0.10.7",

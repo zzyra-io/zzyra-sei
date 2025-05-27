@@ -46,7 +46,6 @@ export async function middleware(req: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
     cookieName,
   });
-  console.log("Middleware: Pathname:", pathname, "Token:", token);
 
   // Handle guest routes
   const isGuestPath = GUEST_PATHS.includes(pathname);

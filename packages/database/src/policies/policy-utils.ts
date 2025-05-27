@@ -62,15 +62,16 @@ export function createAccessWhereClause(userId: string, isAdmin: boolean = false
     OR: [
       { userId },
       { isPublic: true },
-      {
-        team: {
-          members: {
-            some: {
-              userId,
-            },
-          },
-        },
-      },
+      
+      // {
+      //   team: {
+      //     members: {
+      //       some: {
+      //         userId,
+      //       },
+      //     },
+      //   },
+      // },
     ],
   };
 }

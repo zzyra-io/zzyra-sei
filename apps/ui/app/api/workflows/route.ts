@@ -16,7 +16,9 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    console.log("session", session);
     const workflows = await workflowRepository.findByUserId(session.user.id);
+    console.log("workflows", workflows);
 
     // Map the Prisma model to match the expected format in the frontend
     const mappedWorkflows = workflows.map((workflow) => ({
