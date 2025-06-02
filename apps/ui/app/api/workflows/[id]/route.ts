@@ -16,7 +16,7 @@ export async function GET(
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
+    console.log("params", params);
     const { id } = params;
     const workflow = await workflowRepository.findById(id, session.user.id);
 
@@ -59,7 +59,7 @@ export async function PUT(
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
+    console.log("params", params);
     const { id } = params;
     const workflowData = await request.json();
 

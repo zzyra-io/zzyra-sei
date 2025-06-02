@@ -55,212 +55,139 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { createClient } from "@/lib/supabase/client";
 import { debounce } from "lodash";
-// import { topologicalSort } from "@/lib/utils/graph";
-import { Workflow } from "@/lib/supabase/schema";
-
-// ### TypeScript Interfaces
-interface Execution {
-  id: string;
-  workflow_id: string;
-  status: "completed" | "failed" | "running" | "paused" | "pending";
-  started_at: string;
-  completed_at?: string;
-  error?: string;
-}
-
-interface NodeExecution {
-  id: string;
-  execution_id: string;
-  node_id: string;
-  status: "completed" | "failed" | "running" | "paused" | "pending";
-  started_at: string;
-  completed_at?: string;
-  error?: string;
-  output_data?: Record<string, unknown>;
-  output?: Record<string, unknown>;
-  input_data?: Record<string, unknown>;
-  input?: Record<string, unknown>;
-}
-
-interface NodeInput {
-  execution_id: string;
-  node_id: string;
-  data: Record<string, unknown>;
-}
-
-interface NodeOutput {
-  execution_id: string;
-  node_id: string;
-  data: Record<string, unknown>;
-}
-
-interface NodeLog {
-  execution_id: string;
-  node_id: string;
-  timestamp: string;
-  level: "info" | "warning" | "error";
-  message: string;
-  data?: Record<string, unknown>;
-}
+import { CheckCircle } from "lucide-react";
+import {
+  useWorkflowExecutions,
+  type WorkflowExecution,
+  type NodeExecution,
+  type NodeLog,
+} from "@/hooks/useExecutionLogs";
+import { Workflow } from "@/hooks/use-workflows";
 
 interface ExecutionLogsListProps {
   workflowId: string;
   workflow?: Workflow;
 }
 
-// ### Main Component
 export function ExecutionLogsList({
   workflowId,
   workflow,
 }: ExecutionLogsListProps) {
-  const supabase = createClient();
   const { toast } = useToast();
 
-  // ### State Definitions
-  const [executions, setExecutions] = useState<Execution[]>([]);
-  const [nodeExecutionsMap, setNodeExecutionsMap] = useState<
-    Record<string, NodeExecution[]>
-  >({});
-  const [nodeInputsMap, setNodeInputsMap] = useState<
-    Record<string, Record<string, unknown>>
-  >({});
-  const [nodeOutputsMap, setNodeOutputsMap] = useState<
-    Record<string, Record<string, unknown>>
-  >({});
-  const [nodeLogsMap, setNodeLogsMap] = useState<Record<string, NodeLog[]>>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"all" | Execution["status"]>(
-    "all"
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | WorkflowExecution["status"]
+  >("all");
   const [sortKey, setSortKey] = useState<"started_at" | "duration">(
     "started_at"
   );
   const [sortAsc, setSortAsc] = useState(false);
   const [expandedLogs, setExpandedLogs] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<"all" | Execution["status"]>(
-    "all"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "all" | WorkflowExecution["status"]
+  >("all");
   const [jsonViewerData, setJsonViewerData] = useState<Record<
     string,
     unknown
   > | null>(null);
   const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
+  const [limit] = useState(10);
+  const [offset] = useState(0);
+
+  const {
+    data: executionsData,
+    isLoading,
+    refetch: refetchExecutions,
+  } = useWorkflowExecutions(
+    workflowId,
+    limit,
+    offset,
+    statusFilter,
+    sortKey,
+    sortAsc ? "asc" : "desc"
+  );
+
+  // Memoize executions to prevent dependency issues in hooks
+  const executions = useMemo(
+    () => executionsData?.executions || [],
+    [executionsData]
+  );
+  // Total count for pagination (will be implemented in future pagination feature)
+  // const totalCount = executionsData?.total || 0;
+
+  const debouncedRefetch = useCallback(() => {
+    debounce(() => {
+      refetchExecutions();
+    }, 1000)();
+  }, [refetchExecutions]);
+
   const [loadingExecutionIds, setLoadingExecutionIds] = useState<Set<string>>(
     new Set()
   );
 
-  // ### Fetch Executions (Lazy Loading Initial Data)
-  const fetchLogs = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      let query = supabase
-        .from("workflow_executions")
-        .select("*")
-        .eq("workflow_id", workflowId)
-        .order(sortKey, { ascending: sortAsc });
-
-      if (statusFilter !== "all") query = query.eq("status", statusFilter);
-
-      const { data, error } = await query;
-      if (error)
-        throw new Error(`Failed to fetch executions: ${error.message}`);
-      if (!data) throw new Error("No execution data returned");
-
-      setExecutions(data as Execution[]);
-    } catch (e: any) {
-      toast({
-        title: "Fetch Error",
-        description: e.message || "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [supabase, workflowId, statusFilter, sortKey, sortAsc, toast]);
-  console.log("nodeExecutionsMap", nodeExecutionsMap);
-
-  const debouncedFetchLogs = useCallback(debounce(fetchLogs, 1000), [
-    fetchLogs,
-  ]);
+  const [nodeExecutionsCache, setNodeExecutionsCache] = useState<
+    Record<string, NodeExecution[]>
+  >({});
+  // Caches for node data
+  const [nodeInputsCache] = useState<Record<string, Record<string, unknown>>>(
+    {}
+  );
+  const [nodeOutputsCache] = useState<Record<string, Record<string, unknown>>>(
+    {}
+  );
+  const [nodeLogsCache, setNodeLogsCache] = useState<Record<string, NodeLog[]>>(
+    {}
+  );
 
   const loadNodeData = useCallback(
     async (executionId: string) => {
       if (
         loadingExecutionIds.has(executionId) ||
-        nodeExecutionsMap[executionId]
+        nodeExecutionsCache[executionId]
       ) {
         return;
       }
 
       setLoadingExecutionIds((prev) => new Set(prev).add(executionId));
+
       try {
-        const [nodeExecutionsRes, inputsRes, outputsRes, logsRes] =
-          await Promise.all([
-            supabase
-              .from("node_executions")
-              .select("*")
-              .eq("execution_id", executionId),
-            supabase
-              .from("node_inputs")
-              .select("*")
-              .eq("execution_id", executionId),
-            supabase
-              .from("node_outputs")
-              .select("*")
-              .eq("execution_id", executionId),
-            supabase
-              .from("node_logs")
-              .select("*")
-              .eq("execution_id", executionId),
-          ]);
-
-        if (nodeExecutionsRes.error)
-          throw new Error(nodeExecutionsRes.error.message);
-        if (inputsRes.error) throw new Error(inputsRes.error.message);
-        if (outputsRes.error) throw new Error(outputsRes.error.message);
-        if (logsRes.error) throw new Error(logsRes.error.message);
-
-        const nodeExecutions = nodeExecutionsRes.data as NodeExecution[];
-        // Map inputs from the database to our state
-        const inputsMap = Object.fromEntries(
-          (inputsRes.data || []).map((input: any) => [
-            `${input.execution_id}_${input.node_id}`,
-            input.input_data || input.data,
-          ])
-        );
-        // Map outputs from the database to our state
-        const outputsMap = Object.fromEntries(
-          (outputsRes.data || []).map((output: any) => [
-            `${output.execution_id}_${output.node_id}`,
-            output.output_data || output.data,
-          ])
-        );
-        const logsMap = (logsRes.data || []).reduce(
-          (acc: Record<string, NodeLog[]>, l: NodeLog) => {
-            const key = `${l.execution_id}_${l.node_id}`;
-            if (!acc[key]) acc[key] = [];
-            acc[key].push(l);
-            return acc;
-          },
-          {}
+        const response = await fetch(
+          `/api/executions/nodes?executionId=${executionId}`
         );
 
-        setNodeExecutionsMap((prev) => ({
-          ...prev,
-          [executionId]: nodeExecutions,
-        }));
-        setNodeInputsMap((prev) => ({ ...prev, ...inputsMap }));
-        setNodeOutputsMap((prev) => ({ ...prev, ...outputsMap }));
-        setNodeLogsMap((prev) => ({ ...prev, ...logsMap }));
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Unknown error occurred";
+        if (!response.ok) {
+          throw new Error("Failed to fetch node executions");
+        }
+
+        const nodeExecutions = await response.json();
+
+        if (nodeExecutions) {
+          setNodeExecutionsCache((prev) => ({
+            ...prev,
+            [executionId]: nodeExecutions,
+          }));
+
+          for (const nodeExecution of nodeExecutions) {
+            const logsResponse = await fetch(
+              `/api/executions/node-logs?nodeExecutionId=${nodeExecution.id}`
+            );
+
+            if (logsResponse.ok) {
+              const logs = await logsResponse.json();
+              setNodeLogsCache((prev) => ({
+                ...prev,
+                [nodeExecution.id]: logs,
+              }));
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error loading node data:", error);
         toast({
-          title: "Error Loading Node Data",
-          description: errorMessage || "Failed to load node details",
           variant: "destructive",
+          title: "Failed to load node data",
+          description: error instanceof Error ? error.message : String(error),
         });
       } finally {
         setLoadingExecutionIds((prev) => {
@@ -270,87 +197,50 @@ export function ExecutionLogsList({
         });
       }
     },
-    [
-      supabase,
-      toast,
-      loadingExecutionIds,
-      nodeExecutionsMap,
-      setNodeExecutionsMap,
-      setNodeInputsMap,
-      setNodeOutputsMap,
-      setNodeLogsMap,
-    ]
+    [loadingExecutionIds, nodeExecutionsCache, toast]
   );
 
-  // Optimized useEffect to trigger loadNodeData
+  const loadAll = useCallback(() => {
+    executions.forEach((log) => {
+      if (expandedLogs[log.id]) {
+        loadNodeData(log.id);
+      }
+    });
+  }, [executions, expandedLogs, loadNodeData]);
+
   useEffect(() => {
-    const toLoad = Object.entries(expandedLogs)
-      .filter(
-        ([id, isExpanded]) =>
-          isExpanded && !nodeExecutionsMap[id] && !loadingExecutionIds.has(id)
-      )
-      .map(([id]) => id);
-
-    if (toLoad.length === 0) return;
-
-    // Batch load to prevent multiple rapid triggers
-    const loadAll = async () => {
-      await Promise.all(toLoad.map((executionId) => loadNodeData(executionId)));
-    };
-
     loadAll();
-  }, [expandedLogs, nodeExecutionsMap, loadingExecutionIds, loadNodeData]);
+  }, [loadAll]);
 
-  // ### Real-Time Subscriptions
   useEffect(() => {
-    fetchLogs();
+    refetchExecutions();
 
-    const subscriptions = [
-      supabase
-        .channel("realtime-executions")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "workflow_executions",
-            filter: `workflow_id=eq.${workflowId}`,
-          },
-          debouncedFetchLogs
-        )
-        .subscribe(),
-    ];
+    const intervalId = setInterval(() => {
+      refetchExecutions();
+    }, 10000);
 
-    return () => {
-      subscriptions.forEach((sub) => supabase.removeChannel(sub));
-    };
-  }, [
-    workflowId,
-    statusFilter,
-    sortKey,
-    sortAsc,
-    debouncedFetchLogs,
-    fetchLogs,
-  ]);
+    return () => clearInterval(intervalId);
+  }, [workflowId, statusFilter, sortKey, sortAsc, offset, refetchExecutions]);
 
-  // ### Memoized Status Counts
   const statusCounts = useMemo(() => {
     const counts = {
       all: executions.length,
+      pending: 0,
+      running: 0,
       completed: 0,
       failed: 0,
-      running: 0,
       paused: 0,
     };
-    executions.forEach((exec) => {
-      if (counts[exec.status as keyof typeof counts] !== undefined) {
-        counts[exec.status as keyof typeof counts]++;
+
+    executions.forEach((log) => {
+      if (counts[log.status] !== undefined) {
+        counts[log.status]++;
       }
     });
+
     return counts;
   }, [executions]);
 
-  // ### Memoized Filtered Executions
   const filteredLogs = useMemo(() => {
     if (activeTab === "all") return executions;
     return executions.filter((exec) => exec.status === activeTab);
@@ -364,13 +254,8 @@ export function ExecutionLogsList({
     }
   }, [activeTab]);
 
-  useEffect(() => {
-    if (!supabase) return;
-  }, [supabase]);
-
-  // ### Utility Functions
-  const formatDate = useCallback((dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = useCallback((date: string) => {
+    const dateObject = new Date(date);
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
       day: "numeric",
@@ -378,32 +263,14 @@ export function ExecutionLogsList({
       minute: "2-digit",
       second: "2-digit",
       hour12: true,
-    }).format(date);
+    }).format(dateObject);
   }, []);
 
-  const getStatusIcon = useCallback((status: string) => {
-    switch (status) {
-      case "completed":
-        return (
-          <CheckCircle2
-            className='h-4 w-4 text-green-500'
-            aria-label='Completed'
-          />
-        );
-      case "failed":
-        return <XCircle className='h-4 w-4 text-red-500' aria-label='Failed' />;
-      case "running":
-        return (
-          <Loader2
-            className='h-4 w-4 text-blue-500 animate-spin'
-            aria-label='Running'
-          />
-        );
-      case "paused":
-        return <Pause className='h-4 w-4 text-amber-500' aria-label='Paused' />;
-      default:
-        return <Clock className='h-4 w-4 text-gray-500' aria-label='Pending' />;
-    }
+  const formatDuration = useCallback((start: string, end?: string | null) => {
+    if (!end) return "In progress";
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    return formatDistance(startDate, endDate);
   }, []);
 
   const getStatusBadge = useCallback((status: string) => {
@@ -451,37 +318,54 @@ export function ExecutionLogsList({
     }
   }, []);
 
-  const handleAction = async (
-    action: string,
-    logId: string,
-    nodeId?: string
-  ) => {
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/api/execution/${action}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ executionId: logId, nodeId }),
-      });
-      if (!response.ok) throw new Error(`Action ${action} failed`);
-      await fetchLogs();
-    } catch (e: any) {
-      toast({
-        title: "Action Error",
-        description: e.message || "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const handleAction = useCallback(
+    async (action: string, logId: string, nodeId?: string) => {
+      try {
+        let endpoint = `/api/executions/${logId}`;
 
-  const viewJsonData = (data: Record<string, unknown>) => {
-    setJsonViewerData(data);
+        if (action === "retry") {
+          endpoint += "/retry";
+        } else if (action === "cancel") {
+          endpoint += "/cancel";
+        } else if (action === "pause") {
+          endpoint += "/pause";
+        } else if (action === "resume") {
+          endpoint += "/resume";
+        }
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nodeId }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to ${action} execution`);
+        }
+
+        toast({
+          title: `Execution ${action}ed`,
+          description: `The workflow execution has been ${action}ed successfully.`,
+        });
+
+        refetchExecutions();
+      } catch (error) {
+        console.error(`Error ${action}ing execution:`, error);
+        toast({
+          variant: "destructive",
+          title: `Failed to ${action} execution`,
+          description: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+    [toast, refetchExecutions]
+  );
+
+  const viewJsonData = (data: Record<string, unknown> | null) => {
+    setJsonViewerData(data || {});
     setIsJsonDialogOpen(true);
   };
 
-  // ### Render
   return (
     <div className='space-y-6'>
       {/* Header */}
@@ -499,7 +383,7 @@ export function ExecutionLogsList({
                 <Button
                   variant='outline'
                   size='icon'
-                  onClick={fetchLogs}
+                  onClick={debouncedRefetch}
                   disabled={isLoading}
                   aria-label='Refresh logs'
                   className='h-9 w-9'>
@@ -632,14 +516,14 @@ export function ExecutionLogsList({
                   expandedLogs={expandedLogs}
                   setExpandedLogs={setExpandedLogs}
                   formatDate={formatDate}
-                  getStatusIcon={getStatusIcon}
+                  formatDuration={formatDuration}
                   getStatusBadge={getStatusBadge}
                   handleAction={handleAction}
                   viewJsonData={viewJsonData}
-                  nodeExecutions={nodeExecutionsMap[log.id]}
-                  nodeInputs={nodeInputsMap}
-                  nodeOutputs={nodeOutputsMap}
-                  nodeLogs={nodeLogsMap}
+                  nodeExecutions={nodeExecutionsCache[log.id]}
+                  nodeInputs={nodeInputsCache}
+                  nodeOutputs={nodeOutputsCache}
+                  nodeLogs={nodeLogsCache}
                   isLoading={loadingExecutionIds.has(log.id)}
                   workflow={workflow}
                 />
@@ -671,25 +555,24 @@ export function ExecutionLogsList({
   );
 }
 
-// ### Execution Log Card Component
 interface ExecutionLogCardProps {
-  log: Execution;
+  log: WorkflowExecution;
   expandedLogs: Record<string, boolean>;
   setExpandedLogs: React.Dispatch<
     React.SetStateAction<Record<string, boolean>>
   >;
-  formatDate: (dateString: string) => string;
-  getStatusIcon: (status: string) => JSX.Element;
+  formatDate: (date: string) => string;
+  formatDuration: (start: string, end?: string | null) => string;
   getStatusBadge: (status: string) => JSX.Element;
   handleAction: (
     action: string,
     logId: string,
     nodeId?: string
   ) => Promise<void>;
-  viewJsonData: (data: any) => void;
+  viewJsonData: (data: Record<string, unknown> | null) => void;
   nodeExecutions?: NodeExecution[];
-  nodeInputs: Record<string, any>;
-  nodeOutputs: Record<string, any>;
+  nodeInputs: Record<string, Record<string, unknown>>;
+  nodeOutputs: Record<string, Record<string, unknown>>;
   nodeLogs: Record<string, NodeLog[]>;
   isLoading: boolean;
   workflow?: Workflow;
@@ -701,7 +584,6 @@ export const ExecutionLogCard = React.memo(
     expandedLogs,
     setExpandedLogs,
     formatDate,
-    getStatusIcon,
     getStatusBadge,
     handleAction,
     viewJsonData,
@@ -710,7 +592,7 @@ export const ExecutionLogCard = React.memo(
     nodeOutputs,
     nodeLogs,
     isLoading,
-    workflow,
+    // Removed unused workflow parameter
   }: ExecutionLogCardProps) => {
     const duration = useMemo(() => {
       return log.completed_at
@@ -726,7 +608,17 @@ export const ExecutionLogCard = React.memo(
         <CardHeader className='pb-2'>
           <div className='flex justify-between items-start'>
             <div className='flex items-center gap-2'>
-              {getStatusIcon(log.status)}
+              {log.status === "running" ? (
+                <Loader2 className='h-4 w-4 animate-spin text-blue-500' />
+              ) : log.status === "completed" ? (
+                <CheckCircle className='h-4 w-4 text-green-500' />
+              ) : log.status === "failed" ? (
+                <XCircle className='h-4 w-4 text-red-500' />
+              ) : log.status === "paused" ? (
+                <Pause className='h-4 w-4 text-yellow-500' />
+              ) : (
+                <Clock className='h-4 w-4 text-gray-500' />
+              )}
               <div>
                 <CardTitle className='text-base'>
                   Execution {log.id.substring(0, 8)}
@@ -828,7 +720,6 @@ export const ExecutionLogCard = React.memo(
                                 log={log}
                                 expandedLogs={expandedLogs}
                                 setExpandedLogs={setExpandedLogs}
-                                getStatusIcon={getStatusIcon}
                                 getStatusBadge={getStatusBadge}
                                 formatDate={formatDate}
                                 handleAction={handleAction}
@@ -867,25 +758,23 @@ export const ExecutionLogCard = React.memo(
 const NodeExecutionItem = React.memo(
   ({
     nodeExec,
+    nodeLogs,
+    nodeOutputs,
+    viewJsonData,
     log,
     expandedLogs,
     setExpandedLogs,
-    getStatusIcon,
     getStatusBadge,
     formatDate,
     handleAction,
-    viewJsonData,
     nodeInputs,
-    nodeOutputs,
-    nodeLogs,
   }: {
     nodeExec: NodeExecution;
-    log: Execution;
+    log: WorkflowExecution;
     expandedLogs: Record<string, boolean>;
     setExpandedLogs: React.Dispatch<
       React.SetStateAction<Record<string, boolean>>
     >;
-    getStatusIcon: (status: string) => JSX.Element;
     getStatusBadge: (status: string) => JSX.Element;
     formatDate: (dateString: string) => string;
     handleAction: (
@@ -893,9 +782,9 @@ const NodeExecutionItem = React.memo(
       logId: string,
       nodeId?: string
     ) => Promise<void>;
-    viewJsonData: (data: any) => void;
-    nodeInputs: Record<string, any>;
-    nodeOutputs: Record<string, any>;
+    viewJsonData: (data: Record<string, unknown> | null) => void;
+    nodeInputs: Record<string, Record<string, unknown>>;
+    nodeOutputs: Record<string, Record<string, unknown>>;
     nodeLogs: Record<string, NodeLog[]>;
   }) => {
     const [logLevel, setLogLevel] = useState<
@@ -903,17 +792,18 @@ const NodeExecutionItem = React.memo(
     >("all");
     console.log("nodeInputs", nodeInputs);
 
+    const nodeLogKey = `${log.id}_${nodeExec.node_id}`;
+
     const filteredNodeLogs = useMemo(() => {
-      const logsArr = nodeLogs[`${log.id}_${nodeExec.node_id}`] || [];
+      const logsArr = nodeLogs[nodeLogKey] || [];
       if (logLevel === "all") return logsArr;
       return logsArr.filter((l) => l.level === logLevel);
-    }, [nodeLogs, log.id, nodeExec.node_id, logLevel]);
+    }, [nodeLogs, nodeLogKey, logLevel]);
 
     return (
       <div className='p-3 mb-3 border rounded-md '>
         <div className='flex items-center justify-between'>
           <div className='flex items-center gap-2'>
-            {getStatusIcon(nodeExec.status)}
             <span className='text-sm font-medium'>
               Node: {nodeExec.node_id}
             </span>

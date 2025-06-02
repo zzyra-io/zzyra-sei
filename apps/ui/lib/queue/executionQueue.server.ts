@@ -29,7 +29,16 @@ export async function initExecutionQueue(): Promise<any> {
   queueOptions.forEach((queue) => {
     channel.assertQueue(queue.name, queue.options);
   });
-  channel.prefetch(config.concurrency.prefetch);
+  
+  try {
+    // Default to 1 if prefetch value is missing or invalid
+    const prefetchCount = config.concurrency?.prefetch || 1;
+    channel.prefetch(prefetchCount);
+  } catch (error) {
+    console.warn("Failed to set prefetch count, using default: ", error);
+    channel.prefetch(1); // Default fallback
+  }
+  
   return channel;
 }
 

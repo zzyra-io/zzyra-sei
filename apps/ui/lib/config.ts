@@ -12,6 +12,11 @@ interface EnvVars {
 
   // Magic Link
   magicPublishableKey: string;
+  
+  // Concurrency settings
+  concurrency: {
+    prefetch: number;
+  };
 }
 
 // Get environment variables with validation
@@ -22,6 +27,11 @@ export const config: EnvVars = {
 
   // Magic Link
   magicPublishableKey: process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY || "",
+  
+  // Concurrency settings
+  concurrency: {
+    prefetch: parseInt(process.env.QUEUE_PREFETCH || '1'),
+  },
 };
 
 // Validate required environment variables
