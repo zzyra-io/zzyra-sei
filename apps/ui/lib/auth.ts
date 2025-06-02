@@ -43,7 +43,6 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      console.log("JWT Callback: user--->token", { user, token });
       // Initial sign-in: populate token from user
       if (user) {
         token.sub = user.id;
