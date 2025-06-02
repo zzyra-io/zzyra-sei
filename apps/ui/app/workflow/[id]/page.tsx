@@ -1,6 +1,5 @@
 "use client";
 
-import { AuthGate } from "@/components/auth-gate";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ExecutionLogsList } from "@/components/execution-logs-list";
 import { Button } from "@/components/ui/button";
@@ -14,15 +13,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import WorkflowTimeline from "@/components/workflow-execution-timeline";
-import type { ExecutionResult } from "@/lib/services/execution-service";
-import { executionService } from "@/lib/services/execution-service";
-import { workflowService } from "@/lib/services/workflow-service";
-import { createClient } from "@/lib/supabase/client";
-import type { Workflow } from "@/lib/supabase/schema";
+import { useWorkflowDetail } from "@/lib/hooks/use-workflow-detail";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Play, Settings } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -43,190 +39,27 @@ export default function WorkflowDetailPage() {
     ? paramsClient.id[0]
     : paramsClient?.id;
 
-  const [workflow, setWorkflow] = useState<Workflow | null>(null);
-  const [executionLogs, setExecutionLogs] = useState<ExecutionResult[]>([]);
-  const [isWorkflowLoading, setIsWorkflowLoading] = useState(true);
-  const [isLogsLoading, setIsLogsLoading] = useState(true);
-  const [isStatsLoading, setIsStatsLoading] = useState(true);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [stats, setStats] = useState<{
-    avgDuration: number;
-    medianDuration: number;
-    peakConcurrency: number;
-  } | null>(null);
-  const [trends, setTrends] = useState<
-    Array<{ timestamp: string; count: number }>
-  >([]);
-  const [heatmap, setHeatmap] = useState<
-    Array<{
-      nodeId: string;
-      date: string;
-      avgDuration: number;
-      failureRate: number;
-    }>
-  >([]);
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
-    null
-  );
-  const [execDetail, setExecDetail] = useState<ExecutionResult | null>(null);
   const { toast } = useToast();
   const router = useRouter();
-  const supabaseClient = createClient();
+  const queryClient = useQueryClient();
+  
+  // Use the custom hook for workflow details
+  const {
+    workflow,
+    stats,
+    trends,
+    heatmap,
+    isWorkflowLoading,
+    isLogsLoading,
+    isStatsLoading,
+    executionSummary,
+    activeTab,
+    setActiveTab
+  } = useWorkflowDetail(id);
 
-  // Memoized execution summary
-  const executionSummary = useMemo(
-    () => ({
-      total: executionLogs.length,
-      successful: executionLogs.filter((log) => log.status === "completed")
-        .length,
-      failed: executionLogs.filter((log) => log.status === "failed").length,
-    }),
-    [executionLogs]
-  );
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsWorkflowLoading(true);
-        setIsLogsLoading(true);
-        setIsStatsLoading(true);
 
-        // Parallelize independent API calls
-        const [workflowData, logsData, statsRes, trendsRes, hmRes] =
-          await Promise.all([
-            workflowService.getWorkflow(id),
-            executionService.getWorkflowExecutions(id).catch((err) => {
-              console.error("Error fetching logs:", err);
-              toast({
-                title: "Warning",
-                description:
-                  "Could not load execution logs. Some features may be limited.",
-              });
-              return [];
-            }),
-            fetch(`/api/executions/stats?workflowId=${id}`)
-              .then((res) => (res.ok ? res.json() : null))
-              .catch((err) => {
-                console.error("Error fetching stats:", err);
-                toast({
-                  title: "Error",
-                  description: "Failed to load execution stats.",
-                  variant: "destructive",
-                });
-                return null;
-              }),
-            fetch(`/api/executions/trends?workflowId=${id}`)
-              .then((res) => (res.ok ? res.json() : []))
-              .catch((err) => {
-                console.error("Error fetching trends:", err);
-                toast({
-                  title: "Error",
-                  description: "Failed to load execution trends.",
-                  variant: "destructive",
-                });
-                return [];
-              }),
-            fetch(`/api/executions/heatmap?workflowId=${id}`)
-              .then((res) => (res.ok ? res.json() : []))
-              .catch((err) => {
-                console.error("Error fetching heatmap:", err);
-                toast({
-                  title: "Error",
-                  description: "Failed to load heatmap data.",
-                  variant: "destructive",
-                });
-                return [];
-              }),
-          ]);
-
-        setWorkflow(workflowData);
-        setExecutionLogs(logsData);
-        setStats(statsRes);
-        setTrends(trendsRes);
-        setHeatmap(hmRes);
-        if (logsData.length > 0) setSelectedExecutionId(logsData[0].id);
-      } catch (error) {
-        toast({
-          title: "Error fetching workflow",
-          description: "Failed to load workflow details. Please try again.",
-          variant: "destructive",
-        });
-        router.push("/dashboard");
-      } finally {
-        setIsWorkflowLoading(false);
-        setIsLogsLoading(false);
-        setIsStatsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [id, toast, router]);
-
-  useEffect(() => {
-    if (activeTab === "timeline" && selectedExecutionId) {
-      executionService
-        .getExecution(selectedExecutionId)
-        .then(setExecDetail)
-        .catch((err) => console.error("Error fetching execution detail:", err));
-    }
-  }, [activeTab, selectedExecutionId]);
-
-  useEffect(() => {
-    if (activeTab === "timeline" && selectedExecutionId) {
-      const channel = supabaseClient
-        .channel(`node_exec_${selectedExecutionId}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "node_executions",
-            filter: `execution_id=eq.${selectedExecutionId}`,
-          },
-          (payload) => {
-            setExecDetail((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    nodeExecutions: [
-                      ...prev.nodeExecutions,
-                      payload.new as ExecutionResult["nodeExecutions"][0],
-                    ],
-                  }
-                : prev
-            );
-          }
-        )
-        .subscribe();
-      return () => {
-        supabaseClient.removeChannel(channel);
-      };
-    }
-  }, [activeTab, selectedExecutionId, supabaseClient]);
-
-  useEffect(() => {
-    if (activeTab === "history") {
-      const channel = supabaseClient
-        .channel(`executions_${id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "execution_results",
-            filter: `workflow_id=eq.${id}`,
-          },
-          (payload) => {
-            setExecutionLogs((prev) => [payload.new, ...prev]);
-          }
-        )
-        .subscribe();
-      return () => {
-        supabaseClient.removeChannel(channel);
-      };
-    }
-  }, [activeTab, id, supabaseClient]);
 
   const handleExecute = async () => {
     try {
@@ -239,8 +72,10 @@ export default function WorkflowDetailPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to start execution");
-      const logs = await executionService.getWorkflowExecutions(id);
-      setExecutionLogs(logs);
+      
+      // Invalidate and refetch execution logs
+      await queryClient.invalidateQueries({ queryKey: ['workflow-executions', id] });
+      
       toast({
         title: "Workflow started",
         description: "Your workflow execution has been queued.",
@@ -266,26 +101,23 @@ export default function WorkflowDetailPage() {
 
   if (isWorkflowLoading) {
     return (
-      <AuthGate>
-        <div className='flex min-h-screen flex-col'>
-          <DashboardHeader />
-          <main className='flex flex-1 items-center justify-center bg-muted/30'>
-            <Loader2 className='h-8 w-8 animate-spin text-primary' />
-          </main>
-        </div>
-      </AuthGate>
+      <div className='flex min-h-screen flex-col'>
+        <DashboardHeader />
+        <main className='flex flex-1 items-center justify-center bg-muted/30'>
+          <Loader2 className='h-8 w-8 animate-spin text-primary' />
+        </main>
+      </div>
     );
   }
   if (!id) return null; // or show a loader
 
   if (!workflow) {
     return (
-      <AuthGate>
-        <div className='flex min-h-screen flex-col'>
-          <DashboardHeader />
-          <main className='flex-1 bg-muted/30 px-4 py-6 sm:px-6 lg:px-8'>
-            <div className='mx-auto max-w-7xl'>
-              <div className='mb-6 flex items-center gap-4'>
+      <div className='flex min-h-screen flex-col'>
+        <DashboardHeader />
+        <main className='flex-1 bg-muted/30 px-4 py-6 sm:px-6 lg:px-8'>
+          <div className='mx-auto max-w-7xl'>
+            <div className='mb-6 flex items-center gap-4'>
                 <Button variant='ghost' size='sm' asChild>
                   <Link href='/dashboard'>
                     <ArrowLeft className='mr-2 h-4 w-4' />
@@ -308,13 +140,11 @@ export default function WorkflowDetailPage() {
             </div>
           </main>
         </div>
-      </AuthGate>
     );
   }
 
   return (
-    <AuthGate>
-      <div className='flex min-h-screen flex-col'>
+        <div className='flex min-h-screen flex-col'>
         <DashboardHeader />
         <main className='flex-1 bg-muted/30 px-4 py-6 sm:px-6 lg:px-8'>
           <div className='mx-auto max-w-7xl'>
@@ -673,6 +503,5 @@ export default function WorkflowDetailPage() {
           </div>
         </main>
       </div>
-    </AuthGate>
-  );
+    );
 }
