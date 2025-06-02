@@ -12,22 +12,26 @@ interface ProtectedRouteProps {
   redirectPath?: string;
 }
 
-
-
-export function ProtectedRoute({ 
-  children, 
-  fallback = null, 
-  redirectPath = "/login" 
+export function ProtectedRoute({
+  children,
+  fallback = null,
+  redirectPath = "/login",
 }: ProtectedRouteProps) {
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Get authentication state from both Magic Link and NextAuth.js
-  const { isAuthenticated: isMagicAuthenticated, isInitializing: isMagicInitializing } = useMagic();
-  const { isAuthenticated: isNextAuthAuthenticated, isLoading: isNextAuthLoading } = useNextAuthSession();
-  
+  const {
+    isAuthenticated: isMagicAuthenticated,
+    isInitializing: isMagicInitializing,
+  } = useMagic();
+  const {
+    isAuthenticated: isNextAuthAuthenticated,
+    isLoading: isNextAuthLoading,
+  } = useNextAuthSession();
+
   // Combined authentication state - simplified to prevent loops
   // We prioritize Magic authentication since that's your primary system
   const isAuthenticated = isMagicAuthenticated;
@@ -39,7 +43,9 @@ export function ProtectedRoute({
       setIsClient(true);
       setIsLoading(isAuthLoading);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred");
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred"
+      );
     }
   }, [isAuthLoading]);
 
@@ -47,12 +53,18 @@ export function ProtectedRoute({
   useEffect(() => {
     if (isClient && !isAuthenticated && !isAuthLoading) {
       try {
+        // Don't redirect if we're already on the login page
+        if (window.location.pathname === "/login") {
+          return;
+        }
+
         // Store current path for post-login redirect
         if (typeof window !== "undefined") {
           const currentPath = window.location.pathname;
-          const query = currentPath !== redirectPath 
-            ? `?redirect=${encodeURIComponent(currentPath)}`
-            : "";
+          const query =
+            currentPath !== redirectPath
+              ? `?redirect=${encodeURIComponent(currentPath)}`
+              : "";
           router.push(`${redirectPath}${query}`);
         }
       } catch (err) {
@@ -61,7 +73,7 @@ export function ProtectedRoute({
       }
     }
   }, [isClient, isAuthenticated, isAuthLoading, router, redirectPath]);
-  
+
   console.log("ProtectedRoute auth state:", {
     isClient,
     isMagicAuthenticated,
@@ -69,9 +81,8 @@ export function ProtectedRoute({
     isAuthenticated,
     isMagicInitializing,
     isNextAuthLoading,
-    isAuthLoading
+    isAuthLoading,
   });
-    
 
   if (!isClient || isLoading) {
     return fallback;

@@ -18,10 +18,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { OAuthProvider } from "@/lib/magic-auth-types";
 import { useEffect, useState } from "react";
 import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
-import { useMagic } from "@/lib/magic-provider";
 import { useSession } from "next-auth/react";
 
 /**
@@ -40,7 +38,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [activeTab, setActiveTab] = useState<string>("email");
-  const [formLoading, setFormLoading] = useState(false);
+  const [formLoading] = useState(false); // Used for UI state
   const [formError, setFormError] = useState<Error | null>(null);
 
   // Magic auth hook for direct authentication
@@ -49,7 +47,7 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
     // isLoading and isAuthenticated are now primarily from useMagic()
     error: authError, // This is error from loginWithEmail mutation
   } = useMagicAuth();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
 
   // // Check for authentication success
   useEffect(() => {
@@ -147,8 +145,8 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
   // Determine error state
   const displayError = formError || authError;
 
-  // Show a more detailed loading state
-  if (status !== "authenticated") {
+  // Only show loading state when we're in the process of authenticating
+  if (loginWithEmail.isPending) {
     return (
       <Card className='w-full max-w-md mx-auto'>
         <CardHeader>
@@ -159,10 +157,29 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
           <div className='flex flex-col items-center justify-center p-4'>
             <Loader2 className='h-8 w-8 animate-spin text-primary' />
             <p className='mt-2 text-sm text-muted-foreground'>
-              Initializing authentication...
+              Processing authentication...
             </p>
             <p className='mt-1 text-xs text-muted-foreground'>
               This may take a moment. Please wait.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // If already authenticated, show a success message with redirect info
+  if (status === "authenticated") {
+    return (
+      <Card className='w-full max-w-md mx-auto'>
+        <CardHeader>
+          <CardTitle>Authentication Successful</CardTitle>
+          <CardDescription>You are now logged in</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className='flex flex-col items-center justify-center p-4'>
+            <p className='mt-2 text-sm text-muted-foreground'>
+              Redirecting to dashboard...
             </p>
           </div>
         </CardContent>

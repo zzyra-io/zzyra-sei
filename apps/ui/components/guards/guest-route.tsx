@@ -15,10 +15,16 @@ export function GuestRoute({ children, fallback = null }: GuestRouteProps) {
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Get authentication state from both Magic Link and NextAuth.js
-  const { isAuthenticated: isMagicAuthenticated, isInitializing: isMagicInitializing } = useMagic();
-  const { isAuthenticated: isNextAuthAuthenticated, isLoading: isNextAuthLoading } = useNextAuthSession();
+  const {
+    isAuthenticated: isMagicAuthenticated,
+    isInitializing: isMagicInitializing,
+  } = useMagic();
+  const {
+    isAuthenticated: isNextAuthAuthenticated,
+    isLoading: isNextAuthLoading,
+  } = useNextAuthSession();
 
   // Combined authentication state - simplified to prevent loops
   // We prioritize Magic authentication since that's your primary system
@@ -31,7 +37,9 @@ export function GuestRoute({ children, fallback = null }: GuestRouteProps) {
       setIsClient(true);
       setIsLoading(isAuthLoading);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred");
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred"
+      );
     }
   }, [isAuthLoading]);
 
@@ -39,6 +47,11 @@ export function GuestRoute({ children, fallback = null }: GuestRouteProps) {
   useEffect(() => {
     if (isClient && isAuthenticated && !isAuthLoading) {
       try {
+        // Don't redirect if we're already on the login page
+        if (window.location.pathname === "/login") {
+          return;
+        }
+
         // Attempt to go back to previous page if available
         if (window.history.length > 1) {
           router.back();
@@ -51,7 +64,7 @@ export function GuestRoute({ children, fallback = null }: GuestRouteProps) {
       }
     }
   }, [isClient, isAuthenticated, isAuthLoading, router]);
-    
+
   console.log("GuestRoute auth state:", {
     isClient,
     isMagicAuthenticated,
@@ -59,7 +72,7 @@ export function GuestRoute({ children, fallback = null }: GuestRouteProps) {
     isAuthenticated,
     isMagicInitializing,
     isNextAuthLoading,
-    isAuthLoading
+    isAuthLoading,
   });
 
   if (!isClient || isLoading) {
