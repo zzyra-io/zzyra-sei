@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "@nestjs/config": "^2.3.1",
-    "@nestjs/terminus": "^9.2.2",
-    "@willsoto/nestjs-prometheus": "^5.1.0",
-    "prom-client": "^14.2.0"
-  }
-}

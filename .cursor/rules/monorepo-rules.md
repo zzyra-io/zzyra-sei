@@ -73,16 +73,6 @@ zyra/
 - Use proper version constraints
 - Use proper version updates
 
-```json
-{
-  "packageManager": "pnpm@8.0.0",
-  "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
-  }
-}
-```
-
 ## Build System
 
 ### Build Configuration

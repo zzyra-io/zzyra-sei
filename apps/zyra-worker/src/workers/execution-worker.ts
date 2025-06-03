@@ -29,6 +29,7 @@ export class ExecutionWorker implements OnModuleInit {
     max: 100,
     ttl: 60 * 60 * 1000,
   });
+  private isInitialized = false;
 
   constructor(
     @Inject(AMQP_CONNECTION) private readonly connection: AmqpConnectionManager,
@@ -40,55 +41,102 @@ export class ExecutionWorker implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    this.channelWrapper = this.connection.createChannel({
-      json: true,
-      setup: async (channel) => {
-        for (const queue of this.queueOptions) {
-          await channel.assertQueue(queue.name, {
-            durable: queue.durable,
-            ...queue.options,
-          });
-          this.logger.log(
-            `Queue ${queue.name} asserted with options: ${JSON.stringify({ durable: queue.durable, ...queue.options })}`,
-          );
-        }
-        channel.prefetch(10);
-        await channel.consume(EXECUTION_QUEUE, async (msg) => {
-          if (!msg) return;
-          const span = this.tracer.startSpan('process_message');
+    try {
+      this.logger.log('Initializing ExecutionWorker...');
+
+      // Initialize RabbitMQ channel
+      this.channelWrapper = this.connection.createChannel({
+        json: true,
+        setup: async (channel) => {
           try {
-            const batch = [JSON.parse(msg.content.toString())];
-            await this.processItem(batch);
-            channel.ack(msg);
-          } catch (err) {
-            this.logger.error(
-              `Message processing failed: ${err instanceof Error ? err.message : err}`,
-              err instanceof Error ? err.stack : undefined,
-            );
-            span.recordException(err as Error);
-            channel.nack(msg, false, false);
-          } finally {
-            span.end();
+            for (const queue of this.queueOptions) {
+              await channel.assertQueue(queue.name, {
+                durable: queue.durable,
+                ...queue.options,
+              });
+              this.logger.log(
+                `Queue ${queue.name} asserted with options: ${JSON.stringify({ durable: queue.durable, ...queue.options })}`,
+              );
+            }
+
+            channel.prefetch(10);
+
+            // Set up message consumers
+            await this.setupMessageConsumers(channel);
+
+            this.isInitialized = true;
+            this.logger.log('ExecutionWorker successfully initialized');
+          } catch (error) {
+            this.logger.error('Error during channel setup:', error);
+            throw error;
           }
-        });
-        await channel.consume(EXECUTION_DLQ, (msg) => {
-          if (msg) {
-            this.logger.error(
-              `Message moved to DLQ: ${msg.content.toString()}`,
-            );
-            channel.ack(msg);
-          }
-        });
-      },
+        },
+      });
+
+      // Set up error handlers
+      this.setupErrorHandlers();
+    } catch (error) {
+      this.logger.error('Failed to initialize ExecutionWorker:', error);
+      throw error;
+    }
+  }
+
+  private async setupMessageConsumers(channel: any) {
+    // Main queue consumer
+    await channel.consume(EXECUTION_QUEUE, async (msg) => {
+      if (!msg) return;
+
+      const span = this.tracer.startSpan('process_message');
+      try {
+        if (!this.isInitialized) {
+          this.logger.warn('Worker not fully initialized, requeuing message');
+          channel.nack(msg, false, true);
+          return;
+        }
+
+        const batch = [JSON.parse(msg.content.toString())];
+        await this.processItem(batch);
+        channel.ack(msg);
+      } catch (err) {
+        this.logger.error(
+          `Message processing failed: ${err instanceof Error ? err.message : err}`,
+          err instanceof Error ? err.stack : undefined,
+        );
+        span.recordException(err as Error);
+        channel.nack(msg, false, false);
+      } finally {
+        span.end();
+      }
     });
 
-    this.channelWrapper.on('error', (err) =>
-      this.logger.error('Channel error', err),
-    );
-    this.connection.on('error', (err) =>
-      this.logger.error('Connection error', err),
-    );
-    this.logger.log('ExecutionWorker initialized with DLQ and tracing');
+    // DLQ consumer
+    await channel.consume(EXECUTION_DLQ, (msg) => {
+      if (msg) {
+        this.logger.error(`Message moved to DLQ: ${msg.content.toString()}`);
+        channel.ack(msg);
+      }
+    });
+  }
+
+  private setupErrorHandlers() {
+    this.channelWrapper.on('error', (err) => {
+      this.logger.error('Channel error:', err);
+      this.isInitialized = false;
+    });
+
+    this.connection.on('error', (err) => {
+      this.logger.error('Connection error:', err);
+      this.isInitialized = false;
+    });
+
+    this.connection.on('connect', () => {
+      this.logger.log('RabbitMQ connection established');
+    });
+
+    this.connection.on('disconnect', () => {
+      this.logger.warn('RabbitMQ connection lost');
+      this.isInitialized = false;
+    });
   }
 
   private async processItem(batch: any[]): Promise<void> {
@@ -97,7 +145,7 @@ export class ExecutionWorker implements OnModuleInit {
       const supabase = createServiceClient();
       const workerId = `worker-${process.pid}-${Math.random().toString(36).substring(2, 10)}`;
       this.logger.log(`Worker ${workerId} looking for pending executions...`);
-      
+
       const { data: pendingExecutions, error } = await supabase
         .from('workflow_executions')
         .select('id, workflow_id, triggered_by, status')
@@ -105,21 +153,25 @@ export class ExecutionWorker implements OnModuleInit {
         .limit(batch.length || 1);
 
       if (error) {
-        this.logger.error(`Failed to fetch pending executions: ${error.message}`);
+        this.logger.error(
+          `Failed to fetch pending executions: ${error.message}`,
+        );
         throw new Error(`Failed to fetch pending executions: ${error.message}`);
       }
-      
+
       if (!pendingExecutions || pendingExecutions.length === 0) {
         this.logger.debug('No pending executions found');
         return;
       }
-      
-      this.logger.log(`Found ${pendingExecutions.length} pending executions: ${pendingExecutions.map(e => e.id).join(', ')}`);
+
+      this.logger.log(
+        `Found ${pendingExecutions.length} pending executions: ${pendingExecutions.map((e) => e.id).join(', ')}`,
+      );
 
       const claimedExecutions: string[] = [];
       for (const execution of pendingExecutions) {
         this.logger.log(`Attempting to claim execution ${execution.id}...`);
-        
+
         // Try with a more resilient update that doesn't depend on retry_count
         const { error: updateError } = await supabase
           .from('workflow_executions')
@@ -134,10 +186,12 @@ export class ExecutionWorker implements OnModuleInit {
           .eq('status', 'pending');
 
         if (updateError) {
-          this.logger.warn(`Failed to claim execution ${execution.id}: ${updateError.message}`);
+          this.logger.warn(
+            `Failed to claim execution ${execution.id}: ${updateError.message}`,
+          );
           continue;
         }
-        
+
         this.logger.log(`Successfully claimed execution ${execution.id}`);
         claimedExecutions.push(execution.id);
         await this.executionLogger.logExecutionEvent(supabase, execution.id, {
@@ -152,9 +206,11 @@ export class ExecutionWorker implements OnModuleInit {
         this.logger.warn('No executions were successfully claimed');
         return;
       }
-      
-      this.logger.log(`Successfully claimed ${claimedExecutions.length} executions: ${claimedExecutions.join(', ')}`);
-      
+
+      this.logger.log(
+        `Successfully claimed ${claimedExecutions.length} executions: ${claimedExecutions.join(', ')}`,
+      );
+
       const jobs = pendingExecutions
         .filter((e) => claimedExecutions.includes(e.id))
         .map((e) => ({
@@ -171,8 +227,10 @@ export class ExecutionWorker implements OnModuleInit {
         await this.processJob(job, supabase);
       }
     } catch (error) {
-      this.logger.error(`Error in processItem: ${error instanceof Error ? error.message : String(error)}`, 
-                       error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        `Error in processItem: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
     } finally {
       span.end();
     }

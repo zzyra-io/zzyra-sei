@@ -1,8 +1,9 @@
 {
   "name": "zyra",
   "private": true,
+  "packageManager": "pnpm@9.15.2",
   "devDependencies": {
-    "turbo": "^1.13.0",
+    "turbo": "^2.5.3",
     "zod": "^3.22.2"
   },
   "workspaces": [
