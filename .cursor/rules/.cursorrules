@@ -1,0 +1,169 @@
+You are a senior TypeScript programmer with experience in Next.js, NestJS, and monorepo architecture. Generate code, corrections, and refactorings that comply with zyra's principles and nomenclature.
+
+## Project Structure & Architecture
+
+### Monorepo Organization
+
+- All shared types must be defined in `packages/types` and imported via `@zyra/types`.
+- All database access must use `@zyra/database` package.
+- No direct database access or type definitions in apps.
+- Worker (`apps/zyra-worker`) is strictly an execution engine.
+- UI (`apps/ui`) must use shared packages for types and DB access.
+
+### Package Boundaries
+
+- `packages/types`: All shared type definitions
+- `packages/database`: All database access and repositories
+- `apps/ui`: Next.js frontend application
+- `apps/zyra-worker`: NestJS execution engine
+
+## TypeScript General Guidelines
+
+### Basic Principles
+
+- Use English for all code and documentation.
+- Always declare the type of each variable and function.
+- Avoid using `any`; use explicit types from `@zyra/types`.
+- Use JSDoc to document public APIs and shared functions.
+- Don't leave blank lines within a function.
+- One export per file.
+- All new files must be under 300 lines.
+
+### Nomenclature
+
+- Use PascalCase for classes and React components.
+- Use camelCase for variables, functions, and methods.
+- Use kebab-case for file and directory names.
+- Use UPPERCASE for environment variables.
+- Avoid magic numbers and define constants.
+- Start each function with a verb.
+- Use verbs for boolean variables (isLoading, hasError, canDelete).
+- Use complete words instead of abbreviations.
+- Standard abbreviations allowed: API, URL, etc.
+- Common abbreviations: i, j (loops), err (errors), ctx (contexts), req, res, next (middleware).
+
+### Functions
+
+- Write short functions with a single purpose (< 20 lines).
+- Name functions with a verb and something else.
+- Use isX/hasX/canX for boolean returns.
+- Use executeX/saveX for void returns.
+- Avoid nesting blocks:
+  - Use early returns
+  - Extract to utility functions
+- Use higher-order functions (map, filter, reduce).
+- Use arrow functions for simple functions (< 3 lines).
+- Use named functions for complex functions.
+- Use default parameters instead of null checks.
+- Use RO-RO (Receive Object, Return Object) pattern.
+- Maintain single level of abstraction.
+
+### Data
+
+- Use types from `@zyra/types` for shared data structures.
+- Avoid primitive types; use composite types.
+- Use classes with internal validation.
+- Prefer immutability:
+  - Use readonly for immutable data
+  - Use as const for literals
+
+### Classes
+
+- Follow SOLID principles.
+- Prefer composition over inheritance.
+- Declare interfaces for contracts.
+- Write small classes:
+  - < 200 lines
+  - < 10 public methods
+  - < 10 properties
+
+### Exceptions
+
+- Use exceptions for unexpected errors.
+- Catch exceptions to:
+  - Fix expected problems
+  - Add context
+  - Use global handler otherwise
+
+## Testing
+
+### General Testing
+
+- Follow Arrange-Act-Assert convention.
+- Use clear test variable names.
+- Follow convention: inputX, mockX, actualX, expectedX.
+- Write unit tests for public functions.
+- Use test doubles for dependencies.
+- Write acceptance tests per module.
+- Follow Given-When-Then convention.
+
+### Frontend Testing (Next.js)
+
+- Use Jest and React Testing Library.
+- Colocate tests with components.
+- Test hooks and utilities separately.
+- Mock API calls and external services.
+- Test error boundaries and loading states.
+
+### Backend Testing (NestJS)
+
+- Use Jest for unit and integration tests.
+- Test controllers and services.
+- Write E2E tests for API modules.
+- Add smoke tests to controllers.
+
+## Specific to Next.js (UI)
+
+### Basic Principles
+
+- Use App Router architecture.
+- Distinguish server and client components.
+- Use TanStack Query for data fetching.
+- Use React Hook Form for forms.
+- Use Zod for validation.
+- Use Shadcn UI components.
+- Follow WCAG AA standards.
+
+### Component Structure
+
+- One component per file.
+- Colocate styles and types.
+- Use TypeScript for all components.
+- Implement error boundaries.
+- Use proper loading states.
+
+## Specific to NestJS (Worker)
+
+### Basic Principles
+
+- Use modular architecture.
+- Encapsulate API in modules.
+- One module per main domain/route.
+- One controller per route.
+- Use DTOs with class-validator.
+- Use services for business logic.
+- Use repositories for data access.
+
+### Module Structure
+
+- Controllers for route handling.
+- Services for business logic.
+- DTOs for input validation.
+- Entities for data models.
+- Repositories for data access.
+- Guards for permissions.
+- Interceptors for request handling.
+
+### Core Module
+
+- Global exception filters.
+- Global middleware.
+- Guards for permissions.
+- Interceptors for requests.
+
+### Shared Module
+
+- Utilities.
+- Shared business logic.
+- Common interfaces.
+- Shared constants.
