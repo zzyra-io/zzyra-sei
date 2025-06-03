@@ -1,95 +1,131 @@
-import { createServiceClient } from '../../lib/supabase/serviceClient';
-import { Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { BlockExecutionContext, BlockHandler } from '@zyra/types';
+import { DatabaseService } from '../../services/database.service';
+import { NotificationService } from '../../services/notification.service';
 
+@Injectable()
 export class NotificationBlockHandler implements BlockHandler {
   private readonly logger = new Logger(NotificationBlockHandler.name);
 
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly notificationService: NotificationService,
+  ) {}
+
   async execute(node: any, ctx: BlockExecutionContext): Promise<any> {
-    const cfg = (node.data as any).config || {};
-    const supabase = createServiceClient();
+    const { nodeId, executionId, userId } = ctx;
+    const data = node.data || {};
 
-    // Use userId from execution context
-    const userId = ctx.userId;
-    if (!userId) {
-      throw new Error('User ID not found in execution context');
-    }
-
-    // Validate required fields
-    const { type: notificationType = 'info', title, message } = cfg;
-    if (!title) {
-      throw new Error('Notification title is required');
-    }
-    if (!message) {
-      throw new Error('Notification message is required');
-    }
-
-    // Normalize notification type
-    const uiType = this.normalizeNotificationType(notificationType);
-
-    // Insert in-app notification
-    const payload = {
-      originalType: notificationType,
-      timestamp: new Date().toISOString(),
-      workflowData: {
-        nodeId: ctx.workflowData.nodeId,
-        executionId: ctx.executionId,
-      },
-    };
-
-    this.logger.debug(
-      `Creating notification for user ${userId}: ${title} (${uiType})`,
-    );
+    this.logger.log(`Executing Notification block: ${nodeId}`);
 
     try {
-      const { error } = await supabase.from('notifications').insert({
-        user_id: userId,
-        type: uiType,
-        title,
-        message,
-        data: payload,
-        read: false,
-        created_at: new Date().toISOString(),
+      // Validate required fields
+      if (!data.type) {
+        throw new Error('Notification type is required');
+      }
+      if (!data.title) {
+        throw new Error('Notification title is required');
+      }
+      if (!data.message) {
+        throw new Error('Notification message is required');
+      }
+      if (!data.channel) {
+        throw new Error('Notification channel is required');
+      }
+      if (
+        !data.recipients ||
+        !Array.isArray(data.recipients) ||
+        data.recipients.length === 0
+      ) {
+        throw new Error('Notification recipients are required');
+      }
+
+      // Send notification through the notification service
+      await this.notificationService.sendNotification(userId, data.type, {
+        title: data.title,
+        message: data.message,
+        recipients: data.recipients,
+        channel: data.channel,
+        priority: data.config?.priority || 'normal',
+        execution_id: executionId,
+        node_id: nodeId,
       });
 
-      if (error) {
-        throw new Error(`Notification insert failed: ${error.message}`);
-      }
+      // Store notification record in database
+      const notification =
+        await this.databaseService.prisma.notification.create({
+          data: {
+            type: data.type,
+            title: data.title,
+            message: data.message,
+            userId: userId,
+            data: {
+              recipients: data.recipients,
+              channel: data.channel,
+              executionId: executionId,
+              nodeId: nodeId,
+              priority: data.config?.priority || 'normal',
+            },
+          },
+        });
+
+      // Log the notification delivery
+      await this.databaseService.prisma.notificationLog.create({
+        data: {
+          userId: userId,
+          channel: data.channel,
+          status: 'sent',
+          notificationId: notification.id,
+        },
+      });
 
       return {
         success: true,
-        notificationId: payload.timestamp, // Can be used for tracking
-        type: uiType,
+        data: {
+          sent: true,
+          recipients: data.recipients,
+          channel: data.channel,
+        },
       };
     } catch (error: any) {
-      const errorMessage = error?.message || 'Unknown error';
-      this.logger.error(`Failed to create notification: ${errorMessage}`);
-      throw new Error(`Notification creation failed: ${errorMessage}`);
-    }
-  }
+      this.logger.error(`Notification failed: ${error.message}`);
 
-  private normalizeNotificationType(
-    type: string,
-  ): 'info' | 'success' | 'warning' | 'error' {
-    const normalizedType = type.toLowerCase();
+      // Store failed notification record
+      try {
+        const notification =
+          await this.databaseService.prisma.notification.create({
+            data: {
+              type: data.type || 'unknown',
+              title: data.title || 'Failed notification',
+              message: data.message || 'Failed to send',
+              userId: userId,
+              data: {
+                recipients: data.recipients || [],
+                channel: data.channel || 'unknown',
+                executionId: executionId,
+                nodeId: nodeId,
+                error: error.message,
+              },
+            },
+          });
 
-    switch (normalizedType) {
-      case 'success':
-      case 'ok':
-      case 'done':
-        return 'success';
+        // Log the failed notification
+        await this.databaseService.prisma.notificationLog.create({
+          data: {
+            userId: userId,
+            channel: data.channel || 'unknown',
+            status: 'failed',
+            error: error.message,
+            notificationId: notification.id,
+          },
+        });
+      } catch (dbError: any) {
+        this.logger.error(
+          `Failed to store notification record: ${dbError.message}`,
+        );
+      }
 
-      case 'warning':
-      case 'warn':
-        return 'warning';
-
-      case 'error':
-      case 'fail':
-      case 'failed':
-        return 'error';
-
-      default:
-        return 'info';
+      throw error;
     }
   }
 }

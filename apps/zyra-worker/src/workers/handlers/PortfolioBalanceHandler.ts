@@ -1,12 +1,10 @@
 import { z } from 'zod';
 
-
 import { PortfolioService } from '../../services/portfolio.service';
 import { Injectable, Logger } from '@nestjs/common';
 import retry from 'async-retry';
-import { createServiceClient } from '../../lib/supabase/serviceClient';
-import { BlockExecutionContext, BlockType, BlockHandler  } from '@zyra/types';
-
+import { DatabaseService } from '../../services/database.service';
+import { BlockExecutionContext, BlockType, BlockHandler } from '@zyra/types';
 
 // Define the schema for configuration validation
 const PortfolioConfigSchema = z.object({
@@ -29,9 +27,11 @@ type PortfolioConfig = z.infer<typeof PortfolioConfigSchema>;
 @Injectable()
 export class PortfolioBalanceHandler implements BlockHandler {
   private readonly logger = new Logger(PortfolioBalanceHandler.name);
-  private readonly supabase = createServiceClient();
 
-  constructor(private readonly portfolioService: PortfolioService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly portfolioService: PortfolioService,
+  ) {}
 
   /**
    * Execute the portfolio balance block
@@ -43,7 +43,11 @@ export class PortfolioBalanceHandler implements BlockHandler {
     const { executionId } = ctx;
 
     // Start execution tracking
-    const blockExecutionId = await this.startExecution(nodeId, executionId, type);
+    const blockExecutionId = await this.startExecution(
+      nodeId,
+      executionId,
+      type,
+    );
 
     try {
       // Validate configuration
@@ -52,51 +56,82 @@ export class PortfolioBalanceHandler implements BlockHandler {
         const errorMessage = `Invalid configuration: ${parseResult.error.message}`;
         this.logger.error(errorMessage);
         await this.trackLog(executionId, nodeId, 'error', errorMessage);
-        await this.completeExecution(blockExecutionId, 'failed', null, new Error(errorMessage));
+        await this.completeExecution(
+          blockExecutionId,
+          'failed',
+          null,
+          new Error(errorMessage),
+        );
         throw new Error(errorMessage);
       }
 
       const config: PortfolioConfig = parseResult.data;
 
       // Log execution start
-      this.logger.log(`Executing portfolio balance check for wallet: ${config.walletAddress}`);
-      await this.trackLog(executionId, nodeId, 'info', `Starting portfolio balance check for wallet: ${config.walletAddress}`);
-
-      // Fetch portfolio data with retry logic
-      const result = await retry(
-        async () => this.getPortfolioData(config),
-        {
-          retries: config.maxRetries,
-          factor: 2,
-          minTimeout: config.retryDelay,
-          onRetry: (error, attempt) => {
-            this.logger.warn(`Retry ${attempt}/${config.maxRetries} for portfolio data: ${error.message}`);
-            this.trackLog(executionId, nodeId, 'warn', `Retry ${attempt}/${config.maxRetries}: ${error.message}`);
-          },
-        }
+      this.logger.log(
+        `Executing portfolio balance check for wallet: ${config.walletAddress}`,
+      );
+      await this.trackLog(
+        executionId,
+        nodeId,
+        'info',
+        `Starting portfolio balance check for wallet: ${config.walletAddress}`,
       );
 
+      // Fetch portfolio data with retry logic
+      const result = await retry(async () => this.getPortfolioData(config), {
+        retries: config.maxRetries,
+        factor: 2,
+        minTimeout: config.retryDelay,
+        onRetry: (error, attempt) => {
+          this.logger.warn(
+            `Retry ${attempt}/${config.maxRetries} for portfolio data: ${error.message}`,
+          );
+          this.trackLog(
+            executionId,
+            nodeId,
+            'warn',
+            `Retry ${attempt}/${config.maxRetries}: ${error.message}`,
+          );
+        },
+      });
+
       // Log success and complete execution
-      this.logger.log(`Portfolio balance check completed for wallet: ${config.walletAddress}`);
-      await this.trackLog(executionId, nodeId, 'info', `Portfolio balance check completed with total value: $${result.totalValue.toFixed(2)}`);
+      this.logger.log(
+        `Portfolio balance check completed for wallet: ${config.walletAddress}`,
+      );
+      await this.trackLog(
+        executionId,
+        nodeId,
+        'info',
+        `Portfolio balance check completed with total value: $${result.totalValue.toFixed(2)}`,
+      );
 
       await this.completeExecution(blockExecutionId, 'completed', result);
       return result;
     } catch (error) {
       // Handle errors
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred';
       this.logger.error(`Portfolio balance check failed: ${errorMessage}`);
-      await this.trackLog(executionId, nodeId, 'error', `Portfolio balance check failed: ${errorMessage}`);
-      await this.completeExecution(blockExecutionId, 'failed', null, error instanceof Error ? error : new Error(errorMessage));
+      await this.trackLog(
+        executionId,
+        nodeId,
+        'error',
+        `Portfolio balance check failed: ${errorMessage}`,
+      );
+      await this.completeExecution(
+        blockExecutionId,
+        'failed',
+        null,
+        error instanceof Error ? error : new Error(errorMessage),
+      );
       throw error;
     }
   }
 
   /**
    * Start tracking execution of a block
-   * @param nodeId The ID of the node being executed
-   * @param executionId The workflow execution ID
-   * @param blockType The type of block being executed
    */
   private async startExecution(
     nodeId: string,
@@ -104,36 +139,28 @@ export class PortfolioBalanceHandler implements BlockHandler {
     blockType: string,
   ): Promise<string> {
     try {
-      const { data, error } = await this.supabase
-        .from('node_executions')
-        .insert({
-          node_id: nodeId,
-          execution_id: executionId,
-          block_type: blockType,
-          status: 'running',
-          started_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
+      const blockExecution =
+        await this.databaseService.prisma.blockExecution.create({
+          data: {
+            nodeId,
+            executionId,
+            blockType,
+            status: 'running',
+            startTime: new Date(),
+          },
+        });
 
-      if (error) {
-        this.logger.error(`Failed to start execution tracking: ${String(error)}`);
-        return '';
-      }
-
-      return data.id;
+      return blockExecution.id;
     } catch (error: any) {
-      this.logger.error(`Error starting execution tracking: ${error?.message || 'Unknown error'}`);
+      this.logger.error(
+        `Error starting execution tracking: ${error?.message || 'Unknown error'}`,
+      );
       return '';
     }
   }
 
   /**
    * Complete execution tracking for a block
-   * @param blockExecutionId The ID of the block execution record
-   * @param status The final status of the execution
-   * @param result The result of the execution
-   * @param error Any error that occurred during execution
    */
   private async completeExecution(
     blockExecutionId: string,
@@ -144,51 +171,45 @@ export class PortfolioBalanceHandler implements BlockHandler {
     if (!blockExecutionId) return;
 
     try {
-      const { error: dbError } = await this.supabase
-        .from('node_executions')
-        .update({
+      await this.databaseService.prisma.blockExecution.update({
+        where: { id: blockExecutionId },
+        data: {
           status,
-          completed_at: new Date().toISOString(),
-          result: result ? JSON.stringify(result) : null,
+          endTime: new Date(),
+          output: result ? JSON.stringify(result) : null,
           error: error ? error.message : null,
-        })
-        .eq('id', blockExecutionId);
-
-      if (dbError) {
-        this.logger.error(`Failed to complete execution tracking: ${String(dbError)}`);
-      }
+        },
+      });
     } catch (error: any) {
-      this.logger.error(`Error completing execution tracking: ${error?.message || 'Unknown error'}`);
+      this.logger.error(
+        `Error completing execution tracking: ${error?.message || 'Unknown error'}`,
+      );
     }
   }
 
   /**
-   * Track a log message for a block execution
-   * @param executionId The workflow execution ID
-   * @param nodeId The ID of the node being executed
-   * @param level The log level
-   * @param message The log message
+   * Track a log entry for a node execution
    */
   private async trackLog(
     executionId: string,
     nodeId: string,
-    level: 'info' | 'error' | 'warn' | 'debug',
+    level: 'info' | 'error' | 'warn',
     message: string,
   ): Promise<void> {
     try {
-      const { error } = await this.supabase.from('node_logs').insert({
-        execution_id: executionId,
-        node_id: nodeId,
+      await this.databaseService.executions.addLog(
+        executionId,
         level,
         message,
-        timestamp: new Date().toISOString(),
-      });
-
-      if (error) {
-        this.logger.error(`Failed to track log: ${String(error)}`);
-      }
+        {
+          nodeId,
+          timestamp: new Date().toISOString(),
+        },
+      );
     } catch (error: any) {
-      this.logger.error(`Error tracking log: ${error?.message || 'Unknown error'}`);
+      this.logger.error(
+        `Error tracking log: ${error?.message || 'Unknown error'}`,
+      );
     }
   }
 
@@ -231,7 +252,8 @@ export class PortfolioBalanceHandler implements BlockHandler {
           .map(() => (Math.random() - 0.5) * 0.1),
       }));
 
-      const riskMetrics = await this.portfolioService.calculateRiskMetrics(positions);
+      const riskMetrics =
+        await this.portfolioService.calculateRiskMetrics(positions);
       result.riskMetrics = riskMetrics;
     }
 
@@ -246,10 +268,11 @@ export class PortfolioBalanceHandler implements BlockHandler {
         {} as Record<string, any>,
       );
 
-      const performance = await this.portfolioService.calculatePortfolioPerformance(
-        mockBalances,
-        config.timeframe,
-      );
+      const performance =
+        await this.portfolioService.calculatePortfolioPerformance(
+          mockBalances,
+          config.timeframe,
+        );
 
       result.performance = performance;
     }

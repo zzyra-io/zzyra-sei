@@ -5,21 +5,19 @@ import {
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
-import { AmqpConnectionManager, ChannelWrapper } from 'amqp-connection-manager';
 import { trace } from '@opentelemetry/api';
 import { LRUCache } from 'lru-cache';
 import { WorkflowService } from '../lib/services/workflow-service';
-import { AMQP_CONNECTION, EXECUTION_DLQ, EXECUTION_QUEUE } from '../config';
 import { WorkflowExecutor } from './workflow-executor';
 import { ExecutionLogger } from './execution-logger';
 import { ErrorHandler } from './error-handler';
 import { DatabaseService } from '../services/database.service';
+import { RabbitMQService, QueueMessage } from '../services/rabbitmq.service';
 
 @Global()
 @Injectable()
 export class ExecutionWorker implements OnModuleInit {
   private readonly logger = new Logger(ExecutionWorker.name);
-  private channelWrapper: ChannelWrapper;
   private tracer = trace.getTracer('workflow-execution');
   private workflowCache = new LRUCache<string, any>({
     max: 100,
@@ -32,8 +30,7 @@ export class ExecutionWorker implements OnModuleInit {
   private isInitialized = false;
 
   constructor(
-    @Inject(AMQP_CONNECTION) private readonly connection: AmqpConnectionManager,
-    @Inject('QUEUE_NAMES') private readonly queueOptions: any[],
+    private readonly rabbitmqService: RabbitMQService,
     private readonly workflowService: WorkflowService,
     private readonly workflowExecutor: WorkflowExecutor,
     private readonly executionLogger: ExecutionLogger,
@@ -43,184 +40,157 @@ export class ExecutionWorker implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      this.logger.log('Initializing ExecutionWorker...');
+      this.logger.log('🚀 Initializing ExecutionWorker...');
 
-      // Initialize RabbitMQ channel
-      this.channelWrapper = this.connection.createChannel({
-        json: true,
-        setup: async (channel) => {
-          try {
-            for (const queue of this.queueOptions) {
-              await channel.assertQueue(queue.name, {
-                durable: queue.durable,
-                ...queue.options,
-              });
-              this.logger.log(
-                `Queue ${queue.name} asserted with options: ${JSON.stringify({ durable: queue.durable, ...queue.options })}`,
-              );
-            }
+      // Setup message consumers using the new RabbitMQ service
+      await this.setupMessageConsumers();
 
-            channel.prefetch(10);
-
-            // Set up message consumers
-            await this.setupMessageConsumers(channel);
-
-            this.isInitialized = true;
-            this.logger.log('ExecutionWorker successfully initialized');
-          } catch (error) {
-            this.logger.error('Error during channel setup:', error);
-            throw error;
-          }
-        },
-      });
-
-      // Set up error handlers
-      this.setupErrorHandlers();
+      this.isInitialized = true;
+      this.logger.log('✅ ExecutionWorker successfully initialized');
     } catch (error) {
-      this.logger.error('Failed to initialize ExecutionWorker:', error);
+      this.logger.error('❌ Failed to initialize ExecutionWorker:', error);
       throw error;
     }
   }
 
-  private async setupMessageConsumers(channel: any) {
-    // Main queue consumer
-    await channel.consume(EXECUTION_QUEUE, async (msg) => {
-      if (!msg) return;
-
-      const span = this.tracer.startSpan('process_message');
+  private async setupMessageConsumers() {
+    // Setup execution queue consumer
+    await this.rabbitmqService.consumeExecutions(async (message, ack, nack) => {
+      const span = this.tracer.startSpan('process_execution_message');
       try {
         if (!this.isInitialized) {
           this.logger.warn('Worker not fully initialized, requeuing message');
-          channel.nack(msg, false, true);
+          nack(true); // Requeue
           return;
         }
 
-        const batch = [JSON.parse(msg.content.toString())];
-        await this.processItem(batch);
-        channel.ack(msg);
+        this.logger.log(
+          `📥 Processing execution message: ${message.executionId}`,
+        );
+        await this.processMessageFromQueue(message);
+        ack(); // Acknowledge successful processing
       } catch (err) {
         this.logger.error(
           `Message processing failed: ${err instanceof Error ? err.message : err}`,
           err instanceof Error ? err.stack : undefined,
         );
         span.recordException(err as Error);
-        channel.nack(msg, false, false);
+
+        // Check if we should retry
+        const maxRetries = 3;
+        if ((message.retryCount || 0) < maxRetries) {
+          // Publish to retry queue with exponential backoff
+          const delayMs = Math.pow(2, message.retryCount || 0) * 1000;
+          await this.rabbitmqService.publishRetry(message, delayMs);
+          ack(); // Ack original message since we've queued retry
+        } else {
+          // Max retries exceeded, send to DLQ
+          nack(false); // Don't requeue, goes to DLQ
+        }
       } finally {
         span.end();
       }
     });
 
-    // DLQ consumer
-    await channel.consume(EXECUTION_DLQ, (msg) => {
-      if (msg) {
-        this.logger.error(`Message moved to DLQ: ${msg.content.toString()}`);
-        channel.ack(msg);
-      }
+    // Setup DLQ consumer for monitoring
+    await this.rabbitmqService.consumeDLQ((message) => {
+      this.logger.error(`💀 Failed message in DLQ: ${JSON.stringify(message)}`);
+      // Here you could add alerting, metrics, or manual retry logic
     });
+
+    this.logger.log('👂 Message consumers configured');
   }
 
-  private setupErrorHandlers() {
-    this.channelWrapper.on('error', (err) => {
-      this.logger.error('Channel error:', err);
-      this.isInitialized = false;
-    });
+  /**
+   * Process a single message from RabbitMQ queue
+   */
+  private async processMessageFromQueue(message: QueueMessage): Promise<void> {
+    const { executionId, workflowId, userId } = message;
+    const workerId = `worker-${process.pid}-${Math.random().toString(36).substring(2, 10)}`;
 
-    this.connection.on('error', (err) => {
-      this.logger.error('Connection error:', err);
-      this.isInitialized = false;
-    });
+    this.logger.log(
+      `Worker ${workerId} processing message for execution ${executionId}`,
+    );
 
-    this.connection.on('connect', () => {
-      this.logger.log('RabbitMQ connection established');
-    });
-
-    this.connection.on('disconnect', () => {
-      this.logger.warn('RabbitMQ connection lost');
-      this.isInitialized = false;
-    });
-  }
-
-  private async processItem(batch: any[]): Promise<void> {
-    const span = this.tracer.startSpan('processItem');
     try {
-      const workerId = `worker-${process.pid}-${Math.random().toString(36).substring(2, 10)}`;
-      this.logger.log(`Worker ${workerId} looking for pending executions...`);
+      // Verify execution exists and is in a processable state
+      const execution =
+        await this.databaseService.executions.findById(executionId);
+      if (!execution) {
+        this.logger.error(`Execution ${executionId} not found`);
+        return;
+      }
 
-      // Use DatabaseService instead of Supabase
-      const pendingExecutions =
-        await this.databaseService.getPendingExecutionsForWorker(
-          batch.length || 1,
+      // Check if execution is already completed or failed
+      if (execution.status === 'completed' || execution.status === 'failed') {
+        this.logger.warn(
+          `Skipping already ${execution.status} execution: ${executionId}`,
         );
-
-      if (!pendingExecutions || pendingExecutions.length === 0) {
-        this.logger.debug('No pending executions found');
         return;
       }
 
-      this.logger.log(
-        `Found ${pendingExecutions.length} pending executions: ${pendingExecutions.map((e) => e.id).join(', ')}`,
-      );
-
-      const claimedExecutions: string[] = [];
-      for (const execution of pendingExecutions) {
-        this.logger.log(`Attempting to claim execution ${execution.id}...`);
-
-        try {
-          // Use DatabaseService to lock execution
-          await this.databaseService.lockExecutionForWorker(
-            execution.id,
-            workerId,
-          );
-
-          this.logger.log(`Successfully claimed execution ${execution.id}`);
-          claimedExecutions.push(execution.id);
-
-          // Log the claim
-          await this.databaseService.executions.addLog(
-            execution.id,
-            'info',
-            `Worker ${workerId} claimed execution`,
-            { worker_id: workerId },
-          );
-        } catch (error) {
-          this.logger.warn(
-            `Failed to claim execution ${execution.id}: ${error}`,
-          );
-          continue;
-        }
-      }
-
-      if (claimedExecutions.length === 0) {
-        this.logger.warn('No executions were successfully claimed');
+      // Check if execution is paused - requeue for later
+      if (execution.status === 'paused') {
+        this.logger.warn(`Execution ${executionId} is paused, skipping`);
         return;
       }
 
-      this.logger.log(
-        `Successfully claimed ${claimedExecutions.length} executions: ${claimedExecutions.join(', ')}`,
+      // Try to claim/lock the execution for this worker
+      try {
+        await this.databaseService.lockExecutionForWorker(
+          executionId,
+          workerId,
+        );
+        this.logger.log(`Successfully claimed execution ${executionId}`);
+      } catch (lockError) {
+        this.logger.warn(
+          `Failed to claim execution ${executionId}: ${lockError}. Another worker may have claimed it.`,
+        );
+        return;
+      }
+
+      // Log the claim
+      await this.databaseService.executions.addLog(
+        executionId,
+        'info',
+        `Worker ${workerId} claimed execution from RabbitMQ`,
+        {
+          worker_id: workerId,
+          message_source: 'rabbitmq',
+          workflow_id: workflowId,
+          user_id: userId,
+        },
       );
 
-      const jobs = pendingExecutions
-        .filter((e) => claimedExecutions.includes(e.id))
-        .map((e) => ({
-          execution_id: e.id,
-          workflow_id: e.workflowId,
-          user_id: e.userId,
-          id: e.id,
-          payload: {},
-          status: 'processing',
-        }));
+      // Create job object for processing
+      const job = {
+        execution_id: executionId,
+        workflow_id: workflowId,
+        user_id: userId,
+        id: executionId,
+        payload: message.payload || {},
+        status: 'processing',
+      };
 
-      for (const job of jobs) {
-        this.logger.log(`Processing job for execution ${job.execution_id}...`);
-        await this.processJob(job);
-      }
+      this.logger.log(`Processing job for execution ${executionId}...`);
+      await this.processJob(job);
     } catch (error) {
       this.logger.error(
-        `Error in processItem: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
+        `Failed to process message for execution ${executionId}: ${error instanceof Error ? error.message : String(error)}`,
       );
-    } finally {
-      span.end();
+
+      // Log the failure
+      await this.databaseService.executions.addLog(
+        executionId,
+        'error',
+        `Worker failed to process execution: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          worker_id: workerId,
+          error_details: error instanceof Error ? error.stack : undefined,
+        },
+      );
+
+      throw error; // Re-throw to trigger message nack
     }
   }
 

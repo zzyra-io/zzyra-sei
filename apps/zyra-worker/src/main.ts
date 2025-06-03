@@ -1,10 +1,6 @@
-import { NestFactory, Reflector } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import {
-  ClassSerializerInterceptor,
-  ValidationPipe,
-  Logger,
-} from '@nestjs/common';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -51,17 +47,17 @@ async function bootstrap() {
     });
 
     logger.log('🔧 Configuring global pipes and interceptors...');
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true,
-      }),
-    );
+    // app.useGlobalPipes(
+    //   new ValidationPipe({
+    //     transform: true,
+    //     whitelist: true,
+    //     forbidNonWhitelisted: true,
+    //   }),
+    // );
 
-    app.useGlobalInterceptors(
-      new ClassSerializerInterceptor(app.get(Reflector)),
-    );
+    // app.useGlobalInterceptors(
+    //   new ClassSerializerInterceptor(app.get(Reflector)),
+    // );
 
     // Enable CORS for development
     if (process.env.NODE_ENV !== 'production') {
@@ -75,7 +71,6 @@ async function bootstrap() {
     logger.log(`🌐 Starting server on port ${port}...`);
     await app.listen(port);
 
-    logger.log(`✅ Application is running on: http://localhost:${port}`);
     logger.log('🔄 Worker is ready to process tasks');
 
     // Health check endpoint info

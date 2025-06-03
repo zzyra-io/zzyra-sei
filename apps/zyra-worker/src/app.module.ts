@@ -1,8 +1,6 @@
 import { Module, Logger } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { RabbitMQModule, WorkerModule } from '@argahvk/rabbitmq';
-import { AMQP_CONNECTION, queueOptions } from './config';
 import { WorkflowModule } from './lib/services/workflow.module';
 import { HealthModule } from './health/health.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -11,7 +9,8 @@ import { TestNotificationController } from './controllers/test-notification.cont
 import { ExecutionWorker } from './workers/execution-worker';
 import { AIModule } from './modules/ai.module';
 import { BlockchainModule } from './lib/blockchain/BlockchainModule';
-import { DatabaseService } from './services/database.service';
+import { DatabaseModule } from './services/database.module';
+import { RabbitMQService } from './services/rabbitmq.service';
 
 // Configuration validation schema
 const configValidationSchema = {
@@ -53,43 +52,8 @@ const configValidationSchema = {
       },
     }),
 
-    // RabbitMQ and worker configuration with better error handling
-    RabbitMQModule.register({
-      providers: [ExecutionWorker],
-      imports: [WorkflowModule],
-
-      workerModuleProvider: WorkerModule.register({
-        globalDataProvider: {},
-        workers: [
-          // Scale horizontally by adding more workers in production
-          { provide: 'ExecutionWorker1', useClass: ExecutionWorker },
-          ...(process.env.NODE_ENV === 'production'
-            ? [
-                { provide: 'ExecutionWorker2', useClass: ExecutionWorker },
-                { provide: 'ExecutionWorker3', useClass: ExecutionWorker },
-              ]
-            : []),
-        ],
-      }),
-      ampqProviderName: AMQP_CONNECTION,
-      urls: process.env.RABBIT_MQ_URLS
-        ? process.env.RABBIT_MQ_URLS.split(',')
-        : [process.env.RABBIT_MQ_URL || 'amqp://guest:guest@localhost:5672'],
-      queues: queueOptions,
-      // Enhanced connection recovery settings for production
-      connectionOptions: {
-        heartbeatIntervalInSeconds: parseInt(
-          process.env.RABBITMQ_HEARTBEAT || '30',
-          10,
-        ),
-        reconnectTimeInSeconds: parseInt(
-          process.env.RABBITMQ_RECONNECT_TIMEOUT || '5',
-          10,
-        ),
-      },
-    }),
-
     // Core application modules
+    DatabaseModule,
     WorkflowModule,
     HealthModule,
     NotificationModule,
@@ -109,14 +73,14 @@ const configValidationSchema = {
   providers: [
     AppService,
     ExecutionWorker,
-    DatabaseService,
+    RabbitMQService,
     // Add configuration as a provider for dependency injection
     {
       provide: 'CONFIG',
       useValue: configValidationSchema,
     },
   ],
-  exports: [DatabaseService, 'CONFIG'],
+  exports: [RabbitMQService, 'CONFIG'],
 })
 export class AppModule {
   private readonly logger = new Logger(AppModule.name);
@@ -125,7 +89,7 @@ export class AppModule {
     this.logger.log('🏗️  AppModule initialized');
     this.logger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     this.logger.log(
-      `Worker scaling: ${process.env.NODE_ENV === 'production' ? '3 workers' : '1 worker'}`,
+      `Worker scaling: ${process.env.NODE_ENV === 'production' ? 'production mode' : 'development mode'}`,
     );
   }
 

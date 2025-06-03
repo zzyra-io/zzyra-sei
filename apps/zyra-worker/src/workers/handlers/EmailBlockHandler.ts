@@ -1,166 +1,179 @@
-
-import nodemailer, { Transporter } from 'nodemailer';
-
-import sanitizeHtml from 'sanitize-html'; // For sanitizing email content
-import { Logger } from '@nestjs/common'; // NestJS logger
-import { z } from 'zod'; // For runtime validation
-import { configDotenv } from 'dotenv';
+import { Injectable, Logger } from '@nestjs/common';
 import { BlockExecutionContext, BlockHandler } from '@zyra/types';
+import { DatabaseService } from '../../services/database.service';
+import * as nodemailer from 'nodemailer';
 
-
-configDotenv();
-
-// Define the schema for blkCfg using Zod
-const BlkCfgSchema = z.object({
-  to: z.string().email().nonempty('Recipient email is required'),
-  body: z.string().nonempty('Email body is required'),
-  subject: z.string().nonempty('Email subject is required'),
-  template: z.string().optional().default('notification'),
-  asset: z.string().optional(),
-  condition: z.enum(['above', 'below']).optional(),
-  dataSource: z.string().optional(),
-  maxRetries: z.string().transform(Number).default('3'),
-  retryDelay: z.string().transform(Number).default('30'),
-  targetPrice: z.string().optional(),
-  checkInterval: z.string().optional(),
-  retryOnFailure: z.boolean().default(true),
-  notifyOnTrigger: z.boolean().default(true),
-  comparisonPeriod: z.string().optional(),
-  includeWorkflowData: z.boolean().default(true),
-  historicalComparison: z.string().optional(),
-});
-
-// Define the type for blkCfg based on the schema
-type BlkCfg = z.infer<typeof BlkCfgSchema>;
-
-// Environment variable validation
-const requiredEnvVars = [
-  'SMTP_HOST',
-  'SMTP_PORT',
-  'SMTP_USER',
-  'SMTP_PASS',
-  'EMAIL_FROM',
-];
-const missingEnvVars = requiredEnvVars.filter(
-  (varName) => !process.env[varName],
-);
-
-if (missingEnvVars.length > 0) {
-  throw new Error(
-    `Missing required environment variables: ${missingEnvVars.join(', ')}`,
-  );
-}
-
+@Injectable()
 export class EmailBlockHandler implements BlockHandler {
-  private transporter: Transporter;
-  private logger: Logger;
+  private readonly logger = new Logger(EmailBlockHandler.name);
 
-  constructor(logger: Logger) {
-    this.logger = logger;
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST!,
-      port: Number(process.env.SMTP_PORT!),
-      secure: Number(process.env.SMTP_PORT!) === 465, // Use SSL for port 465
-      auth: {
-        user: process.env.SMTP_USER!,
-        pass: process.env.SMTP_PASS!,
-      },
-    });
-  }
-
-  private sanitizeContent(content: string): string {
-    return sanitizeHtml(content, {
-      allowedTags: [], // Strip all HTML tags for plain text emails
-      allowedAttributes: {},
-    });
-  }
-
-  private async sendEmailWithRetry(
-    mailOptions: nodemailer.SendMailOptions,
-    maxRetries: number,
-    retryDelay: number,
-  ): Promise<any> {
-    let attempt = 1;
-
-    while (attempt <= maxRetries) {
-      try {
-        this.logger.log(`Sending email, attempt ${attempt}`, {
-          to: mailOptions.to,
-        });
-        const info = await this.transporter.sendMail(mailOptions);
-        this.logger.log('Email sent successfully', {
-          messageId: info.messageId,
-        });
-        return { messageId: info.messageId };
-      } catch (error: any) {
-        this.logger.error(`Failed to send email on attempt ${attempt}`, {
-          error: error.message,
-          to: mailOptions.to,
-        });
-
-        if (attempt === maxRetries) {
-          throw new Error(
-            `Failed to send email after ${maxRetries} attempts: ${error.message}`,
-          );
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, retryDelay * 1000));
-        attempt++;
-      }
-    }
-  }
-
-  private renderTemplate(blkCfg: BlkCfg, ctx: BlockExecutionContext): string {
-    // Basic template rendering logic (extend as needed)
-    let body = blkCfg.body;
-    if (blkCfg.template === 'notification' && blkCfg.includeWorkflowData) {
-      body += `\n\nWorkflow Context:\nAsset: ${blkCfg.asset || 'N/A'}\nTarget Price: ${blkCfg.targetPrice || 'N/A'}\n`;
-      if (ctx.workflowData) {
-        body += `Workflow Data: ${JSON.stringify(ctx.workflowData, null, 2)}\n`;
-      }
-    }
-    return this.sanitizeContent(body);
-  }
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async execute(node: any, ctx: BlockExecutionContext): Promise<any> {
-    // Validate blkCfg
-    const cfg = node.data as Record<string, any>;
-    if (!cfg.config) {
-      throw new Error('Configuration is missing in node data');
+    const { nodeId, executionId, userId } = ctx;
+    const data = node.data || {};
+
+    this.logger.log(`Executing Email block: ${nodeId}`);
+
+    try {
+      // Validate required email configuration
+      this.validateEmailConfig();
+
+      // Validate required fields
+      if (!data.to) {
+        throw new Error('Email recipient is required');
+      }
+      if (!data.subject) {
+        throw new Error('Email subject is required');
+      }
+      if (!data.body) {
+        throw new Error('Email body is required');
+      }
+
+      // Create email transporter
+      const transporter = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST,
+        port: parseInt(process.env.EMAIL_PORT || '587', 10),
+        secure: process.env.EMAIL_PORT === '465',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      // Process email template if specified
+      let emailBody = data.body;
+      let emailSubject = data.subject;
+
+      if (data.config?.template) {
+        const template = await this.getEmailTemplate(data.config.template);
+        if (template) {
+          emailBody = this.processTemplate(
+            template.message,
+            data.variables || {},
+          );
+          emailSubject = this.processTemplate(
+            template.title,
+            data.variables || {},
+          );
+        }
+      }
+
+      // Send email
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+        to: data.to,
+        subject: emailSubject,
+        html: emailBody,
+        attachments: data.config?.attachments || [],
+      };
+
+      const result = await transporter.sendMail(mailOptions);
+
+      // Log successful email send
+      await this.logEmailSent(userId, executionId, nodeId, {
+        to: data.to,
+        subject: emailSubject,
+        messageId: result.messageId,
+        status: 'sent',
+      });
+
+      return {
+        success: true,
+        data: {
+          messageId: result.messageId,
+          envelope: result.envelope,
+          accepted: result.accepted,
+          rejected: result.rejected,
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(`Email sending failed: ${error.message}`);
+
+      // Log failed email attempt
+      await this.logEmailSent(userId, executionId, nodeId, {
+        to: data.to || 'unknown',
+        subject: data.subject || 'unknown',
+        status: 'failed',
+        error: error.message,
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Validate email configuration
+   */
+  private validateEmailConfig(): void {
+    const requiredVars = [
+      'EMAIL_HOST',
+      'EMAIL_PORT',
+      'EMAIL_USER',
+      'EMAIL_PASS',
+    ];
+    const missing = requiredVars.filter((varName) => !process.env[varName]);
+
+    if (missing.length > 0) {
+      throw new Error(`Email configuration is missing: ${missing.join(', ')}`);
+    }
+  }
+
+  /**
+   * Get email template from database
+   */
+  private async getEmailTemplate(templateId: string): Promise<any> {
+    try {
+      const template =
+        await this.databaseService.prisma.notificationTemplate.findUnique({
+          where: { id: templateId },
+        });
+      return template;
+    } catch (error: any) {
+      this.logger.error(`Failed to get email template: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Process template with variables
+   */
+  private processTemplate(
+    template: string,
+    variables: Record<string, any>,
+  ): string {
+    let processed = template;
+
+    for (const [key, value] of Object.entries(variables)) {
+      const placeholder = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      processed = processed.replace(placeholder, String(value));
     }
 
-    const parseResult = BlkCfgSchema.safeParse(cfg.config);
-    if (!parseResult.success) {
-      this.logger.error('Invalid configuration', {
-        errors: parseResult.error.errors,
+    return processed;
+  }
+
+  /**
+   * Log email sending activity
+   */
+  private async logEmailSent(
+    userId: string,
+    executionId: string,
+    nodeId: string,
+    data: Record<string, any>,
+  ): Promise<void> {
+    try {
+      await this.databaseService.prisma.notificationLog.create({
+        data: {
+          userId: userId,
+          channel: 'email',
+          status: data.status,
+          error: data.error || null,
+          notificationId: `${executionId}-${nodeId}`,
+        },
       });
-      throw new Error(`Invalid configuration: ${parseResult.error.message}`);
-    }
-
-    const blkCfg: BlkCfg = parseResult.data;
-
-    // Prepare email options
-    const mailOptions: nodemailer.SendMailOptions = {
-      from: process.env.EMAIL_FROM!,
-      to: blkCfg.to,
-      subject: this.sanitizeContent(blkCfg.subject),
-      text: this.renderTemplate(blkCfg, ctx),
-    };
-
-    // Send email with retry logic if enabled
-    if (blkCfg.retryOnFailure) {
-      return await this.sendEmailWithRetry(
-        mailOptions,
-        blkCfg.maxRetries,
-        blkCfg.retryDelay,
-      );
-    } else {
-      this.logger.log('Sending email without retry', { to: blkCfg.to });
-      const info = await this.transporter.sendMail(mailOptions);
-      this.logger.log('Email sent successfully', {
-        messageId: info.messageId,
-      });
-      return { messageId: info.messageId };
+    } catch (error: any) {
+      this.logger.error(`Failed to log email activity: ${error.message}`);
+      // Don't throw here as logging failure shouldn't stop execution
     }
   }
 }

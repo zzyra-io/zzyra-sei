@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DatabaseService } from '../../services/database.service';
 
 import { MetricsBlockHandler } from './MetricsBlockHandler';
 import { EmailBlockHandler } from './EmailBlockHandler';
@@ -44,6 +45,7 @@ export class BlockHandlerRegistry {
 
   constructor(
     private readonly logger: Logger,
+    private readonly databaseService: DatabaseService,
     private readonly configService?: ConfigService,
     private readonly portfolioService?: PortfolioService,
     private readonly protocolService?: ProtocolService,
@@ -59,11 +61,11 @@ export class BlockHandlerRegistry {
       // Action blocks
       [BlockType.EMAIL]: new MetricsBlockHandler(
         BlockType.EMAIL,
-        new EmailBlockHandler(this.logger),
+        new EmailBlockHandler(this.databaseService),
       ),
       [BlockType.DATABASE]: new MetricsBlockHandler(
         BlockType.DATABASE,
-        new DatabaseBlockHandler(),
+        new DatabaseBlockHandler(this.databaseService),
       ),
       [BlockType.WEBHOOK]: new MetricsBlockHandler(
         BlockType.WEBHOOK,
@@ -71,7 +73,7 @@ export class BlockHandlerRegistry {
       ),
       [BlockType.NOTIFICATION]: new MetricsBlockHandler(
         BlockType.NOTIFICATION,
-        new NotificationBlockHandler(),
+        new NotificationBlockHandler(this.databaseService, {} as any),
       ),
       [BlockType.DISCORD]: new MetricsBlockHandler(
         BlockType.DISCORD,
@@ -104,6 +106,7 @@ export class BlockHandlerRegistry {
       [BlockType.AI_BLOCKCHAIN]: new MetricsBlockHandler(
         BlockType.AI_BLOCKCHAIN,
         new AiBlockchain(
+          this.databaseService,
           this.configService || new ConfigService(),
           walletService,
         ),
@@ -117,6 +120,7 @@ export class BlockHandlerRegistry {
       [BlockType.DEFI_PORTFOLIO]: new MetricsBlockHandler(
         BlockType.DEFI_PORTFOLIO,
         new PortfolioBalanceHandler(
+          this.databaseService,
           this.portfolioService || new PortfolioService(null),
         ),
       ),
@@ -124,6 +128,7 @@ export class BlockHandlerRegistry {
       [BlockType.DEFI_YIELD_MONITOR]: new MetricsBlockHandler(
         BlockType.DEFI_YIELD_MONITOR,
         new YieldMonitorHandler(
+          this.databaseService,
           this.protocolService ||
             new ProtocolService(new DefaultProtocolProvider(this.logger)),
         ),
@@ -143,6 +148,7 @@ export class BlockHandlerRegistry {
       [BlockType.DEFI_PROTOCOL]: new MetricsBlockHandler(
         BlockType.DEFI_PROTOCOL,
         new ProtocolMonitorHandler(
+          this.databaseService,
           this.protocolService ||
             new ProtocolService(new DefaultProtocolProvider(this.logger)),
         ),
@@ -190,6 +196,7 @@ export class BlockHandlerRegistry {
       [BlockType.PROTOCOL_MONITOR]: new MetricsBlockHandler(
         BlockType.PROTOCOL_MONITOR,
         new ProtocolMonitorHandler(
+          this.databaseService,
           this.protocolService ||
             new ProtocolService(new DefaultProtocolProvider(this.logger)),
         ),
@@ -197,6 +204,7 @@ export class BlockHandlerRegistry {
       [BlockType.YIELD_MONITOR]: new MetricsBlockHandler(
         BlockType.YIELD_MONITOR,
         new YieldMonitorHandler(
+          this.databaseService,
           this.protocolService ||
             new ProtocolService(new DefaultProtocolProvider(this.logger)),
         ),
@@ -205,11 +213,13 @@ export class BlockHandlerRegistry {
         BlockType.REBALANCE_CALCULATOR,
         new RebalanceCalculatorHandler(
           this.portfolioService || new PortfolioService(null),
+          this.databaseService,
         ),
       ),
       [BlockType.SWAP_EXECUTOR]: new MetricsBlockHandler(
         BlockType.SWAP_EXECUTOR,
         new SwapExecutorHandler(
+          this.databaseService,
           this.protocolService ||
             new ProtocolService(new DefaultProtocolProvider(this.logger)),
           walletService,
@@ -217,11 +227,12 @@ export class BlockHandlerRegistry {
       ),
       [BlockType.GAS_OPTIMIZER]: new MetricsBlockHandler(
         BlockType.GAS_OPTIMIZER,
-        new GasOptimizerHandler(),
+        new GasOptimizerHandler(this.databaseService),
       ),
       [BlockType.LIQUIDITY_PROVIDER]: new MetricsBlockHandler(
         BlockType.LIQUIDITY_PROVIDER,
         new LiquidityProviderHandler(
+          this.databaseService,
           this.protocolService ||
             new ProtocolService(new DefaultProtocolProvider(this.logger)),
           walletService,
@@ -230,6 +241,7 @@ export class BlockHandlerRegistry {
       [BlockType.POSITION_MANAGER]: new MetricsBlockHandler(
         BlockType.POSITION_MANAGER,
         new PositionManagerHandler(
+          this.databaseService,
           this.protocolService ||
             new ProtocolService(new DefaultProtocolProvider(this.logger)),
           walletService,
@@ -238,6 +250,7 @@ export class BlockHandlerRegistry {
       [BlockType.YIELD_STRATEGY]: new MetricsBlockHandler(
         BlockType.YIELD_STRATEGY,
         new YieldStrategyHandler(
+          this.databaseService,
           this.protocolService ||
             new ProtocolService(new DefaultProtocolProvider(this.logger)),
         ),

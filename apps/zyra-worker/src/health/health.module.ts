@@ -4,8 +4,8 @@ import { HealthController } from './health.controller';
 import { QueueHealthIndicator } from './queue.health';
 import { WorkerHealthIndicator } from './worker.health';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
-import { RABBITMQ_HEALTH_PROVIDER } from './health.constants';
 import { getOrCreateCounter, getOrCreateGauge } from '../lib/prometheus';
+import { RabbitMQService } from '../services/rabbitmq.service';
 
 @Module({
   imports: [
@@ -18,9 +18,9 @@ import { getOrCreateCounter, getOrCreateGauge } from '../lib/prometheus';
   ],
   controllers: [HealthController],
   providers: [
-    RABBITMQ_HEALTH_PROVIDER,
     QueueHealthIndicator,
     WorkerHealthIndicator,
+    RabbitMQService,
     {
       provide: 'PROM_METRIC_WORKER_HEALTH_CHECK_TOTAL',
       useValue: getOrCreateCounter({
@@ -61,6 +61,10 @@ import { getOrCreateCounter, getOrCreateGauge } from '../lib/prometheus';
           buckets: [0.1, 0.5, 1, 5, 10, 30, 60, 120, 300, 600],
         },
       ],
+    },
+    {
+      provide: 'RABBITMQ_HEALTH_CONNECTION',
+      useExisting: RabbitMQService,
     },
   ],
   exports: [WorkerHealthIndicator],

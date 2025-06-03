@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-
-
-import { createServiceClient } from '../../lib/supabase/serviceClient';
 import { BlockExecutionContext, BlockHandler } from '@zyra/types';
-
+import { DatabaseService } from '../../services/database.service';
 
 /**
  * Abstract base class for block handlers
@@ -12,7 +9,8 @@ import { BlockExecutionContext, BlockHandler } from '@zyra/types';
 @Injectable()
 export abstract class AbstractBlockHandler implements BlockHandler {
   protected readonly logger = new Logger(this.constructor.name);
-  protected readonly supabase = createServiceClient();
+
+  constructor(protected readonly databaseService: DatabaseService) {}
 
   /**
    * Execute the block
@@ -23,10 +21,7 @@ export abstract class AbstractBlockHandler implements BlockHandler {
   abstract execute(node: any, ctx: BlockExecutionContext): Promise<any>;
 
   /**
-   * Start tracking execution of a block
-   * @param nodeId The ID of the node being executed
-   * @param executionId The workflow execution ID
-   * @param blockType The type of block being executed
+   * Track the start of block execution
    */
   protected async startExecution(
     nodeId: string,
@@ -34,36 +29,25 @@ export abstract class AbstractBlockHandler implements BlockHandler {
     blockType: string,
   ): Promise<string> {
     try {
-      const { data, error } = await this.supabase
-        .from('node_executions')
-        .insert({
-          node_id: nodeId,
-          execution_id: executionId,
-          block_type: blockType,
-          status: 'running',
-          started_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
-
-      if (error) {
-        this.logger.error(`Failed to start execution tracking: ${String(error)}`);
-        return '';
-      }
-
-      return data.id;
+      const blockExecution =
+        await this.databaseService.prisma.blockExecution.create({
+          data: {
+            nodeId,
+            executionId,
+            blockType,
+            status: 'running',
+            startTime: new Date(),
+          },
+        });
+      return blockExecution.id;
     } catch (error: any) {
-      this.logger.error(`Error starting execution tracking: ${error?.message || 'Unknown error'}`);
+      this.logger.error(`Failed to start execution tracking: ${error.message}`);
       return '';
     }
   }
 
   /**
-   * Complete execution tracking for a block
-   * @param blockExecutionId The ID of the block execution record
-   * @param status The final status of the execution
-   * @param result The result of the execution
-   * @param error Any error that occurred during execution
+   * Track the completion of block execution
    */
   protected async completeExecution(
     blockExecutionId: string,
@@ -74,89 +58,150 @@ export abstract class AbstractBlockHandler implements BlockHandler {
     if (!blockExecutionId) return;
 
     try {
-      const { error: dbError } = await this.supabase
-        .from('node_executions')
-        .update({
+      await this.databaseService.prisma.blockExecution.update({
+        where: { id: blockExecutionId },
+        data: {
           status,
-          completed_at: new Date().toISOString(),
-          result: result ? JSON.stringify(result) : null,
+          endTime: new Date(),
+          output: result ? JSON.stringify(result) : null,
           error: error ? error.message : null,
-        })
-        .eq('id', blockExecutionId);
-
-      if (dbError) {
-        this.logger.error(`Failed to complete execution tracking: ${String(dbError)}`);
-      }
+        },
+      });
     } catch (error: any) {
-      this.logger.error(`Error completing execution tracking: ${error?.message || 'Unknown error'}`);
+      this.logger.error(
+        `Failed to complete execution tracking: ${error.message}`,
+      );
     }
   }
 
   /**
-   * Track a log message for a block execution
-   * @param executionId The workflow execution ID
-   * @param nodeId The ID of the node being executed
-   * @param level The log level
-   * @param message The log message
+   * Track execution logs
    */
   protected async trackLog(
     executionId: string,
     nodeId: string,
-    level: 'info' | 'error' | 'warn' | 'debug',
+    level: 'info' | 'error' | 'warn',
     message: string,
+    data?: any,
   ): Promise<void> {
     try {
-      const { error } = await this.supabase.from('node_logs').insert({
-        execution_id: executionId,
-        node_id: nodeId,
+      await this.databaseService.executions.addLog(
+        executionId,
         level,
         message,
-        timestamp: new Date().toISOString(),
-      });
-
-      if (error) {
-        this.logger.error(`Failed to track log: ${String(error)}`);
-      }
+        {
+          nodeId,
+          timestamp: new Date().toISOString(),
+          ...(data && { data }),
+        },
+      );
     } catch (error: any) {
-      this.logger.error(`Error tracking log: ${error?.message || 'Unknown error'}`);
+      this.logger.error(`Failed to track log: ${error.message}`);
     }
   }
 
   /**
-   * Helper method to extract node data safely
-   * @param node The node to extract data from
+   * Get workflow execution data
    */
-  protected getNodeData(node: any): { nodeId: string; type: string; config: any; inputs: any } {
-    const nodeId = node?.id || 'unknown-node';
-    const type = node?.type || 'unknown-type';
-    const config = node?.data?.config || {};
-    const inputs = node?.data?.inputs || {};
-
-    return { nodeId, type, config, inputs };
+  protected async getExecutionData(executionId: string): Promise<any> {
+    try {
+      const execution =
+        await this.databaseService.prisma.workflowExecution.findUnique({
+          where: { id: executionId },
+          include: {
+            workflow: true,
+            executionLogs: true,
+            nodeExecutions: true,
+          },
+        });
+      return execution;
+    } catch (error: any) {
+      this.logger.error(`Failed to get execution data: ${error.message}`);
+      return null;
+    }
   }
 
   /**
-   * Helper method to handle errors consistently
-   * @param error The error that occurred
-   * @param nodeId The ID of the node being executed
-   * @param executionId The workflow execution ID
-   * @param blockExecutionId The ID of the block execution record
+   * Update workflow execution status
    */
-  protected async handleError(
-    error: unknown,
-    nodeId: string,
+  protected async updateExecutionStatus(
     executionId: string,
-    blockExecutionId: string,
-  ): Promise<never> {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    this.logger.error(`Block execution failed: ${errorMessage}`);
-    await this.trackLog(executionId, nodeId, 'error', `Execution failed: ${errorMessage}`);
-    await this.completeExecution(
-      blockExecutionId, 
-      'failed', 
-      null, 
-      error instanceof Error ? error : new Error(errorMessage)
-    );
-    throw error;
+    status: 'pending' | 'running' | 'completed' | 'failed' | 'paused',
+    result?: any,
+    error?: string,
+  ): Promise<void> {
+    try {
+      await this.databaseService.prisma.workflowExecution.update({
+        where: { id: executionId },
+        data: {
+          status,
+          ...(result && { output: JSON.stringify(result) }),
+          ...(error && { error }),
+          ...((status === 'completed' || status === 'failed') && {
+            finishedAt: new Date(),
+          }),
+        },
+      });
+    } catch (error: any) {
+      this.logger.error(`Failed to update execution status: ${error.message}`);
+    }
+  }
+
+  /**
+   * Validate block configuration
+   */
+  protected validateConfig(
+    config: Record<string, any>,
+    requiredFields: string[],
+  ): void {
+    for (const field of requiredFields) {
+      if (!config[field]) {
+        throw new Error(`Missing required configuration field: ${field}`);
+      }
+    }
+  }
+
+  /**
+   * Process input parameters with variable substitution
+   */
+  protected processInputs(
+    parameters: Record<string, any>,
+    ctx: BlockExecutionContext,
+  ): Record<string, any> {
+    const processed: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(parameters)) {
+      if (typeof value === 'string' && value.includes('{{')) {
+        // Handle variable substitution from context inputs
+        processed[key] = this.substituteVariables(value, ctx);
+      } else {
+        processed[key] = value;
+      }
+    }
+
+    return processed;
+  }
+
+  /**
+   * Substitute variables in strings
+   */
+  private substituteVariables(
+    template: string,
+    ctx: BlockExecutionContext,
+  ): any {
+    return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+      const keys = path.trim().split('.');
+      let value: any = ctx.inputs;
+
+      for (const key of keys) {
+        if (value && typeof value === 'object' && key in value) {
+          value = value[key];
+        } else {
+          return match; // Return original if path not found
+        }
+      }
+
+      return value;
+    });
   }
 }

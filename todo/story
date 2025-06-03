@@ -48,6 +48,15 @@ Process file metadata automatically
 Connect file monitoring to other workflows
 Customize monitoring parameters"
 
+AI Voice Assistant for portfolio management:
+"As a portfolio manager, I want to manage my portfolio using voice commands so I can:
+Create workflows in the by typing and generating them with AI
+Get AI-suggested optimal rebalancing strategies
+Receive performance reports automatically
+Monitor multiple portfolios simultaneously
+Make data-driven investment decisions,
+I should get the voice call from the assistant and respond to it and it should be able to understand the user's voice and respond to it, I should be able to use the voice assistant to create workflows and get AI-suggested optimal rebalancing strategies and receive performance reports automatically and monitor multiple portfolios simultaneously and make data-driven investment decisions and sell and buy and hold and all the other things that a portfolio manager does"
+
 DeFi Power User Story:
 Current Status: Not Implemented
 Missing Components:

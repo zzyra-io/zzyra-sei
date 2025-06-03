@@ -1,105 +1,136 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseClient } from '@supabase/supabase-js';
-import type { ExecutionContext } from '../../types/execution';
-import { createServiceClient } from '../../lib/supabase/serviceClient';
-import type { Node as WorkflowNode } from '../../types/workflow';
-import { BlockHandler, BlockExecutionContext } from '@zyra/types';
-
-
-export interface BlockExecutionRecord {
-  id: string;
-  node_id: string;
-  workflow_execution_id: string;
-  block_type: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  started_at: string;
-  completed_at?: string;
-  error?: string;
-  inputs?: Record<string, any>;
-  outputs?: Record<string, any>;
-  execution_time_ms?: number;
-  created_at: string;
-}
+import { BlockExecutionContext, BlockHandler } from '@zyra/types';
+import { DatabaseService } from '../../services/database.service';
 
 @Injectable()
 export abstract class BaseBlockHandler implements BlockHandler {
-  protected readonly logger: Logger;
-  protected readonly supabase: SupabaseClient;
+  protected readonly logger = new Logger(this.constructor.name);
 
-  constructor() {
-    this.supabase = createServiceClient();
-    this.logger = new Logger(this.constructor.name);
+  constructor(protected readonly databaseService: DatabaseService) {}
+
+  abstract execute(node: any, ctx: BlockExecutionContext): Promise<any>;
+
+  /**
+   * Start tracking execution of a block
+   */
+  protected async startExecution(
+    nodeId: string,
+    executionId: string,
+    blockType: string,
+  ): Promise<string> {
+    try {
+      const blockExecution =
+        await this.databaseService.prisma.blockExecution.create({
+          data: {
+            nodeId,
+            executionId,
+            blockType,
+            status: 'running',
+            startTime: new Date(),
+          },
+        });
+      return blockExecution.id;
+    } catch (error: any) {
+      this.logger.error(`Failed to start execution tracking: ${error.message}`);
+      return '';
+    }
   }
 
-  abstract executeBlock(node: WorkflowNode, ctx: ExecutionContext): Promise<any>;
-  
-  // Implement the BlockHandler interface
-  async execute(node: any, ctx: BlockExecutionContext): Promise<any> {
-    // Call the executeBlock method with the appropriate types
-    return this.executeBlock(node as any, ctx as any);
-  }
-
-  // This is the actual implementation used by executeBlock
-  async _execute(node: WorkflowNode, ctx: ExecutionContext): Promise<any> {
-    const startedAt = new Date().toISOString();
-
-    // Create execution record
-    const { data: executionData, error: createError } = await this.supabase
-      .from('block_executions')
-      .insert({
-        node_id: node.id,
-        workflow_execution_id: ctx.executionId,
-        block_type: node.type,
-        status: 'running',
-        started_at: startedAt,
-        inputs: node.data.inputs || {},
-      })
-      .select('id, started_at')
-      .single();
-
-    if (createError) {
-      throw new Error(
-        `Failed to create block execution: ${createError.message}`,
-      );
-    }
-
-    if (!executionData) {
-      throw new Error('Failed to create block execution record');
-    }
-
-    const executionId = executionData.id;
+  /**
+   * Complete execution tracking for a block
+   */
+  protected async completeExecution(
+    blockExecutionId: string,
+    status: 'completed' | 'failed',
+    result?: any,
+    error?: Error,
+  ): Promise<void> {
+    if (!blockExecutionId) return;
 
     try {
-      // Execute the block's logic
-      const result = await this.executeBlock(node, ctx);
-
-      // Update execution status to completed
-      await this.supabase
-        .from('block_executions')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          outputs: result,
-          execution_time_ms: Date.now() - new Date(startedAt).getTime(),
-        })
-        .eq('id', executionId);
-
-      return result;
+      await this.databaseService.prisma.blockExecution.update({
+        where: { id: blockExecutionId },
+        data: {
+          status,
+          endTime: new Date(),
+          output: result ? JSON.stringify(result) : null,
+          error: error ? error.message : null,
+        },
+      });
     } catch (error: any) {
-      this.logger.error(`Block execution error: ${error.message}`, error.stack);
-
-      // Update execution status to failed
-      await this.supabase
-        .from('block_executions')
-        .update({
-          status: 'failed',
-          completed_at: new Date().toISOString(),
-          error: error.message,
-          execution_time_ms: Date.now() - new Date(startedAt).getTime(),
-        })
-        .eq('id', executionId);
-
-      throw error;
+      this.logger.error(
+        `Failed to complete execution tracking: ${error.message}`,
+      );
     }
+  }
+
+  /**
+   * Track a log message for a block execution
+   */
+  protected async trackLog(
+    executionId: string,
+    nodeId: string,
+    level: 'info' | 'error' | 'warn',
+    message: string,
+    metadata?: any,
+  ): Promise<void> {
+    try {
+      await this.databaseService.executions.addLog(
+        executionId,
+        level,
+        message,
+        {
+          nodeId,
+          timestamp: new Date().toISOString(),
+          ...(metadata && { metadata }),
+        },
+      );
+    } catch (error: any) {
+      this.logger.error(`Failed to track log: ${error.message}`);
+    }
+  }
+
+  /**
+   * Helper method to extract node data safely
+   */
+  protected getNodeData(node: any): {
+    nodeId: string;
+    type: string;
+    config: any;
+    inputs: any;
+  } {
+    const nodeId = node?.id || 'unknown-node';
+    const type = node?.type || 'unknown-type';
+    const config = node?.data?.config || {};
+    const inputs = node?.data?.inputs || {};
+
+    return { nodeId, type, config, inputs };
+  }
+
+  /**
+   * Helper method to handle errors consistently
+   */
+  protected async handleError(
+    error: unknown,
+    nodeId: string,
+    executionId: string,
+    blockExecutionId: string,
+  ): Promise<never> {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error occurred';
+    this.logger.error(`Block execution failed: ${errorMessage}`);
+    await this.trackLog(
+      executionId,
+      nodeId,
+      'error',
+      `Execution failed: ${errorMessage}`,
+    );
+    await this.completeExecution(
+      blockExecutionId,
+      'failed',
+      null,
+      error instanceof Error ? error : new Error(errorMessage),
+    );
+    throw error;
   }
 }

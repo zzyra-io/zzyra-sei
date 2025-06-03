@@ -1,13 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { ethers, Contract } from 'ethers';
-
+import { DatabaseService } from '../../services/database.service';
 
 import { ProtocolService } from '../../services/protocol.service';
 import { WalletService } from './blockchain/WalletService';
-import { BlockType, BlockExecutionContext, BlockHandler  } from '@zyra/types';
-
+import { BlockType, BlockExecutionContext, BlockHandler } from '@zyra/types';
 
 // Define the configuration schema for swap execution
 const SwapExecutorConfigSchema = z.object({
@@ -29,11 +27,13 @@ type SwapExecutorConfig = z.infer<typeof SwapExecutorConfigSchema>;
 @Injectable()
 export class SwapExecutorHandler implements BlockHandler {
   private readonly logger = new Logger(SwapExecutorHandler.name);
-  private readonly supabase = createClient(
-    process.env.SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_KEY || '',
-  );
-  
+
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly protocolService: ProtocolService,
+    private readonly walletService: WalletService,
+  ) {}
+
   // Execution tracking methods
   private async startExecution(
     nodeId: string,
@@ -41,26 +41,22 @@ export class SwapExecutorHandler implements BlockHandler {
     blockType: string,
   ): Promise<string> {
     try {
-      const { data, error } = await this.supabase
-        .from('node_executions')
-        .insert({
-          node_id: nodeId,
-          execution_id: executionId,
-          block_type: blockType,
-          status: 'running',
-          started_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
+      const blockExecution =
+        await this.databaseService.prisma.blockExecution.create({
+          data: {
+            nodeId,
+            executionId,
+            blockType,
+            status: 'running',
+            startTime: new Date(),
+          },
+        });
 
-      if (error) {
-        this.logger.error(`Failed to start execution tracking: ${String(error)}`);
-        return '';
-      }
-
-      return data.id;
+      return blockExecution.id;
     } catch (error: any) {
-      this.logger.error(`Error starting execution tracking: ${error?.message || 'Unknown error'}`);
+      this.logger.error(
+        `Error starting execution tracking: ${error?.message || 'Unknown error'}`,
+      );
       return '';
     }
   }
@@ -74,51 +70,44 @@ export class SwapExecutorHandler implements BlockHandler {
     if (!blockExecutionId) return;
 
     try {
-      const { error: dbError } = await this.supabase
-        .from('node_executions')
-        .update({
+      await this.databaseService.prisma.blockExecution.update({
+        where: { id: blockExecutionId },
+        data: {
           status,
-          completed_at: new Date().toISOString(),
-          result: result ? JSON.stringify(result) : null,
+          endTime: new Date(),
+          output: result ? JSON.stringify(result) : null,
           error: error ? error.message : null,
-        })
-        .eq('id', blockExecutionId);
-
-      if (dbError) {
-        this.logger.error(`Failed to complete execution tracking: ${String(dbError)}`);
-      }
+        },
+      });
     } catch (error: any) {
-      this.logger.error(`Error completing execution tracking: ${error?.message || 'Unknown error'}`);
+      this.logger.error(
+        `Error completing execution tracking: ${error?.message || 'Unknown error'}`,
+      );
     }
   }
 
   private async trackLog(
     executionId: string,
     nodeId: string,
-    level: 'info' | 'error' | 'warn' | 'debug',
+    level: 'info' | 'error' | 'warn',
     message: string,
   ): Promise<void> {
     try {
-      const { error } = await this.supabase.from('node_logs').insert({
-        execution_id: executionId,
-        node_id: nodeId,
+      await this.databaseService.executions.addLog(
+        executionId,
         level,
         message,
-        timestamp: new Date().toISOString(),
-      });
-
-      if (error) {
-        this.logger.error(`Failed to track log: ${String(error)}`);
-      }
+        {
+          nodeId,
+          timestamp: new Date().toISOString(),
+        },
+      );
     } catch (error: any) {
-      this.logger.error(`Error tracking log: ${error?.message || 'Unknown error'}`);
+      this.logger.error(
+        `Error tracking log: ${error?.message || 'Unknown error'}`,
+      );
     }
   }
-
-  constructor(
-    private readonly protocolService: ProtocolService,
-    private readonly walletService: WalletService,
-  ) {}
 
   async execute(node: any, ctx: BlockExecutionContext): Promise<any> {
     const { id: nodeId } = node;
@@ -127,22 +116,26 @@ export class SwapExecutorHandler implements BlockHandler {
     const inputs = ctx.workflowData || {};
     const config = node.data?.config || {};
     this.logger.log(`Executing SwapExecutor block: ${nodeId}`);
-    
+
     // Track execution
-    const blockExecutionId = await this.startExecution(nodeId, executionId, blockType);
-    
+    const blockExecutionId = await this.startExecution(
+      nodeId,
+      executionId,
+      blockType,
+    );
+
     try {
       // Validate configuration
       const validatedConfig = this.validateConfig(config);
-      
+
       // Log the start of swap execution
       await this.trackLog(
-        executionId, 
-        nodeId, 
-        'info', 
-        `Preparing to swap ${validatedConfig.amount} ${validatedConfig.sourceAsset} to ${validatedConfig.targetAsset}`
+        executionId,
+        nodeId,
+        'info',
+        `Preparing to swap ${validatedConfig.amount} ${validatedConfig.sourceAsset} to ${validatedConfig.targetAsset}`,
       );
-      
+
       // Get wallet from wallet service
       // For this example, we'll use the wallet for Ethereum mainnet (chain ID 1)
       // In a real implementation, you would map the walletId to a chainId or use a different method
@@ -151,28 +144,28 @@ export class SwapExecutorHandler implements BlockHandler {
       if (!wallet) {
         throw new Error(`Wallet for chain ID ${chainId} not found`);
       }
-      
+
       // Execute the swap directly through the protocol service
       await this.trackLog(
         executionId,
         nodeId,
         'info',
-        `Checking balance of ${validatedConfig.sourceAsset} before swap`
+        `Checking balance of ${validatedConfig.sourceAsset} before swap`,
       );
-      
+
       // Check balance before swap
       const balanceBefore = await this.checkAssetBalance(
         wallet,
-        validatedConfig.sourceAsset
+        validatedConfig.sourceAsset,
       );
-      
+
       await this.trackLog(
         executionId,
         nodeId,
         'info',
-        `Current balance of ${validatedConfig.sourceAsset}: ${balanceBefore}`
+        `Current balance of ${validatedConfig.sourceAsset}: ${balanceBefore}`,
       );
-      
+
       // Execute the swap using the ProtocolService
       const txResponse = await this.protocolService.executeSwap({
         sourceAsset: validatedConfig.sourceAsset,
@@ -180,44 +173,44 @@ export class SwapExecutorHandler implements BlockHandler {
         amount: validatedConfig.amount,
         slippage: validatedConfig.slippage,
         gasLimit: validatedConfig.gasLimit || 0,
-        maxFee: validatedConfig.maxFee || 0
+        maxFee: validatedConfig.maxFee || 0,
       });
-      
+
       // Wait for transaction to be mined
       const receipt = await txResponse.wait();
-      
+
       const swapResult = {
         transactionHash: receipt.hash,
-        gasUsed: receipt.gasUsed.toString()
+        gasUsed: receipt.gasUsed.toString(),
       };
-      
+
       // Check balance after swap
       const balanceAfter = await this.checkAssetBalance(
         wallet,
-        validatedConfig.targetAsset
+        validatedConfig.targetAsset,
       );
-      
+
       await this.trackLog(
         executionId,
         nodeId,
         'info',
-        `Swap completed. New balance of ${validatedConfig.targetAsset}: ${balanceAfter}`
+        `Balance after swap - ${validatedConfig.targetAsset}: ${balanceAfter}`,
       );
-      
-      // Complete execution
+
       const result = {
-        transactionHash: swapResult.transactionHash,
+        action: 'swap',
         sourceAsset: validatedConfig.sourceAsset,
         targetAsset: validatedConfig.targetAsset,
-        amountSwapped: validatedConfig.amount,
+        amount: validatedConfig.amount,
         balanceBefore,
         balanceAfter,
-        gasUsed: swapResult.gasUsed,
+        swapResult,
         timestamp: new Date().toISOString(),
       };
-      
+
+      // Complete execution
       await this.completeExecution(blockExecutionId, 'completed', result);
-      
+
       return result;
     } catch (error: any) {
       // Log error
@@ -225,16 +218,16 @@ export class SwapExecutorHandler implements BlockHandler {
         executionId,
         nodeId,
         'error',
-        `Swap execution failed: ${error?.message || 'Unknown error'}`
+        `Swap execution failed: ${error?.message || 'Unknown error'}`,
       );
-      
+
       // Complete execution with error
       await this.completeExecution(blockExecutionId, 'failed', null, error);
-      
+
       throw error;
     }
   }
-  
+
   /**
    * Validates the configuration for the swap executor block
    */
@@ -242,16 +235,18 @@ export class SwapExecutorHandler implements BlockHandler {
     try {
       return SwapExecutorConfigSchema.parse(config);
     } catch (error: any) {
-      throw new Error(`Invalid swap executor configuration: ${error?.message || 'Unknown validation error'}`);
+      throw new Error(
+        `Invalid swap executor configuration: ${error?.message || 'Unknown validation error'}`,
+      );
     }
   }
-  
+
   /**
    * Checks the balance of a specific asset in a wallet
    */
   private async checkAssetBalance(
     wallet: ethers.Wallet,
-    asset: string
+    asset: string,
   ): Promise<string> {
     try {
       if (asset.toLowerCase() === 'eth') {
@@ -263,19 +258,21 @@ export class SwapExecutorHandler implements BlockHandler {
         const tokenContract = new Contract(
           this.getTokenAddress(asset),
           ['function balanceOf(address) view returns (uint256)'],
-          wallet.provider
+          wallet.provider,
         );
-        
+
         const balance = await tokenContract.balanceOf(wallet.address);
         return ethers.formatUnits(balance, this.getTokenDecimals(asset));
       }
     } catch (error: any) {
-      throw new Error(`Failed to check asset balance: ${error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to check asset balance: ${error?.message || 'Unknown error'}`,
+      );
     }
   }
-  
+
   // This method is no longer needed as we're using the ProtocolService directly
-  
+
   /**
    * Gets the token address for a given asset symbol
    * This is a simplified implementation and should be replaced with a proper token registry
@@ -283,20 +280,20 @@ export class SwapExecutorHandler implements BlockHandler {
   private getTokenAddress(asset: string): string {
     // This would typically come from a token registry or configuration
     const tokenAddresses: Record<string, string> = {
-      'USDC': '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // Mainnet USDC
-      'DAI': '0x6B175474E89094C44Da98b954EedeAC495271d0F', // Mainnet DAI
-      'WETH': '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // Mainnet WETH
+      USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // Mainnet USDC
+      DAI: '0x6B175474E89094C44Da98b954EedeAC495271d0F', // Mainnet DAI
+      WETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // Mainnet WETH
       // Add more tokens as needed
     };
-    
+
     const address = tokenAddresses[asset.toUpperCase()];
     if (!address) {
       throw new Error(`Token address not found for asset: ${asset}`);
     }
-    
+
     return address;
   }
-  
+
   /**
    * Gets the token decimals for a given asset symbol
    * This is a simplified implementation and should be replaced with a proper token registry
@@ -304,18 +301,18 @@ export class SwapExecutorHandler implements BlockHandler {
   private getTokenDecimals(asset: string): number {
     // This would typically come from a token registry or configuration
     const tokenDecimals: Record<string, number> = {
-      'ETH': 18,
-      'USDC': 6,
-      'DAI': 18,
-      'WETH': 18,
+      ETH: 18,
+      USDC: 6,
+      DAI: 18,
+      WETH: 18,
       // Add more tokens as needed
     };
-    
+
     const decimals = tokenDecimals[asset.toUpperCase()];
     if (decimals === undefined) {
       throw new Error(`Token decimals not found for asset: ${asset}`);
     }
-    
+
     return decimals;
   }
 }

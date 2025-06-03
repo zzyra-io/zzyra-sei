@@ -29,4 +29,3 @@ export * from "./auth/middleware";
 // Export utilities
 export * from "./utils/validation";
 export * from "./utils/pagination";
-export * from "./utils/migration";

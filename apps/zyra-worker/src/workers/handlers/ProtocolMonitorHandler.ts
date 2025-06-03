@@ -1,11 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
-
+import { DatabaseService } from '../../services/database.service';
 
 import { ProtocolService } from '../../services/protocol.service';
-import { createClient } from '@/lib/supabase/server';
 import { BlockType, BlockExecutionContext, BlockHandler } from '@zyra/types';
-
 
 // Define the configuration schema for protocol monitoring
 const ProtocolMonitorConfigSchema = z.object({
@@ -32,7 +30,11 @@ type ProtocolMonitorConfig = z.infer<typeof ProtocolMonitorConfigSchema>;
 @Injectable()
 export class ProtocolMonitorHandler implements BlockHandler {
   private readonly logger = new Logger(ProtocolMonitorHandler.name);
-  private readonly supabase = createClient();
+
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly protocolService: ProtocolService,
+  ) {}
 
   // Execution tracking methods
   public async startExecution(
@@ -40,35 +42,25 @@ export class ProtocolMonitorHandler implements BlockHandler {
     executionId: string,
     blockType: string,
   ): Promise<string> {
-    const blockExecutionId = `${executionId}_${nodeId}`;
-
     try {
-      const { error } = await this.supabase.from('node_logs').insert({
-        id: blockExecutionId,
-        execution_id: executionId,
-        node_id: nodeId,
-        level: 'info',
-        message: `Started execution for block_type: ${blockType}`,
-        timestamp: new Date().toISOString(),
-        data: {
-          block_type: blockType,
-          status: 'running',
-          started_at: new Date().toISOString(),
-        },
-      });
+      const blockExecution =
+        await this.databaseService.prisma.blockExecution.create({
+          data: {
+            nodeId,
+            executionId,
+            blockType,
+            status: 'running',
+            startTime: new Date(),
+          },
+        });
 
-      if (error) {
-        this.logger.error(
-          `Failed to insert execution record: ${error.message}`,
-        );
-      }
+      return blockExecution.id;
     } catch (error: any) {
       this.logger.error(
         `Failed to start execution tracking: ${error?.message || 'Unknown error'}`,
       );
+      return '';
     }
-
-    return blockExecutionId;
   }
 
   public async completeExecution(
@@ -77,27 +69,22 @@ export class ProtocolMonitorHandler implements BlockHandler {
     result?: any,
     error?: any,
   ): Promise<void> {
-    try {
-      const { error: dbError } = await this.supabase
-        .from('node_logs')
-        .update({
-          level: status === 'completed' ? 'info' : 'error',
-          message: status === 'completed' ? 'Execution completed' : 'Execution failed',
-          timestamp: new Date().toISOString(),
-          data: {
-            ...(result ? { result: JSON.stringify(result) } : {}),
-            ...(error ? { error: JSON.stringify(error) } : {}),
-            status,
-            completed_at: new Date().toISOString(),
-          },
-        })
-        .eq('id', blockExecutionId);
+    if (!blockExecutionId) return;
 
-      if (dbError) {
-        this.logger.error(
-          `Failed to update execution record: ${dbError.message}`,
-        );
-      }
+    try {
+      await this.databaseService.prisma.blockExecution.update({
+        where: { id: blockExecutionId },
+        data: {
+          status,
+          endTime: new Date(),
+          output: result ? JSON.stringify(result) : null,
+          error: error
+            ? typeof error === 'string'
+              ? error
+              : JSON.stringify(error)
+            : null,
+        },
+      });
     } catch (error: any) {
       this.logger.error(
         `Failed to complete execution tracking: ${error?.message || 'Unknown error'}`,
@@ -112,25 +99,21 @@ export class ProtocolMonitorHandler implements BlockHandler {
     message: string,
   ): Promise<void> {
     try {
-      const { error } = await this.supabase.from('execution_logs').insert({
-        execution_id: executionId,
-        node_id: nodeId,
+      await this.databaseService.executions.addLog(
+        executionId,
         level,
         message,
-        timestamp: new Date().toISOString(),
-      });
-
-      if (error) {
-        this.logger.error(`Failed to insert log: ${error.message}`);
-      }
+        {
+          nodeId,
+          timestamp: new Date().toISOString(),
+        },
+      );
     } catch (error: any) {
       this.logger.error(
         `Failed to track log: ${error?.message || 'Unknown error'}`,
       );
     }
   }
-
-  constructor(private readonly protocolService: ProtocolService) {}
 
   async execute(node: any, ctx: BlockExecutionContext): Promise<any> {
     const { id: nodeId } = node;

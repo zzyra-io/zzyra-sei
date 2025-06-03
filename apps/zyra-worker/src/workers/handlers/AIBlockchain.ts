@@ -1,23 +1,17 @@
-
-import {
-  AgentKit,
-  cdpApiActionProvider,
-  SmartWalletProvider,
-  walletActionProvider,
-} from '@coinbase/agentkit';
-import { getVercelAITools } from '@coinbase/agentkit-vercel-ai-sdk';
 import { Injectable, Logger } from '@nestjs/common';
-import { generateText } from 'ai';
 import { Address } from 'viem';
 
 import { privateKeyToAccount } from 'viem/accounts';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { createServiceClient } from '../../lib/supabase/serviceClient';
+import { DatabaseService } from '../../services/database.service';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { WalletService } from './blockchain/WalletService';
 import { BlockExecutionContext, BlockHandler } from '@zyra/types';
 
+// Lazy import types to avoid ES module issues
+type AgentKitType = any;
+type SmartWalletProviderType = any;
+type AiBlockchainTools = { [key: string]: any };
 
 // Define types for AI step results
 type StepResult = {
@@ -25,30 +19,6 @@ type StepResult = {
   step?: number;
   toolCalls?: any[];
   toolResults?: any[];
-};
-
-// Define custom types for our new tables
-type UserWallet = {
-  id: string;
-  user_id: string;
-  network_id: string;
-  smart_wallet_address: string;
-  created_at: string;
-  updated_at: string;
-};
-
-type AIBlockchainOperation = {
-  id: string;
-  user_id: string;
-  node_id: string;
-  execution_id: string;
-  operation_type: string;
-  prompt: string;
-  blockchain: string;
-  result: any;
-  status: string;
-  error: string | null;
-  created_at: string;
 };
 
 /**
@@ -71,9 +41,6 @@ asks you to do something you can't do with your currently available tools, you m
 encourage them to implement it themselves using the CDP SDK + Agentkit, recommend they go to
 docs.cdp.coinbase.com for more information. Be concise and helpful with your responses. Refrain from
 restating your tools' descriptions unless it is explicitly requested.`;
-
-// Use CoreTool for type safety; fallback to Record<string, any> if unavailable
-export type AiBlockchainTools = { [key: string]: any };
 
 /**
  * Error types for AI Blockchain operations
@@ -112,6 +79,7 @@ export class AiBlockchain implements BlockHandler {
   private readonly maxExecutionTime = 60000; // 1 minute timeout
 
   constructor(
+    private readonly databaseService: DatabaseService,
     private configService: ConfigService,
     private walletService?: WalletService,
   ) {}
@@ -145,34 +113,24 @@ export class AiBlockchain implements BlockHandler {
     networkId: string,
   ): Promise<WalletData | null> {
     try {
-      const supabase = createServiceClient();
+      // Query user wallet from database
+      const userWallet = await this.databaseService.prisma.userWallet.findFirst(
+        {
+          where: {
+            userId: userId,
+            chainId: networkId,
+          },
+        },
+      );
 
-      // Use casting to handle tables not in Supabase type definitions yet
-      const response = (await supabase
-        .from('user_wallets')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('network_id', networkId)
-        .maybeSingle()) as { data: UserWallet | null; error: any };
-
-      const { data, error } = response;
-
-      if (error) {
-        throw new AIBlockchainError(
-          `Error retrieving wallet data: ${error.message}`,
-          AIBlockchainErrorType.WALLET_ACCESS,
-          { userId, networkId },
-        );
-      }
-
-      if (!data) return null;
+      if (!userWallet) return null;
 
       return {
-        smartWalletAddress: data.smart_wallet_address as Address,
-        networkId: data.network_id,
-        userId: data.user_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
+        smartWalletAddress: userWallet.walletAddress as Address,
+        networkId: userWallet.chainId,
+        userId: userWallet.userId,
+        createdAt: userWallet.createdAt?.toISOString() || '',
+        updatedAt: userWallet.updatedAt?.toISOString() || '',
       };
     } catch (error) {
       if (error instanceof AIBlockchainError) throw error;
@@ -204,65 +162,47 @@ export class AiBlockchain implements BlockHandler {
 
     // Otherwise use the built-in implementation
     try {
-      const supabase = createServiceClient();
-
-      // Use casting to handle tables not in Supabase type definitions yet
-      const selectResponse = (await supabase
-        .from('user_wallets')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('network_id', networkId)
-        .maybeSingle()) as { data: Pick<UserWallet, 'id'> | null; error: any };
-
-      const { data: existingWallet, error: selectError } = selectResponse;
-
-      if (selectError) {
-        throw new Error(selectError.message);
-      }
+      // First check if wallet exists for this user and chain
+      const existingWallet =
+        await this.databaseService.prisma.userWallet.findFirst({
+          where: {
+            userId: userId,
+            chainId: networkId,
+          },
+        });
 
       if (existingWallet) {
         // Update existing wallet
-        const updateResponse = (await supabase
-          .from('user_wallets')
-          .update({
-            smart_wallet_address: smartWalletAddress.toString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingWallet.id)) as { error: any };
-
-        if (updateResponse.error) {
-          throw new Error(updateResponse.error.message);
-        }
+        await this.databaseService.prisma.userWallet.update({
+          where: { id: existingWallet.id },
+          data: {
+            walletAddress: smartWalletAddress,
+            updatedAt: new Date(),
+          },
+        });
       } else {
         // Create new wallet
-        const insertResponse = (await supabase.from('user_wallets').insert({
-          id: randomUUID(),
-          user_id: userId,
-          network_id: networkId,
-          smart_wallet_address: smartWalletAddress.toString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })) as { error: any };
-
-        if (insertResponse.error) {
-          throw new Error(insertResponse.error.message);
-        }
+        await this.databaseService.prisma.userWallet.create({
+          data: {
+            userId: userId,
+            chainId: networkId,
+            walletAddress: smartWalletAddress,
+            walletType: 'smart_wallet',
+            chainType: 'evm',
+          },
+        });
       }
     } catch (error) {
       throw new AIBlockchainError(
         `Failed to save wallet data: ${(error as Error).message}`,
         AIBlockchainErrorType.WALLET_ACCESS,
-        {
-          userId,
-          networkId,
-          smartWalletAddress: smartWalletAddress.toString(),
-        },
+        { userId, networkId, smartWalletAddress },
       );
     }
   }
 
   /**
-   * Record AI blockchain operation for auditing purposes
+   * Log AI blockchain operation to database
    */
   private async logOperation(
     userId: string,
@@ -271,290 +211,223 @@ export class AiBlockchain implements BlockHandler {
     data: Record<string, any>,
   ): Promise<void> {
     try {
-      const supabase = createServiceClient();
-
-      // Use casting to handle tables not in Supabase type definitions yet
-      const response = (await supabase.from('ai_blockchain_operations').insert({
-        id: randomUUID(),
-        user_id: userId,
-        node_id: nodeId,
-        execution_id: executionId,
-        operation_type: data.operation || 'query',
-        prompt: data.prompt || '',
-        blockchain: data.blockchain || '',
-        result: data.result || null,
-        status: data.status || 'completed',
-        error: data.error || null,
-        created_at: new Date().toISOString(),
-      })) as { error: any };
-
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
+      await this.databaseService.prisma.aiBlockchainOperation.create({
+        data: {
+          userId: userId,
+          nodeId: nodeId,
+          executionId: executionId,
+          operationType: data.operationType || 'unknown',
+          prompt: data.prompt || '',
+          blockchain: data.blockchain || 'ethereum',
+          result: data.result ? JSON.stringify(data.result) : null,
+          status: data.status || 'pending',
+          error: data.error || null,
+        },
+      });
     } catch (error) {
-      // Log but don't fail the operation if logging fails
       this.logger.error(
         `Failed to log AI blockchain operation: ${(error as Error).message}`,
-        {
-          userId,
-          nodeId,
-          executionId,
-          error,
-        },
       );
+      // Don't throw here as logging failure shouldn't stop execution
     }
   }
-  /**
-   * Execute an AI blockchain operation
-   */
-  async execute(node: any, ctx: BlockExecutionContext) {
-    const startTime = Date.now();
-    const operationId = randomUUID();
 
+  async execute(node: any, ctx: BlockExecutionContext) {
     try {
-      // Validate environment configuration
+      this.logger.log(`Starting AI Blockchain execution for node: ${node.id}`);
+
+      // Validate configuration first
       this.validateConfig();
 
-      // Extract and validate input parameters
-      const { prompt, operation, blockchain, timeout } =
-        node.data?.config || {};
+      // Check if this is production environment and warn about experimental feature
+      if (process.env.NODE_ENV === 'production') {
+        this.logger.warn(
+          'AI Blockchain handler is experimental and not recommended for production',
+        );
+      }
+
+      // Try to dynamically import required modules
+      let AgentKit: any,
+        SmartWalletProvider: any,
+        walletActionProvider: any,
+        cdpApiActionProvider: any,
+        getVercelAITools: any,
+        createOpenRouter: any,
+        generateText: any;
+
+      try {
+        // Dynamic imports to avoid ES module issues
+        const agentKitModule = await import('@coinbase/agentkit');
+        AgentKit = agentKitModule.AgentKit;
+        SmartWalletProvider = agentKitModule.SmartWalletProvider;
+        walletActionProvider = agentKitModule.walletActionProvider;
+        cdpApiActionProvider = agentKitModule.cdpApiActionProvider;
+
+        const vercelModule = await import('@coinbase/agentkit-vercel-ai-sdk');
+        getVercelAITools = vercelModule.getVercelAITools;
+
+        const openRouterModule = await import('@openrouter/ai-sdk-provider');
+        createOpenRouter = openRouterModule.createOpenRouter;
+
+        const aiModule = await import('ai');
+        generateText = aiModule.generateText;
+      } catch (importError) {
+        throw new AIBlockchainError(
+          `Failed to load required blockchain modules: ${importError instanceof Error ? importError.message : String(importError)}`,
+          AIBlockchainErrorType.CONFIGURATION,
+          { nodeId: node.id, importError },
+        );
+      }
+
+      const startTime = Date.now();
+      const executionId = ctx.executionId;
+      const userId = ctx.userId;
+      const nodeId = node.id;
+
+      const inputData = node.data || {};
+      const { prompt, blockchain = 'base-sepolia' } = inputData;
 
       if (!prompt) {
         throw new AIBlockchainError(
-          'Missing required parameter: prompt',
+          'AI Blockchain prompt is required',
           AIBlockchainErrorType.VALIDATION,
-          { nodeId: node.id },
+          { nodeId },
         );
       }
 
-      // Get userId from context
-      const userId = ctx.userId || 'unknown_user';
-      const networkId = process.env.NETWORK_ID || 'base-sepolia';
-
-      ctx.logger.log(
-        `Starting AI blockchain operation: ${operation || 'query'}`,
-        {
-          userId,
-          nodeId: node.id,
-          operationId,
-          networkId,
-        },
+      // Create account from private key
+      const account = privateKeyToAccount(
+        this.configService.get<string>('ETHEREUM_PRIVATE_KEY') as `0x${string}`,
       );
 
-      // Initialize signer from private key
-      const privateKey = process.env.ETHEREUM_PRIVATE_KEY;
-      if (!privateKey) {
-        throw new AIBlockchainError(
-          'Missing Ethereum private key',
-          AIBlockchainErrorType.CONFIGURATION,
-        );
-      }
-
-      // Ensure the private key has the correct format
-      const formattedPrivateKey: `0x${string}` = privateKey.startsWith('0x')
-        ? (privateKey as `0x${string}`)
-        : (`0x${privateKey}` as `0x${string}`);
-
-      const signer = privateKeyToAccount(formattedPrivateKey);
-
-      // Get wallet data from secure storage
+      // Get or create user wallet
+      const networkId = this.configService.get<string>(
+        'NETWORK_ID',
+        blockchain,
+      );
       let walletData = await this.getWalletData(userId, networkId);
 
-      // Configure Smart Wallet Provider
-      const walletProvider = await SmartWalletProvider.configureWithWallet({
-        networkId: networkId,
-        signer: signer,
-        smartWalletAddress: walletData?.smartWalletAddress,
-        paymasterUrl: process.env.PAYMASTER_URL, // Optional: Sponsor transactions
+      if (!walletData) {
+        this.logger.log(
+          `Creating new wallet for user ${userId} on network ${networkId}`,
+        );
+      }
+
+      // Initialize SmartWalletProvider
+      const walletProvider = new SmartWalletProvider({
+        account,
+        walletData: walletData
+          ? {
+              walletId: walletData.smartWalletAddress,
+              networkId: walletData.networkId,
+            }
+          : undefined,
       });
 
-      // Save/update wallet data securely
-      const smartWalletAddress = walletProvider.getAddress();
-      // Convert the address to 0x hex string format expected by TypeScript
-      await this.saveWalletData(
-        userId,
-        networkId,
-        smartWalletAddress as `0x${string}`,
+      // Initialize AgentKit
+      const agentKit = new AgentKit({
+        wallet: walletProvider,
+        actions: [walletActionProvider, cdpApiActionProvider],
+      });
+
+      // Save wallet data if this is a new wallet
+      if (!walletData) {
+        const smartWalletAddress = await agentKit.wallet.getAddress();
+        await this.saveWalletData(userId, networkId, smartWalletAddress);
+        this.logger.log(
+          `Saved new wallet ${smartWalletAddress} for user ${userId}`,
+        );
+      }
+
+      // Get available tools
+      const tools = getVercelAITools(agentKit);
+
+      // Initialize OpenRouter
+      const openrouter = createOpenRouter({
+        apiKey: this.configService.get<string>('OPENROUTER_API_KEY'),
+      });
+
+      this.logger.log(`Executing AI prompt: "${prompt.substring(0, 100)}..."`);
+
+      // Execute AI generation with timeout
+      const executionPromise = generateText({
+        model: openrouter('anthropic/claude-3.5-sonnet'),
+        tools,
+        system,
+        prompt,
+        maxSteps: 10,
+      });
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new AIBlockchainError(
+                'AI execution timeout',
+                AIBlockchainErrorType.TIMEOUT,
+                { nodeId, prompt: prompt.substring(0, 100) },
+              ),
+            ),
+          this.maxExecutionTime,
+        ),
       );
 
-      // Configure Agent Kit
-      const cdpApiKeyName = process.env.CDP_API_KEY_NAME;
-      const cdpApiKeyPrivateKey = process.env.CDP_API_KEY_PRIVATE_KEY;
+      const result = await Promise.race([executionPromise, timeoutPromise]);
 
-      if (!cdpApiKeyName || !cdpApiKeyPrivateKey) {
-        throw new AIBlockchainError(
-          'Missing CDP API credentials',
-          AIBlockchainErrorType.CONFIGURATION,
-        );
-      }
+      const executionTime = Date.now() - startTime;
 
-      const agentKit = await AgentKit.from({
-        walletProvider,
-        actionProviders: [
-          walletActionProvider(),
-          cdpApiActionProvider({
-            apiKeyName: cdpApiKeyName,
-            apiKeyPrivateKey: cdpApiKeyPrivateKey,
-          }),
-        ],
-      });
-
-      // Configure AI tools
-      const tools = getVercelAITools(agentKit);
-      const openRouterApiKey = process.env.OPENROUTER_API_KEY;
-
-      if (!openRouterApiKey) {
-        throw new AIBlockchainError(
-          'Missing OpenRouter API key',
-          AIBlockchainErrorType.CONFIGURATION,
-        );
-      }
-
-      const openrouter = createOpenRouter({
-        apiKey: openRouterApiKey,
-      });
-
-      // Prepare and enhance prompt
-      const mergedPrompt = `${prompt} ${operation ? `(Operation: ${operation})` : ''} ${blockchain ? `(Blockchain: ${blockchain})` : ''}`;
-
-      ctx.logger.log(`Sending AI prompt: ${mergedPrompt.substring(0, 100)}...`);
-
-      // Create promise with timeout
-      const operationTimeoutMs = timeout
-        ? Math.min(Number(timeout), this.maxExecutionTime)
-        : this.maxExecutionTime;
-
-      // Main execution with timeout protection
-      const executionPromise = generateText({
-        model: openrouter('openai/gpt-4o-mini'),
-        system,
-        tools,
-        prompt: mergedPrompt,
-        maxSteps: 10, // Maximum number of tool invocations per request
-        onStepFinish: (event: StepResult) => {
-          // Log each step for debugging and auditing
-          ctx.logger.log(`AI step: ${event.index || event.step || 0}`, {
-            hasToolCalls: !!event.toolCalls?.length,
-            hasToolResults: !!event.toolResults?.length,
-          });
-
-          // Check if execution timeout is reached
-          if (Date.now() - startTime > operationTimeoutMs) {
-            throw new AIBlockchainError(
-              `Operation timed out after ${operationTimeoutMs}ms`,
-              AIBlockchainErrorType.TIMEOUT,
-              { operationId },
-            );
-          }
-        },
-      });
-
-      // Add timeout protection
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          reject(
-            new AIBlockchainError(
-              `Operation timed out after ${operationTimeoutMs}ms`,
-              AIBlockchainErrorType.TIMEOUT,
-              { operationId },
-            ),
-          );
-        }, operationTimeoutMs);
-      });
-
-      // Race between execution and timeout
-      const result = (await Promise.race([
-        executionPromise,
-        timeoutPromise,
-      ])) as any;
-
-      ctx.logger.log('AI operation completed', {
-        responseLength: result?.text?.length || 0,
-        steps: result?.steps?.length || 0,
-        executionTime: Date.now() - startTime,
-      });
-
-      // Structure the output in a way that can be properly logged
-      const structuredOutput = {
-        aiResponse: result.text,
-        metadata: {
-          operation: operation,
-          blockchain: blockchain,
-          walletAddress: smartWalletAddress,
-          timestamp: new Date().toISOString(),
-          executionTime: Date.now() - startTime,
-          operationId,
-        },
-        toolCalls: result.steps?.flatMap((step) => step.toolCalls || []) || [],
-        toolResults:
-          result.steps?.flatMap((step) => step.toolResults || []) || [],
-      };
-
-      // Log the operation for auditing
-      await this.logOperation(userId, node.id, ctx.executionId, {
-        operation,
+      // Log successful operation
+      await this.logOperation(userId, nodeId, executionId, {
         prompt,
         blockchain,
-        result: structuredOutput,
+        result: result.text,
+        execution_time_ms: executionTime,
         status: 'completed',
       });
 
-      return structuredOutput;
+      this.logger.log(
+        `AI Blockchain execution completed in ${executionTime}ms for node: ${nodeId}`,
+      );
+
+      return {
+        success: true,
+        result: result.text,
+        steps: result.steps?.map((step: StepResult, index: number) => ({
+          step: index + 1,
+          toolCalls: step.toolCalls || [],
+          toolResults: step.toolResults || [],
+        })),
+        walletAddress: await agentKit.wallet.getAddress(),
+        networkId,
+        executionTime,
+      };
     } catch (error) {
-      // Handle and categorize errors
-      let errorType = AIBlockchainErrorType.UNKNOWN;
-      let errorMessage = 'Unknown error occurred';
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorType =
+        error instanceof AIBlockchainError
+          ? error.type
+          : AIBlockchainErrorType.UNKNOWN;
 
-      if (error instanceof AIBlockchainError) {
-        errorType = error.type;
-        errorMessage = error.message;
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-        // Categorize common errors
-        if (errorMessage.includes('timeout')) {
-          errorType = AIBlockchainErrorType.TIMEOUT;
-        } else if (errorMessage.includes('configuration')) {
-          errorType = AIBlockchainErrorType.CONFIGURATION;
-        }
-      }
+      this.logger.error(
+        `AI Blockchain execution failed: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
 
-      const errorResponse = {
+      // Log failed operation
+      await this.logOperation(ctx.userId, node.id, ctx.executionId, {
+        prompt: node.data?.prompt,
+        blockchain: node.data?.blockchain,
+        error: errorMessage,
+        status: 'failed',
+      });
+
+      return {
+        success: false,
         error: errorMessage,
         errorType,
-        metadata: {
-          nodeId: node.id,
-          executionId: ctx.executionId,
-          operationId,
-          timestamp: new Date().toISOString(),
-          executionTime: Date.now() - startTime,
-        },
+        nodeId: node.id,
       };
-
-      // Log the error for debugging and monitoring
-      this.logger.error(
-        `AI blockchain operation failed: ${errorMessage}`,
-        errorResponse,
-      );
-      ctx.logger.error(
-        `AI blockchain operation failed: ${errorMessage}`,
-        errorResponse,
-      );
-
-      // Log the failed operation for auditing
-      await this.logOperation(
-        ctx.userId || 'unknown_user',
-        node.id,
-        ctx.executionId,
-        {
-          operation: node.data?.config?.operation || 'unknown',
-          prompt: node.data?.config?.prompt || '',
-          blockchain: node.data?.config?.blockchain || '',
-          error: errorMessage,
-          status: 'failed',
-        },
-      );
-
-      throw error;
     }
   }
 

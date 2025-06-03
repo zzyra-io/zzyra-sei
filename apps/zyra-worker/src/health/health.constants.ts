@@ -1,6 +1,6 @@
-import { AMQP_CONNECTION } from '../config';
+import { RabbitMQService } from '../services/rabbitmq.service';
 
 export const RABBITMQ_HEALTH_PROVIDER = {
   provide: 'RABBITMQ_HEALTH_CONNECTION',
-  useExisting: AMQP_CONNECTION,
+  useClass: RabbitMQService,
 };

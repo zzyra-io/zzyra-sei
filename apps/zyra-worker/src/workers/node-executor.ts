@@ -75,8 +75,11 @@ export class NodeExecutor {
     private readonly executionLogger: ExecutionLogger,
   ) {
     this.circuitBreaker = new CircuitBreaker();
-    // Initialize BlockHandlerRegistry with class-level logger
-    const registry = new BlockHandlerRegistry(this.logger);
+    // Initialize BlockHandlerRegistry with class-level logger and database service
+    const registry = new BlockHandlerRegistry(
+      this.logger,
+      this.databaseService,
+    );
     this.handlers = registry.getAllHandlers();
   }
 
