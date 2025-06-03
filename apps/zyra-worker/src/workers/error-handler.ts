@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createServiceClient } from '../lib/supabase/serviceClient';
+import { DatabaseService } from '../services/database.service';
 import { ExecutionEventsService } from '../lib/services/execution-events.service';
 
 @Injectable()
 export class ErrorHandler {
   private readonly logger = new Logger(ErrorHandler.name);
+
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async handleJobFailure(
     error: Error,
@@ -12,7 +14,6 @@ export class ErrorHandler {
     userId: string,
     nodeId?: string,
   ): Promise<void> {
-    const supabase = createServiceClient();
     const errorType = this.categorizeError(error);
     const details = {
       type: errorType,
@@ -25,15 +26,26 @@ export class ErrorHandler {
       `[executionId=${executionId}] Job failed: ${error.message}`,
       { userId, details },
     );
-    await supabase
-      .from('workflow_executions')
-      .update({
-        status: 'failed',
-        error: error.message,
+
+    // Update execution status using DatabaseService
+    await this.databaseService.executions.updateStatus(
+      executionId,
+      'failed',
+      error.message,
+    );
+
+    // Add detailed error log
+    await this.databaseService.executions.addLog(
+      executionId,
+      'error',
+      `Job failed: ${error.message}`,
+      {
+        error_type: errorType,
         error_details: details,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', executionId);
+        node_id: nodeId || 'system',
+        user_id: userId,
+      },
+    );
 
     ExecutionEventsService.emitWorkflowFailed({
       executionId,

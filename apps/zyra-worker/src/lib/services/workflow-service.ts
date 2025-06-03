@@ -20,8 +20,10 @@ export interface Workflow {
 // Utility: detect cycles in workflow graph
 function detectCycle(nodes: any[], edges: any[]): boolean {
   const adj: Record<string, string[]> = {};
-  nodes.forEach(n => { adj[n.id] = []; });
-  edges.forEach(e => {
+  nodes.forEach((n) => {
+    adj[n.id] = [];
+  });
+  edges.forEach((e) => {
     const src = (e as any).source ?? (e as any).sourceNodeId;
     const tgt = (e as any).target ?? (e as any).targetNodeId;
     if (src && tgt && adj[src]) adj[src].push(tgt);
@@ -40,7 +42,7 @@ function detectCycle(nodes: any[], edges: any[]): boolean {
     recStack[u] = false;
     return false;
   }
-  return nodes.some(n => dfs(n.id));
+  return nodes.some((n) => dfs(n.id));
 }
 
 @Injectable()
@@ -52,10 +54,10 @@ export class WorkflowService {
       .select('*')
       .order('created_at', { ascending: false });
     if (error) throw new Error(`Error fetching workflows: ${error.message}`);
-    return (data || []).map(d => ({
+    return (data || []).map((d) => ({
       ...d,
-      nodes: (d.nodes as any) as any[],
-      edges: (d.edges as any) as any[],
+      nodes: d.nodes as any as any[],
+      edges: d.edges as any as any[],
     }));
   }
 
@@ -69,8 +71,8 @@ export class WorkflowService {
     if (error) throw new Error(`Error fetching workflow: ${error.message}`);
     return {
       ...(data as any),
-      nodes: (data?.nodes as any) as any[],
-      edges: (data?.edges as any) as any[],
+      nodes: data?.nodes as any as any[],
+      edges: data?.edges as any as any[],
     };
   }
 
@@ -85,7 +87,9 @@ export class WorkflowService {
       is_public: workflow.is_public || false,
     };
     if (detectCycle(newWorkflow.nodes, newWorkflow.edges)) {
-      throw new Error('Workflow contains a cycle; please remove loops before saving.');
+      throw new Error(
+        'Workflow contains a cycle; please remove loops before saving.',
+      );
     }
     const { data, error } = await supabase
       .from('workflows')
@@ -98,11 +102,17 @@ export class WorkflowService {
 
   async updateWorkflow(
     id: string,
-    workflow: Partial<Workflow>
+    workflow: Partial<Workflow>,
   ): Promise<Workflow> {
     const supabase: SupabaseClient<Database> = createServiceClient();
-    if (workflow.nodes && workflow.edges && detectCycle(workflow.nodes, workflow.edges)) {
-      throw new Error('Workflow update contains a cycle; please remove loops before saving.');
+    if (
+      workflow.nodes &&
+      workflow.edges &&
+      detectCycle(workflow.nodes, workflow.edges)
+    ) {
+      throw new Error(
+        'Workflow update contains a cycle; please remove loops before saving.',
+      );
     }
     const { data, error } = await supabase
       .from('workflows')
@@ -116,10 +126,7 @@ export class WorkflowService {
 
   async deleteWorkflow(id: string): Promise<void> {
     const supabase: SupabaseClient<Database> = createServiceClient();
-    const { error } = await supabase
-      .from('workflows')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.from('workflows').delete().eq('id', id);
     if (error) throw new Error(`Error deleting workflow: ${error.message}`);
   }
 }

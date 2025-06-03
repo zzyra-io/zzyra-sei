@@ -13,7 +13,7 @@ import { AMQP_CONNECTION, EXECUTION_DLQ, EXECUTION_QUEUE } from '../config';
 import { WorkflowExecutor } from './workflow-executor';
 import { ExecutionLogger } from './execution-logger';
 import { ErrorHandler } from './error-handler';
-import { createServiceClient } from '@/lib/supabase/serviceClient';
+import { DatabaseService } from '../services/database.service';
 
 @Global()
 @Injectable()
@@ -38,6 +38,7 @@ export class ExecutionWorker implements OnModuleInit {
     private readonly workflowExecutor: WorkflowExecutor,
     private readonly executionLogger: ExecutionLogger,
     private readonly errorHandler: ErrorHandler,
+    private readonly databaseService: DatabaseService,
   ) {}
 
   async onModuleInit() {
@@ -142,22 +143,14 @@ export class ExecutionWorker implements OnModuleInit {
   private async processItem(batch: any[]): Promise<void> {
     const span = this.tracer.startSpan('processItem');
     try {
-      const supabase = createServiceClient();
       const workerId = `worker-${process.pid}-${Math.random().toString(36).substring(2, 10)}`;
       this.logger.log(`Worker ${workerId} looking for pending executions...`);
 
-      const { data: pendingExecutions, error } = await supabase
-        .from('workflow_executions')
-        .select('id, workflow_id, triggered_by, status')
-        .eq('status', 'pending')
-        .limit(batch.length || 1);
-
-      if (error) {
-        this.logger.error(
-          `Failed to fetch pending executions: ${error.message}`,
+      // Use DatabaseService instead of Supabase
+      const pendingExecutions =
+        await this.databaseService.getPendingExecutionsForWorker(
+          batch.length || 1,
         );
-        throw new Error(`Failed to fetch pending executions: ${error.message}`);
-      }
 
       if (!pendingExecutions || pendingExecutions.length === 0) {
         this.logger.debug('No pending executions found');
@@ -172,34 +165,29 @@ export class ExecutionWorker implements OnModuleInit {
       for (const execution of pendingExecutions) {
         this.logger.log(`Attempting to claim execution ${execution.id}...`);
 
-        // Try with a more resilient update that doesn't depend on retry_count
-        const { error: updateError } = await supabase
-          .from('workflow_executions')
-          .update({
-            status: 'running',
-            locked_by: workerId,
-            started_at: new Date().toISOString(),
-            user_id: execution.triggered_by, // Set user_id from triggered_by
-            // Don't include retry_count in the update
-          })
-          .eq('id', execution.id)
-          .eq('status', 'pending');
+        try {
+          // Use DatabaseService to lock execution
+          await this.databaseService.lockExecutionForWorker(
+            execution.id,
+            workerId,
+          );
 
-        if (updateError) {
+          this.logger.log(`Successfully claimed execution ${execution.id}`);
+          claimedExecutions.push(execution.id);
+
+          // Log the claim
+          await this.databaseService.executions.addLog(
+            execution.id,
+            'info',
+            `Worker ${workerId} claimed execution`,
+            { worker_id: workerId },
+          );
+        } catch (error) {
           this.logger.warn(
-            `Failed to claim execution ${execution.id}: ${updateError.message}`,
+            `Failed to claim execution ${execution.id}: ${error}`,
           );
           continue;
         }
-
-        this.logger.log(`Successfully claimed execution ${execution.id}`);
-        claimedExecutions.push(execution.id);
-        await this.executionLogger.logExecutionEvent(supabase, execution.id, {
-          level: 'info',
-          message: `Worker ${workerId} claimed execution`,
-          node_id: 'system',
-          data: { worker_id: workerId },
-        });
       }
 
       if (claimedExecutions.length === 0) {
@@ -215,8 +203,8 @@ export class ExecutionWorker implements OnModuleInit {
         .filter((e) => claimedExecutions.includes(e.id))
         .map((e) => ({
           execution_id: e.id,
-          workflow_id: e.workflow_id,
-          user_id: e.triggered_by,
+          workflow_id: e.workflowId,
+          user_id: e.userId,
           id: e.id,
           payload: {},
           status: 'processing',
@@ -224,7 +212,7 @@ export class ExecutionWorker implements OnModuleInit {
 
       for (const job of jobs) {
         this.logger.log(`Processing job for execution ${job.execution_id}...`);
-        await this.processJob(job, supabase);
+        await this.processJob(job);
       }
     } catch (error) {
       this.logger.error(
@@ -236,7 +224,7 @@ export class ExecutionWorker implements OnModuleInit {
     }
   }
 
-  private async processJob(job: any, supabase: any): Promise<void> {
+  private async processJob(job: any): Promise<void> {
     try {
       const {
         execution_id: executionId,
@@ -248,51 +236,48 @@ export class ExecutionWorker implements OnModuleInit {
       const isResume = payload.resumed === true;
       const resumeData = isResume ? payload.resumeData || {} : {};
 
+      // Get workflow using existing method
       let workflow =
         this.workflowCache.get(workflowId) ||
         (await this.fetchWorkflow(workflowId));
       if (workflow.user_id !== userId)
         throw new Error('User does not have permission');
 
+      // Get or create profile using DatabaseService
       let profile =
         this.profileCache.get(userId) ||
-        (await this.fetchOrCreateProfile(userId, supabase));
-      if (profile.monthly_execution_count >= profile.monthly_execution_quota)
+        (await this.databaseService.getOrCreateUserProfile(userId));
+      if (profile.monthlyExecutionCount >= profile.monthlyExecutionQuota) {
         throw new Error('Monthly execution quota exceeded');
+      }
 
-      await supabase
-        .from('profiles')
-        .update({
-          monthly_execution_count: profile.monthly_execution_count + 1,
-        })
-        .eq('id', userId);
-      const { data: execution } = await supabase
-        .from('workflow_executions')
-        .select('status')
-        .eq('id', executionId)
-        .single();
-      if (execution?.status === 'paused' && !isResume) return;
-
-      await supabase
-        .from('workflow_executions')
-        .update({
-          status: 'running',
-          started_at:
-            isRetry || isResume ? new Date().toISOString() : undefined,
-          user_id: userId,
-        })
-        .eq('id', executionId);
-      await this.executionLogger.logExecutionEvent(supabase, executionId, {
-        level: 'info',
-        message: isRetry
-          ? 'Execution retry started'
-          : isResume
-            ? 'Execution resumed'
-            : 'Execution started by worker',
-        node_id: 'system',
+      // Increment execution count
+      await this.databaseService.prisma.profile.update({
+        where: { id: userId },
+        data: {
+          monthlyExecutionCount: {
+            increment: 1,
+          },
+        },
       });
 
+      // Check execution status
+      const execution =
+        await this.databaseService.executions.findById(executionId);
+      if (execution?.status === 'paused' && !isResume) return;
+
+      // Update execution status
+      await this.databaseService.updateExecutionStatusWithLogging(
+        executionId,
+        'running',
+        undefined,
+        undefined,
+      );
+
+      // Extract workflow definition
       const { nodes, edges } = this.extractNodesAndEdges(workflow);
+
+      // Execute workflow
       const result = await this.workflowExecutor.executeWorkflow(
         nodes,
         edges,
@@ -302,33 +287,13 @@ export class ExecutionWorker implements OnModuleInit {
         resumeData,
       );
 
-      await supabase
-        .from('workflow_executions')
-        .update({
-          status: result.status,
-          completed_at:
-            result.status !== 'paused' ? new Date().toISOString() : null,
-          result: result.outputs,
-          error: result.error,
-        })
-        .eq('id', executionId);
-      if (result.status !== 'paused')
-        await this.executionLogger.logExecutionEvent(supabase, executionId, {
-          level: result.status === 'completed' ? 'info' : 'error',
-          message:
-            result.status === 'completed'
-              ? 'Execution completed successfully'
-              : `Execution failed: ${result.error}`,
-          node_id: 'system',
-        });
-      await supabase
-        .from('execution_queue')
-        .update({
-          status: result.status === 'paused' ? 'paused' : 'completed',
-          updated_at: new Date().toISOString(),
-          error: result.error || null,
-        })
-        .eq('id', job.id);
+      // Update final status
+      await this.databaseService.updateExecutionStatusWithLogging(
+        executionId,
+        result.status,
+        result.outputs,
+        result.error,
+      );
     } catch (error) {
       await this.errorHandler.handleJobFailure(
         error instanceof Error ? error : new Error(String(error)),
@@ -346,31 +311,6 @@ export class ExecutionWorker implements OnModuleInit {
       'data' in workflowResult ? workflowResult.data : workflowResult;
     this.workflowCache.set(workflowId, workflow);
     return workflow;
-  }
-
-  private async fetchOrCreateProfile(userId: string, supabase: any) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('monthly_execution_count, monthly_execution_quota')
-      .eq('id', userId);
-    if (error) throw new Error(`Failed to fetch profile: ${error.message}`);
-    if (!data || data.length === 0) {
-      const defaultProfile = {
-        id: userId,
-        monthly_execution_count: 0,
-        monthly_execution_quota: 100,
-        created_at: new Date().toISOString(),
-      };
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert(defaultProfile);
-      if (insertError)
-        throw new Error(`Failed to create profile: ${insertError.message}`);
-      this.profileCache.set(userId, defaultProfile);
-      return defaultProfile;
-    }
-    this.profileCache.set(userId, data[0]);
-    return data[0];
   }
 
   private extractNodesAndEdges(workflow: any) {

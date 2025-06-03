@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseClient } from '@supabase/supabase-js';
+import { DatabaseService } from '../services/database.service';
 import { BlockExecutionContext } from '@zyra/types';
 
 // Extended logger interface with the 'log' method for compatibility
@@ -13,33 +13,31 @@ interface ExtendedLogger {
 
 import { configDotenv } from 'dotenv';
 
-
-
 @Injectable()
 export class ExecutionLogger {
   private readonly logger = new Logger(ExecutionLogger.name);
 
+  constructor(private readonly databaseService: DatabaseService) {}
+
   async logExecutionEvent(
-    supabase: SupabaseClient,
     executionId: string,
     event: {
-      level: 'info' | 'error' | 'warning';
+      level: 'info' | 'error' | 'warn';
       message: string;
       node_id: string;
       data?: any;
     },
   ): Promise<void> {
     try {
-      const { error } = await supabase.from('execution_logs').insert({
-        execution_id: executionId,
-        level: event.level,
-        message: event.message,
-        node_id: event.node_id,
-        data: event.data || null,
-        timestamp: new Date().toISOString(),
-      });
-      if (error)
-        this.logger.error(`Failed to log execution event: ${error.message}`);
+      await this.databaseService.executions.addLog(
+        executionId,
+        event.level,
+        event.message,
+        {
+          node_id: event.node_id,
+          ...event.data,
+        },
+      );
     } catch (err) {
       this.logger.error(
         `Error logging execution event: ${err instanceof Error ? err.message : String(err)}`,
@@ -48,23 +46,22 @@ export class ExecutionLogger {
   }
 
   async logNodeEvent(
-    supabase: SupabaseClient,
     executionId: string,
     nodeId: string,
-    level: 'info' | 'warning' | 'error',
+    level: 'info' | 'warn' | 'error',
     message: string,
     data?: any,
   ): Promise<void> {
     try {
-      const { error } = await supabase.from('node_logs').insert({
-        execution_id: executionId,
-        node_id: nodeId,
+      await this.databaseService.executions.addLog(
+        executionId,
         level,
         message,
-        data: data || null,
-        timestamp: new Date().toISOString(),
-      });
-      if (error) this.logger.warn(`Failed to log node event: ${error.message}`);
+        {
+          node_id: nodeId,
+          ...data,
+        },
+      );
     } catch (err) {
       this.logger.warn(
         `Error logging node event: ${err instanceof Error ? err.message : String(err)}`,
@@ -72,46 +69,21 @@ export class ExecutionLogger {
     }
   }
 
-  createNodeLogger(
-    supabase: SupabaseClient,
-    executionId: string,
-    nodeId: string,
-  ): ExtendedLogger {
+  createNodeLogger(executionId: string, nodeId: string): ExtendedLogger {
     return {
       // Use log for standard informational messages (same as info for compatibility)
       log: (message: string, data?: any) =>
-        this.logNodeEvent(supabase, executionId, nodeId, 'info', message, data),
+        this.logNodeEvent(executionId, nodeId, 'info', message, data),
       // info is an alias for log to maintain interface compatibility
       info: (message: string, data?: any) =>
-        this.logNodeEvent(supabase, executionId, nodeId, 'info', message, data),
+        this.logNodeEvent(executionId, nodeId, 'info', message, data),
       error: (message: string, data?: any) =>
-        this.logNodeEvent(
-          supabase,
-          executionId,
-          nodeId,
-          'error',
-          message,
-          data,
-        ),
+        this.logNodeEvent(executionId, nodeId, 'error', message, data),
       warn: (message: string, data?: any) =>
-        this.logNodeEvent(
-          supabase,
-          executionId,
-          nodeId,
-          'warning',
-          message,
-          data,
-        ),
+        this.logNodeEvent(executionId, nodeId, 'warn', message, data),
       debug: (message: string, data?: any) => {
         this.logger.debug(message);
-        return this.logNodeEvent(
-          supabase,
-          executionId,
-          nodeId,
-          'info',
-          message,
-          data,
-        );
+        return this.logNodeEvent(executionId, nodeId, 'info', message, data);
       },
     };
   }

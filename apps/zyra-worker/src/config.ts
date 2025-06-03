@@ -1,5 +1,4 @@
-import { RabbitMQModuleOptions } from '@argahvk/rabbitmq';
-import { AssertQueue, Options } from 'amqplib';
+import { Options } from 'amqplib';
 
 interface ExtendedQueueOptions extends Options.AssertQueue {
   name: string;

@@ -15,14 +15,14 @@ import { NotificationModule } from '../../services/notification.module';
     WorkflowExecutor,
     NodeExecutor,
     ExecutionLogger,
-    ErrorHandler
+    ErrorHandler,
   ],
   exports: [
     WorkflowService,
     WorkflowExecutor,
     NodeExecutor,
     ExecutionLogger,
-    ErrorHandler
+    ErrorHandler,
   ],
 })
 export class WorkflowModule {}

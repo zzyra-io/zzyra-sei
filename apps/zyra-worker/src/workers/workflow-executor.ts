@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
-import { createServiceClient } from '../lib/supabase/serviceClient';
+import { DatabaseService } from '../services/database.service';
 import {
   topologicalSort,
   validateAcyclic,
@@ -10,12 +10,11 @@ import {
 import { validateWorkflowDefinition } from '../utils/blockValidator';
 import { NodeExecutor } from './node-executor';
 import { ExecutionLogger } from './execution-logger';
-import { SupabaseClient } from '@supabase/supabase-js';
-
-import { Database, TablesInsert, TablesUpdate } from '../types/supabase';
-import { NotificationService, NotificationType } from '../services/notification.service';
+import {
+  NotificationService,
+  NotificationType,
+} from '../services/notification.service';
 import { BlockType } from '@zyra/types';
-
 
 @Injectable()
 export class WorkflowExecutor {
@@ -23,6 +22,7 @@ export class WorkflowExecutor {
   private tracer = trace.getTracer('workflow-execution');
 
   constructor(
+    private readonly databaseService: DatabaseService,
     private readonly nodeExecutor: NodeExecutor,
     private readonly executionLogger: ExecutionLogger,
     private readonly notificationService: NotificationService,
@@ -102,46 +102,40 @@ export class WorkflowExecutor {
       attributes: { executionId, userId },
     });
     const start = Date.now();
-    const supabase = createServiceClient();
 
     // Define these variables early to be accessible in finally block
     let finalStatus: string = 'processing';
     let finalError: string | null = null;
-    let workflowName: string = 'Unknown Workflow'; // Default or fetch later
+    let workflowName: string = 'Unknown Workflow';
     const activeNodeExecutions = new Set<string>();
-    type ExecDataType = { workflow_id: string; workflows: { name: string } | null } | null;
-    let execData: ExecDataType = null;
+    let workflowId: string = 'unknown';
 
     try {
-      // --- Fetch Workflow Name (Assuming executionId relates to workflow_executions table which has workflow_id)
-      // We need the workflow name for notifications. This might require an extra query.
-      // Let's assume we can get it somehow, perhaps via the execution record.
-      // Placeholder - This logic needs refinement based on actual data flow.
-      const { data: fetchedExecData, error: execError } = await supabase
-        .from('workflow_executions')
-        .select('workflow_id, workflows ( name )')
-        .eq('id', executionId)
-        .single();
-
-      execData = fetchedExecData as ExecDataType;
-
-      if (execError) {
-        this.logger.warn(`Could not fetch workflow name for execution ${executionId}: ${execError.message}`);
-      } else if (execData?.workflows?.name) {
-        workflowName = execData.workflows.name;
+      // Fetch execution details to get workflow info
+      const execution =
+        await this.databaseService.executions.findById(executionId);
+      if (execution) {
+        workflowId = execution.workflowId;
+        const workflow =
+          await this.databaseService.workflows.findById(workflowId);
+        if (workflow) {
+          workflowName = workflow.name;
+        }
       }
-      // --- End Fetch Workflow Name
 
-      // --- Send Workflow Started Notification ---
-      await this.notificationService.sendNotification(userId, 'workflow_started', {
-        workflow_id: execData?.workflow_id || 'unknown',
-        execution_id: executionId,
-        workflow_name: workflowName,
-      });
-      // --- End Send Notification ---
+      // Send workflow started notification
+      await this.notificationService.sendNotification(
+        userId,
+        'workflow_started',
+        {
+          workflow_id: workflowId,
+          execution_id: executionId,
+          workflow_name: workflowName,
+        },
+      );
 
       // Log workflow execution start
-      await this.executionLogger.logExecutionEvent(supabase, executionId, {
+      await this.executionLogger.logExecutionEvent(executionId, {
         level: 'info',
         message: 'Starting workflow execution',
         node_id: 'system',
@@ -153,16 +147,13 @@ export class WorkflowExecutor {
       });
 
       // Validate workflow definition
-      const handlerRegistry: Record<string, any> = {}; // Create a registry of handlers from node executor
-      // Import all block types
+      const handlerRegistry: Record<string, any> = {};
       const blockTypes = Object.values(BlockType);
 
-      // Create a simple registry for validation
       blockTypes.forEach((type) => {
         handlerRegistry[type] = { validateConfig: () => [] };
       });
 
-      // Now call with the correct parameters
       validateWorkflowDefinition(nodes, handlerRegistry, userId);
 
       // Additional validations for production
@@ -173,7 +164,6 @@ export class WorkflowExecutor {
       // Sort nodes in execution order
       const sortedNodes = topologicalSort(nodes, edges);
 
-      // Log all nodes and their types for debugging
       this.logger.debug(
         `Workflow nodes (${nodes.length}): ${JSON.stringify(
           nodes.map((n) => ({
@@ -198,39 +188,36 @@ export class WorkflowExecutor {
       const outputs: Record<string, any> = resumeData || {};
 
       // If resuming, skip nodes until we reach the resume point
-      let shouldExecute = !resumeFromNodeId; // If no resumeFromNodeId, execute all nodes
+      let shouldExecute = !resumeFromNodeId;
       let resumeNodeFound = false;
 
-      // Track active node executions for cleanup in case of errors
       // Create block execution records for all nodes
       await Promise.all(
         nodes.map(async (node) => {
-          const blockExecution: TablesInsert<'block_executions'> = {
-            node_id: node.id,
-            workflow_execution_id: executionId,
-            block_type: node.data?.type || node.data?.blockType || node.type,
-            status:
-              resumeFromNodeId && node.id === resumeFromNodeId
-                ? 'completed'
-                : 'pending',
-            inputs: node.data?.config || {},
-            created_at: new Date().toISOString(),
-          };
-
-          const { error } = await supabase
-            .from('block_executions')
-            .insert(blockExecution);
-
-          if (error) {
+          try {
+            await this.databaseService.prisma.blockExecution.create({
+              data: {
+                nodeId: node.id,
+                execution: { connect: { id: executionId } },
+                blockType: node.data?.type || node.data?.blockType || node.type,
+                status:
+                  resumeFromNodeId && node.id === resumeFromNodeId
+                    ? 'completed'
+                    : 'pending',
+                input: node.data?.config || {},
+                startTime: new Date(),
+              },
+            });
+          } catch (error) {
             this.logger.error(
-              `Error creating block execution record for ${node.id}: ${error.message}`,
+              `Error creating block execution record for ${node.id}: ${error instanceof Error ? error.message : String(error)}`,
             );
           }
         }),
       );
 
       // Log execution plan
-      await this.executionLogger.logExecutionEvent(supabase, executionId, {
+      await this.executionLogger.logExecutionEvent(executionId, {
         level: 'info',
         message: 'Execution plan prepared',
         node_id: 'system',
@@ -245,24 +232,18 @@ export class WorkflowExecutor {
         // Check if we need to start executing from this node
         if (!shouldExecute) {
           if (node.id === resumeFromNodeId) {
-            // We found the node to resume from, start executing from the next node
             shouldExecute = true;
             resumeNodeFound = true;
             this.logger.log(`Resuming execution from node: ${node.id}`);
 
-            await this.executionLogger.logExecutionEvent(
-              supabase,
-              executionId,
-              {
-                level: 'info',
-                message: `Resuming execution from node: ${node.id}`,
-                node_id: 'system',
-              },
-            );
+            await this.executionLogger.logExecutionEvent(executionId, {
+              level: 'info',
+              message: `Resuming execution from node: ${node.id}`,
+              node_id: 'system',
+            });
 
-            continue; // Skip this node as it was already executed
+            continue;
           } else {
-            // Skip nodes until we find the resume point
             this.logger.debug(`Skipping already executed node: ${node.id}`);
             continue;
           }
@@ -284,12 +265,13 @@ export class WorkflowExecutor {
 
         try {
           // Get the block execution record for this node
-          const { data: blockExecution } = await supabase
-            .from('block_executions')
-            .select('id, started_at')
-            .eq('workflow_execution_id', executionId)
-            .eq('node_id', node.id)
-            .single();
+          const blockExecution =
+            await this.databaseService.prisma.blockExecution.findFirst({
+              where: {
+                execution: { id: executionId },
+                nodeId: node.id,
+              },
+            });
 
           if (!blockExecution) {
             throw new Error(
@@ -298,15 +280,13 @@ export class WorkflowExecutor {
           }
 
           // Update block status to running
-          const runningUpdate: TablesUpdate<'block_executions'> = {
-            status: 'running',
-            started_at: new Date().toISOString(),
-          };
-
-          await supabase
-            .from('block_executions')
-            .update(runningUpdate)
-            .eq('id', blockExecution.id);
+          await this.databaseService.prisma.blockExecution.update({
+            where: { id: blockExecution.id },
+            data: {
+              status: 'running',
+              startTime: new Date(),
+            },
+          });
 
           // Execute the node
           outputs[node.id] = await this.nodeExecutor.executeNode(
@@ -317,18 +297,14 @@ export class WorkflowExecutor {
           );
 
           // Update block status to completed
-          const completedUpdate: TablesUpdate<'block_executions'> = {
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            outputs: outputs[node.id],
-            execution_time_ms:
-              Date.now() - new Date(blockExecution.started_at).getTime(),
-          };
-
-          await supabase
-            .from('block_executions')
-            .update(completedUpdate)
-            .eq('id', blockExecution.id);
+          await this.databaseService.prisma.blockExecution.update({
+            where: { id: blockExecution.id },
+            data: {
+              status: 'completed',
+              endTime: new Date(),
+              output: outputs[node.id],
+            },
+          });
 
           this.logger.log(
             `[executionId=${executionId}] Completed node ${node.id}`,
@@ -340,14 +316,12 @@ export class WorkflowExecutor {
           // Remove from active executions on error
           activeNodeExecutions.delete(node.id);
 
-          // Log the error
           this.logger.error(
             `[executionId=${executionId}] Error executing node ${node.id}: ${nodeError.message || 'Unknown error'}`,
           );
 
           // Clean up any active node executions
           await this.cleanupActiveNodeExecutions(
-            supabase,
             executionId,
             activeNodeExecutions,
             nodeError.message,
@@ -363,7 +337,7 @@ export class WorkflowExecutor {
       );
 
       // Log workflow completion
-      await this.executionLogger.logExecutionEvent(supabase, executionId, {
+      await this.executionLogger.logExecutionEvent(executionId, {
         level: 'info',
         message: `Workflow execution completed successfully in ${duration}s`,
         node_id: 'system',
@@ -373,63 +347,84 @@ export class WorkflowExecutor {
         },
       });
 
-      // Update final status and error based on outcome
       finalStatus = 'completed';
       finalError = null;
     } catch (error) {
-      finalStatus = 'failed'; // Ensure status is updated on error
+      finalStatus = 'failed';
       finalError = error instanceof Error ? error.message : String(error);
       this.logger.error(
         `Workflow execution ${executionId} failed: ${finalError}`,
       );
       span.recordException(error as Error);
-      span.setStatus({ code: 2, message: finalError }); // 2 is ERROR code in OpenTelemetry
+      span.setStatus({ code: 2, message: finalError });
 
       // Update workflow execution status to failed
-      await supabase
-        .from('workflow_executions')
-        .update({ status: 'failed', finished_at: new Date().toISOString(), error: finalError })
-        .eq('id', executionId);
+      await this.databaseService.executions.updateStatus(
+        executionId,
+        'failed',
+        finalError,
+      );
 
       // Ensure active node executions are marked as failed
       await Promise.allSettled(
-        Array.from(activeNodeExecutions).map(async (nodeExecId) => {
-          await supabase
-            .from('block_executions')
-            .update({ status: 'failed', finished_at: new Date().toISOString(), error: 'Workflow failed' })
-            .eq('id', nodeExecId);
-        })
+        Array.from(activeNodeExecutions).map(async (nodeId) => {
+          try {
+            const blockExecution =
+              await this.databaseService.prisma.blockExecution.findFirst({
+                where: {
+                  execution: { id: executionId },
+                  nodeId,
+                },
+              });
+            if (blockExecution) {
+              await this.databaseService.prisma.blockExecution.update({
+                where: { id: blockExecution.id },
+                data: {
+                  status: 'failed',
+                  error: finalError,
+                  endTime: new Date(),
+                },
+              });
+            }
+          } catch (cleanupError) {
+            this.logger.warn(
+              `Failed to cleanup node execution ${nodeId}: ${cleanupError}`,
+            );
+          }
+        }),
       );
 
       // Log final failure event
-      await this.executionLogger.logExecutionEvent(supabase, executionId, {
+      await this.executionLogger.logExecutionEvent(executionId, {
         level: 'error',
         message: `Workflow execution failed: ${finalError}`,
         node_id: 'system',
         data: { error: finalError },
       });
 
-      // Rethrow or return error state
       return { status: 'failed', outputs: {}, error: finalError };
     } finally {
-      // --- Send Final Notification (Completed/Failed) ---
-      const notificationType: NotificationType = finalStatus === 'completed' ? 'workflow_completed' : 'workflow_failed';
-      await this.notificationService.sendNotification(userId, notificationType, {
-        workflow_id: execData?.workflow_id || 'unknown',
-        execution_id: executionId,
-        workflow_name: workflowName,
-        status: finalStatus,
-        error: finalError,
-        duration_ms: Date.now() - start,
-      });
-      // --- End Send Final Notification ---
+      // Send final notification
+      const notificationType: NotificationType =
+        finalStatus === 'completed' ? 'workflow_completed' : 'workflow_failed';
+      await this.notificationService.sendNotification(
+        userId,
+        notificationType,
+        {
+          workflow_id: workflowId,
+          execution_id: executionId,
+          workflow_name: workflowName,
+          status: finalStatus,
+          error: finalError,
+          duration_ms: Date.now() - start,
+        },
+      );
 
       const duration = Date.now() - start;
       this.logger.log(
         `[executionId=${executionId}] Workflow execution completed in ${duration}ms`,
       );
 
-      // Return the final state
       return { status: finalStatus, outputs: {}, error: finalError };
     }
   }
@@ -438,7 +433,6 @@ export class WorkflowExecutor {
    * Clean up any active node executions that might be stuck
    */
   private async cleanupActiveNodeExecutions(
-    supabase: SupabaseClient,
     executionId: string,
     activeNodeExecutions: Set<string>,
     errorMessage: string,
@@ -449,32 +443,32 @@ export class WorkflowExecutor {
       `[executionId=${executionId}] Cleaning up ${activeNodeExecutions.size} active node executions`,
     );
 
-    // Mark all active nodes as failed
-    for (const nodeId of activeNodeExecutions) {
-      try {
-        await supabase
-          .from('node_executions')
-          .update({
-            status: 'failed',
-            error: 'Workflow execution failed or was interrupted',
-            finished_at: new Date().toISOString(),
-            completed_at: new Date().toISOString(),
-          })
-          .match({ execution_id: executionId, node_id: nodeId });
-
-        await this.executionLogger.logNodeEvent(
-          supabase,
-          executionId,
-          nodeId,
-          'error',
-          'Node execution terminated due to workflow failure',
-          { workflow_error: errorMessage || 'Unknown error' },
-        );
-      } catch (cleanupError) {
-        this.logger.error(
-          `[executionId=${executionId}] Error cleaning up node ${nodeId}: ${cleanupError}`,
-        );
-      }
-    }
+    await Promise.allSettled(
+      Array.from(activeNodeExecutions).map(async (nodeId) => {
+        try {
+          const blockExecution =
+            await this.databaseService.prisma.blockExecution.findFirst({
+              where: {
+                execution: { id: executionId },
+                nodeId,
+              },
+            });
+          if (blockExecution) {
+            await this.databaseService.prisma.blockExecution.update({
+              where: { id: blockExecution.id },
+              data: {
+                status: 'failed',
+                error: errorMessage,
+                endTime: new Date(),
+              },
+            });
+          }
+        } catch (cleanupError) {
+          this.logger.warn(
+            `Failed to cleanup node execution ${nodeId}: ${cleanupError}`,
+          );
+        }
+      }),
+    );
   }
 }
