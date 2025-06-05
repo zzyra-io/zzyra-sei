@@ -15,7 +15,7 @@ import {
   applyNodeChanges,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { NodeCategory } from "@zyra/types";
+import { NodeCategory, BlockType } from "@zyra/types";
 // Removed debounce import since we're using direct node updates
 import { useWorkflowStore } from "@/lib/store/workflow-store";
 import React, {
@@ -185,6 +185,19 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
       });
 
       // Create a well-formed node with proper data structure for the ImprovedCustomNode
+      
+      // Add default configuration values based on block type
+      let defaultConfig = {};
+      
+      // Add specific default values for different block types
+      if (blockType === BlockType.WEBHOOK) {
+        defaultConfig = {
+          url: "http://localhost:3000/health", // Default URL
+          method: "GET",
+          headers: {}
+        };
+      }
+      
       const newNode = {
         id: `${blockType}-${Date.now()}`,
         type: "custom",
@@ -199,6 +212,7 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
           inputCount: 1,
           outputCount: 1,
           status: "idle",
+          config: defaultConfig, // Add default config
           ...nodeMetadata,
         },
       };
