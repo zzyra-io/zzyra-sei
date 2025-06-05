@@ -2,10 +2,8 @@
 
 import { useCallback } from "react";
 import type { Node, Edge } from "@xyflow/react";
-import { WorkflowError, ErrorCodes } from "@/lib/utils/error-handler";
-import { BlockType } from "@/lib/types";
-import { BlockType } from '@zyra/types';
-
+import { ErrorCodes } from "@/lib/utils/error-handler";
+import { BlockType } from "@zyra/types";
 
 /**
  * Custom hook for comprehensive workflow validation with detailed error reporting
@@ -15,7 +13,10 @@ export function useWorkflowValidation() {
    * Validates a workflow with detailed error messages
    */
   const validateWorkflow = useCallback(
-    (nodes: Node[], edges: Edge[]): { valid: boolean; message?: string; issues?: any[] } => {
+    (
+      nodes: Node[],
+      edges: Edge[]
+    ): { valid: boolean; message?: string; issues?: any[] } => {
       const issues: any[] = [];
 
       // Check if workflow has nodes
@@ -23,20 +24,30 @@ export function useWorkflowValidation() {
         return {
           valid: false,
           message: "Workflow is empty. Please add some blocks first.",
-          issues: [{ type: ErrorCodes.VALIDATION.INVALID_WORKFLOW, detail: "empty_workflow" }],
+          issues: [
+            {
+              type: ErrorCodes.VALIDATION.INVALID_WORKFLOW,
+              detail: "empty_workflow",
+            },
+          ],
         };
       }
 
       // Check for unconfigured nodes
       const unconfiguredNodes = nodes.filter(
-        (node) => node.type === "custom" && (!node.data.config || Object.keys(node.data.config).length === 0)
+        (node) =>
+          node.type === "custom" &&
+          (!node.data.config || Object.keys(node.data.config).length === 0)
       );
 
       if (unconfiguredNodes.length > 0) {
         issues.push({
           type: ErrorCodes.VALIDATION.MISSING_CONFIG,
           detail: "unconfigured_nodes",
-          nodes: unconfiguredNodes.map((n) => ({ id: n.id, label: n.data.label })),
+          nodes: unconfiguredNodes.map((n) => ({
+            id: n.id,
+            label: n.data.label,
+          })),
         });
 
         return {
@@ -61,14 +72,19 @@ export function useWorkflowValidation() {
         issues.push({
           type: ErrorCodes.VALIDATION.MISSING_CONFIG,
           detail: "webhook_missing_url",
-          nodes: invalidWebhookNodes.map((n) => ({ id: n.id, label: n.data.label })),
+          nodes: invalidWebhookNodes.map((n) => ({
+            id: n.id,
+            label: n.data.label,
+          })),
         });
 
         return {
           valid: false,
           message: `Webhook node${invalidWebhookNodes.length > 1 ? "s" : ""} "${invalidWebhookNodes
             .map((n) => n.data.label)
-            .join('", "')}" require${invalidWebhookNodes.length > 1 ? "" : "s"} a URL.`,
+            .join(
+              '", "'
+            )}" require${invalidWebhookNodes.length > 1 ? "" : "s"} a URL.`,
           issues,
         };
       }
@@ -82,13 +98,18 @@ export function useWorkflowValidation() {
           connectedNodeIds.add(edge.target);
         });
 
-        const disconnectedNodes = nodes.filter((node) => !connectedNodeIds.has(node.id));
+        const disconnectedNodes = nodes.filter(
+          (node) => !connectedNodeIds.has(node.id)
+        );
 
         if (disconnectedNodes.length > 0) {
           issues.push({
             type: ErrorCodes.VALIDATION.DISCONNECTED_NODES,
             detail: "disconnected_nodes",
-            nodes: disconnectedNodes.map((n) => ({ id: n.id, label: n.data.label })),
+            nodes: disconnectedNodes.map((n) => ({
+              id: n.id,
+              label: n.data.label,
+            })),
           });
 
           return {
@@ -115,7 +136,8 @@ export function useWorkflowValidation() {
 
         return {
           valid: false,
-          message: "Workflow must have a starting node (a node with no incoming connections).",
+          message:
+            "Workflow must have a starting node (a node with no incoming connections).",
           issues,
         };
       }
@@ -146,7 +168,8 @@ export function useWorkflowValidation() {
 
         return {
           valid: false,
-          message: "Cyclic dependency detected in workflow. Remove loops to create a valid workflow.",
+          message:
+            "Cyclic dependency detected in workflow. Remove loops to create a valid workflow.",
           issues,
         };
       }
@@ -159,61 +182,64 @@ export function useWorkflowValidation() {
   /**
    * Helper function to check for cycles in the workflow graph
    */
-  const checkForCycles = useCallback((nodes: Node[], edges: Edge[]): boolean => {
-    // Create adjacency list
-    const adjacencyList = new Map<string, string[]>();
-    
-    nodes.forEach((node) => {
-      adjacencyList.set(node.id, []);
-    });
-    
-    edges.forEach((edge) => {
-      const adjacentNodes = adjacencyList.get(edge.source) || [];
-      adjacentNodes.push(edge.target);
-      adjacencyList.set(edge.source, adjacentNodes);
-    });
-    
-    // Track visited nodes
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-    
-    function dfs(nodeId: string): boolean {
-      // If node is in recursion stack, we found a cycle
-      if (recursionStack.has(nodeId)) {
-        return true;
-      }
-      
-      // If already processed in another branch, no need to process again
-      if (visited.has(nodeId)) {
+  const checkForCycles = useCallback(
+    (nodes: Node[], edges: Edge[]): boolean => {
+      // Create adjacency list
+      const adjacencyList = new Map<string, string[]>();
+
+      nodes.forEach((node) => {
+        adjacencyList.set(node.id, []);
+      });
+
+      edges.forEach((edge) => {
+        const adjacentNodes = adjacencyList.get(edge.source) || [];
+        adjacentNodes.push(edge.target);
+        adjacencyList.set(edge.source, adjacentNodes);
+      });
+
+      // Track visited nodes
+      const visited = new Set<string>();
+      const recursionStack = new Set<string>();
+
+      function dfs(nodeId: string): boolean {
+        // If node is in recursion stack, we found a cycle
+        if (recursionStack.has(nodeId)) {
+          return true;
+        }
+
+        // If already processed in another branch, no need to process again
+        if (visited.has(nodeId)) {
+          return false;
+        }
+
+        // Mark as visited and add to recursion stack
+        visited.add(nodeId);
+        recursionStack.add(nodeId);
+
+        // Visit all adjacent nodes
+        const adjacentNodes = adjacencyList.get(nodeId) || [];
+        for (const adjacent of adjacentNodes) {
+          if (dfs(adjacent)) {
+            return true;
+          }
+        }
+
+        // Remove from recursion stack as we backtrack
+        recursionStack.delete(nodeId);
         return false;
       }
-      
-      // Mark as visited and add to recursion stack
-      visited.add(nodeId);
-      recursionStack.add(nodeId);
-      
-      // Visit all adjacent nodes
-      const adjacentNodes = adjacencyList.get(nodeId) || [];
-      for (const adjacent of adjacentNodes) {
-        if (dfs(adjacent)) {
+
+      // Try starting DFS from each node
+      for (const node of nodes) {
+        if (!visited.has(node.id) && dfs(node.id)) {
           return true;
         }
       }
-      
-      // Remove from recursion stack as we backtrack
-      recursionStack.delete(nodeId);
+
       return false;
-    }
-    
-    // Try starting DFS from each node
-    for (const node of nodes) {
-      if (!visited.has(node.id) && dfs(node.id)) {
-        return true;
-      }
-    }
-    
-    return false;
-  }, []);
+    },
+    []
+  );
 
   return { validateWorkflow };
 }

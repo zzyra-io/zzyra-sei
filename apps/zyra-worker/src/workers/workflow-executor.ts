@@ -157,6 +157,18 @@ export class WorkflowExecutor {
       validateWorkflowDefinition(nodes, handlerRegistry, userId);
 
       // Additional validations for production
+      this.logger.log(`=== WORKFLOW VALIDATION DEBUG ===`);
+      this.logger.log(
+        `Received ${nodes.length} nodes and ${edges.length} edges`,
+      );
+      this.logger.log(
+        `Nodes: ${nodes.map((n) => `${n.id}(${n.data?.type || n.type})`).join(', ')}`,
+      );
+      this.logger.log(
+        `Edges: ${edges.map((e) => `${e.source}->${e.target}`).join(', ')}`,
+      );
+      this.logger.log(`=====================================`);
+
       validateAcyclic(nodes, edges);
       validateOrphans(nodes, edges);
       validateTerminals(nodes, edges);

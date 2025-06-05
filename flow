@@ -1,0 +1,97 @@
+sequenceDiagram
+participant U as User
+participant UI as Builder UI
+participant ValidationHook as useWorkflowValidation
+participant API as /api/execute-workflow
+participant Queue as RabbitMQ Queue
+participant Worker as Zyra Worker
+participant Executor as WorkflowExecutor
+participant DB as Database (Prisma)
+participant WS as WebSocket/SSE
+
+    Note over U,WS: Production-Ready Execution Flow
+
+    U->>UI: Click Execute Button
+
+    Note over UI,ValidationHook: 1. Client-Side Validation
+    UI->>ValidationHook: validateWorkflow(nodes, edges)
+    ValidationHook->>ValidationHook: Check for orphan nodes
+    ValidationHook->>ValidationHook: Validate node configurations
+    ValidationHook->>ValidationHook: Check for cycles
+    ValidationHook->>ValidationHook: Verify starting nodes
+
+    alt Validation Fails
+        ValidationHook->>UI: Return validation errors
+        UI->>U: Show specific error messages
+        UI->>U: Highlight problem nodes
+    else Validation Passes
+        ValidationHook->>UI: Validation successful
+
+        Note over UI,API: 2. Save & Execute Request
+        alt Workflow Not Saved
+            UI->>U: Auto-trigger save dialog
+            U->>UI: Provide workflow details
+            UI->>API: Save workflow first
+        end
+
+        UI->>UI: Show "Executing..." state
+        UI->>API: POST /api/execute-workflow
+
+        Note over API,DB: 3. Server-Side Processing
+        API->>API: Validate user permissions
+        API->>DB: Verify workflow exists & access
+        API->>DB: Create execution record
+        API->>Queue: addExecutionJob(executionId)
+        API->>UI: Return executionId
+
+        Note over Worker,Executor: 4. Worker Processing
+        Queue->>Worker: Pick up execution job
+        Worker->>Executor: executeWorkflow()
+
+        Note over Executor: 5. Workflow Validation (Server)
+        Executor->>Executor: validateWorkflowDefinition()
+        Executor->>Executor: validateAcyclic(nodes, edges)
+        Executor->>Executor: validateOrphans(nodes, edges)
+        Executor->>Executor: validateTerminals(nodes, edges)
+
+        alt Server Validation Fails
+            Executor->>DB: Log validation failure
+            Executor->>WS: Broadcast failure
+            WS->>UI: Show validation error
+        else Server Validation Passes
+
+            Note over Executor,DB: 6. Execution Orchestration
+            Executor->>Executor: topologicalSort(nodes, edges)
+            Executor->>DB: Update execution status to 'running'
+            Executor->>WS: Broadcast execution started
+            WS->>UI: Update UI to running state
+
+            loop For Each Node (in topological order)
+                Executor->>DB: Create node execution record
+                Executor->>Executor: NodeExecutor.executeNode()
+                Executor->>DB: Log node execution result
+                Executor->>WS: Broadcast node completion
+                WS->>UI: Update node visual state
+
+                alt Node Execution Fails
+                    Executor->>Executor: Apply retry logic
+                    alt Max Retries Exceeded
+                        Executor->>DB: Mark execution as failed
+                        Executor->>WS: Broadcast failure
+                        WS->>UI: Show error state
+                    end
+                end
+            end
+
+            Note over Executor,UI: 7. Completion & Cleanup
+            Executor->>DB: Save execution results
+            Executor->>DB: Update execution status
+            Executor->>WS: Broadcast completion
+            WS->>UI: Show success/failure state
+        end
+    end
+
+    Note over UI: 8. Post-Execution
+    UI->>UI: Update execution history
+    UI->>UI: Enable re-run option
+    UI->>UI: Show analytics/metrics

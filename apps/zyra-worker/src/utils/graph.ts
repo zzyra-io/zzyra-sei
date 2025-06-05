@@ -55,17 +55,26 @@ export function topologicalSort(nodes: Node[], edges: Edge[]): Node[] {
   return sorted;
 }
 
-// Ensure every non-trigger node has at least one incoming edge
+// Ensure every node is properly connected (no orphan nodes)
 export function validateOrphans(nodes: Node[], edges: Edge[]): void {
+  // For single node workflows, no orphan validation needed
+  if (nodes.length <= 1) {
+    return;
+  }
+
   const hasIncoming = new Set(edges.map((e) => e.target as string));
+  const hasOutgoing = new Set(edges.map((e) => e.source as string));
+
   nodes.forEach((n) => {
-    if (!hasIncoming.has(n.id) && edges.some((e) => e.source === n.id)) {
-      // it's a source node, allowed
-    } else if (
-      !hasIncoming.has(n.id) &&
-      !edges.some((e) => e.source === n.id)
-    ) {
-      throw new Error(`Orphan node detected: ${n.id}`);
+    const hasIncomingEdge = hasIncoming.has(n.id);
+    const hasOutgoingEdge = hasOutgoing.has(n.id);
+
+    // A node is orphan if it has neither incoming nor outgoing connections
+    // in a multi-node workflow
+    if (!hasIncomingEdge && !hasOutgoingEdge) {
+      throw new Error(
+        `Orphan node detected: ${n.id} - Node has no connections`,
+      );
     }
   });
 }

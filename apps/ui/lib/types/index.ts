@@ -1,24 +1,13 @@
-import { BlockType } from '@zyra/types';
 "use client";
+
+import { BlockType } from "@zyra/types";
 
 /**
  * Core type definitions for Zyra workflow system
  */
 
-export enum BlockType {
-  TRIGGER = "TRIGGER",
-  CONDITION = "CONDITION",
-  ACTION = "ACTION",
-  WEBHOOK = "WEBHOOK",
-  INPUT = "INPUT",
-  OUTPUT = "OUTPUT",
-  TRANSFORMATION = "TRANSFORMATION",
-  INTEGRATION = "INTEGRATION",
-  AI = "AI",
-  BLOCKCHAIN = "BLOCKCHAIN",
-  FINANCE = "FINANCE",
-  AI_BLOCKCHAIN = "AI_BLOCKCHAIN"
-}
+// Export BlockType from the types package to ensure consistency
+export { BlockType } from "@zyra/types";
 
 export interface BlockDefinition {
   id: string;

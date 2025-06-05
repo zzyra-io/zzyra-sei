@@ -16,30 +16,41 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus, Loader2 } from "lucide-react";
+import { X, Plus, Loader2, Copy, Save } from "lucide-react";
 
-interface SaveNewWorkflowDialogProps {
+interface UpdateWorkflowDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (name: string, description: string, tags: string[]) => Promise<void>;
-  initialName?: string;
-  initialDescription?: string;
-  initialTags?: string[];
+  onUpdate: (
+    name: string,
+    description: string,
+    tags: string[]
+  ) => Promise<void>;
+  onSaveAsNew: (
+    name: string,
+    description: string,
+    tags: string[]
+  ) => Promise<void>;
+  currentName: string;
+  currentDescription: string;
+  currentTags: string[];
 }
 
-export function SaveNewWorkflowDialog({
+export function UpdateWorkflowDialog({
   open,
   onOpenChange,
-  onSave,
-  initialName = "",
-  initialDescription = "",
-  initialTags = [],
-}: SaveNewWorkflowDialogProps) {
-  const [name, setName] = useState(initialName || "Untitled Workflow");
-  const [description, setDescription] = useState(initialDescription || "");
-  const [tags, setTags] = useState<string[]>(initialTags);
+  onUpdate,
+  onSaveAsNew,
+  currentName,
+  currentDescription,
+  currentTags,
+}: UpdateWorkflowDialogProps) {
+  const [name, setName] = useState(currentName);
+  const [description, setDescription] = useState(currentDescription);
+  const [tags, setTags] = useState<string[]>(currentTags);
   const [tagInput, setTagInput] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isSavingAsNew, setIsSavingAsNew] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; description?: string }>(
     {}
   );
@@ -62,8 +73,7 @@ export function SaveNewWorkflowDialog({
     }
   };
 
-  const handleSave = async () => {
-    // Validate
+  const validateForm = () => {
     const newErrors: { name?: string; description?: string } = {};
     if (!name.trim()) {
       newErrors.name = "Name is required";
@@ -71,14 +81,30 @@ export function SaveNewWorkflowDialog({
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      return;
+      return false;
     }
+    return true;
+  };
 
-    setIsSaving(true);
+  const handleUpdate = async () => {
+    if (!validateForm()) return;
+
+    setIsUpdating(true);
     try {
-      await onSave(name, description, tags);
+      await onUpdate(name, description, tags);
     } finally {
-      setIsSaving(false);
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSaveAsNew = async () => {
+    if (!validateForm()) return;
+
+    setIsSavingAsNew(true);
+    try {
+      await onSaveAsNew(name, description, tags);
+    } finally {
+      setIsSavingAsNew(false);
     }
   };
 
@@ -86,10 +112,9 @@ export function SaveNewWorkflowDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className='sm:max-w-[500px]'>
         <DialogHeader>
-          <DialogTitle>Save New Workflow</DialogTitle>
+          <DialogTitle>Update Workflow</DialogTitle>
           <DialogDescription>
-            Give your workflow a name and description to save it to your
-            dashboard.
+            Update your existing workflow or save it as a new workflow.
           </DialogDescription>
         </DialogHeader>
         <div className='grid gap-4 py-4'>
@@ -171,23 +196,46 @@ export function SaveNewWorkflowDialog({
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className='flex justify-between'>
           <Button
             variant='outline'
             onClick={() => onOpenChange(false)}
-            disabled={isSaving}>
+            disabled={isUpdating || isSavingAsNew}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                Saving...
-              </>
-            ) : (
-              "Save Workflow"
-            )}
-          </Button>
+          <div className='flex gap-2'>
+            <Button
+              variant='outline'
+              onClick={handleSaveAsNew}
+              disabled={isUpdating || isSavingAsNew}>
+              {isSavingAsNew ? (
+                <>
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  Saving as New...
+                </>
+              ) : (
+                <>
+                  <Copy className='mr-2 h-4 w-4' />
+                  Save as New
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleUpdate}
+              disabled={isUpdating || isSavingAsNew}>
+              {isUpdating ? (
+                <>
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Save className='mr-2 h-4 w-4' />
+                  Update Workflow
+                </>
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -4,6 +4,12 @@ export * from "./workflow";
 // Export wallet types for blockchain integration
 export * from "./wallet";
 
+// Export schemas
+export { blockSchemas } from "./schemas/blockSchemas";
+
+// Export metadata catalog
+export { BLOCK_CATALOG } from "./workflow/metadata";
+
 // Explicitly re-export critical types at the top level for backward compatibility
 // This ensures all import paths continue to work for both UI and worker components
 export { BlockType } from "./workflow/block-types";

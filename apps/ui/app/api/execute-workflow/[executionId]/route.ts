@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ExecutionRepository } from "@zyra/database";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 // Initialize repositories
 const executionRepository = new ExecutionRepository();
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { executionId: string } }
+  { params }: { params: Promise<{ executionId: string }> }
 ) {
   try {
     // Get session using Next Auth
@@ -21,12 +21,12 @@ export async function GET(
     }
 
     const userId = session.user.id;
-    const executionId = params.executionId;
+    const resolvedParams = await params;
+    const executionId = resolvedParams.executionId;
 
     // Get the execution with nodes and logs using the repository
-    const executionWithDetails = await executionRepository.findWithNodesAndLogs(
-      executionId
-    );
+    const executionWithDetails =
+      await executionRepository.findWithNodesAndLogs(executionId);
 
     if (!executionWithDetails) {
       return NextResponse.json(

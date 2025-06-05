@@ -60,6 +60,32 @@ export function BlockConfigPanel({
 
   // Dynamic Zod schema for block config
   const schema = (blockSchemas as Record<string, any>)[blockType];
+
+  // Guard: If blockType is missing or schema is undefined, show error UI
+  if (!blockType || !schema) {
+    return (
+      <div className='w-80 h-full flex flex-col bg-background border-l'>
+        <div className='flex items-center justify-between p-4 border-b'>
+          <h3 className='font-medium'>Block Type Error</h3>
+          <Button variant='ghost' size='icon' onClick={onClose}>
+            <X className='h-4 w-4' />
+          </Button>
+        </div>
+        <div className='flex-1 flex items-center justify-center'>
+          <div className='text-center'>
+            <p className='text-destructive mb-2'>
+              Block type <b>{String(blockType)}</b> is not recognized or not
+              supported.
+            </p>
+            <p className='text-xs text-muted-foreground'>
+              Please check your workflow or try re-adding this block.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // react-hook-form setup
   const {
     register,

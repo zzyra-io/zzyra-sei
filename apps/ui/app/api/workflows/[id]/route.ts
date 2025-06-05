@@ -8,7 +8,7 @@ const workflowRepository = new WorkflowRepository();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -16,8 +16,9 @@ export async function GET(
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.log("params", params);
-    const { id } = params;
+    const resolvedParams = await params;
+    console.log("params", resolvedParams);
+    const { id } = resolvedParams;
     const workflow = await workflowRepository.findById(id, session.user.id);
 
     if (!workflow) {
@@ -51,7 +52,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -59,8 +60,9 @@ export async function PUT(
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.log("params", params);
-    const { id } = params;
+    const resolvedParams = await params;
+    console.log("params", resolvedParams);
+    const { id } = resolvedParams;
     const workflowData = await request.json();
 
     // Check if workflow exists and user has access
@@ -117,7 +119,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -126,7 +128,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
 
     // Check if workflow exists and user has access
     const existingWorkflow = await workflowRepository.findById(

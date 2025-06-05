@@ -2,11 +2,11 @@
 
 import { StateCreator } from "zustand";
 import { nanoid } from "nanoid";
-import type { Node, Edge } from "@xyflow/react";
+import type { Node, Edge, ReactFlowInstance } from "@xyflow/react";
 import { CanvasState, CanvasActions, WorkflowStore } from "./types";
 
 // Throttle function for performance optimization
-const throttle = <T extends (...args: any[]) => any>(
+const throttle = <T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): T => {
@@ -19,12 +19,15 @@ const throttle = <T extends (...args: any[]) => any>(
       lastRan = Date.now();
     } else {
       clearTimeout(lastFunc);
-      lastFunc = setTimeout(() => {
-        if (Date.now() - lastRan >= limit) {
-          func(...args);
-          lastRan = Date.now();
-        }
-      }, limit - (Date.now() - lastRan));
+      lastFunc = setTimeout(
+        () => {
+          if (Date.now() - lastRan >= limit) {
+            func(...args);
+            lastRan = Date.now();
+          }
+        },
+        limit - (Date.now() - lastRan)
+      );
     }
     return undefined as unknown as ReturnType<T>;
   }) as T;
@@ -71,9 +74,30 @@ export const createCanvasSlice: StateCreator<
 
   updateNode: (nodeId: string, updates: Partial<Node>) => {
     const { nodes, addToHistory, edges } = get();
-    const newNodes = nodes.map((node) =>
-      node.id === nodeId ? { ...node, ...updates } : node
-    );
+    const newNodes = nodes.map((node) => {
+      if (node.id === nodeId) {
+        // Deep clone to avoid React Flow immutability issues
+        const updatedNode = {
+          ...node,
+          ...updates,
+          // Ensure measured properties are properly cloned if they exist
+          ...(node.measured && {
+            measured: { ...node.measured },
+          }),
+          // Ensure style properties are properly cloned if they exist
+          ...(node.style && {
+            style: { ...node.style, ...(updates.style || {}) },
+          }),
+          // Ensure data properties are properly cloned
+          data: {
+            ...node.data,
+            ...(updates.data || {}),
+          },
+        };
+        return updatedNode;
+      }
+      return node;
+    });
     set(() => ({ nodes: newNodes }));
     addToHistory(newNodes, edges);
   },

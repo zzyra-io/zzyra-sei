@@ -100,16 +100,28 @@ export class NodeExecutor {
       const startTime = Date.now();
 
       try {
-        // Get block type
-        const blockType = node.data?.type || node.data?.blockType || node.type;
+        // Get block type - prioritize blockType from data over generic type
+        const blockType = node.data?.blockType || node.data?.type || node.type;
         if (!blockType) {
           throw new Error(`Node ${node.id} has no block type specified`);
         }
 
+        // Debug logging
+        this.logger.debug(`Block type resolution for node ${node.id}:`);
+        this.logger.debug(`  node.data?.blockType: ${node.data?.blockType}`);
+        this.logger.debug(`  node.data?.type: ${node.data?.type}`);
+        this.logger.debug(`  node.type: ${node.type}`);
+        this.logger.debug(`  final blockType: ${blockType}`);
+        this.logger.debug(
+          `  available handlers: ${Object.keys(this.handlers).join(', ')}`,
+        );
+
         // Get handler
         const handler = this.handlers[blockType as BlockType];
         if (!handler) {
-          throw new Error(`No handler found for block type: ${blockType}`);
+          throw new Error(
+            `No handler found for block type: ${blockType}. Available: ${Object.keys(this.handlers).join(', ')}`,
+          );
         }
 
         // Create timeout promise
@@ -183,12 +195,7 @@ export class NodeExecutor {
           { output: result },
         );
 
-        // Update execution status using direct Prisma
-        await this.databaseService.executions.updateNodeStatus(
-          node.id,
-          'completed',
-          result,
-        );
+        // Note: Block execution status is handled by WorkflowExecutor
 
         const duration = Date.now() - startTime;
         await this.executionLogger.logNodeEvent(
@@ -235,13 +242,7 @@ export class NodeExecutor {
           errorDetails,
         );
 
-        // Update node execution with detailed status
-        await this.databaseService.executions.updateNodeStatus(
-          node.id,
-          'failed',
-          undefined,
-          err.message,
-        );
+        // Note: Block execution status is handled by WorkflowExecutor
 
         if (attempt < NodeExecutor.MAX_RETRIES) {
           const jitter = Math.floor(
