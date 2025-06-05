@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { BlockType } from "../index";
+import { BlockType } from "../workflow/block-types";
+
+// Import directly from the source file to ensure we get the latest enum values
 
 /**
  * Zod schemas for block configurations

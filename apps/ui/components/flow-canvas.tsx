@@ -347,9 +347,21 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
           nodes={nodes}
           edges={edges}
           onNodesChange={(changes) => {
-            // Apply changes directly, the store's setNodes is already throttled
-            const updatedNodes = applyNodeChanges(changes, nodes);
-            setNodes(updatedNodes);
+            try {
+              // Create a deep copy of nodes to avoid modifying read-only properties
+              const nodesCopy = nodes.map(node => ({
+                ...JSON.parse(JSON.stringify(node)),
+                // Preserve any non-serializable properties if needed
+                // For example, if there are functions or complex objects
+              }));
+              
+              // Apply changes to our copied nodes
+              const updatedNodes = applyNodeChanges(changes, nodesCopy);
+              setNodes(updatedNodes);
+            } catch (error) {
+              console.error("Error applying node changes:", error);
+              // Fallback: just use the original nodes if there's an error
+            }
           }}
           onEdgesChange={(changes) => {
             // Apply changes directly, the store's setEdges is already throttled

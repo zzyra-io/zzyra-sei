@@ -4,56 +4,56 @@
  */
 export enum BlockType {
   // Trigger blocks
-  PRICE_MONITOR = "price-monitor",
-  SCHEDULE = "schedule",
-  WEBHOOK = "webhook",
-  
+  PRICE_MONITOR = "PRICE_MONITOR",
+  SCHEDULE = "SCHEDULE",
+  WEBHOOK = "WEBHOOK",
+
   // Action blocks
-  EMAIL = "email",
-  NOTIFICATION = "notification",
-  TRANSFORM = "transform",
-  WALLET = "wallet",
-  TRANSACTION = "transaction",
-  DATABASE = "database",
-  DISCORD = "discord",
-  LLM_PROMPT = "llm-prompt",
-  API = "api",
-  SMS = "sms",
-  AI = "ai",
-  FINANCE = "finance",
-  
+  EMAIL = "EMAIL",
+  NOTIFICATION = "NOTIFICATION",
+  TRANSFORM = "TRANSFORM",
+  WALLET = "WALLET",
+  TRANSACTION = "TRANSACTION",
+  DATABASE = "DATABASE",
+  DISCORD = "DISCORD",
+  LLM_PROMPT = "LLM_PROMPT",
+  API = "API",
+  SMS = "SMS",
+  AI = "AI",
+  FINANCE = "FINANCE",
+
   // Logic blocks
-  CONDITION = "condition",
-  DELAY = "delay",
-  
+  CONDITION = "CONDITION",
+  DELAY = "DELAY",
+
   // Finance blocks
-  DEFI_PRICE_MONITOR = "defi-price-monitor",
-  DEFI_YIELD_MONITOR = "defi-yield-monitor",
-  DEFI_PORTFOLIO = "defi-portfolio",
-  DEFI_REBALANCE = "defi-rebalance",
-  DEFI_SWAP = "defi-swap",
-  DEFI_GAS = "defi-gas",
-  DEFI_PROTOCOL = "defi-protocol",
-  DEFI_YIELD_STRATEGY = "defi-yield-strategy",
-  DEFI_LIQUIDITY = "defi-liquidity",
-  DEFI_POSITION = "defi-position",
-  AI_BLOCKCHAIN = "ai-blockchain",
-  
+  DEFI_PRICE_MONITOR = "DEFI_PRICE_MONITOR",
+  DEFI_YIELD_MONITOR = "DEFI_YIELD_MONITOR",
+  DEFI_PORTFOLIO = "DEFI_PORTFOLIO",
+  DEFI_REBALANCE = "DEFI_REBALANCE",
+  DEFI_SWAP = "DEFI_SWAP",
+  DEFI_GAS = "DEFI_GAS",
+  DEFI_PROTOCOL = "DEFI_PROTOCOL",
+  DEFI_YIELD_STRATEGY = "DEFI_YIELD_STRATEGY",
+  DEFI_LIQUIDITY = "DEFI_LIQUIDITY",
+  DEFI_POSITION = "DEFI_POSITION",
+  AI_BLOCKCHAIN = "AI_BLOCKCHAIN",
+
   // Advanced monitoring
-  PROTOCOL_MONITOR = "protocol-monitor",
-  POSITION_MANAGER = "position-manager",
-  YIELD_STRATEGY = "yield-strategy",
-  LIQUIDITY_PROVIDER = "liquidity-provider",
-  REBALANCE_CALCULATOR = "rebalance-calculator",
-  GAS_OPTIMIZER = "gas-optimizer",
-  SWAP_EXECUTOR = "swap-executor",
-  PORTFOLIO_BALANCE = "portfolio-balance",
-  YIELD_MONITOR = "yield-monitor",
-  
+  PROTOCOL_MONITOR = "PROTOCOL_MONITOR",
+  POSITION_MANAGER = "POSITION_MANAGER",
+  YIELD_STRATEGY = "YIELD_STRATEGY",
+  LIQUIDITY_PROVIDER = "LIQUIDITY_PROVIDER",
+  REBALANCE_CALCULATOR = "REBALANCE_CALCULATOR",
+  GAS_OPTIMIZER = "GAS_OPTIMIZER",
+  SWAP_EXECUTOR = "SWAP_EXECUTOR",
+  PORTFOLIO_BALANCE = "PORTFOLIO_BALANCE",
+  YIELD_MONITOR = "YIELD_MONITOR",
+
   // Custom blocks
-  CUSTOM = "custom",
-  GOAT_FINANCE = "goat-finance",
-  
+  CUSTOM = "CUSTOM",
+  GOAT_FINANCE = "GOAT_FINANCE",
+
   // Default/fallback
-  UNKNOWN = "unknown"
+  UNKNOWN = "UNKNOWN",
 }
