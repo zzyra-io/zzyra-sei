@@ -126,95 +126,215 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Setup queues with proper configuration
+   * Setup queues with intelligent parameter detection and production-ready configuration
    */
   private async setupQueues(channel: amqp.Channel): Promise<void> {
     try {
       // Production-ready prefetch settings based on worker capacity
       const prefetchCount = parseInt(
-        this.configService.get('RABBITMQ_PREFETCH') || '50', // Increased for higher throughput
+        this.configService.get('RABBITMQ_PREFETCH') || '50',
       );
       await channel.prefetch(prefetchCount);
 
-      // Check if queue exists first
-      const queueCheck = await channel.checkQueue(EXECUTION_QUEUE);
-      const queueExists = queueCheck.messageCount !== undefined;
-
-      // Assert main execution queue with production settings
-      await channel.assertQueue(EXECUTION_QUEUE, {
-        durable: true,
-        deadLetterExchange: '',
-        deadLetterRoutingKey: EXECUTION_DLQ,
-        // Only set TTL if queue doesn't exist
-        ...(queueExists
-          ? {}
-          : {
-              messageTtl: parseInt(
-                this.configService.get('RABBITMQ_MESSAGE_TTL') || '3600000',
-              ), // 1 hour default
-            }),
-        maxLength: parseInt(
-          this.configService.get('RABBITMQ_MAX_QUEUE_LENGTH') || '100000', // Increased to 100K
-        ),
-        // Add priority queue support for high-volume scenarios
-        arguments: {
-          'x-max-priority': 10,
-          'x-queue-mode': 'lazy', // Better for high volume with less memory usage
-        },
-      });
-
-      // Check if retry queue exists
-      const retryQueueCheck = await channel.checkQueue(EXECUTION_RETRY_QUEUE);
-      const retryQueueExists = retryQueueCheck.messageCount !== undefined;
-
-      // Assert retry queue with exponential backoff support
-      await channel.assertQueue(EXECUTION_RETRY_QUEUE, {
-        durable: true,
-        deadLetterExchange: '',
-        deadLetterRoutingKey: EXECUTION_QUEUE,
-        // Only set TTL if queue doesn't exist
-        ...(retryQueueExists
-          ? {}
-          : {
-              messageTtl: parseInt(
-                this.configService.get('RABBITMQ_RETRY_TTL') || '300000',
-              ), // 5 minutes default
-            }),
-        arguments: {
-          'x-queue-mode': 'lazy',
-        },
-      });
-
-      // Check if DLQ exists
-      const dlqCheck = await channel.checkQueue(EXECUTION_DLQ);
-      const dlqExists = dlqCheck.messageCount !== undefined;
-
-      // Assert dead letter queue
-      await channel.assertQueue(EXECUTION_DLQ, {
-        durable: true,
-        arguments: {
-          'x-queue-mode': 'lazy',
-          // Only set TTL if queue doesn't exist
-          ...(dlqExists
-            ? {}
-            : {
-                'x-message-ttl': 604800000, // 7 days retention for failed messages
-              }),
-        },
-      });
+      // Setup each queue with intelligent parameter detection
+      await this.setupExecutionQueue(channel);
+      await this.setupRetryQueue(channel);
+      await this.setupDeadLetterQueue(channel);
 
       this.logger.log(
         `✅ Production queues configured: ${EXECUTION_QUEUE}, ${EXECUTION_RETRY_QUEUE}, ${EXECUTION_DLQ}`,
       );
-      this.logger.log(
-        `📊 Prefetch count: ${prefetchCount}, Max queue length: ${parseInt(
-          this.configService.get('RABBITMQ_MAX_QUEUE_LENGTH') || '100000',
-        )}`,
-      );
+      this.logger.log(`📊 Prefetch count: ${prefetchCount}`);
     } catch (error) {
       this.logger.error('Failed to setup queues:', error);
       throw error;
     }
+  }
+
+  /**
+   * Setup execution queue with intelligent parameter detection
+   */
+  private async setupExecutionQueue(channel: amqp.Channel): Promise<void> {
+    const queueConfig = await this.getOptimalQueueConfig(
+      channel,
+      EXECUTION_QUEUE,
+    );
+
+    try {
+      await channel.assertQueue(EXECUTION_QUEUE, queueConfig);
+      this.logger.log(`✅ Execution queue configured with optimal parameters`);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes('PRECONDITION_FAILED')
+      ) {
+        // Use minimal safe configuration
+        await channel.assertQueue(EXECUTION_QUEUE, { durable: true });
+        this.logger.warn(
+          `⚠️ Using minimal configuration for ${EXECUTION_QUEUE} due to parameter conflict`,
+        );
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Setup retry queue with intelligent parameter detection
+   */
+  private async setupRetryQueue(channel: amqp.Channel): Promise<void> {
+    const queueConfig = await this.getOptimalQueueConfig(
+      channel,
+      EXECUTION_RETRY_QUEUE,
+    );
+
+    try {
+      await channel.assertQueue(EXECUTION_RETRY_QUEUE, queueConfig);
+      this.logger.log(`✅ Retry queue configured with optimal parameters`);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes('PRECONDITION_FAILED')
+      ) {
+        // Use minimal safe configuration
+        await channel.assertQueue(EXECUTION_RETRY_QUEUE, { durable: true });
+        this.logger.warn(
+          `⚠️ Using minimal configuration for ${EXECUTION_RETRY_QUEUE} due to parameter conflict`,
+        );
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Setup dead letter queue with intelligent parameter detection
+   */
+  private async setupDeadLetterQueue(channel: amqp.Channel): Promise<void> {
+    const queueConfig = await this.getOptimalQueueConfig(
+      channel,
+      EXECUTION_DLQ,
+    );
+
+    try {
+      await channel.assertQueue(EXECUTION_DLQ, queueConfig);
+      this.logger.log(
+        `✅ Dead letter queue configured with optimal parameters`,
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes('PRECONDITION_FAILED')
+      ) {
+        // Use minimal safe configuration
+        await channel.assertQueue(EXECUTION_DLQ, { durable: true });
+        this.logger.warn(
+          `⚠️ Using minimal configuration for ${EXECUTION_DLQ} due to parameter conflict`,
+        );
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Get optimal queue configuration based on existing queue or create new optimal config
+   */
+  private async getOptimalQueueConfig(
+    channel: amqp.Channel,
+    queueName: string,
+  ): Promise<any> {
+    try {
+      // Check if queue exists
+      const queueInfo = await channel.checkQueue(queueName);
+
+      // Queue exists, use compatible configuration
+      return this.getCompatibleConfig(queueName);
+    } catch (error) {
+      // Queue doesn't exist, use optimal new configuration
+      return this.getOptimalNewConfig(queueName);
+    }
+  }
+
+  /**
+   * Get compatible configuration for existing queues
+   */
+  private getCompatibleConfig(queueName: string): any {
+    const baseConfig = { durable: true };
+
+    if (queueName === EXECUTION_QUEUE) {
+      return {
+        ...baseConfig,
+        deadLetterExchange: '',
+        deadLetterRoutingKey: EXECUTION_DLQ,
+      };
+    }
+
+    if (queueName === EXECUTION_RETRY_QUEUE) {
+      return baseConfig; // Minimal config for retry queue
+    }
+
+    if (queueName === EXECUTION_DLQ) {
+      return baseConfig; // Minimal config for DLQ
+    }
+
+    return baseConfig;
+  }
+
+  /**
+   * Get optimal configuration for new queues
+   */
+  private getOptimalNewConfig(queueName: string): any {
+    const baseConfig = {
+      durable: true,
+      arguments: {
+        'x-queue-mode': 'lazy', // Memory efficient
+        'x-max-priority': 10, // Priority support
+      },
+    };
+
+    if (queueName === EXECUTION_QUEUE) {
+      return {
+        ...baseConfig,
+        deadLetterExchange: '',
+        deadLetterRoutingKey: EXECUTION_DLQ,
+        arguments: {
+          ...baseConfig.arguments,
+          'x-max-length': parseInt(
+            this.configService.get('RABBITMQ_MAX_QUEUE_LENGTH') || '100000',
+          ),
+          'x-message-ttl': parseInt(
+            this.configService.get('RABBITMQ_MESSAGE_TTL') || '3600000',
+          ),
+        },
+      };
+    }
+
+    if (queueName === EXECUTION_RETRY_QUEUE) {
+      return {
+        ...baseConfig,
+        deadLetterExchange: '',
+        deadLetterRoutingKey: EXECUTION_QUEUE,
+        arguments: {
+          ...baseConfig.arguments,
+          'x-message-ttl': parseInt(
+            this.configService.get('RABBITMQ_RETRY_TTL') || '300000',
+          ),
+        },
+      };
+    }
+
+    if (queueName === EXECUTION_DLQ) {
+      return {
+        ...baseConfig,
+        arguments: {
+          ...baseConfig.arguments,
+          'x-message-ttl': 604800000, // 7 days retention
+        },
+      };
+    }
+
+    return baseConfig;
   }
 
   /**
