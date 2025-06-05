@@ -1,354 +1,286 @@
+import { DatabaseService } from '../../services/database.service';
 import { Injectable, Logger } from '@nestjs/common';
-import { createServiceClient } from '../../lib/supabase/serviceClient';
-import { CircuitBreaker, CircuitState } from './CircuitBreaker';
+
+export interface CircuitBreakerState {
+  id?: string;
+  circuitId: string;
+  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  failureCount: number;
+  successCount: number;
+  lastFailureTime?: Date;
+  lastSuccessTime?: Date;
+  lastHalfOpenTime?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
 /**
- * Service to handle database operations for the circuit breaker pattern
- * This ensures that circuit breaker state is persisted across worker restarts
- * and provides a consistent view of the state across multiple worker instances.
+ * Circuit Breaker Database Service
+ *
+ * Handles database operations for circuit breaker state management
+ * using Prisma instead of Supabase.
  */
 @Injectable()
 export class CircuitBreakerDbService {
   private readonly logger = new Logger(CircuitBreakerDbService.name);
-  
-  constructor(private readonly circuitBreaker: CircuitBreaker) {}
-  
+
+  constructor(private readonly databaseService: DatabaseService) {}
+
   /**
-   * Generate a unique circuit ID for tracking
+   * Generate circuit ID from service and endpoint
    */
-  generateCircuitId(chainId: number, userId: string, operationType: string): string {
-    return `${chainId}-${userId}-${operationType}`;
+  generateCircuitId(service: string, endpoint: string): string {
+    return `${service}:${endpoint}`;
   }
-  
+
   /**
-   * Check if operations are allowed for a specific circuit
+   * Get circuit breaker state by circuit ID
    */
-  async isOperationAllowed(chainId: number, userId: string, operationType: string): Promise<boolean> {
-    const circuitId = this.generateCircuitId(chainId, userId, operationType);
-    
+  async getState(circuitId: string): Promise<CircuitBreakerState | null> {
     try {
-      const circuitId = `${chainId}-${userId}-${operationType}`;
-      
-      const { data } = await this.getCircuitState(circuitId);
-      
-      // No circuit state exists yet, so allow the operation
-      if (!data || data.length === 0) return true;
-      
-      const state = data[0].state;
-      
-      // Only allow operations if circuit is CLOSED or HALF_OPEN
-      return state === CircuitState.CLOSED || state === CircuitState.HALF_OPEN;
+      const state =
+        await this.databaseService.prisma.circuitBreakerState.findFirst({
+          where: { circuitId },
+        });
+
+      if (!state) return null;
+
+      return {
+        id: state.id,
+        circuitId: state.circuitId,
+        state: state.state as 'CLOSED' | 'OPEN' | 'HALF_OPEN',
+        failureCount: state.failureCount,
+        successCount: state.successCount,
+        lastFailureTime: state.lastFailureTime,
+        lastSuccessTime: state.lastSuccessTime,
+        lastHalfOpenTime: state.lastHalfOpenTime,
+        createdAt: state.createdAt,
+        updatedAt: state.updatedAt,
+      };
     } catch (error) {
-      console.error('Error checking circuit breaker state:', error);
-      // Default to allowing operation if there's an error checking state
-      return true;
+      this.logger.error(
+        `Failed to get circuit breaker state for ${circuitId}:`,
+        error,
+      );
+      throw error;
     }
   }
 
   /**
-   * Get the current state of a circuit breaker
+   * Update or create circuit breaker state
    */
-  async getCircuitState(circuitId: string) {
-    const supabase = createServiceClient();
-    
-    const response = await supabase
-      .from('circuit_breaker_state')
-      .select('state')
-      .eq('circuit_id', circuitId);
-    
-    return response;
+  async updateState(
+    circuitId: string,
+    state: 'CLOSED' | 'OPEN' | 'HALF_OPEN',
+    failureCount: number,
+    successCount: number = 0,
+  ): Promise<CircuitBreakerState> {
+    try {
+      const now = new Date();
+      const updateData = {
+        state,
+        failureCount,
+        successCount,
+        updatedAt: now,
+        ...(state === 'OPEN' && { lastHalfOpenTime: now }),
+        ...(failureCount > 0 && { lastFailureTime: now }),
+        ...(successCount > 0 && { lastSuccessTime: now }),
+      };
+
+      // Try to update existing record
+      const existingState =
+        await this.databaseService.prisma.circuitBreakerState.findFirst({
+          where: { circuitId },
+        });
+
+      let result;
+      if (existingState) {
+        result = await this.databaseService.prisma.circuitBreakerState.update({
+          where: { id: existingState.id },
+          data: updateData,
+        });
+      } else {
+        // Create new record
+        result = await this.databaseService.prisma.circuitBreakerState.create({
+          data: {
+            circuitId,
+            ...updateData,
+            createdAt: now,
+          },
+        });
+      }
+
+      return {
+        id: result.id,
+        circuitId: result.circuitId,
+        state: result.state as 'CLOSED' | 'OPEN' | 'HALF_OPEN',
+        failureCount: result.failureCount,
+        successCount: result.successCount,
+        lastFailureTime: result.lastFailureTime,
+        lastSuccessTime: result.lastSuccessTime,
+        lastHalfOpenTime: result.lastHalfOpenTime,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to update circuit breaker state for ${circuitId}:`,
+        error,
+      );
+      throw error;
+    }
   }
 
   /**
    * Record a successful operation
    */
-  async recordSuccess(params: {
-    chainId: number;
-    userId: string;
-    operation: string;
-    metadata?: Record<string, any>;
-  }): Promise<void> {
-    // Generate circuit ID from parameters
-    const circuitId = `${params.chainId}-${params.userId}-${params.operation}`;
+  async recordSuccess(circuitId: string): Promise<void> {
     try {
-      const supabase = createServiceClient();
-      const now = new Date().toISOString();
-      
-      // Check if the circuit exists
-      const existingResponse = await supabase
-        .from('circuit_breaker_state')
-        .select('id, state, success_count, failure_count')
-        .eq('circuit_id', circuitId);
-      
-      let state = CircuitState.CLOSED;
-      
-      // If circuit exists, transition state if needed
-      if (existingResponse.data && existingResponse.data.length > 0) {
-        // If we're in HALF_OPEN and get a success, transition to CLOSED
-        if (existingResponse.data[0].state === CircuitState.HALF_OPEN.toString()) {
-          state = CircuitState.CLOSED;
-        } else {
-          // Convert the string state from DB to CircuitState enum
-          const stateStr = existingResponse.data[0].state;
-          if (stateStr === CircuitState.CLOSED.toString()) {
-            state = CircuitState.CLOSED;
-          } else if (stateStr === CircuitState.OPEN.toString()) {
-            state = CircuitState.OPEN;
-          } else if (stateStr === CircuitState.HALF_OPEN.toString()) {
-            state = CircuitState.HALF_OPEN;
-          } else {
-            // Default to current state if unknown
-            state = CircuitState.CLOSED;
-          }
-        }
-        
-        // Update existing circuit
-        await supabase
-          .from('circuit_breaker_state')
-          .update({
-            state: state.toString(),
-            success_count: (existingResponse.data[0].success_count || 0) + 1,
-            last_success_time: now,
-            updated_at: now
-          })
-          .eq('id', existingResponse.data[0].id);
+      const currentState = await this.getState(circuitId);
+
+      if (currentState) {
+        await this.updateState(
+          circuitId,
+          'CLOSED', // Success always closes the circuit
+          0, // Reset failure count
+          currentState.successCount + 1,
+        );
       } else {
         // Create new circuit in CLOSED state
-        await supabase
-          .from('circuit_breaker_state')
-          .insert({
-            circuit_id: circuitId,
-            state: CircuitState.CLOSED,
-            success_count: 1,
-            failure_count: 0,
-            last_success_time: now,
-            created_at: now,
-            updated_at: now
-          });
+        await this.updateState(circuitId, 'CLOSED', 0, 1);
       }
+
+      this.logger.log(`Circuit breaker success recorded for ${circuitId}`);
     } catch (error) {
-      console.error('Error recording circuit breaker success:', error);
+      this.logger.error(
+        `Failed to record success for circuit ${circuitId}:`,
+        error,
+      );
+      throw error;
     }
   }
 
   /**
    * Record a failed operation
    */
-  async recordFailure(params: {
-    chainId: number;
-    userId: string;
-    operation: string;
-    metadata?: Record<string, any>;
-  }, threshold = 5): Promise<void> {
-    // Generate circuit ID from parameters
-    const circuitId = `${params.chainId}-${params.userId}-${params.operation}`;
+  async recordFailure(circuitId: string, threshold: number = 5): Promise<void> {
     try {
-      const supabase = createServiceClient();
-      const now = new Date().toISOString();
-      
-      // Check if the circuit exists
-      const existingResponse = await supabase
-        .from('circuit_breaker_state')
-        .select('id, state, failure_count, success_count')
-        .eq('circuit_id', circuitId);
-      
-      let state = CircuitState.CLOSED;
-      
-      // If circuit exists, update state based on failure threshold
-      if (existingResponse.data && existingResponse.data.length > 0) {
-        const currentFailures = existingResponse.data[0].failure_count || 0;
-        
-        // If failures exceed threshold, open the circuit
-        if (currentFailures + 1 >= threshold) {
-          state = CircuitState.OPEN;
-        } else {
-          // Convert the string state to enum
-          const stateStr = existingResponse.data[0].state;
-          if (stateStr === CircuitState.CLOSED.toString()) {
-            state = CircuitState.CLOSED;
-          } else if (stateStr === CircuitState.OPEN.toString()) {
-            state = CircuitState.OPEN;
-          } else if (stateStr === CircuitState.HALF_OPEN.toString()) {
-            state = CircuitState.HALF_OPEN;
-          } else {
-            // Default to CLOSED if unknown state
-            state = CircuitState.CLOSED;
-          }
-        }
-        
-        // Update existing circuit
-        await supabase
-          .from('circuit_breaker_state')
-          .update({
-            state,
-            failure_count: (existingResponse.data[0].failure_count || 0) + 1,
-            last_failure_time: now,
-            updated_at: now,
-            last_half_open_time: state === CircuitState.HALF_OPEN ? now : undefined
-          })
-          .eq('id', existingResponse.data[0].id);
-      } else {
-        // Create new circuit - if first operation is a failure, still create in CLOSED state
-        // but record the failure
-        await supabase
-          .from('circuit_breaker_state')
-          .insert({
-            circuit_id: circuitId,
-            state: CircuitState.CLOSED.toString(), // Start in CLOSED even on first failure
-            success_count: 0,
-            failure_count: 1,
-            last_failure_time: now,
-            created_at: now,
-            updated_at: now
-          });
-      }
+      const currentState = await this.getState(circuitId);
+      const newFailureCount = (currentState?.failureCount || 0) + 1;
+
+      // Determine new state based on failure count
+      const newState = newFailureCount >= threshold ? 'OPEN' : 'CLOSED';
+
+      await this.updateState(
+        circuitId,
+        newState,
+        newFailureCount,
+        currentState?.successCount || 0,
+      );
+
+      this.logger.log(
+        `Circuit breaker failure recorded for ${circuitId}, failures: ${newFailureCount}, state: ${newState}`,
+      );
     } catch (error) {
-      console.error('Error recording circuit breaker failure:', error);
+      this.logger.error(
+        `Failed to record failure for circuit ${circuitId}:`,
+        error,
+      );
+      throw error;
     }
   }
 
   /**
-   * Log a blockchain transaction
+   * Reset circuit breaker state to CLOSED
    */
-  async logTransaction(transaction: {
-    user_id: string;
-    node_id: string;
-    execution_id: string;
-    chain_id: number;
-    to_address: string;
-    value?: string;
-    data?: string | null;
-    gas_limit?: string | null;
-    hash?: string | null;
-    status?: string;
-    error?: string | null;
-    retry_count?: number;
-    wallet_address: string;
-    created_at?: string;
-    updated_at?: string;
-  }): Promise<void> {
+  async resetState(circuitId: string): Promise<void> {
     try {
-      const supabase = createServiceClient();
-      const now = new Date().toISOString();
-      
-      // Insert transaction record
-      await supabase
-        .from('blockchain_transactions')
-        .insert({
-          user_id: transaction.user_id,
-          node_id: transaction.node_id,
-          execution_id: transaction.execution_id,
-          chain_id: transaction.chain_id,
-          to_address: transaction.to_address,
-          value: transaction.value || '0',
-          data: transaction.data || null,
-          gas_limit: transaction.gas_limit || null,
-          hash: transaction.hash || null,
-          status: transaction.status || 'PENDING',
-          error: transaction.error || null,
-          retry_count: transaction.retry_count || 0,
-          wallet_address: transaction.wallet_address,
-          created_at: transaction.created_at || now,
-          updated_at: transaction.updated_at || now
+      await this.updateState(circuitId, 'CLOSED', 0, 0);
+      this.logger.log(`Circuit breaker reset for ${circuitId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to reset circuit breaker state for ${circuitId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Check if operation is allowed
+   */
+  async isOperationAllowed(circuitId: string): Promise<boolean> {
+    try {
+      const state = await this.getState(circuitId);
+
+      if (!state) {
+        // No state exists, allow operation
+        return true;
+      }
+
+      // Only allow operations if circuit is CLOSED or HALF_OPEN
+      return state.state === 'CLOSED' || state.state === 'HALF_OPEN';
+    } catch (error) {
+      this.logger.error(
+        `Failed to check operation allowance for ${circuitId}:`,
+        error,
+      );
+      // Default to allowing operation on error
+      return true;
+    }
+  }
+
+  /**
+   * Get all circuit breaker states
+   */
+  async getAllStates(): Promise<CircuitBreakerState[]> {
+    try {
+      const states =
+        await this.databaseService.prisma.circuitBreakerState.findMany({
+          orderBy: { updatedAt: 'desc' },
         });
+
+      return states.map((state) => ({
+        id: state.id,
+        circuitId: state.circuitId,
+        state: state.state as 'CLOSED' | 'OPEN' | 'HALF_OPEN',
+        failureCount: state.failureCount,
+        successCount: state.successCount,
+        lastFailureTime: state.lastFailureTime,
+        lastSuccessTime: state.lastSuccessTime,
+        lastHalfOpenTime: state.lastHalfOpenTime,
+        createdAt: state.createdAt,
+        updatedAt: state.updatedAt,
+      }));
     } catch (error) {
-      console.error('Error logging blockchain transaction:', error);
+      this.logger.error('Failed to get all circuit breaker states:', error);
+      throw error;
     }
   }
 
   /**
-   * Update a transaction status
+   * Clean up old circuit breaker states
    */
-  async updateTransactionStatus(
-    transactionId: string,
-    status: string,
-    details: {
-      transactionHash?: string;
-      gasUsed?: string;
-      gasPrice?: string;
-      errorMessage?: string;
-      retryCount?: number;
-    } = {}
-  ): Promise<void> {
+  async cleanup(olderThanDays: number = 7): Promise<number> {
     try {
-      const supabase = createServiceClient();
-      const updateData: Record<string, any> = {
-        status,
-        updated_at: new Date().toISOString()
-      };
-      
-      // Add optional fields if provided
-      if (details.transactionHash) {
-        updateData.transaction_hash = details.transactionHash;
-      }
-      
-      if (details.gasUsed) {
-        updateData.gas_used = details.gasUsed;
-      }
-      
-      if (details.gasPrice) {
-        updateData.gas_price = details.gasPrice;
-      }
-      
-      if (details.errorMessage) {
-        updateData.error_message = details.errorMessage;
-      }
-      
-      if (details.retryCount !== undefined) {
-        updateData.retry_count = details.retryCount;
-      }
-      
-      // Add confirmation time if status is confirmed
-      if (status === 'confirmed') {
-        updateData.confirmed_at = new Date().toISOString();
-      }
-      
-      await supabase
-        .from('blockchain_transactions')
-        .update(updateData)
-        .eq('id', transactionId);
-    } catch (error) {
-      console.error('Error updating transaction status:', error);
-    }
-  }
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
-  async getTransactionByHash(hash: string): Promise<any> {
-    try {
-      const supabase = createServiceClient();
-      const { data, error } = await supabase
-        .from('blockchain_transactions')
-        .select('*')
-        .eq('hash', hash)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error fetching transaction by hash:', error);
-      return null;
-    }
-  }
+      const result =
+        await this.databaseService.prisma.circuitBreakerState.deleteMany({
+          where: {
+            updatedAt: {
+              lt: cutoffDate,
+            },
+            state: 'CLOSED', // Only cleanup CLOSED states
+          },
+        });
 
-  async logTransactionUpdate(
-    transactionId: string,
-    updates: Partial<{
-      status: string;
-      error: string;
-      block_number: number;
-      gas_used: string;
-      effective_gas_price: string;
-      retry_count?: number;
-    }>,
-  ): Promise<void> {
-    try {
-      const supabase = createServiceClient();
-      
-      await supabase
-        .from('blockchain_transactions')
-        .update(updates)
-        .eq('id', transactionId);
+      this.logger.log(`Cleaned up ${result.count} old circuit breaker states`);
+      return result.count;
     } catch (error) {
-      console.error('Error logging transaction update:', error);
+      this.logger.error('Failed to cleanup circuit breaker states:', error);
+      throw error;
     }
   }
 }

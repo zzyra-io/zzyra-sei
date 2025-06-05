@@ -1,8 +1,6 @@
-import { createServiceClient } from '@/lib/supabase/serviceClient';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@/types/supabase';
-import { v4 as uuidv4 } from 'uuid';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { DatabaseService } from '../../services/database.service';
+import type { WorkflowStatus } from '@zyra/database';
 
 export interface Workflow {
   id: string;
@@ -47,86 +45,143 @@ function detectCycle(nodes: any[], edges: any[]): boolean {
 
 @Injectable()
 export class WorkflowService {
-  async getWorkflows(): Promise<Workflow[]> {
-    const supabase: SupabaseClient<Database> = createServiceClient();
-    const { data, error } = await supabase
-      .from('workflows')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) throw new Error(`Error fetching workflows: ${error.message}`);
-    return (data || []).map((d) => ({
-      ...d,
-      nodes: d.nodes as any as any[],
-      edges: d.edges as any as any[],
-    }));
-  }
+  private readonly logger = new Logger(WorkflowService.name);
 
-  async getWorkflow(id: string): Promise<Workflow> {
-    const supabase: SupabaseClient<Database> = createServiceClient();
-    const { data, error } = await supabase
-      .from('workflows')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw new Error(`Error fetching workflow: ${error.message}`);
-    return {
-      ...(data as any),
-      nodes: data?.nodes as any as any[],
-      edges: data?.edges as any as any[],
-    };
-  }
+  constructor(private readonly databaseService: DatabaseService) {}
 
-  async createWorkflow(workflow: Partial<Workflow>): Promise<Workflow> {
-    const supabase: SupabaseClient<Database> = createServiceClient();
-    const newWorkflow = {
-      ...workflow,
-      id: uuidv4(),
-      nodes: workflow.nodes || [],
-      edges: workflow.edges || [],
-      tags: workflow.tags || [],
-      is_public: workflow.is_public || false,
-    };
-    if (detectCycle(newWorkflow.nodes, newWorkflow.edges)) {
-      throw new Error(
-        'Workflow contains a cycle; please remove loops before saving.',
-      );
+  /**
+   * Get all workflows for the system (admin operation)
+   */
+  async getWorkflows(): Promise<any[]> {
+    try {
+      // Use direct Prisma client for complex queries with includes
+      const workflows = await this.databaseService.prisma.workflow.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            include: {
+              profile: true,
+            },
+          },
+        },
+      });
+      return workflows.map((wf) => ({
+        ...wf,
+        user_id: wf.userId, // Map to legacy field name
+        is_public: wf.isPublic,
+        created_at: wf.createdAt?.toISOString(),
+        updated_at: wf.updatedAt?.toISOString(),
+        nodes: wf.nodes as any as any[],
+        edges: wf.edges as any as any[],
+      }));
+    } catch (error) {
+      this.logger.error('Error fetching workflows:', error);
+      throw error;
     }
-    const { data, error } = await supabase
-      .from('workflows')
-      .insert(newWorkflow as any)
-      .select()
-      .single();
-    if (error) throw new Error(`Error creating workflow: ${error.message}`);
-    return data as Workflow;
   }
 
-  async updateWorkflow(
+  /**
+   * Get workflow by ID with full details
+   */
+  async getWorkflow(id: string): Promise<any | null> {
+    try {
+      const workflow = await this.databaseService.prisma.workflow.findUnique({
+        where: { id },
+        include: {
+          user: {
+            include: {
+              profile: true,
+            },
+          },
+        },
+      });
+
+      if (!workflow) return null;
+
+      return {
+        ...workflow,
+        user_id: workflow.userId,
+        is_public: workflow.isPublic,
+        created_at: workflow.createdAt?.toISOString(),
+        updated_at: workflow.updatedAt?.toISOString(),
+        nodes: workflow.nodes as any as any[],
+        edges: workflow.edges as any as any[],
+      };
+    } catch (error) {
+      this.logger.error('Error fetching workflow:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get workflow execution by ID
+   */
+  async getWorkflowExecution(id: string): Promise<any | null> {
+    try {
+      const execution =
+        await this.databaseService.executions.findWithNodesAndLogs(id);
+      return execution;
+    } catch (error) {
+      this.logger.error('Error fetching workflow execution:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update workflow execution status
+   */
+  async updateExecutionStatus(
     id: string,
-    workflow: Partial<Workflow>,
-  ): Promise<Workflow> {
-    const supabase: SupabaseClient<Database> = createServiceClient();
-    if (
-      workflow.nodes &&
-      workflow.edges &&
-      detectCycle(workflow.nodes, workflow.edges)
-    ) {
-      throw new Error(
-        'Workflow update contains a cycle; please remove loops before saving.',
+    status: WorkflowStatus,
+    output?: any,
+    error?: string,
+  ): Promise<void> {
+    try {
+      await this.databaseService.updateExecutionStatusWithLogging(
+        id,
+        status,
+        output,
+        error,
       );
+    } catch (err) {
+      this.logger.error('Error updating execution status:', err);
+      throw err;
     }
-    const { data, error } = await supabase
-      .from('workflows')
-      .update(workflow as any)
-      .eq('id', id)
-      .select('*')
-      .single();
-    if (error) throw new Error(`Error updating workflow: ${error.message}`);
-    return data as Workflow;
   }
 
+  /**
+   * Create a new workflow execution
+   */
+  async createExecution(data: {
+    workflowId: string;
+    userId: string;
+    input?: any;
+    triggerType?: string;
+    triggerData?: any;
+  }): Promise<any> {
+    try {
+      const execution = await this.databaseService.executions.createExecution(
+        data.workflowId,
+        data.userId,
+        data.input,
+        data.triggerType,
+      );
+      return execution;
+    } catch (error) {
+      this.logger.error('Error creating workflow execution:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete workflow
+   */
   async deleteWorkflow(id: string): Promise<void> {
-    const supabase: SupabaseClient<Database> = createServiceClient();
-    const { error } = await supabase.from('workflows').delete().eq('id', id);
-    if (error) throw new Error(`Error deleting workflow: ${error.message}`);
+    try {
+      await this.databaseService.workflows.delete(id);
+    } catch (error) {
+      this.logger.error('Error deleting workflow:', error);
+      throw error;
+    }
   }
 }

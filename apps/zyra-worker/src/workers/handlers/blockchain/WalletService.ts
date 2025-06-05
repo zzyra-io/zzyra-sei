@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Wallet } from 'ethers';
-import { createServiceClient } from '../../../lib/supabase/serviceClient';
+import { DatabaseService } from '../../../services/database.service';
 
 /**
  * Service for managing blockchain wallets
@@ -10,7 +10,7 @@ export class WalletService {
   private readonly logger = new Logger(WalletService.name);
   private wallets: Map<number, Wallet> = new Map();
 
-  constructor() {
+  constructor(private readonly databaseService: DatabaseService) {
     this.initializeWallets();
   }
 
@@ -29,9 +29,13 @@ export class WalletService {
       try {
         const wallet = new Wallet(defaultPrivateKey);
         this.wallets.set(1, wallet); // Ethereum mainnet is chain ID 1
-        this.logger.log(`Initialized wallet for Ethereum mainnet (chain ID: 1)`);
+        this.logger.log(
+          `Initialized wallet for Ethereum mainnet (chain ID: 1)`,
+        );
       } catch (error) {
-        this.logger.error(`Failed to initialize Ethereum mainnet wallet: ${error}`);
+        this.logger.error(
+          `Failed to initialize Ethereum mainnet wallet: ${error}`,
+        );
       }
     }
 
@@ -48,7 +52,9 @@ export class WalletService {
             this.wallets.set(chainId, wallet);
             this.logger.log(`Initialized wallet for chain ID: ${chainId}`);
           } catch (error) {
-            this.logger.error(`Failed to initialize wallet for chain ID ${chainId}: ${error}`);
+            this.logger.error(
+              `Failed to initialize wallet for chain ID ${chainId}: ${error}`,
+            );
           }
         }
       }
@@ -65,44 +71,46 @@ export class WalletService {
   /**
    * Save wallet data securely in the database
    */
-  async saveWalletData(userId: string, chainId: number, address: string): Promise<void> {
+  async saveWalletData(
+    userId: string,
+    chainId: number,
+    address: string,
+  ): Promise<void> {
     try {
-      const supabase = createServiceClient();
-      
       // Check if wallet exists for this user and network
-      const { data, error } = await supabase
-        .from('user_wallets')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('network_id', chainId.toString())
-        .single();
-      
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-      
-      if (data) {
+      const existingWallet =
+        await this.databaseService.prisma.userWallet.findFirst({
+          where: {
+            userId,
+            chainId: chainId.toString(),
+          },
+        });
+
+      if (existingWallet) {
         // Update existing wallet
-        await supabase
-          .from('user_wallets')
-          .update({ 
-            smart_wallet_address: address, 
-            updated_at: new Date().toISOString() 
-          })
-          .eq('user_id', userId)
-          .eq('network_id', chainId.toString());
+        await this.databaseService.prisma.userWallet.update({
+          where: { id: existingWallet.id },
+          data: {
+            walletAddress: address,
+            updatedAt: new Date(),
+          },
+        });
       } else {
         // Create new wallet entry
-        await supabase
-          .from('user_wallets')
-          .insert({
-            user_id: userId,
-            network_id: chainId.toString(),
-            smart_wallet_address: address,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
+        await this.databaseService.prisma.userWallet.create({
+          data: {
+            userId,
+            chainId: chainId.toString(),
+            walletAddress: address,
+            walletType: 'smart_wallet',
+            chainType: 'ethereum',
+          },
+        });
       }
+
+      this.logger.log(
+        `Wallet data saved for user ${userId} on chain ${chainId}`,
+      );
     } catch (error) {
       this.logger.error(`Failed to save wallet data: ${error}`);
       throw error;

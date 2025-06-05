@@ -51,11 +51,13 @@ export class BlockHandlerRegistry {
     private readonly protocolService?: ProtocolService,
   ) {
     // Initialize services
-    const walletService = new WalletService();
+    const walletService = new WalletService(this.databaseService);
 
     // Create circuit breaker for blockchain operations
     const circuitBreaker = new CircuitBreaker();
-    const circuitBreakerDbService = new CircuitBreakerDbService(circuitBreaker);
+    const circuitBreakerDbService = new CircuitBreakerDbService(
+      this.databaseService,
+    );
 
     this.handlers = {
       // Action blocks
