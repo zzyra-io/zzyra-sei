@@ -64,8 +64,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LogEntry } from '@zyra/types';
-
+import { LogEntry } from "@zyra/types";
 
 // Types
 interface NodeExecution {
@@ -497,6 +496,7 @@ export default function WorkflowTimeline() {
   // Get filtered logs for selected node
   const getFilteredLogs = () => {
     if (!execDetail || !selectedNodeId) return [];
+    console.log("execDetail", execDetail);
 
     return execDetail.logs
       .filter(
@@ -922,8 +922,8 @@ export default function WorkflowTimeline() {
                                     log.level === "error"
                                       ? "bg-red-50 text-red-700"
                                       : log.level === "warning"
-                                      ? "bg-amber-50 text-amber-700"
-                                      : "bg-blue-50 text-blue-700"
+                                        ? "bg-amber-50 text-amber-700"
+                                        : "bg-blue-50 text-blue-700"
                                   }`}>
                                   {log.level.toUpperCase()}
                                 </Badge>
@@ -980,8 +980,8 @@ export default function WorkflowTimeline() {
                       modalLog.level === "error"
                         ? "bg-red-50 text-red-700"
                         : modalLog.level === "warning"
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-blue-50 text-blue-700"
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-blue-50 text-blue-700"
                     }>
                     {modalLog.level.toUpperCase()}
                   </Badge>
@@ -1077,8 +1077,8 @@ function generateMockExecutionDetail(executionId: string) {
           Math.random() > 0.8
             ? "error"
             : Math.random() > 0.6
-            ? "warning"
-            : "info";
+              ? "warning"
+              : "info";
 
         logs.push({
           id: `log_${i}_${j}_${Math.random().toString(36).substring(2, 10)}`,
@@ -1089,8 +1089,8 @@ function generateMockExecutionDetail(executionId: string) {
             level === "error"
               ? "Error"
               : level === "warning"
-              ? "Warning"
-              : "Info"
+                ? "Warning"
+                : "Info"
           }: ${nodeTypes[i]} operation ${j + 1}`,
           data:
             Math.random() > 0.5
