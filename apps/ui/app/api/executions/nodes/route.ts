@@ -39,43 +39,68 @@ export async function GET(request: Request) {
     }
 
     // Fetch block executions (which store node execution data)
-    console.log(`[DEBUG] Looking for block executions with executionId: ${executionId}`);
-    
-    // Query the blockExecution table instead of nodeExecution
+    console.log(
+      `[DEBUG] Looking for block executions with executionId: ${executionId}`
+    );
+
+    // Query the blockExecution table instead of nodeExecution with more complete data
     const blockExecutions = await prisma.blockExecution.findMany({
       where: {
         executionId: executionId,
       },
+      include: {
+        // Include related execution for additional metadata if needed
+        execution: {
+          select: {
+            id: true,
+            workflowId: true,
+            status: true,
+            executionLogs: true,
+          },
+        },
+      },
     });
-    
+
     console.log(`[DEBUG] Found ${blockExecutions.length} block executions`);
-    
+
     // Map the block executions to the expected node execution format
     const nodeExecutions = blockExecutions;
-    
+
     // If we didn't find any, check if there are any block executions at all in the database
     if (blockExecutions.length === 0) {
       const recentBlockExecutions = await prisma.blockExecution.findMany({
         take: 5,
         orderBy: {
-          startTime: 'desc'
+          startTime: "desc",
         },
         select: {
           id: true,
           executionId: true,
           nodeId: true,
-          status: true
-        }
+          status: true,
+        },
       });
-      
-      console.log(`[DEBUG] Recent block executions:`, JSON.stringify(recentBlockExecutions, null, 2));
+
+      console.log(
+        `[DEBUG] Recent block executions:`,
+        JSON.stringify(recentBlockExecutions, null, 2)
+      );
     }
 
     // Format the response to match the expected structure
     const formattedNodeExecutions = nodeExecutions.map((node) => {
-      // Get input data from inputs relation if needed
-      // For now, we'll use null as we need to fetch this separately
-      const inputData = null;
+      // Parse input data if it exists
+      let inputData = null;
+      try {
+        if (node.input) {
+          inputData =
+            typeof node.input === "string"
+              ? JSON.parse(node.input)
+              : node.input;
+        }
+      } catch (e) {
+        console.error("Error parsing node input:", e);
+      }
 
       // Parse output if it exists
       let outputData = null;
@@ -95,12 +120,19 @@ export async function GET(request: Request) {
         execution_id: node.executionId,
         node_id: node.nodeId,
         status: node.status,
+        block_type: node.blockType, // Include the blockType for UI rendering
         // Map startTime to started_at and endTime to completed_at
         started_at: node.startTime?.toISOString() || null,
         completed_at: node.endTime?.toISOString() || null,
         error: node.error || null,
         input_data: inputData,
         output_data: outputData,
+        // Add more metadata that might be useful for the frontend
+        duration_ms:
+          node.endTime && node.startTime
+            ? new Date(node.endTime).getTime() -
+              new Date(node.startTime).getTime()
+            : null,
       };
     });
 
