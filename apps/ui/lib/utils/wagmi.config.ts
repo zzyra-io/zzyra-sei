@@ -8,6 +8,7 @@ import {
   getActiveNetworkConfigs,
   getNetworkUrl,
   getChainId,
+  supportedNetworks,
 } from "./network";
 import { getDefaultConfig } from "connectkit";
 
@@ -38,7 +39,7 @@ export function createWagmiConfig(
   apiKey: string | undefined,
   isDarkMode = false
 ): Config {
-  const chains = getActiveChains();
+  const chains = supportedNetworks;
   const activeConnectors = [];
 
   // Add Magic connector only if API key is provided
