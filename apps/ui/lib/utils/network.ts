@@ -1,216 +1,230 @@
+import {
+  mainnet,
+  polygonAmoy,
+  baseSepolia,
+  sepolia,
+  polygon,
+} from "wagmi/chains";
+import type { Chain } from "wagmi/chains";
+
 // import { sonic_blaze_rpc } from "@/constants/sonic";
 
-export enum Network {
-  POLYGON_AMOY = "polygon-amoy",
-  POLYGON = "polygon",
-  ETHEREUM_SEPOLIA = "ethereum-sepolia",
-  ETHEREUM = "ethereum",
-  ETHERLINK = "etherlink",
-  ETHERLINK_TESTNET = "etherlink-testnet",
-  ZKSYNC = "zksync",
-  ZKSYNC_SEPOLIA = "zksync-sepolia",
-  SONIC_TESTNET = "sonic-blaze",
-  BASE_SEPOLIA = "base-sepolia",
+// Single source of truth for supported networks
+export const supportedNetworks = [
+  baseSepolia,
+  polygonAmoy,
+  mainnet,
+  sepolia,
+  polygon,
+] as const;
+
+// Type for supported networks
+export type SupportedNetwork = (typeof supportedNetworks)[number];
+
+// Network configuration mapping chain ID to RPC URLs
+export const NETWORK_CONFIG: Record<number, { chain: Chain; rpcUrl: string }> =
+  {
+    [baseSepolia.id]: {
+      chain: baseSepolia,
+      rpcUrl:
+        "https://base-sepolia.g.alchemy.com/v2/fYFybLQFR9Zr2GCRcgALmAktStFKr0i0",
+    },
+    [polygonAmoy.id]: {
+      chain: polygonAmoy,
+      rpcUrl: "https://rpc-amoy.polygon.technology/",
+    },
+    [mainnet.id]: {
+      chain: mainnet,
+      rpcUrl:
+        "https://eth-mainnet.g.alchemy.com/v2/fYFybLQFR9Zr2GCRcgALmAktStFKr0i0",
+    },
+    [sepolia.id]: {
+      chain: sepolia,
+      rpcUrl:
+        "https://eth-sepolia.g.alchemy.com/v2/fYFybLQFR9Zr2GCRcgALmAktStFKr0i0",
+    },
+    [polygon.id]: {
+      chain: polygon,
+      rpcUrl: "https://polygon-rpc.com/",
+    },
+  };
+
+// Active networks - change order to control priority (first is default)
+export const ACTIVE_NETWORKS = [baseSepolia, polygonAmoy, mainnet] as const;
+
+// Get the default network (first in ACTIVE_NETWORKS)
+export const getDefaultNetwork = (): Chain => {
+  return ACTIVE_NETWORKS[0];
+};
+
+// Get active chains for wagmi config
+export const getActiveChains = (): [Chain, ...Chain[]] => {
+  const chains = [...ACTIVE_NETWORKS];
+  if (chains.length === 0) {
+    throw new Error("At least one active network must be configured");
+  }
+  return [chains[0], ...chains.slice(1)];
+};
+
+// Get active network configs for Magic connector
+export const getActiveNetworkConfigs = () => {
+  return ACTIVE_NETWORKS.map((chain) => ({
+    rpcUrl: NETWORK_CONFIG[chain.id].rpcUrl,
+    chainId: chain.id,
+  }));
+};
+
+// Get current network from environment or default
+export const getCurrentNetwork = (): Chain => {
+  const envChainId = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK;
+  if (envChainId) {
+    const chainId = parseInt(envChainId);
+    const network = supportedNetworks.find((chain) => chain.id === chainId);
+    if (network) return network;
+  }
+  return getDefaultNetwork();
+};
+
+// Check if a chain ID is supported
+function isSupportedChain(chainId: number): boolean {
+  return chainId in NETWORK_CONFIG;
 }
 
-export const getNetworkUrl = () => {
-  // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
-  
-  switch (network) {
-    case Network.POLYGON:
-      return "https://polygon-rpc.com/";
-    case Network.POLYGON_AMOY:
-      return "https://rpc-amoy.polygon.technology/";
-    case Network.ETHEREUM_SEPOLIA:
-      return "https://eth-sepolia.g.alchemy.com/v2/fYFybLQFR9Zr2GCRcgALmAktStFKr0i0";
-    case Network.ETHEREUM:
-      return "https://eth-mainnet.g.alchemy.com/v2/fYFybLQFR9Zr2GCRcgALmAktStFKr0i0";
-    case Network.ETHERLINK:
-      return "https://node.mainnet.etherlink.com";
-    case Network.ETHERLINK_TESTNET:
-      return "https://node.ghostnet.etherlink.com";
-    case Network.ZKSYNC:
-      return "https://mainnet.era.zksync.io";
-    case Network.ZKSYNC_SEPOLIA:
-      return "https://zksync-era-sepolia.blockpi.network/v1/rpc/public";
-    case Network.BASE_SEPOLIA:
-      return "https://base-sepolia.g.alchemy.com/v2/fYFybLQFR9Zr2GCRcgALmAktStFKr0i0";
-    // case Network.SONIC_TESTNET:
-    //   return sonic_blaze_rpc;
-    default:
-      console.warn(`Network "${network}" not explicitly supported, defaulting to Ethereum Sepolia`);
-      return "https://eth-sepolia.g.alchemy.com/v2/fYFybLQFR9Zr2GCRcgALmAktStFKr0i0";
+// Get network URL by chain ID
+export const getNetworkUrl = (chainIdOrChain?: number | Chain): string => {
+  const chainId =
+    typeof chainIdOrChain === "number"
+      ? chainIdOrChain
+      : (chainIdOrChain?.id ?? getCurrentNetwork().id);
+
+  if (!isSupportedChain(chainId)) {
+    console.warn(
+      `Chain ID ${chainId} not supported, defaulting to ${getDefaultNetwork().name}`
+    );
+    return NETWORK_CONFIG[getDefaultNetwork().id].rpcUrl;
   }
+  return NETWORK_CONFIG[chainId].rpcUrl;
 };
 
-export const getChainId = () => {
-  // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
-
-  switch (network) {
-    case Network.POLYGON:
-      return 137;
-    case Network.POLYGON_AMOY:
-      return 80002;
-    case Network.ETHEREUM_SEPOLIA:
-      return 11155111;
-    case Network.ZKSYNC:
-      return 324;
-    case Network.ZKSYNC_SEPOLIA:
-      return 300;
-    case Network.BASE_SEPOLIA:
-      return 84531;
-    case Network.ETHEREUM:
-      return 1;
-    case Network.ETHERLINK:
-      return 42793;
-    case Network.ETHERLINK_TESTNET:
-      return 128123;
-    case Network.SONIC_TESTNET:
-      return 57054; // Sonic Testnet Chain ID
-    default:
-      console.warn(`Network "${network}" not explicitly supported for chain ID, defaulting to Ethereum Sepolia`);
-      return 11155111; // Default to Ethereum Sepolia chain ID
-  }
+// Get chain ID (for backward compatibility)
+export const getChainId = (chainIdOrChain?: number | Chain): number => {
+  if (typeof chainIdOrChain === "number") return chainIdOrChain;
+  if (chainIdOrChain?.id) return chainIdOrChain.id;
+  return getCurrentNetwork().id;
 };
 
-export const getNetworkToken = () => {
-  // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
+// Get network token symbol
+export const getNetworkToken = (chainIdOrChain?: number | Chain): string => {
+  const chainId =
+    typeof chainIdOrChain === "number"
+      ? chainIdOrChain
+      : (chainIdOrChain?.id ?? getCurrentNetwork().id);
 
-  switch (network) {
-    case Network.POLYGON_AMOY:
-    case Network.POLYGON:
+  switch (chainId) {
+    case polygonAmoy.id:
+    case polygon.id:
       return "MATIC";
-    case Network.ETHEREUM:
-    case Network.ETHEREUM_SEPOLIA:
-    case Network.ZKSYNC:
-    case Network.ZKSYNC_SEPOLIA:
-    case Network.BASE_SEPOLIA:
+    case mainnet.id:
+    case sepolia.id:
+    case baseSepolia.id:
       return "ETH";
-    case Network.ETHERLINK:
-    case Network.ETHERLINK_TESTNET:
-      return "XTZ";
-    case Network.SONIC_TESTNET:
-      return "S";
     default:
-      console.warn(`Network "${network}" not explicitly supported for token, defaulting to ETH`);
       return "ETH";
   }
 };
 
-export const getFaucetUrl = () => {
-  // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
+// Get faucet URL for testnet networks
+export const getFaucetUrl = (
+  chainIdOrChain?: number | Chain
+): string | undefined => {
+  const chainId =
+    typeof chainIdOrChain === "number"
+      ? chainIdOrChain
+      : (chainIdOrChain?.id ?? getCurrentNetwork().id);
 
-  switch (network) {
-    case Network.POLYGON_AMOY:
+  switch (chainId) {
+    case polygonAmoy.id:
       return "https://faucet.polygon.technology/";
-    case Network.ETHEREUM_SEPOLIA:
+    case sepolia.id:
       return "https://sepoliafaucet.com/";
-    case Network.ETHERLINK_TESTNET:
-      return "https://faucet.etherlink.com/";
-    case Network.ZKSYNC_SEPOLIA:
-      return "https://faucet.quicknode.com/ethereum/sepolia";
-    case Network.BASE_SEPOLIA:
+    case baseSepolia.id:
       return "https://faucet.base.org/";
-    case Network.SONIC_TESTNET:
-      return "https://faucet.testnet.soniclabs.com";
-    case Network.POLYGON:
-    case Network.ETHEREUM:
-    case Network.ETHERLINK:
-    case Network.ZKSYNC:
-      // No faucets for mainnet networks
-      return undefined;
+    case polygon.id:
+    case mainnet.id:
+      return undefined; // No faucets for mainnets
     default:
-      // Default to Sepolia faucet for development
-      console.warn(`No faucet URL configured for network "${network}", defaulting to Sepolia faucet`);
       return "https://sepoliafaucet.com/";
   }
 };
 
-export const getNetworkName = () => {
-  // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
+// Get network display name
+export const getNetworkName = (chainIdOrChain?: number | Chain): string => {
+  const chainId =
+    typeof chainIdOrChain === "number"
+      ? chainIdOrChain
+      : (chainIdOrChain?.id ?? getCurrentNetwork().id);
 
-  switch (network) {
-    case Network.POLYGON:
-      return "Polygon (Mainnet)";
-    case Network.POLYGON_AMOY:
-      return "Polygon (Amoy)";
-    case Network.ETHEREUM_SEPOLIA:
-      return "Ethereum (Sepolia)";
-    case Network.ETHEREUM:
-      return "Ethereum (Mainnet)";
-    case Network.ETHERLINK:
-      return "Etherlink (Mainnet)";
-    case Network.ETHERLINK_TESTNET:
-      return "Etherlink (Testnet)";
-    case Network.ZKSYNC:
-      return "zkSync (Mainnet)";
-    case Network.ZKSYNC_SEPOLIA:
-      return "zkSync (Sepolia)";
-    case Network.BASE_SEPOLIA:
-      return "Base Sepolia";
-    case Network.SONIC_TESTNET:
-      return "Sonic (Blaze Testnet)";
-    default:
-      console.warn(`Network "${network}" not recognized, defaulting to Ethereum Sepolia`);
-      return "Ethereum (Sepolia) [Default]";
+  const config = NETWORK_CONFIG[chainId];
+  if (config) {
+    return config.chain.name;
   }
+  return `Unknown Network (${chainId})`;
 };
 
-export const getBlockExplorer = (address: string) => {
-  // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
+// Get block explorer URL
+export const getBlockExplorer = (
+  address: string,
+  chainIdOrChain?: number | Chain
+): string => {
+  const chainId =
+    typeof chainIdOrChain === "number"
+      ? chainIdOrChain
+      : (chainIdOrChain?.id ?? getCurrentNetwork().id);
 
-  switch (network) {
-    case Network.POLYGON:
+  switch (chainId) {
+    case polygon.id:
       return `https://polygonscan.com/address/${address}`;
-    case Network.POLYGON_AMOY:
+    case polygonAmoy.id:
       return `https://www.oklink.com/amoy/address/${address}`;
-    case Network.ETHEREUM:
+    case mainnet.id:
       return `https://etherscan.io/address/${address}`;
-    case Network.ETHEREUM_SEPOLIA:
+    case sepolia.id:
       return `https://sepolia.etherscan.io/address/${address}`;
-    case Network.ETHERLINK:
-      return `https://explorer.etherlink.com/address/${address}`;
-    case Network.ETHERLINK_TESTNET:
-      return `https://testnet-explorer.etherlink.com/address/${address}`;
-    case Network.ZKSYNC:
-      return `https://explorer.zksync.io/address/${address}`;
-    case Network.ZKSYNC_SEPOLIA:
-      return `https://sepolia.explorer.zksync.io/address/${address}`;
-    case Network.BASE_SEPOLIA:
-      return `https://sepolia.explorer.zksync.io/address/${address}`;
-    case Network.SONIC_TESTNET:
-      return `https://explorer.testnet.soniclabs.com/address/${address}`;
+    case baseSepolia.id:
+      return `https://basescan.org/address/${address}`;
     default:
-      console.warn(`Block explorer not configured for network "${network}", defaulting to Ethereum Sepolia`);
       return `https://sepolia.etherscan.io/address/${address}`;
   }
 };
 
-export const isEip1559Supported = () => {
-  // Get network from env or default to Ethereum Sepolia for development
-  const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || Network.BASE_SEPOLIA;
+// Check if EIP-1559 is supported
+export const isEip1559Supported = (
+  chainIdOrChain?: number | Chain
+): boolean => {
+  const chainId =
+    typeof chainIdOrChain === "number"
+      ? chainIdOrChain
+      : (chainIdOrChain?.id ?? getCurrentNetwork().id);
 
-  switch (network) {
-    case Network.ETHEREUM_SEPOLIA:
-    case Network.ETHEREUM:
+  switch (chainId) {
+    case sepolia.id:
+    case mainnet.id:
       return true;
-    case Network.ZKSYNC:
-    case Network.ZKSYNC_SEPOLIA:
-    case Network.BASE_SEPOLIA:
-    case Network.POLYGON:
-    case Network.POLYGON_AMOY:
-    case Network.ETHERLINK:
-    case Network.ETHERLINK_TESTNET:
-    case Network.SONIC_TESTNET:
+    case baseSepolia.id:
+    case polygon.id:
+    case polygonAmoy.id:
       return false;
     default:
-      console.warn(`EIP-1559 support not configured for network "${network}", assuming not supported`);
       return false;
   }
+};
+
+// Get chain by ID
+export const getChainById = (chainId: number): Chain | undefined => {
+  return supportedNetworks.find((chain) => chain.id === chainId);
+};
+
+// Check if chain is active
+export const isActiveNetwork = (chainId: number): boolean => {
+  return ACTIVE_NETWORKS.some((chain) => chain.id === chainId);
 };

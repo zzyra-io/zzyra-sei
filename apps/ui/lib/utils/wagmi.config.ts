@@ -1,10 +1,14 @@
 import { http } from "viem";
 import { type Config, createConfig } from "wagmi";
-import { baseSepolia, mainnet, polygonAmoy } from "wagmi/chains";
 import { QueryClient } from "@tanstack/react-query";
 import { dedicatedWalletConnector } from "@magiclabs/wagmi-connector";
 import { injected } from "wagmi/connectors";
-import { getChainId, getNetworkUrl } from "./network";
+import {
+  getActiveChains,
+  getActiveNetworkConfigs,
+  getNetworkUrl,
+  getChainId,
+} from "./network";
 import { getDefaultConfig } from "connectkit";
 
 // Create a new query client for React Query
@@ -14,7 +18,7 @@ export const queryClient = new QueryClient({
       staleTime: 60 * 60 * 1000, // 1 hour
     },
     mutations: {
-      onError(error, variables, context) {
+      onError(error) {
         console.error("Mutation error:", error);
       },
     },
@@ -34,8 +38,7 @@ export function createWagmiConfig(
   apiKey: string | undefined,
   isDarkMode = false
 ): Config {
-  const chains = [mainnet, polygonAmoy, baseSepolia] as const;
-
+  const chains = getActiveChains();
   const activeConnectors = [];
 
   // Add Magic connector only if API key is provided
@@ -46,6 +49,7 @@ export function createWagmiConfig(
         options: {
           apiKey,
           isDarkMode,
+          networks: getActiveNetworkConfigs(),
           magicSdkConfiguration: {
             network: {
               rpcUrl: getNetworkUrl(),
@@ -58,7 +62,11 @@ export function createWagmiConfig(
   }
 
   // Always add injected connector
-  activeConnectors.push(injected());
+  // activeConnectors.push(injected());
+
+  const transports = Object.fromEntries(
+    chains.map((chain) => [chain.id, http()])
+  );
 
   return createConfig(
     getDefaultConfig({
@@ -66,12 +74,8 @@ export function createWagmiConfig(
       walletConnectProjectId: "",
       syncConnectedChain: true,
       chains,
-      transports: {
-        [mainnet.id]: http(),
-        [polygonAmoy.id]: http(),
-        [baseSepolia.id]: http(),
-      },
-      connectors: activeConnectors, // use the conditionally populated list
+      transports,
+      connectors: activeConnectors,
     })
   );
 }

@@ -44,22 +44,21 @@ const MagicProvider = ({ children }: { children: ReactNode }) => {
       if (process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY) {
         setIsInitializing(true);
         try {
-            // Create a simpler Magic instance without network configuration
+          // Create a simpler Magic instance without network configuration
           console.log("Creating Magic instance with basic configuration");
 
           const magic = new MagicBase(
             process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY,
             {
               extensions: [new OAuthExtension()],
-              network: {
 
+              network: {
                 chainId: getChainId(),
                 rpcUrl: getNetworkUrl(),
-              }
+              },
             }
           );
-          magic.preload().then(() => console.log('Magic <iframe> loaded.'));
-
+          magic.preload().then(() => console.log("Magic <iframe> loaded."));
 
           console.log("Magic instance created successfully");
           setMagic(magic);
@@ -93,9 +92,7 @@ const MagicProvider = ({ children }: { children: ReactNode }) => {
   }, [magic, isAuthenticated, isInitializing]);
 
   return (
-    <MagicContext.Provider value={value}>
-      {children}
-    </MagicContext.Provider>
+    <MagicContext.Provider value={value}>{children}</MagicContext.Provider>
   );
 };
 

@@ -9,19 +9,19 @@ import {
 import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
 import { useUserWallets, CreateWalletInput } from "./useUserWallets";
 import { toast } from "@/hooks/use-toast";
-import { baseSepolia, mainnet, polygonAmoy } from "wagmi/chains";
+import {
+  getDefaultNetwork,
+  ACTIVE_NETWORKS,
+  getNetworkName,
+  isActiveNetwork,
+} from "@/lib/utils/network";
 
-// Use wagmi chains for supported networks
-const SUPPORTED_NETWORKS = [
-  { id: mainnet.id, name: mainnet.name, symbol: "ETH" },
-  { id: polygonAmoy.id, name: polygonAmoy.name, symbol: "MATIC" },
-  { id: baseSepolia.id, name: baseSepolia.name, symbol: "ETH" },
-  // Add additional networks from the network utility
-  { id: 11155111, name: "Ethereum Sepolia", symbol: "ETH" },
-  { id: 80002, name: "Polygon Amoy", symbol: "MATIC" },
-  { id: 324, name: "zkSync", symbol: "ETH" },
-  { id: 300, name: "zkSync Sepolia", symbol: "ETH" },
-];
+// Convert active networks to the format expected by the component
+const SUPPORTED_NETWORKS = ACTIVE_NETWORKS.map((chain) => ({
+  id: chain.id,
+  name: chain.name,
+  symbol: chain.name.toLowerCase().includes("polygon") ? "MATIC" : "ETH",
+}));
 
 /**
  * Hook to integrate wallet functionality with Magic Link and wagmi
@@ -63,6 +63,34 @@ export const useWalletIntegration = () => {
     chainId
   );
 
+  // Auto-switch to default network when wallet connects with wrong network
+  useEffect(() => {
+    const handleNetworkSwitch = async () => {
+      if (isConnected && chainId && switchChain) {
+        const defaultNetworkId = getDefaultNetwork().id;
+
+        // If not on an active network, switch to default
+        if (!isActiveNetwork(chainId)) {
+          console.log(
+            `Switching from unsupported network ${chainId} to default network ${defaultNetworkId}`
+          );
+          try {
+            await switchChain({ chainId: defaultNetworkId });
+          } catch (error: unknown) {
+            console.warn("Failed to auto-switch to default network:", error);
+            toast({
+              title: "Network Switch Required",
+              description: `Please switch to ${getDefaultNetwork().name} to use this app.`,
+              variant: "destructive",
+            });
+          }
+        }
+      }
+    };
+
+    handleNetworkSwitch();
+  }, [isConnected, chainId, switchChain]);
+
   // Set selected network when chain changes
   useEffect(() => {
     if (chainId) {
@@ -70,267 +98,162 @@ export const useWalletIntegration = () => {
     }
   }, [chainId]);
 
+  // Format address for display
+  const formatAddress = useCallback((address?: string) => {
+    if (!address) return "";
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }, []);
+
+  // Copy address to clipboard
+  const copyAddress = useCallback(async () => {
+    if (!address) return;
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopiedAddress(true);
+      setTimeout(() => setCopiedAddress(false), 2000);
+      toast({
+        title: "Address copied",
+        description: "Wallet address copied to clipboard",
+      });
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy address to clipboard",
+        variant: "destructive",
+      });
+    }
+  }, [address, toast]);
+
   // Save wallet to database when connected
   useEffect(() => {
-    const saveWalletToDatabase = async () => {
-      console.log('Checking conditions for auto wallet save:', {
-        isAuthenticated,
-        isConnected,
-        address,
-        chainId,
-        hasChain: !!chain
-      });
-      
-      if (isAuthenticated && isConnected && address && chainId && chain) {
-        console.log('Auto-saving connected wallet to database');
-        
-        try {
+    const saveConnectedWallet = async () => {
+      if (isConnected && address && isAuthenticated && user?.email) {
+        // Check if wallet is already saved
+        const existingWallet = wallets?.find(
+          (w) => w.walletAddress.toLowerCase() === address.toLowerCase()
+        );
+
+        if (!existingWallet) {
           const walletData: CreateWalletInput = {
             walletAddress: address,
-            chainId: chainId.toString(),
-            walletType: connector?.name || "unknown",
+            chainId: chainId?.toString() || getDefaultNetwork().id.toString(),
+            walletType: connector?.name || "Unknown",
             chainType: "evm",
             metadata: {
-              chainName: chain.name,
-              chainId: chainId,
-              connectorId: connector?.id,
-              connectorName: connector?.name,
-              connected: true,
+              name: `${connector?.name || "Unknown"} Wallet`,
+              description: `Connected via ${connector?.name || "Unknown"} connector`,
+              network: getNetworkName(chainId),
+              chainId: chainId || getDefaultNetwork().id,
               connectedAt: new Date().toISOString(),
-              autoSaved: true
             },
           };
 
-          console.log('Saving wallet data:', walletData);
-          const savedWallet = await saveWallet.mutateAsync(walletData);
-          console.log('Wallet auto-saved successfully:', savedWallet);
-          
-          toast({
-            title: "Wallet Connected",
-            description: `${connector?.name || 'Wallet'} has been connected and saved.`,
-          });
-        } catch (error) {
-          console.error("Error saving wallet to database:", error);
-          toast({
-            title: "Wallet Connection Issue",
-            description: "Connected but couldn't save wallet information.",
-            variant: "destructive",
-          });
+          try {
+            await saveWallet.mutateAsync(walletData);
+
+            // Dispatch custom event for wallet connection
+            const event = new CustomEvent("wallet-connected", {
+              detail: { address, chainId },
+            });
+            window.dispatchEvent(event);
+
+            toast({
+              title: "Wallet saved",
+              description: "Your wallet has been added to your account.",
+            });
+          } catch (error) {
+            console.error("Error saving wallet:", error);
+            // Don't show error toast as this is not critical
+          }
         }
       }
     };
 
-    saveWalletToDatabase();
+    saveConnectedWallet();
   }, [
-    isAuthenticated,
     isConnected,
     address,
+    isAuthenticated,
+    user?.email,
+    connector?.name,
     chainId,
-    chain,
-    connector,
+    wallets,
     saveWallet,
-    // toast is not needed in the dependency array as it's imported and doesn't change
+    toast,
   ]);
 
-  // Format address for display
-  const formatAddress = useCallback((addr: string) => {
-    if (!addr) return "";
-    return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
-  }, []);
-
-  // Copy address to clipboard
-  const copyAddress = useCallback(async (addr: string) => {
-    if (!addr) return;
-
-    try {
-      await navigator.clipboard.writeText(addr);
-      setCopiedAddress(true);
-      toast({
-        title: "Address copied!",
-        description: "Wallet address has been copied to clipboard.",
-      });
-      setTimeout(() => setCopiedAddress(false), 2000);
-    } catch (error) {
-      console.error("Failed to copy address:", error);
-      toast({
-        title: "Copy failed",
-        description: "Failed to copy address to clipboard.",
-        variant: "destructive",
-      });
-    }
-  }, []);
-
-  // Connect wallet with Magic Link
+  // Connect with Magic Link
   const connectWithMagic = useCallback(async () => {
-    if (!magicInstance || !isAuthenticated || !user?.email) {
-      console.error('Cannot connect Magic wallet: Missing dependencies', { 
-        hasMagicInstance: !!magicInstance, 
-        isAuthenticated, 
-        userEmail: user?.email,
-        userId: user?.issuer
-      });
+    if (!magicInstance || !isAuthenticated || !user) {
       toast({
         title: "Authentication required",
-        description: "Please log in to connect your wallet.",
+        description: "Please sign in to connect with Magic Link.",
         variant: "destructive",
       });
-      return null;
+      return false;
     }
-    
-    // Get current network info
-    const currentChainId = chainId || 1; // Default to Ethereum Mainnet if not connected
 
     try {
-      console.log('Attempting to connect Magic wallet for user:', user.email);
-      
-      // Get the Magic wallet info
-      // Magic SDK types may have issues, but we handle it through our validation
-      let walletInfo;
-      let retryCount = 0;
-      const maxRetries = 3;
-      
-      // Implement retry logic for more reliable Magic wallet connection
-      while (retryCount < maxRetries) {
-        try {
-          console.log(`Magic wallet connection attempt ${retryCount + 1}/${maxRetries}`);
-          // @ts-expect-error - Magic SDK types issue
-          walletInfo = await magicInstance.wallet.getInfo();
-          if (walletInfo && walletInfo.publicAddress) {
-            break;
-          }
-          retryCount++;
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (retryError) {
-          console.error(`Magic wallet connection retry ${retryCount + 1} failed:`, retryError);
-          retryCount++;
-          if (retryCount >= maxRetries) throw retryError;
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-      
-      console.log('Magic wallet info received:', walletInfo);
+      // Get Magic wallet info - simplified approach
+      const magicAddress = user.publicAddress;
 
-      if (!walletInfo || !walletInfo.publicAddress) {
-        console.error('Failed to get valid wallet info from Magic after retries');
-        toast({
-          title: "Wallet error",
-          description: "Failed to connect Magic wallet. Please try again.",
-          variant: "destructive",
-        });
-        return null;
-      }
+      if (magicAddress) {
+        // Save Magic wallet
+        const walletData: CreateWalletInput = {
+          walletAddress: magicAddress,
+          chainId: chainId?.toString() || getDefaultNetwork().id.toString(),
+          walletType: "magic",
+          chainType: "evm",
+          metadata: {
+            name: "Magic Wallet",
+            description: "Magic Link wallet",
+            network: getNetworkName(chainId),
+            chainId: chainId || getDefaultNetwork().id,
+            connectedAt: new Date().toISOString(),
+          },
+        };
 
-      // Save the Magic wallet to the database with enhanced metadata
-      const walletData: CreateWalletInput = {
-        walletAddress: walletInfo.publicAddress,
-        chainId: currentChainId?.toString() || "1",
-        walletType: "magic",
-        chainType: "evm",
-        metadata: {
-          email: user.email,
-          issuer: user.issuer,
-          userId: user.issuer, // Make sure we explicitly include the user ID
-          magicUserMetadata: user,
-          connected: true,
-          connectedAt: new Date().toISOString(),
-          provider: "magic",
-          lastSyncTime: new Date().toISOString(),
-          walletSource: "magic-link",
-          chainId: currentChainId?.toString() || "1",
-          deviceInfo: {
-            userAgent: navigator.userAgent,
-            language: navigator.language,
-          }
-        },
-      };
+        // Check if already exists
+        const existingWallet = wallets?.find(
+          (w) => w.walletAddress.toLowerCase() === magicAddress.toLowerCase()
+        );
 
-      console.log('Saving Magic wallet to database:', {
-        address: walletData.walletAddress,
-        chainId: walletData.chainId,
-        walletType: walletData.walletType,
-        email: user.email,
-      });
-      
-      try {
-        console.log('Attempting to save Magic wallet with data:', {
-          address: walletData.walletAddress,
-          chainId: walletData.chainId,
-          userId: user.issuer,
-          email: user.email
-        });
-        
-        const savedWallet = await saveWallet.mutateAsync(walletData);
-        console.log('Magic wallet saved successfully:', savedWallet);
-        
-        toast({
-          title: "Magic wallet connected",
-          description: "Your Magic wallet has been connected successfully.",
-        });
-        
-        // Force refresh wallet list
-        setTimeout(() => {
-          console.log('Forcing wallet list refresh...');
-          saveWallet.reset();
-          window.dispatchEvent(new CustomEvent('wallet-connected', { detail: walletInfo.publicAddress }));
-        }, 500);
-        
-        return walletInfo.publicAddress;
-      } catch (saveError) {
-        console.error('Failed to save Magic wallet to database:', saveError);
-        
-        // Check if this is a conflict error (wallet already exists for another user)
-        const errorMessage = saveError instanceof Error ? saveError.message : String(saveError);
-        
-        // Define a type for API error responses
-        interface ApiErrorResponse {
-          response?: {
-            data?: {
-              message?: string;
-              error?: string;
-              walletAddress?: string;
-            };
-            status?: number;
-          };
-        }
-        
-        // Cast the error with proper typing
-        const apiError = saveError as (Error & ApiErrorResponse);
-        const errorObj = apiError.response?.data;
-        
-        // Detect the 409 conflict error or specific error message
-        if (errorMessage.includes('already connected') || 
-            errorMessage.includes('409') || 
-            (errorObj && errorObj.error === 'WALLET_ALREADY_CONNECTED')) {
-          console.error('Wallet conflict error:', errorObj || errorMessage);
-          toast({
-            title: "Wallet already in use",
-            description: "This wallet address is already connected to another account. Each wallet can only be used by one user.",
-            variant: "destructive",
+        if (!existingWallet) {
+          await saveWallet.mutateAsync(walletData);
+
+          // Dispatch custom event
+          const event = new CustomEvent("wallet-connected", {
+            detail: { address: magicAddress, chainId },
           });
-          return null;
+          window.dispatchEvent(event);
+
+          toast({
+            title: "Magic wallet connected",
+            description: "Your Magic wallet has been connected.",
+          });
         }
-        
-        // Wallet info is valid but saving failed - we can still use the wallet but warn the user
-        toast({
-          title: "Wallet connected",
-          description: "Wallet connected but there was an issue saving it. Some features may be limited.",
-          variant: "default",
-        });
-        
-        return walletInfo.publicAddress;
+
+        return true;
       }
     } catch (error) {
       console.error("Error connecting Magic wallet:", error);
       toast({
-        title: "Connection failed",
+        title: "Magic connection failed",
         description: "Failed to connect Magic wallet.",
         variant: "destructive",
       });
-      return null;
     }
-  }, [magicInstance, isAuthenticated, user, chainId, saveWallet]);
+
+    return false;
+  }, [
+    magicInstance,
+    isAuthenticated,
+    user,
+    chainId,
+    saveWallet,
+    wallets,
+    toast,
+  ]);
 
   // Switch network
   const handleSwitchNetwork = useCallback(
@@ -348,18 +271,15 @@ export const useWalletIntegration = () => {
         await switchChain({ chainId: networkId });
         setSelectedNetwork(networkId);
 
-        const network = SUPPORTED_NETWORKS.find(
-          (n) => n.id === networkId
-        )?.name;
-        if (network) {
-          toast({
-            title: "Network switched",
-            description: `Switched to ${network}`,
-          });
-        }
+        const networkName = getNetworkName(networkId);
+        toast({
+          title: "Network switched",
+          description: `Switched to ${networkName}`,
+        });
         return true;
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         console.error("Error switching network:", error);
         toast({
           title: "Network switch failed",
@@ -369,7 +289,7 @@ export const useWalletIntegration = () => {
         return false;
       }
     },
-    [switchChain]
+    [switchChain, toast]
   );
 
   // Get network details by ID
@@ -396,7 +316,7 @@ export const useWalletIntegration = () => {
         });
       }
     },
-    [deleteWallet]
+    [deleteWallet, toast]
   );
 
   return {
