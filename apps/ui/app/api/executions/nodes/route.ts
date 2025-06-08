@@ -38,16 +38,42 @@ export async function GET(request: Request) {
       );
     }
 
-    // Fetch node executions
-    const nodeExecutions = await prisma.nodeExecution.findMany({
+    // Fetch block executions (which store node execution data)
+    console.log(`[DEBUG] Looking for block executions with executionId: ${executionId}`);
+    
+    // Query the blockExecution table instead of nodeExecution
+    const blockExecutions = await prisma.blockExecution.findMany({
       where: {
         executionId: executionId,
       },
     });
+    
+    console.log(`[DEBUG] Found ${blockExecutions.length} block executions`);
+    
+    // Map the block executions to the expected node execution format
+    const nodeExecutions = blockExecutions;
+    
+    // If we didn't find any, check if there are any block executions at all in the database
+    if (blockExecutions.length === 0) {
+      const recentBlockExecutions = await prisma.blockExecution.findMany({
+        take: 5,
+        orderBy: {
+          startTime: 'desc'
+        },
+        select: {
+          id: true,
+          executionId: true,
+          nodeId: true,
+          status: true
+        }
+      });
+      
+      console.log(`[DEBUG] Recent block executions:`, JSON.stringify(recentBlockExecutions, null, 2));
+    }
 
     // Format the response to match the expected structure
     const formattedNodeExecutions = nodeExecutions.map((node) => {
-      // Get input data from nodeInputs relation if needed
+      // Get input data from inputs relation if needed
       // For now, we'll use null as we need to fetch this separately
       const inputData = null;
 
@@ -69,8 +95,9 @@ export async function GET(request: Request) {
         execution_id: node.executionId,
         node_id: node.nodeId,
         status: node.status,
-        started_at: node.startedAt.toISOString(),
-        completed_at: node.finishedAt ? node.finishedAt.toISOString() : null,
+        // Map startTime to started_at and endTime to completed_at
+        started_at: node.startTime?.toISOString() || null,
+        completed_at: node.endTime?.toISOString() || null,
         error: node.error || null,
         input_data: inputData,
         output_data: outputData,
