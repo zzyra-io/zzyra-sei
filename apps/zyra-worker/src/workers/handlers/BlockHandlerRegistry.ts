@@ -1,36 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../../services/database.service';
 
-import { MetricsBlockHandler } from './MetricsBlockHandler';
-import { EmailBlockHandler } from './EmailBlockHandler';
-import { DatabaseBlockHandler } from './DatabaseBlockHandler';
-import { WebhookBlockHandler } from './WebhookBlockHandler';
-import { LLMPromptBlockHandler } from './LLMPromptBlockHandler';
-import { PriceMonitorBlockHandler } from './PriceMonitorBlockHandler';
-import { ScheduleBlockHandler } from './ScheduleBlockHandler';
-import { WalletBlockHandler } from './WalletBlockHandler';
-import { NotificationBlockHandler } from './NotificationBlockHandler';
-import { TransactionBlockHandler } from './blockchain/TransactionBlockHandler';
-import { AiBlockchain } from './AIBlockchain';
-import { DiscordBlockHandler } from './DiscordBlockHandler';
+import { BlockHandler, BlockType } from '@zyra/types';
+import * as vm from 'vm';
 import { CircuitBreaker } from '../../lib/blockchain/CircuitBreaker';
 import { CircuitBreakerDbService } from '../../lib/blockchain/CircuitBreakerDbService';
 import { WalletService } from './blockchain/WalletService';
-import { PortfolioBalanceHandler } from './PortfolioBalanceHandler';
-import { ProtocolService } from '../../services/protocol.service';
-import { DefaultProtocolProvider } from '../../services/providers/protocol-provider';
-import { PortfolioService } from '../../services/portfolio.service';
-import { YieldMonitorHandler } from './YieldMonitorHandler';
-import { RebalanceCalculatorHandler } from './RebalanceCalculatorHandler';
-import { SwapExecutorHandler } from './SwapExecutorHandler';
-import { GasOptimizerHandler } from './GasOptimizerHandler';
-import { ProtocolMonitorHandler } from './ProtocolMonitorHandler';
-import { YieldStrategyHandler } from './YieldStrategyHandler';
-import { LiquidityProviderHandler } from './LiquidityProviderHandler';
-import { PositionManagerHandler } from './PositionManagerHandler';
-import * as vm from 'vm';
-import { BlockType, BlockHandler } from '@zyra/types';
+import { EmailBlockHandler } from './EmailBlockHandler';
+import { MetricsBlockHandler } from './MetricsBlockHandler';
+import { NotificationBlockHandler } from './NotificationBlockHandler';
+import { PriceMonitorBlockHandler } from './PriceMonitorBlockHandler';
+import { ScheduleBlockHandler } from './ScheduleBlockHandler';
 
 /**
  * Central registry for all block handlers.
@@ -46,9 +26,6 @@ export class BlockHandlerRegistry {
   constructor(
     private readonly logger: Logger,
     private readonly databaseService: DatabaseService,
-    private readonly configService?: ConfigService,
-    private readonly portfolioService?: PortfolioService,
-    private readonly protocolService?: ProtocolService,
   ) {
     // Initialize services
     const walletService = new WalletService(this.databaseService);
@@ -65,21 +42,9 @@ export class BlockHandlerRegistry {
         BlockType.EMAIL,
         new EmailBlockHandler(this.databaseService),
       ),
-      [BlockType.DATABASE]: new MetricsBlockHandler(
-        BlockType.DATABASE,
-        new DatabaseBlockHandler(this.databaseService),
-      ),
-      [BlockType.WEBHOOK]: new MetricsBlockHandler(
-        BlockType.WEBHOOK,
-        new WebhookBlockHandler(),
-      ),
       [BlockType.NOTIFICATION]: new MetricsBlockHandler(
         BlockType.NOTIFICATION,
         new NotificationBlockHandler(this.databaseService, {} as any),
-      ),
-      [BlockType.DISCORD]: new MetricsBlockHandler(
-        BlockType.DISCORD,
-        new DiscordBlockHandler(),
       ),
 
       // Trigger blocks
@@ -87,176 +52,19 @@ export class BlockHandlerRegistry {
         BlockType.PRICE_MONITOR,
         new PriceMonitorBlockHandler(),
       ),
-      [BlockType.SCHEDULE]: new MetricsBlockHandler(
-        BlockType.SCHEDULE,
-        new ScheduleBlockHandler(),
-      ),
-
-      // Finance blocks
-      [BlockType.WALLET]: new MetricsBlockHandler(
-        BlockType.WALLET,
-        new WalletBlockHandler(),
-      ),
-      [BlockType.TRANSACTION]: new MetricsBlockHandler(
-        BlockType.TRANSACTION,
-        new TransactionBlockHandler(
-          circuitBreaker,
-          circuitBreakerDbService,
-          this.configService || new ConfigService(),
-        ),
-      ),
-      [BlockType.AI_BLOCKCHAIN]: new MetricsBlockHandler(
-        BlockType.AI_BLOCKCHAIN,
-        new AiBlockchain(
-          this.databaseService,
-          this.configService || new ConfigService(),
-          walletService,
-        ),
-      ),
-
-      // DeFi blocks with dedicated handlers
-      [BlockType.DEFI_PRICE_MONITOR]: new MetricsBlockHandler(
-        BlockType.DEFI_PRICE_MONITOR,
-        new PriceMonitorBlockHandler(),
-      ),
-      [BlockType.DEFI_PORTFOLIO]: new MetricsBlockHandler(
-        BlockType.DEFI_PORTFOLIO,
-        new PortfolioBalanceHandler(
-          this.databaseService,
-          this.portfolioService || new PortfolioService(null),
-        ),
-      ),
-      // DeFi blocks with proper handlers
-      [BlockType.DEFI_YIELD_MONITOR]: new MetricsBlockHandler(
-        BlockType.DEFI_YIELD_MONITOR,
-        new YieldMonitorHandler(
-          this.databaseService,
-          this.protocolService ||
-            new ProtocolService(new DefaultProtocolProvider(this.logger)),
-        ),
-      ),
-      [BlockType.DEFI_REBALANCE]: new MetricsBlockHandler(
-        BlockType.DEFI_REBALANCE,
-        new LLMPromptBlockHandler(),
-      ),
-      [BlockType.DEFI_SWAP]: new MetricsBlockHandler(
-        BlockType.DEFI_SWAP,
-        new LLMPromptBlockHandler(),
-      ),
-      [BlockType.DEFI_GAS]: new MetricsBlockHandler(
-        BlockType.DEFI_GAS,
-        new LLMPromptBlockHandler(),
-      ),
-      [BlockType.DEFI_PROTOCOL]: new MetricsBlockHandler(
-        BlockType.DEFI_PROTOCOL,
-        new ProtocolMonitorHandler(
-          this.databaseService,
-          this.protocolService ||
-            new ProtocolService(new DefaultProtocolProvider(this.logger)),
-        ),
-      ),
-      [BlockType.DEFI_YIELD_STRATEGY]: new MetricsBlockHandler(
-        BlockType.DEFI_YIELD_STRATEGY,
-        new LLMPromptBlockHandler(),
-      ),
-      [BlockType.DEFI_LIQUIDITY]: new MetricsBlockHandler(
-        BlockType.DEFI_LIQUIDITY,
-        new LLMPromptBlockHandler(),
-      ),
-      [BlockType.DEFI_POSITION]: new MetricsBlockHandler(
-        BlockType.DEFI_POSITION,
-        new LLMPromptBlockHandler(),
-      ),
-
-      // AI blocks
-      [BlockType.LLM_PROMPT]: new MetricsBlockHandler(
-        BlockType.LLM_PROMPT,
-        new LLMPromptBlockHandler(),
-      ),
-      [BlockType.CUSTOM]: new MetricsBlockHandler(
-        BlockType.CUSTOM,
-        new LLMPromptBlockHandler(),
-      ),
 
       // Logic blocks with dedicated handlers
-      [BlockType.CONDITION]: new MetricsBlockHandler(
-        BlockType.CONDITION,
-        new LLMPromptBlockHandler(),
-      ),
+
       [BlockType.DELAY]: new MetricsBlockHandler(
         BlockType.DELAY,
         new ScheduleBlockHandler(),
       ),
-      [BlockType.TRANSFORM]: new MetricsBlockHandler(
-        BlockType.TRANSFORM,
-        new LLMPromptBlockHandler(),
-      ),
-      [BlockType.UNKNOWN]: new MetricsBlockHandler(
-        BlockType.UNKNOWN,
-        new LLMPromptBlockHandler(),
-      ),
-      [BlockType.PROTOCOL_MONITOR]: new MetricsBlockHandler(
-        BlockType.PROTOCOL_MONITOR,
-        new ProtocolMonitorHandler(
-          this.databaseService,
-          this.protocolService ||
-            new ProtocolService(new DefaultProtocolProvider(this.logger)),
-        ),
-      ),
-      [BlockType.YIELD_MONITOR]: new MetricsBlockHandler(
-        BlockType.YIELD_MONITOR,
-        new YieldMonitorHandler(
-          this.databaseService,
-          this.protocolService ||
-            new ProtocolService(new DefaultProtocolProvider(this.logger)),
-        ),
-      ),
-      [BlockType.REBALANCE_CALCULATOR]: new MetricsBlockHandler(
-        BlockType.REBALANCE_CALCULATOR,
-        new RebalanceCalculatorHandler(
-          this.portfolioService || new PortfolioService(null),
-          this.databaseService,
-        ),
-      ),
-      [BlockType.SWAP_EXECUTOR]: new MetricsBlockHandler(
-        BlockType.SWAP_EXECUTOR,
-        new SwapExecutorHandler(
-          this.databaseService,
-          this.protocolService ||
-            new ProtocolService(new DefaultProtocolProvider(this.logger)),
-          walletService,
-        ),
-      ),
-      [BlockType.GAS_OPTIMIZER]: new MetricsBlockHandler(
-        BlockType.GAS_OPTIMIZER,
-        new GasOptimizerHandler(this.databaseService),
-      ),
-      [BlockType.LIQUIDITY_PROVIDER]: new MetricsBlockHandler(
-        BlockType.LIQUIDITY_PROVIDER,
-        new LiquidityProviderHandler(
-          this.databaseService,
-          this.protocolService ||
-            new ProtocolService(new DefaultProtocolProvider(this.logger)),
-          walletService,
-        ),
-      ),
-      [BlockType.POSITION_MANAGER]: new MetricsBlockHandler(
-        BlockType.POSITION_MANAGER,
-        new PositionManagerHandler(
-          this.databaseService,
-          this.protocolService ||
-            new ProtocolService(new DefaultProtocolProvider(this.logger)),
-          walletService,
-        ),
-      ),
-      [BlockType.YIELD_STRATEGY]: new MetricsBlockHandler(
-        BlockType.YIELD_STRATEGY,
-        new YieldStrategyHandler(
-          this.databaseService,
-          this.protocolService ||
-            new ProtocolService(new DefaultProtocolProvider(this.logger)),
-        ),
-      ),
+
+      [BlockType.UNKNOWN]: new MetricsBlockHandler(BlockType.UNKNOWN, {
+        execute: () => {
+          throw new Error('Unknown block type');
+        },
+      }),
     };
   }
 

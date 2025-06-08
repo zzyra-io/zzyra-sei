@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { AuthGate } from "@/components/auth-gate"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,11 +10,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { useSupabase } from "@/components/auth-provider"
 import { Check, ChevronRight } from "lucide-react"
 
 export default function OnboardingPage() {
-  const { supabase, session } = useSupabase()
   const router = useRouter()
   const { toast } = useToast()
 
@@ -48,21 +45,10 @@ export default function OnboardingPage() {
     setLoading(true)
     try {
       // Save all onboarding data to the user's profile
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: fullName,
-          company_name: companyName,
-          role,
-          experience_level: experience,
-          use_case: useCase,
-          goals,
-          theme_preference: theme,
-          email_notifications: notifications,
-          onboarding_completed: true,
-          onboarding_completed_at: new Date().toISOString(),
-        })
-        .eq("id", session?.user.id)
+      // todo:implement prisma
+      const { error } = {
+        error: null,
+      }
 
       if (error) throw error
 
@@ -86,7 +72,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <AuthGate>
+    <>
       <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 px-4 py-8">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-8 text-center">
@@ -292,6 +278,6 @@ export default function OnboardingPage() {
           )}
         </div>
       </div>
-    </AuthGate>
+    </>
   )
 }

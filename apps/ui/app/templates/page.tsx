@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { AuthGate } from "@/components/auth-gate";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { TemplateCard } from "@/components/template-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { templateService } from "@/lib/services/template-service";
 import type { WorkflowTemplate } from "@/lib/services/template-service";
-import { Search, Filter, Database, AlertTriangle } from "lucide-react";
+import { templateService } from "@/lib/services/template-service";
+import { Filter, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
@@ -66,9 +65,8 @@ export default function TemplatesPage() {
 
   const handleUseTemplate = async (templateId: string) => {
     try {
-      const workflow = await templateService.createWorkflowFromTemplate(
-        templateId
-      );
+      const workflow =
+        await templateService.createWorkflowFromTemplate(templateId);
       toast({
         title: "Template applied",
         description: "Workflow created successfully from template.",
@@ -87,7 +85,7 @@ export default function TemplatesPage() {
   };
 
   return (
-    <AuthGate>
+    <>
       <div className='flex min-h-screen flex-col'>
         <DashboardHeader />
         <main className='flex-1 bg-muted/30 px-4 py-6 sm:px-6 lg:px-8'>
@@ -172,6 +170,6 @@ export default function TemplatesPage() {
           </div>
         </main>
       </div>
-    </AuthGate>
+    </>
   );
 }

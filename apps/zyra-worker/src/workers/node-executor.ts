@@ -280,18 +280,6 @@ export class NodeExecutor {
     const baseData = node.data || {};
 
     switch (blockType) {
-      case BlockType.AI_BLOCKCHAIN:
-        return {
-          ...baseData,
-          operation: baseData.operation || 'query',
-          parameters: baseData.parameters || {},
-          config: {
-            ...baseData.config,
-            timeout: baseData.config?.timeout || 30000,
-            retries: baseData.config?.retries || 3,
-          },
-        };
-
       case BlockType.EMAIL:
         return {
           ...baseData,
@@ -303,13 +291,6 @@ export class NodeExecutor {
             template: baseData.config?.template || null,
             attachments: baseData.config?.attachments || [],
           },
-        };
-
-      case BlockType.CUSTOM:
-        return {
-          ...baseData,
-          customBlockId: baseData.customBlockId,
-          inputs: baseData.inputs || {},
         };
 
       default:

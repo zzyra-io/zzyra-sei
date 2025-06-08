@@ -80,8 +80,7 @@ export function validateOrphans(nodes: Node[], edges: Edge[]): void {
 }
 
 // Ensure terminal nodes are action blocks (no outgoing, must be action)
-import { getBlockType, NodeCategory, BLOCK_CATALOG } from '@/types/workflow';
-import { BlockType } from '@zyra/types';
+import { NodeCategory, BLOCK_CATALOG, getBlockType } from '@zyra/types';
 
 // Configurable set of allowed categories for terminal nodes (comma-separated env var)
 const TERMINAL_ALLOWED_CATEGORIES: Set<NodeCategory> = new Set(
