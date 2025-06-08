@@ -8,9 +8,8 @@
  */
 export enum NodeCategory {
   TRIGGER = "trigger",
-  ACTION = "action", 
+  ACTION = "action",
   LOGIC = "logic",
-  FINANCE = "finance",
 }
 
 /**
@@ -24,8 +23,6 @@ export function getCategoryColor(category: NodeCategory): string {
       return "green";
     case NodeCategory.LOGIC:
       return "purple";
-    case NodeCategory.FINANCE:
-      return "amber";
     default:
       return "gray";
   }

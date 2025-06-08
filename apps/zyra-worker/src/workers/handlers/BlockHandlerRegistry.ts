@@ -70,9 +70,29 @@ export class BlockHandlerRegistry {
 
   /**
    * Retrieve a handler for the given block type.
+   * Performs case-insensitive lookup to match handlers.
    */
   getHandler(type: BlockType | string): BlockHandler {
-    return this.handlers[type] || this.handlers[BlockType.UNKNOWN];
+    // Direct match first
+    if (this.handlers[type]) {
+      return this.handlers[type];
+    }
+    
+    // Try case-insensitive match if the type is a string
+    if (typeof type === 'string') {
+      const upperType = type.toUpperCase();
+      // Check if any handler key matches when converted to uppercase
+      const handlerKey = Object.keys(this.handlers).find(
+        key => key.toUpperCase() === upperType
+      );
+      
+      if (handlerKey) {
+        return this.handlers[handlerKey];
+      }
+    }
+    
+    // Fall back to unknown handler
+    return this.handlers[BlockType.UNKNOWN];
   }
 
   /**

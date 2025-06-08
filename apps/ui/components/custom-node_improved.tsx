@@ -187,32 +187,32 @@ const statusConfig = {
 // Using proper typing for the icon components
 const blockIcons: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
   // Trigger blocks
-  'price-monitor': DollarSign,
-  'schedule': Clock,
-  'webhook': Webhook,
-  
+  "price-monitor": DollarSign,
+  schedule: Clock,
+  webhook: Webhook,
+
   // Action blocks
-  'email': Mail,
-  'notification': Bell,
-  'database': Database,
-  'wallet': Wallet,
-  'transaction': ArrowRight,
-  
+  email: Mail,
+  notification: Bell,
+  database: Database,
+  wallet: Wallet,
+  transaction: ArrowRight,
+
   // Logic blocks
-  'condition': GitBranch,
-  'delay': Clock3,
-  'transform': Zap,
-  
+  condition: GitBranch,
+  delay: Clock3,
+  transform: Zap,
+
   // Finance blocks
-  'defi-price-monitor': DollarSign,
-  'ai-blockchain': Code,
-  
+  "defi-price-monitor": DollarSign,
+  "ai-blockchain": Code,
+
   // Custom blocks
-  'goat-finance': Coins,
-  'custom': Sparkles,
-  
+  "goat-finance": Coins,
+  custom: Sparkles,
+
   // Default/fallback
-  'unknown': MoreHorizontal,
+  unknown: MoreHorizontal,
 };
 
 export const ImprovedCustomNode = memo(
@@ -231,8 +231,8 @@ export const ImprovedCustomNode = memo(
 
     // Get the icon component using the string value of blockType
     // Safely convert blockType to string regardless of its type
-    const blockTypeString = String(blockType || '').toLowerCase();
-    const IconComponent = blockIcons[blockTypeString] || blockIcons['unknown'];
+    const blockTypeString = String(blockType || "").toLowerCase();
+    const IconComponent = blockIcons[blockTypeString] || blockIcons["unknown"];
 
     // Determine node category and get appropriate colors
     const nodeCategory = data.nodeType || NodeCategory.ACTION;
@@ -401,56 +401,7 @@ export const ImprovedCustomNode = memo(
         case BlockType.WEBHOOK:
           return (
             <div className='text-xs text-muted-foreground mt-1'>
-              {config.method || "POST"}{" "}
-              {config.url ? config.url.substring(0, 20) + "..." : "No URL"}
-            </div>
-          );
-        case BlockType.TRANSFORM:
-          return (
-            <div className='text-xs text-muted-foreground mt-1'>
-              Type: {config.transformType || "javascript"}
-            </div>
-          );
-        case BlockType.WALLET:
-          return (
-            <div className='text-xs text-muted-foreground mt-1'>
-              {config.operation || "connect"} on{" "}
-              {config.blockchain || "ethereum"}
-            </div>
-          );
-        case BlockType.TRANSACTION:
-          return (
-            <div className='text-xs text-muted-foreground mt-1'>
-              {config.type || "transfer"} on {config.blockchain || "ethereum"}
-            </div>
-          );
-        case BlockType.GOAT_FINANCE:
-          return (
-            <div className='text-xs text-muted-foreground mt-1'>
-              {config.operation || "balance"} on{" "}
-              {config.blockchain || "ethereum"}
-            </div>
-          );
-        case BlockType.CUSTOM:
-          // For custom blocks, show inputs and outputs
-          if (data.customBlockDefinition) {
-            const customBlock = data.customBlockDefinition;
-            return (
-              <div className='text-xs text-muted-foreground mt-1'>
-                <div className='flex items-center gap-1'>
-                  <Code className='h-3 w-3' />
-                  <span>{customBlock.logicType || "JavaScript"}</span>
-                </div>
-                <div className='mt-1'>
-                  {customBlock.inputs?.length || 0} inputs,{" "}
-                  {customBlock.outputs?.length || 0} outputs
-                </div>
-              </div>
-            );
-          }
-          return (
-            <div className='text-xs text-muted-foreground mt-1'>
-              Custom Block: {data.customBlockId || "Unknown"}
+              {config.url ? new URL(config.url).hostname : "No URL"}
             </div>
           );
         default:
@@ -461,36 +412,33 @@ export const ImprovedCustomNode = memo(
     return (
       <>
         <MotionDiv
-          key={`node-${id}-animation-${animationKey}`}
-          initial={{ scale: 0.8, opacity: 0 }}
+          key={animationKey}
+          initial={{ opacity: 0, scale: 0.8 }}
           animate={{
+            opacity: 1,
             scale: 1,
-            opacity: isEnabled ? 1 : 0.6,
             ...currentStatusConfig.animation,
           }}
           transition={{
             type: "spring",
-            damping: 15,
-            stiffness: 300,
+            stiffness: 200,
+            damping: 20,
+            ...currentStatusConfig.animation?.transition,
           }}
-          onHoverStart={() => setIsHovered(true)}
-          onHoverEnd={() => setIsHovered(false)}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
           className={cn(
-            "relative rounded-lg border transition-all duration-300",
-            "backdrop-blur-sm bg-white/90 dark:bg-slate-900/90",
-            categoryColor.border,
-            selected || isHovered
-              ? `shadow-lg ${categoryColor.glow}`
-              : "shadow-md",
-            !isEnabled && "opacity-60 grayscale",
+            "group relative bg-background border rounded-lg transition-all duration-300",
+            "hover:shadow-lg hover:scale-105",
             currentStatusConfig.ringClass,
             currentStatusConfig.bgClass,
-            currentStatusConfig.pulseEffect && "animate-pulse"
-          )}
-          style={{
-            width: data.style?.width || 220,
-            height: data.height,
-          }}>
+            categoryColor.glow,
+            selected && "ring-2 ring-primary",
+            !isEnabled && "opacity-60 grayscale",
+            isHovered && "shadow-xl",
+            showSuccessEffect && "animate-pulse ring-2 ring-green-500"
+          )}>
+          {/* Node resizer for custom size adjustment */}
           {selected && (
             <NodeResizer
               minWidth={180}
@@ -530,7 +478,10 @@ export const ImprovedCustomNode = memo(
               <div className='font-medium truncate text-white'>
                 {blockType === BlockType.CUSTOM && data.customBlockDefinition
                   ? data.customBlockDefinition.name
-                  : data.label || blockMetadata.label}
+                  : data.label ||
+                    blockMetadata?.label ||
+                    blockType ||
+                    "Unknown Block"}
               </div>
               {data.nodeType && (
                 <Badge

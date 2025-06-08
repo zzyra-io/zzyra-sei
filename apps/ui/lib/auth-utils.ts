@@ -1,5 +1,5 @@
-import { cookies } from 'next/headers';
-import { jwtVerify, JWTVerifyResult } from 'jose';
+import { cookies } from "next/headers";
+import { jwtVerify, JWTVerifyResult } from "jose";
 
 interface User {
   id: string;
@@ -18,29 +18,31 @@ interface Session {
 export async function getServerSession(): Promise<Session> {
   try {
     const cookieStore = cookies();
-    const token = cookieStore.get('auth_token')?.value;
-    
+    const token = cookieStore.get("auth_token")?.value;
+
     if (!token) {
       return { user: null };
     }
-    
+
     // Verify the JWT token
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
+    const secret = new TextEncoder().encode(
+      process.env.JWT_SECRET || "your-secret-key"
+    );
     const { payload } = await jwtVerify(token, secret);
-    
+
     if (!payload.sub) {
       return { user: null };
     }
-    
+
     return {
       user: {
         id: payload.sub as string,
         email: payload.email as string,
         issuer: payload.issuer as string,
-      }
+      },
     };
   } catch (error) {
-    console.error('Error verifying auth token:', error);
+    console.error("Error verifying auth token:", error);
     return { user: null };
   }
 }

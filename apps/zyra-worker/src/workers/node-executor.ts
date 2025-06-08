@@ -51,6 +51,7 @@ export class NodeExecutor {
   private readonly logger = new Logger(NodeExecutor.name);
   private tracer = trace.getTracer('workflow-execution');
   private handlers: Record<BlockType, BlockHandler>;
+  private blockHandlerRegistry: BlockHandlerRegistry;
   private circuitBreaker: CircuitBreaker;
 
   private static readonly MAX_RETRIES = parseInt(
@@ -76,11 +77,11 @@ export class NodeExecutor {
   ) {
     this.circuitBreaker = new CircuitBreaker();
     // Initialize BlockHandlerRegistry with class-level logger and database service
-    const registry = new BlockHandlerRegistry(
+    this.blockHandlerRegistry = new BlockHandlerRegistry(
       this.logger,
       this.databaseService,
     );
-    this.handlers = registry.getAllHandlers();
+    this.handlers = this.blockHandlerRegistry.getAllHandlers();
   }
 
   async executeNode(
@@ -116,8 +117,8 @@ export class NodeExecutor {
           `  available handlers: ${Object.keys(this.handlers).join(', ')}`,
         );
 
-        // Get handler
-        const handler = this.handlers[blockType as BlockType];
+        // Get handler using the registry (case-insensitive)
+        const handler = this.blockHandlerRegistry.getHandler(blockType as BlockType);
         if (!handler) {
           throw new Error(
             `No handler found for block type: ${blockType}. Available: ${Object.keys(this.handlers).join(', ')}`,

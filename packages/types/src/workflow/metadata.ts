@@ -61,24 +61,31 @@ export function getBlockMetadata(
  * Used to handle various ways block types might be stored in data
  */
 export function getBlockType(data: any): BlockType {
-  // Gather possible type fields
-  const possibleTypes = [
-    data?.blockType,
-    data?.type,
-    data?.nodeType,
-    data?.id,
-  ].filter(Boolean);
-
-  // Try to match each possible type to a BlockType enum
-  for (const typeValue of possibleTypes) {
-    if (typeof typeValue === "string") {
-      // Check direct match first
-      if (Object.values(BlockType).includes(typeValue as BlockType)) {
-        return typeValue as BlockType;
+  // First check if we have a direct nodeType that matches a category
+  if (data?.nodeType) {
+    const nodeType = data.nodeType.toUpperCase();
+    if (Object.values(NodeCategory).includes(nodeType as NodeCategory)) {
+      // If it's a valid category, look up the corresponding block type
+      const blockType = Object.entries(BLOCK_CATALOG).find(
+        ([_, metadata]) => metadata.category === nodeType
+      )?.[0];
+      if (blockType) {
+        return blockType as BlockType;
       }
     }
   }
 
-  // Return unknown if no match found
+  // Then check blockType
+  const possibleTypes = [data?.blockType, data?.type, data?.id].filter(Boolean);
+
+  for (const type of possibleTypes) {
+    // Convert to uppercase for enum matching since BlockType uses uppercase
+    const upperType = type.toUpperCase();
+    // Check if it matches any BlockType enum value
+    if (Object.values(BlockType).includes(upperType as BlockType)) {
+      return upperType as BlockType;
+    }
+  }
+
   return BlockType.UNKNOWN;
 }

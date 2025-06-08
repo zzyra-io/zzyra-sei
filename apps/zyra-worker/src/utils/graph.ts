@@ -86,7 +86,7 @@ import { NodeCategory, BLOCK_CATALOG, getBlockType } from '@zyra/types';
 const TERMINAL_ALLOWED_CATEGORIES: Set<NodeCategory> = new Set(
   (
     process.env.TERMINAL_ALLOWED_CATEGORIES ??
-    `${NodeCategory.ACTION},${NodeCategory.TRIGGER},${NodeCategory.FINANCE}`
+    `${NodeCategory.ACTION},${NodeCategory.TRIGGER}`
   )
     .split(',')
     .map((c) => c.trim() as NodeCategory),
@@ -96,13 +96,33 @@ export function validateTerminals(nodes: Node[], edges: Edge[]): void {
   nodes.forEach((n) => {
     if (!hasOutgoing.has(n.id)) {
       console.log('Terminal node detected:', n.id, n);
+
+      // First try to get category from block type
       const type = getBlockType(n.data as any);
       const category = BLOCK_CATALOG[type]?.category;
-      if (!TERMINAL_ALLOWED_CATEGORIES.has(category)) {
-        throw new Error(
-          `Terminal node ${n.id} is not an allowed terminal block type. Only ${Array.from(TERMINAL_ALLOWED_CATEGORIES).join(', ')} categories are allowed as terminal nodes.`,
-        );
+
+      // If category is valid from block type, allow it
+      if (category && TERMINAL_ALLOWED_CATEGORIES.has(category)) {
+        return;
       }
+
+      // If block type category check failed, try nodeType
+      if (n.data?.nodeType) {
+        // Convert nodeType to uppercase for comparison
+        const nodeTypeCategory = n.data.nodeType.toUpperCase() as NodeCategory;
+        // Convert allowed categories to uppercase when comparing
+        const allowedCategoriesUpper = Array.from(TERMINAL_ALLOWED_CATEGORIES)
+          .map(cat => typeof cat === 'string' ? cat.toUpperCase() : cat);
+        
+        if (allowedCategoriesUpper.includes(nodeTypeCategory)) {
+          return; // Node type is valid, allow it
+        }
+      }
+
+      // If both checks failed, throw error
+      throw new Error(
+        `Terminal node ${n.id} is not an allowed terminal block type. Only ${Array.from(TERMINAL_ALLOWED_CATEGORIES).join(', ')} categories are allowed as terminal nodes.`,
+      );
     }
   });
 }
