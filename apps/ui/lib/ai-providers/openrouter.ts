@@ -310,6 +310,20 @@ export class OpenRouterProvider implements AIProvider {
       [BlockType.DELAY]: "adds delays",
       [BlockType.SCHEDULE]: "schedules tasks",
       [BlockType.WEBHOOK]: "triggers webhooks",
+      [BlockType.HTTP_REQUEST]: "makes HTTP requests to external APIs",
+      [BlockType.CALCULATOR]: "performs arithmetic calculations and operations",
+      [BlockType.COMPARATOR]: "compares values with logical conditions",
+      [BlockType.BLOCKCHAIN_READ]: "reads data from blockchain networks",
+      [BlockType.DATABASE_QUERY]: "queries database for information",
+      [BlockType.FILE_READ]: "reads content from files",
+      [BlockType.TRANSFORMER]: "transforms and manipulates data",
+      [BlockType.AGGREGATOR]: "aggregates and analyzes data",
+      [BlockType.LOOP]: "repeats actions with loop logic",
+      [BlockType.HTTP_CALL]: "makes HTTP calls to external services",
+      [BlockType.MESSAGE_SEND]: "sends messages via various channels",
+      [BlockType.DATABASE_WRITE]: "writes data to database",
+      [BlockType.BLOCKCHAIN_WRITE]: "writes transactions to blockchain",
+      [BlockType.FILE_WRITE]: "writes content to files",
       [BlockType.UNKNOWN]: "performs actions",
     };
 
@@ -328,15 +342,28 @@ export class OpenRouterProvider implements AIProvider {
       [BlockType.PRICE_MONITOR]: "trending-up",
       [BlockType.EMAIL]: "mail",
       [BlockType.NOTIFICATION]: "bell",
-      [BlockType.CONDITION]: "code-branch",
+      [BlockType.CONDITION]: "filter",
       [BlockType.DELAY]: "clock",
       [BlockType.SCHEDULE]: "calendar",
       [BlockType.WEBHOOK]: "webhook",
-      [BlockType.CUSTOM]: "puzzle",
-      [BlockType.UNKNOWN]: "block",
+      [BlockType.HTTP_REQUEST]: "globe",
+      [BlockType.CALCULATOR]: "calculator",
+      [BlockType.COMPARATOR]: "scale",
+      [BlockType.BLOCKCHAIN_READ]: "database",
+      [BlockType.DATABASE_QUERY]: "database",
+      [BlockType.FILE_READ]: "file-text",
+      [BlockType.TRANSFORMER]: "shuffle",
+      [BlockType.AGGREGATOR]: "pie-chart",
+      [BlockType.LOOP]: "repeat",
+      [BlockType.HTTP_CALL]: "send",
+      [BlockType.MESSAGE_SEND]: "message-square",
+      [BlockType.DATABASE_WRITE]: "database",
+      [BlockType.BLOCKCHAIN_WRITE]: "link",
+      [BlockType.FILE_WRITE]: "file-plus",
+      [BlockType.UNKNOWN]: "help-circle",
     };
 
-    return iconMap[blockType] || "block";
+    return iconMap[blockType] || "help-circle";
   }
 
   /**
@@ -362,7 +389,7 @@ export class OpenRouterProvider implements AIProvider {
    * Get base use cases for block type
    */
   private getBaseUseCases(blockType: BlockType): string[] {
-    const useCaseMap: Record<BlockType, string[]> = {
+    const useCaseMap: Partial<Record<BlockType, string[]>> = {
       [BlockType.PRICE_MONITOR]: [
         "Monitor cryptocurrency prices",
         "Set price alerts",
@@ -398,10 +425,75 @@ export class OpenRouterProvider implements AIProvider {
         "Receive triggers",
         "Send data",
       ],
-      [BlockType.CUSTOM]: [
-        "Custom logic",
-        "JavaScript code",
-        "API integrations",
+      [BlockType.HTTP_REQUEST]: [
+        "Fetch data from APIs",
+        "Send HTTP requests",
+        "Integrate with web services",
+      ],
+      [BlockType.CALCULATOR]: [
+        "Perform calculations",
+        "Mathematical operations",
+        "Data processing",
+      ],
+      [BlockType.COMPARATOR]: [
+        "Compare values",
+        "Conditional logic",
+        "Data validation",
+      ],
+      [BlockType.BLOCKCHAIN_READ]: [
+        "Read blockchain data",
+        "Check token balances",
+        "Monitor transactions",
+      ],
+      [BlockType.DATABASE_QUERY]: [
+        "Query databases",
+        "Fetch records",
+        "Data retrieval",
+      ],
+      [BlockType.FILE_READ]: [
+        "Read file contents",
+        "Process documents",
+        "Import data",
+      ],
+      [BlockType.TRANSFORMER]: [
+        "Transform data",
+        "Format conversion",
+        "Data manipulation",
+      ],
+      [BlockType.AGGREGATOR]: [
+        "Aggregate data",
+        "Statistical analysis",
+        "Data summarization",
+      ],
+      [BlockType.LOOP]: [
+        "Repeat operations",
+        "Batch processing",
+        "Iterative tasks",
+      ],
+      [BlockType.HTTP_CALL]: [
+        "Call external APIs",
+        "Send HTTP requests",
+        "Web service integration",
+      ],
+      [BlockType.MESSAGE_SEND]: [
+        "Send messages",
+        "Communication",
+        "Notifications",
+      ],
+      [BlockType.DATABASE_WRITE]: [
+        "Write to database",
+        "Store data",
+        "Update records",
+      ],
+      [BlockType.BLOCKCHAIN_WRITE]: [
+        "Submit transactions",
+        "Blockchain operations",
+        "Token transfers",
+      ],
+      [BlockType.FILE_WRITE]: [
+        "Write to files",
+        "Save documents",
+        "Export data",
       ],
       [BlockType.UNKNOWN]: ["Generic block usage"],
     };
@@ -502,6 +594,112 @@ export class OpenRouterProvider implements AIProvider {
           headers: { "Content-Type": "application/json" },
         });
         break;
+      case BlockType.HTTP_REQUEST:
+        examples.push({
+          ...baseConfig,
+          url: "https://api.coingecko.com/api/v3/simple/price?ids={{asset}}&vs_currencies=usd",
+          method: "GET",
+          headers: { Accept: "application/json" },
+          dataPath: "{{asset}}.usd",
+        });
+        break;
+      case BlockType.CALCULATOR:
+        examples.push({
+          ...baseConfig,
+          operation: "percentage",
+          inputs: { value: "{{balance}}", percentage: 10 },
+          precision: 8,
+        });
+        break;
+      case BlockType.COMPARATOR:
+        examples.push({
+          ...baseConfig,
+          operation: "greater_than",
+          inputs: { left: "{{price}}", right: 2000 },
+        });
+        break;
+      case BlockType.BLOCKCHAIN_READ:
+        examples.push({
+          ...baseConfig,
+          operation: "get_balance",
+          network: "ethereum",
+          address: "{{walletAddress}}",
+        });
+        break;
+      case BlockType.DATABASE_QUERY:
+        examples.push({
+          ...baseConfig,
+          query: "SELECT * FROM users WHERE id = {{userId}}",
+        });
+        break;
+      case BlockType.FILE_READ:
+        examples.push({
+          ...baseConfig,
+          path: "/path/to/file.txt",
+          encoding: "utf8",
+        });
+        break;
+      case BlockType.TRANSFORMER:
+        examples.push({
+          ...baseConfig,
+          transformType: "map",
+          rules: [{ field: "price", transform: "multiply", value: 100 }],
+        });
+        break;
+      case BlockType.AGGREGATOR:
+        examples.push({
+          ...baseConfig,
+          operation: "average",
+        });
+        break;
+      case BlockType.LOOP:
+        examples.push({
+          ...baseConfig,
+          loopType: "for",
+          iterations: 10,
+        });
+        break;
+      case BlockType.HTTP_CALL:
+        examples.push({
+          ...baseConfig,
+          url: "https://api.example.com/data",
+          method: "POST",
+          body: { data: "{{processedData}}" },
+        });
+        break;
+      case BlockType.MESSAGE_SEND:
+        examples.push({
+          ...baseConfig,
+          channel: "slack",
+          recipient: "#alerts",
+          message: "Alert: {{message}}",
+        });
+        break;
+      case BlockType.DATABASE_WRITE:
+        examples.push({
+          ...baseConfig,
+          operation: "insert",
+          table: "transactions",
+          data: { amount: "{{amount}}", timestamp: "{{timestamp}}" },
+        });
+        break;
+      case BlockType.BLOCKCHAIN_WRITE:
+        examples.push({
+          ...baseConfig,
+          operation: "send_transaction",
+          network: "ethereum",
+          to: "{{recipientAddress}}",
+          amount: "{{amount}}",
+        });
+        break;
+      case BlockType.FILE_WRITE:
+        examples.push({
+          ...baseConfig,
+          path: "/path/to/output.json",
+          content: "{{processedData}}",
+          encoding: "utf8",
+        });
+        break;
     }
 
     return examples;
@@ -516,21 +714,45 @@ export class OpenRouterProvider implements AIProvider {
 
     return `You are an EXPERT WORKFLOW AI for Zyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
 
-🎯 **CORE MISSION**: Transform ANY natural language into sophisticated, executable workflows by leveraging comprehensive block intelligence.
+🎯 **CORE MISSION**: Transform ANY natural language into sophisticated, executable workflows using our comprehensive generic block system.
 
 🧠 **ENHANCED BLOCK INTELLIGENCE**:
 ${JSON.stringify(blockIntelligence, null, 2)}
 
+⚠️ **CRITICAL UI COMPATIBILITY NOTICE**:
+The UI uses a helper function getBlockType() that converts block types:
+- Raw input: "blockchain_read" → Processed: "BLOCKCHAIN_READ"  
+- Raw input: "http_request" → Processed: "HTTP_REQUEST"
+- Raw input: "price_monitor" → Processed: "PRICE_MONITOR"
+
+ALWAYS use the UPPERCASE enum format in blockType field. The UI will validate against Object.values(BlockType) which contains:
+${JSON.stringify(Object.values(BlockType), null, 2)}
+
 📊 **AVAILABLE DATA TYPES**: ${JSON.stringify(availableDataTypes, null, 2)}
+
+🔥 **GENERIC BLOCK SYSTEM**: Our platform now uses domain-agnostic, atomic blocks that can be combined to create any workflow:
+
+**🌐 HTTP_REQUEST**: Make any HTTP call to any API (CoinGecko, 1inch, OpenAI, weather APIs, etc.)
+**🧮 CALCULATOR**: Perform any arithmetic (percentages, math operations, custom formulas)
+**⚖️ COMPARATOR**: Compare any values with extensive conditional logic
+**⛓️ BLOCKCHAIN_READ**: Read any blockchain data (balances, transactions, NFTs)
+**🗄️ DATABASE_QUERY/WRITE**: Query and write to databases
+**📁 FILE_READ/WRITE**: Read and write files
+**🔄 TRANSFORMER**: Transform and manipulate any data
+**📊 AGGREGATOR**: Aggregate and analyze datasets
+**🔁 LOOP**: Repeat operations with iterative logic
+**📨 MESSAGE_SEND**: Send messages via any channel
+**🔗 HTTP_CALL**: Call external services and APIs
 
 🔬 **ADVANCED AI CAPABILITIES**:
 
 1. **SCHEMA MASTERY**: Understand every field, type, validation rule, and relationship
 2. **CONTEXT EXTRACTION**: Parse natural language for entities, conditions, actions, and temporal elements
 3. **INTELLIGENT CONFIGURATION**: Generate valid configs by analyzing user intent + schema requirements
-4. **FLOW OPTIMIZATION**: Create logical execution paths with proper data flow
-5. **SMART POSITIONING**: Position nodes based on execution order and visual flow
-6. **ERROR PREVENTION**: Validate all configurations against schemas before output
+4. **GENERIC BLOCK SELECTION**: Choose optimal generic blocks instead of domain-specific ones
+5. **FLOW OPTIMIZATION**: Create logical execution paths with proper data flow
+6. **SMART POSITIONING**: Position nodes based on execution order and visual flow
+7. **ERROR PREVENTION**: Validate all configurations against schemas before output
 
 🚀 **WORKFLOW GENERATION INTELLIGENCE**:
 
@@ -566,14 +788,14 @@ ${JSON.stringify(blockIntelligence, null, 2)}
 **Node Structure** (STRICT FORMAT):
 {
   "id": "node-{{uuid}}",
-  "type": "custom",
+  "type": "custom", // ALWAYS use "custom" - this is the React Flow component type
   "position": {"x": intelligent_x_based_on_flow_order, "y": intelligent_y_based_on_layout},
   "data": {
-    "blockType": "EXACT_ENUM_VALUE_FROM_BlockType",
-    "label": "User-friendly name based on context and function",
+    "blockType": "BLOCKCHAIN_READ", // EXACT UPPERCASE enum value from BlockType
+    "label": "User-friendly name based on context and function", 
     "description": "Clear description of what this node does",
-    "nodeType": "TRIGGER|ACTION|LOGIC (inferred from block category)",
-    "iconName": "kebab-case-icon-name",
+    "nodeType": "ACTION", // TRIGGER|ACTION|LOGIC (inferred from block category)
+    "iconName": "database", // Icon name matching the block metadata
     "isEnabled": true,
     "config": {
       /* AI-generated config matching schema exactly */
@@ -598,11 +820,21 @@ ${JSON.stringify(blockIntelligence, null, 2)}
 🌟 **ADVANCED EXAMPLES**:
 
 **INPUT**: "Monitor Bitcoin above $60k and email john@crypto.com with current price"
-**AI REASONING**:
-1. Need PRICE_MONITOR (trigger) for Bitcoin > $60,000
-2. Need EMAIL (action) to john@crypto.com with price data
-3. Direct connection: PRICE_MONITOR → EMAIL
-4. Use template variables in email for dynamic content
+**AI REASONING (GENERIC BLOCKS)**:
+1. Use HTTP_REQUEST to fetch Bitcoin price from CoinGecko API
+2. Use COMPARATOR to check if price > $60,000
+3. Use MESSAGE_SEND (email) to notify john@crypto.com
+4. Connect: HTTP_REQUEST → COMPARATOR → MESSAGE_SEND
+5. Use template variables for dynamic data flow
+
+**INPUT**: "Sell 10% of my ETH when price is above $2000"
+**AI REASONING (GENERIC BLOCKS)**:
+1. HTTP_REQUEST: Get ETH price from CoinGecko
+2. COMPARATOR: Check price > $2000
+3. BLOCKCHAIN_READ: Get wallet ETH balance  
+4. CALCULATOR: Calculate 10% of balance
+5. HTTP_REQUEST: Execute swap via 1inch API
+6. Flow: Price → Compare → Balance → Calculate → Swap
 
 **OUTPUT**: 
 {
@@ -661,10 +893,18 @@ ${JSON.stringify(blockIntelligence, null, 2)}
   ]
 }
 
-🔥 **CRITICAL REQUIREMENTS**:
+🔥 **CRITICAL BLOCK TYPE MAPPING**:
+Block types in the UI use lowercase_underscore format but MUST be converted to UPPERCASE enum values:
+- UI stores: "blockchain_read" → Enum: "BLOCKCHAIN_READ"  
+- UI stores: "http_request" → Enum: "HTTP_REQUEST"
+- UI stores: "price_monitor" → Enum: "PRICE_MONITOR"
+
+The getBlockType() function automatically converts lowercase_underscore to UPPERCASE for enum matching.
+
+**CRITICAL REQUIREMENTS**:
 - Return ONLY valid JSON: {"nodes": [...], "edges": [...]}
-- No explanations, markdown, or extra text
-- Use exact BlockType enum values
+- No explanations, markdown, or extra text  
+- Use exact BlockType enum values (UPPERCASE format)
 - All configs must match their schemas perfectly
 - Use intelligent positioning based on flow order
 - Use template variables for dynamic content
@@ -720,10 +960,7 @@ You are the most advanced workflow AI. Analyze the user's intent deeply, apply y
       });
 
       // Parse and validate AI response
-      const parsedResponse = await this.parseAndValidateAIResponse(
-        text,
-        prompt
-      );
+      const parsedResponse = await this.parseAndValidateAIResponse(text);
 
       // Enhanced node processing with intelligent validation
       const enhancedNodes = await this.enhanceNodesWithIntelligence(
@@ -951,7 +1188,9 @@ Generate a full workflow that accomplishes the user's automation goal.`;
         usedIds.add(nodeId);
 
         const rawBlockType =
-          nodeData.data?.blockType || nodeData.type || nodeData.blockType;
+          (nodeData.data as any)?.blockType ||
+          nodeData.type ||
+          (nodeData as any).blockType;
         const blockType = rawBlockType as BlockType;
 
         // Get enhanced intelligence for this block

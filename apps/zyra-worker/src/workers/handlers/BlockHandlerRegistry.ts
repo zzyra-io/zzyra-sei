@@ -9,7 +9,10 @@ import { WalletService } from './blockchain/WalletService';
 import { EmailBlockHandler } from './EmailBlockHandler';
 import { MetricsBlockHandler } from './MetricsBlockHandler';
 import { NotificationBlockHandler } from './NotificationBlockHandler';
-import { PriceMonitorBlockHandler } from './PriceMonitorBlockHandler';
+import { HttpRequestHandler } from './HttpRequestHandler';
+import { CalculatorHandler } from './CalculatorHandler';
+import { ComparatorHandler } from './ComparatorHandler';
+import { BlockchainReadHandler } from './BlockchainReadHandler';
 import { ScheduleBlockHandler } from './ScheduleBlockHandler';
 
 /**
@@ -50,7 +53,31 @@ export class BlockHandlerRegistry {
       // Trigger blocks
       [BlockType.PRICE_MONITOR]: new MetricsBlockHandler(
         BlockType.PRICE_MONITOR,
-        new PriceMonitorBlockHandler(),
+        new HttpRequestHandler(),
+      ),
+
+      // Generic blocks
+      [BlockType.HTTP_REQUEST]: new MetricsBlockHandler(
+        BlockType.HTTP_REQUEST,
+        new HttpRequestHandler(),
+      ),
+      [BlockType.CALCULATOR]: new MetricsBlockHandler(
+        BlockType.CALCULATOR,
+        new CalculatorHandler(),
+      ),
+      [BlockType.COMPARATOR]: new MetricsBlockHandler(
+        BlockType.COMPARATOR,
+        new ComparatorHandler(),
+      ),
+      [BlockType.BLOCKCHAIN_READ]: new MetricsBlockHandler(
+        BlockType.BLOCKCHAIN_READ,
+        new BlockchainReadHandler(),
+      ),
+
+      // Legacy block types mapped to new handlers
+      [BlockType.CONDITION]: new MetricsBlockHandler(
+        BlockType.CONDITION,
+        new ComparatorHandler(),
       ),
 
       // Logic blocks with dedicated handlers
@@ -77,20 +104,20 @@ export class BlockHandlerRegistry {
     if (this.handlers[type]) {
       return this.handlers[type];
     }
-    
+
     // Try case-insensitive match if the type is a string
     if (typeof type === 'string') {
       const upperType = type.toUpperCase();
       // Check if any handler key matches when converted to uppercase
       const handlerKey = Object.keys(this.handlers).find(
-        key => key.toUpperCase() === upperType
+        (key) => key.toUpperCase() === upperType,
       );
-      
+
       if (handlerKey) {
         return this.handlers[handlerKey];
       }
     }
-    
+
     // Fall back to unknown handler
     return this.handlers[BlockType.UNKNOWN];
   }

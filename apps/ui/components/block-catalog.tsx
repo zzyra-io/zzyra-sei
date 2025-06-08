@@ -7,17 +7,26 @@ import {
   Mail,
   Bell,
   Database,
-  Wallet,
-  ArrowUpRight,
   Zap,
-  DollarSign,
   Package,
   Calendar,
   Webhook,
   Filter,
-  BarChart3,
   GripHorizontal,
   Star,
+  Calculator,
+  Scale,
+  Globe,
+  TrendingUp,
+  Shuffle,
+  PieChart,
+  Repeat,
+  Send,
+  MessageSquare,
+  Link,
+  FilePlus,
+  HelpCircle,
+  FileText,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,7 +39,7 @@ interface BlockCatalogProps {
   onDragStart?: (
     event: React.DragEvent,
     blockType: BlockType,
-    blockData: any
+    blockData: Record<string, unknown>
   ) => void;
   onAddBlock?: (
     blockType: BlockType,
@@ -75,7 +84,6 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
     { id: NodeCategory.TRIGGER, label: "Triggers" },
     { id: NodeCategory.ACTION, label: "Actions" },
     { id: NodeCategory.LOGIC, label: "Logic" },
-    { id: NodeCategory.FINANCE, label: "Finance" },
   ];
 
   // Filter out unknown types
@@ -241,9 +249,7 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
                   block.category === NodeCategory.ACTION &&
                     "border-l-[5px] border-l-green-500",
                   block.category === NodeCategory.LOGIC &&
-                    "border-l-[5px] border-l-purple-500",
-                  block.category === NodeCategory.FINANCE &&
-                    "border-l-[5px] border-l-amber-500"
+                    "border-l-[5px] border-l-purple-500"
                 )}>
                 <div
                   className={cn(
@@ -254,9 +260,7 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
                     block.category === NodeCategory.ACTION &&
                       "bg-green-50 text-green-700 group-hover:bg-green-100",
                     block.category === NodeCategory.LOGIC &&
-                      "bg-purple-50 text-purple-700 group-hover:bg-purple-100",
-                    block.category === NodeCategory.FINANCE &&
-                      "bg-amber-50 text-amber-700 group-hover:bg-amber-100"
+                      "bg-purple-50 text-purple-700 group-hover:bg-purple-100"
                   )}>
                   {getBlockIcon(block.icon)}
                 </div>
@@ -304,30 +308,48 @@ function getBlockIcon(iconName: string) {
   const iconProps = { className: "h-5 w-5" };
 
   switch (iconName) {
-    case BlockType.PRICE_MONITOR:
-      return <BarChart3 {...iconProps} />;
-    case BlockType.SCHEDULE:
+    case "trending-up":
+      return <TrendingUp {...iconProps} />;
+    case "calendar":
       return <Calendar {...iconProps} />;
-    case BlockType.WEBHOOK:
+    case "webhook":
       return <Webhook {...iconProps} />;
-    case BlockType.EMAIL:
+    case "mail":
       return <Mail {...iconProps} />;
-    case BlockType.NOTIFICATION:
+    case "bell":
       return <Bell {...iconProps} />;
-    case BlockType.DATABASE:
-      return <Database {...iconProps} />;
-    case BlockType.WALLET:
-      return <Wallet {...iconProps} />;
-    case BlockType.TRANSACTION:
-      return <ArrowUpRight {...iconProps} />;
-    case BlockType.CONDITION:
+    case "filter":
       return <Filter {...iconProps} />;
-    case BlockType.DELAY:
+    case "clock":
       return <Clock {...iconProps} />;
-    case BlockType.TRANSFORM:
+    case "shuffle":
+      return <Shuffle {...iconProps} />;
+    case "zap":
       return <Zap {...iconProps} />;
-    case BlockType.GOAT_FINANCE:
-      return <DollarSign {...iconProps} />;
+    case "globe":
+      return <Globe {...iconProps} />;
+    case "calculator":
+      return <Calculator {...iconProps} />;
+    case "scale":
+      return <Scale {...iconProps} />;
+    case "database":
+      return <Database {...iconProps} />;
+    case "file-text":
+      return <FileText {...iconProps} />;
+    case "pie-chart":
+      return <PieChart {...iconProps} />;
+    case "repeat":
+      return <Repeat {...iconProps} />;
+    case "send":
+      return <Send {...iconProps} />;
+    case "message-square":
+      return <MessageSquare {...iconProps} />;
+    case "link":
+      return <Link {...iconProps} />;
+    case "file-plus":
+      return <FilePlus {...iconProps} />;
+    case "help-circle":
+      return <HelpCircle {...iconProps} />;
     default:
       return <Package {...iconProps} />;
   }

@@ -13,21 +13,22 @@ import { Separator } from "@/components/ui/separator";
 import { PriceMonitorConfig } from "./block-configs/price-monitor-config";
 import { EmailConfig } from "./block-configs/email-config";
 import { NotificationConfig } from "./block-configs/notification-config";
-import { DatabaseConfig } from "./block-configs/database-config";
 import { ConditionConfig } from "./block-configs/condition-config";
 import { DelayConfig } from "./block-configs/delay-config";
 import { WebhookConfig } from "./block-configs/webhook-config";
 import { TransformConfig } from "./block-configs/transform-config";
 import { ScheduleConfig } from "./block-configs/schedule-config";
-import { WalletConfig } from "./block-configs/wallet-config";
-import { TransactionConfig } from "./block-configs/transaction-config";
-import { GoatFinanceConfig } from "./block-configs/goat-finance-config";
+import { HttpRequestConfig } from "./block-configs/http-request-config";
+import { CalculatorConfig } from "./block-configs/calculator-config";
+import { ComparatorConfig } from "./block-configs/comparator-config";
+import { BlockchainReadConfig } from "./block-configs/blockchain-read-config";
 import {
   BlockType,
   getBlockType,
   getBlockMetadata,
   blockSchemas,
 } from "@zyra/types";
+import type { ZodType } from "zod";
 
 import { CustomBlockConfigPanel } from "./custom-block-config-panel";
 import { customBlockService } from "@/lib/services/custom-block-service";
@@ -35,9 +36,24 @@ import { useToast } from "@/components/ui/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+interface Node {
+  id: string;
+  data: {
+    label?: string;
+    description?: string;
+    isEnabled?: boolean;
+    config?: Record<string, unknown>;
+    style?: Record<string, unknown>;
+    blockType?: string;
+    customBlockId?: string;
+    customBlockDefinition?: Record<string, unknown>;
+  };
+  type?: string;
+}
+
 interface BlockConfigPanelProps {
-  node: any;
-  onUpdate: (updatedNode: any) => void;
+  node: Node;
+  onUpdate: (updatedNode: Node) => void;
   onClose: () => void;
 }
 
@@ -46,45 +62,26 @@ export function BlockConfigPanel({
   onUpdate,
   onClose,
 }: BlockConfigPanelProps) {
-  const [localNode, setLocalNode] = useState<any>(node);
+  const [localNode, setLocalNode] = useState<Node>(node);
   const [activeTab, setActiveTab] = useState("general");
-  const [customBlockDefinition, setCustomBlockDefinition] = useState<any>(null);
+  const [customBlockDefinition, setCustomBlockDefinition] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [isLoadingCustomBlock, setIsLoadingCustomBlock] = useState(false);
   const { toast } = useToast();
+  console.log("node", node);
 
   // Get the block type using our helper function
   const blockType = getBlockType(node.data);
   const blockMetadata = getBlockMetadata(blockType);
-  const isCustomBlock =
-    blockType === BlockType.CUSTOM && node.data?.customBlockId;
+
+  // Check if this is a custom block
+  // it should not exist in the blocktypes
+  const isCustomBlock = !Object.values(BlockType).includes(blockType);
 
   // Dynamic Zod schema for block config
-  const schema = (blockSchemas as Record<string, any>)[blockType];
-
-  // Guard: If blockType is missing or schema is undefined, show error UI
-  if (!blockType || !schema) {
-    return (
-      <div className='w-80 h-full flex flex-col bg-background border-l'>
-        <div className='flex items-center justify-between p-4 border-b'>
-          <h3 className='font-medium'>Block Type Error</h3>
-          <Button variant='ghost' size='icon' onClick={onClose}>
-            <X className='h-4 w-4' />
-          </Button>
-        </div>
-        <div className='flex-1 flex items-center justify-center'>
-          <div className='text-center'>
-            <p className='text-destructive mb-2'>
-              Block type <b>{String(blockType)}</b> is not recognized or not
-              supported.
-            </p>
-            <p className='text-xs text-muted-foreground'>
-              Please check your workflow or try re-adding this block.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const schema = blockSchemas[blockType] as ZodType | undefined;
 
   // react-hook-form setup
   const {
@@ -93,7 +90,7 @@ export function BlockConfigPanel({
     reset,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(schema),
+    resolver: schema ? zodResolver(schema) : undefined,
     defaultValues: localNode.data.config || {},
   });
   useEffect(
@@ -115,7 +112,7 @@ export function BlockConfigPanel({
 
           // Otherwise try to load from the database
           const blockDef = await customBlockService.getCustomBlockById(
-            node.data.customBlockId
+            node.data.customBlockId!
           );
 
           // If not found in database, try example blocks
@@ -126,11 +123,15 @@ export function BlockConfigPanel({
             );
 
             if (exampleBlockDef) {
-              setCustomBlockDefinition(exampleBlockDef);
+              setCustomBlockDefinition(
+                exampleBlockDef as unknown as Record<string, unknown>
+              );
               return;
             }
           } else {
-            setCustomBlockDefinition(blockDef);
+            setCustomBlockDefinition(
+              blockDef as unknown as Record<string, unknown>
+            );
             return;
           }
 
@@ -166,7 +167,7 @@ export function BlockConfigPanel({
   }, [node.id]);
 
   // Handle basic field changes
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: string | boolean) => {
     const updatedNode = {
       ...localNode,
       data: { ...localNode.data, [field]: value },
@@ -176,14 +177,14 @@ export function BlockConfigPanel({
   };
 
   // Handle config changes
-  const handleConfigChange = (config: any) => {
+  const handleConfigChange = (config: Record<string, unknown>) => {
     const updatedNode = { ...localNode, data: { ...localNode.data, config } };
     onUpdate(updatedNode);
     setLocalNode(updatedNode);
   };
 
   // Handle style changes
-  const handleStyleChange = (style: any) => {
+  const handleStyleChange = (style: Record<string, unknown>) => {
     const updatedNode = {
       ...localNode,
       data: { ...localNode.data, style: { ...localNode.data.style, ...style } },
@@ -246,7 +247,7 @@ export function BlockConfigPanel({
     // Always render the CustomBlockConfigPanel for custom blocks
     return (
       <CustomBlockConfigPanel
-        blockId={node.data.customBlockId}
+        blockId={node.data.customBlockId || ""}
         config={localNode.data.config || {}}
         onUpdate={(config) => {
           // Patch: Always update both config and customBlockId for robustness
@@ -273,39 +274,6 @@ export function BlockConfigPanel({
 
   // Render dynamic config form if schema exists and not custom
   const renderConfigComponent = () => {
-    if (schema && schema.shape && !isCustomBlock) {
-      return (
-        <div className='w-80 h-full flex flex-col bg-background border-l'>
-          <div className='flex items-center justify-between p-4 border-b'>
-            <h3 className='font-medium'>{blockMetadata.label} Configuration</h3>
-            <Button variant='ghost' size='icon' onClick={onClose}>
-              <X className='h-4 w-4' />
-            </Button>
-          </div>
-          <div className='flex-1 overflow-y-auto p-4'>
-            <form onSubmit={handleSubmit((data) => handleConfigChange(data))}>
-              {schema.shape &&
-                Object.keys(schema.shape).map((key) => (
-                  <div key={key} className='mb-4'>
-                    <Label htmlFor={key} className='mb-1'>
-                      {key}
-                    </Label>
-                    <Input id={key} {...register(key)} />
-                    {errors[key] && (
-                      <p className='text-destructive text-sm mt-1'>
-                        {errors[key]?.message}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              <Button type='submit' className='mt-2'>
-                Save
-              </Button>
-            </form>
-          </div>
-        </div>
-      );
-    }
     // Fallback to existing static panels
     const config = localNode.data.config || {};
     console.log(`Rendering config for ${blockType}:`, config);
@@ -331,21 +299,24 @@ export function BlockConfigPanel({
               </Button>
             </div>
             <div className='flex-1 overflow-y-auto p-4'>
-              <form onSubmit={handleSubmit((data) => handleConfigChange(data))}>
+              <form
+                onSubmit={handleSubmit((data) =>
+                  handleConfigChange(data as Record<string, unknown>)
+                )}>
                 <div className='mb-4'>
                   <Label htmlFor='webhookUrl' className='mb-1'>
                     Webhook URL
                   </Label>
                   <Input
                     id='webhookUrl'
-                    defaultValue={config.webhookUrl || ""}
+                    defaultValue={(config.webhookUrl as string) || ""}
                     {...register("webhookUrl", {
                       required: "Webhook URL is required",
                     })}
                   />
                   {errors.webhookUrl?.message && (
                     <p className='text-destructive text-sm mt-1'>
-                      {errors.webhookUrl.message.toString()}
+                      {String(errors.webhookUrl.message)}
                     </p>
                   )}
                 </div>
@@ -355,14 +326,14 @@ export function BlockConfigPanel({
                   </Label>
                   <Textarea
                     id='message'
-                    defaultValue={config.message || ""}
+                    defaultValue={(config.message as string) || ""}
                     {...register("message", {
                       required: "Message is required",
                     })}
                   />
                   {errors.message?.message && (
                     <p className='text-destructive text-sm mt-1'>
-                      {errors.message.message.toString()}
+                      {String(errors.message.message)}
                     </p>
                   )}
                 </div>
@@ -373,8 +344,6 @@ export function BlockConfigPanel({
             </div>
           </div>
         );
-      case BlockType.DATABASE:
-        return <DatabaseConfig config={config} onChange={handleConfigChange} />;
       case BlockType.CONDITION:
         return (
           <ConditionConfig config={config} onChange={handleConfigChange} />
@@ -383,21 +352,27 @@ export function BlockConfigPanel({
         return <DelayConfig config={config} onChange={handleConfigChange} />;
       case BlockType.WEBHOOK:
         return <WebhookConfig config={config} onChange={handleConfigChange} />;
-      case BlockType.TRANSFORM:
+      case BlockType.TRANSFORMER:
         return (
           <TransformConfig config={config} onChange={handleConfigChange} />
         );
       case BlockType.SCHEDULE:
         return <ScheduleConfig config={config} onChange={handleConfigChange} />;
-      case BlockType.WALLET:
-        return <WalletConfig config={config} onChange={handleConfigChange} />;
-      case BlockType.TRANSACTION:
+      case BlockType.HTTP_REQUEST:
         return (
-          <TransactionConfig config={config} onChange={handleConfigChange} />
+          <HttpRequestConfig config={config} onChange={handleConfigChange} />
         );
-      case BlockType.GOAT_FINANCE:
+      case BlockType.CALCULATOR:
         return (
-          <GoatFinanceConfig config={config} onChange={handleConfigChange} />
+          <CalculatorConfig config={config} onChange={handleConfigChange} />
+        );
+      case BlockType.COMPARATOR:
+        return (
+          <ComparatorConfig config={config} onChange={handleConfigChange} />
+        );
+      case BlockType.BLOCKCHAIN_READ:
+        return (
+          <BlockchainReadConfig config={config} onChange={handleConfigChange} />
         );
       default:
         // For unknown types, check if we have any config data to display
@@ -425,8 +400,8 @@ export function BlockConfigPanel({
         return (
           <div className='p-4 text-center text-muted-foreground'>
             <p className='mb-2'>
-              No specific configuration options for "{blockMetadata.label}"
-              block type.
+              No specific configuration options for &quot;
+              {blockMetadata?.label || "Unknown"}&quot; block type.
             </p>
             <p className='text-xs'>
               You can still customize general settings in the General tab.
@@ -434,12 +409,78 @@ export function BlockConfigPanel({
           </div>
         );
     }
+
+    // if (schema && "shape" in schema && !isCustomBlock) {
+    //   return (
+    //     <div className='w-80 h-full flex flex-col bg-background border-l'>
+    //       <div className='flex items-center justify-between p-4 border-b'>
+    //         <h3 className='font-medium'>
+    //           {blockMetadata?.label || "Block"} Configuration
+    //         </h3>
+    //         <Button variant='ghost' size='icon' onClick={onClose}>
+    //           <X className='h-4 w-4' />
+    //         </Button>
+    //       </div>
+    //       <div className='flex-1 overflow-y-auto p-4'>
+    //         <form
+    //           onSubmit={handleSubmit((data) =>
+    //             handleConfigChange(data as Record<string, unknown>)
+    //           )}>
+    //           {"shape" in schema &&
+    //             Object.keys(schema.shape as object).map((key) => (
+    //               <div key={key} className='mb-4'>
+    //                 <Label htmlFor={key} className='mb-1'>
+    //                   {key}
+    //                 </Label>
+    //                 <Input id={key} {...register(key)} />
+    //                 {errors[key] && (
+    //                   <p className='text-destructive text-sm mt-1'>
+    //                     {String(errors[key]?.message || "Invalid value")}
+    //                   </p>
+    //                 )}
+    //               </div>
+    //             ))}
+    //           <Button type='submit' className='mt-2'>
+    //             Save
+    //           </Button>
+    //         </form>
+    //       </div>
+    //     </div>
+    //   );
+    // }
   };
+
+  // Guard: If blockType is missing or schema is undefined, show error UI
+  if (!blockType || !schema) {
+    return (
+      <div className='w-80 h-full flex flex-col bg-background border-l'>
+        <div className='flex items-center justify-between p-4 border-b'>
+          <h3 className='font-medium'>Block Type Error</h3>
+          <Button variant='ghost' size='icon' onClick={onClose}>
+            <X className='h-4 w-4' />
+          </Button>
+        </div>
+        <div className='flex-1 flex items-center justify-center'>
+          <div className='text-center'>
+            <p className='text-destructive mb-2'>
+              Block type <b>{String(blockType)}</b> is not recognized or not
+              supported.
+            </p>
+            <p className='text-xs text-muted-foreground'>
+              Please check your workflow or try re-adding this block.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className='w-80 h-full flex flex-col bg-background border-l'>
       <div className='flex items-center justify-between p-4 border-b'>
-        <h3 className='font-medium'>{blockMetadata.label} Configuration</h3>
+        <h3 className='font-medium'>
+          {blockMetadata?.label || "Block"} Configuration
+        </h3>
         <Button variant='ghost' size='icon' onClick={onClose}>
           <X className='h-4 w-4' />
         </Button>
@@ -531,7 +572,7 @@ export function BlockConfigPanel({
                 <Input
                   id='width'
                   type='number'
-                  value={localNode.data.style?.width || 220}
+                  value={String((localNode.data.style?.width as number) || 220)}
                   onChange={(e) =>
                     handleStyleChange({
                       width: Number.parseInt(e.target.value),
@@ -547,7 +588,9 @@ export function BlockConfigPanel({
                 <Input
                   id='height'
                   type='number'
-                  value={localNode.data.style?.height || 150}
+                  value={String(
+                    (localNode.data.style?.height as number) || 150
+                  )}
                   onChange={(e) =>
                     handleStyleChange({
                       height: Number.parseInt(e.target.value),
