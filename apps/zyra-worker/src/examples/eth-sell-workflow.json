@@ -1,0 +1,124 @@
+{
+  "id": "eth-price-sell-workflow",
+  "name": "ETH Price Monitor and Sell",
+  "description": "Monitors ETH price and sells 10% when price falls below $2000",
+  "version": 1,
+  "active": true,
+  "nodes": [
+    {
+      "id": "price-monitor",
+      "type": "PRICE_MONITOR",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "config": {
+          "asset": "ETH",
+          "condition": "below",
+          "targetPrice": "2000",
+          "checkInterval": "5m",
+          "dataSource": "coingecko"
+        },
+        "label": "Monitor ETH Price"
+      }
+    },
+    {
+      "id": "get-wallet-balance",
+      "type": "MAGIC_WALLET",
+      "position": { "x": 100, "y": 200 },
+      "data": {
+        "config": {
+          "operation": "get_balance",
+          "parameters": {
+            "userId": "{{userId}}",
+            "asset": "ETH",
+            "chainId": 1
+          }
+        },
+        "label": "Get User ETH Balance"
+      }
+    },
+    {
+      "id": "calculate-sell-amount",
+      "type": "CALCULATOR",
+      "position": { "x": 100, "y": 300 },
+      "data": {
+        "config": {
+          "operation": "multiply",
+          "inputs": {
+            "a": "{{get-wallet-balance.balance}}",
+            "b": 0.1
+          },
+          "precision": 6
+        },
+        "label": "Calculate 10% of ETH Balance"
+      }
+    },
+    {
+      "id": "prepare-sell-transaction",
+      "type": "MAGIC_WALLET",
+      "position": { "x": 100, "y": 400 },
+      "data": {
+        "config": {
+          "operation": "prepare_transaction",
+          "parameters": {
+            "userId": "{{userId}}",
+            "asset": "ETH",
+            "chainId": 1,
+            "to": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+            "value": "{{calculate-sell-amount.result}}",
+            "data": "0x"
+          }
+        },
+        "label": "Prepare ETH Sell Transaction"
+      }
+    },
+    {
+      "id": "notify-user",
+      "type": "NOTIFICATION",
+      "position": { "x": 100, "y": 500 },
+      "data": {
+        "config": {
+          "channel": "email",
+          "title": "ETH Price Alert - Selling 10% of your ETH",
+          "message": "ETH price has fallen below $2000. We're selling 10% of your ETH ({{calculate-sell-amount.result}} ETH) to protect your assets."
+        },
+        "label": "Notify User of ETH Sale"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "price-monitor",
+      "target": "get-wallet-balance",
+      "type": "default"
+    },
+    {
+      "id": "e2",
+      "source": "get-wallet-balance",
+      "target": "calculate-sell-amount",
+      "type": "default"
+    },
+    {
+      "id": "e3",
+      "source": "calculate-sell-amount",
+      "target": "prepare-sell-transaction",
+      "type": "default"
+    },
+    {
+      "id": "e4",
+      "source": "prepare-sell-transaction",
+      "target": "notify-user",
+      "type": "default"
+    }
+  ],
+  "metadata": {
+    "createdAt": "2025-06-09T11:34:46+05:45",
+    "updatedAt": "2025-06-09T11:34:46+05:45",
+    "variables": {
+      "userId": {
+        "type": "string",
+        "description": "User ID for the Magic wallet owner"
+      }
+    }
+  }
+}

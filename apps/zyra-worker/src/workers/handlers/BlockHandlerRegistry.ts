@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../services/database.service';
+import { MagicAdminService } from '../../services/magic-admin.service';
 
 import { BlockHandler, BlockType } from '@zyra/types';
 import * as vm from 'vm';
@@ -14,6 +15,7 @@ import { CalculatorHandler } from './CalculatorHandler';
 import { ComparatorHandler } from './ComparatorHandler';
 import { BlockchainReadHandler } from './BlockchainReadHandler';
 import { ScheduleBlockHandler } from './ScheduleBlockHandler';
+import { MagicWalletHandler } from './MagicWalletHandler';
 
 /**
  * Central registry for all block handlers.
@@ -29,6 +31,7 @@ export class BlockHandlerRegistry {
   constructor(
     private readonly logger: Logger,
     private readonly databaseService: DatabaseService,
+    private readonly magicAdminService: MagicAdminService,
   ) {
     // Initialize services
     const walletService = new WalletService(this.databaseService);
@@ -85,6 +88,12 @@ export class BlockHandlerRegistry {
       [BlockType.DELAY]: new MetricsBlockHandler(
         BlockType.DELAY,
         new ScheduleBlockHandler(),
+      ),
+
+      // Magic Wallet handler for blockchain operations via Magic Link
+      [BlockType.MAGIC_WALLET]: new MetricsBlockHandler(
+        BlockType.MAGIC_WALLET,
+        new MagicWalletHandler(this.magicAdminService, this.databaseService),
       ),
 
       [BlockType.UNKNOWN]: new MetricsBlockHandler(BlockType.UNKNOWN, {

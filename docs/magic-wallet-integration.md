@@ -23,12 +23,13 @@ The `@zyra/wallet` library provides a unified wallet management solution for the
 - **Enterprise-Grade Security**: Delegated key management with no client-side key storage
 - **Persistent Identification**: Maintains consistent wallet identity across sessions and devices
 - **Transaction Management**: Streamlined sending and signing of blockchain transactions
-- **Supabase Integration**: First-class support for Zyra's database infrastructure
+- **db Integration**: First-class support for Zyra's database infrastructure
 - **Comprehensive TypeScript Support**: Full type definitions for improved developer experience
 
 ## Supported Chains
 
 - **EVM-Compatible Chains**
+
   - Base Sepolia (Testnet)
   - Ethereum Mainnet (Planned)
   - Other EVM chains (Extensible)
@@ -62,18 +63,20 @@ The `@zyra/wallet` package is designed as a shared library that can be used by b
 ### Data Flow
 
 **Browser Environment:**
+
 1. User authenticates via Magic Link email
 2. Library obtains cryptographic session via Magic SDK
-3. Wallet address and chain information stored in Supabase
+3. Wallet address and chain information stored in db
 4. UI components interact with wallet for signing transactions
 5. Signed transactions submitted directly to blockchain
 
 **Node.js Environment:**
-1. Node worker retrieves wallet information from Supabase
+
+1. Node worker retrieves wallet information from db
 2. Worker performs blockchain read operations directly
 3. For write operations requiring signatures, worker:
    - Creates unsigned transactions
-   - Stores intent in Supabase for user confirmation
+   - Stores intent in db for user confirmation
    - Or uses delegated signing capabilities for pre-approved workflows
 
 ## Security Considerations
@@ -117,13 +120,13 @@ The `@zyra/wallet` library implements a **zero client-side key storage** approac
 
 The following data is collected and stored:
 
-| Data Category | Purpose | Storage Location | Retention Period |
-|---------------|---------|------------------|------------------|
-| Email Address | Authentication, Recovery | Supabase/Magic | Until account deletion |
-| Wallet Addresses | Transaction Processing | Supabase | Until account deletion |
-| Transaction History | User Reference, Compliance | Supabase | 7 years (or as required) |
-| Chain Preferences | User Experience | Supabase | Until account deletion |
-| IP Addresses | Security, Fraud Prevention | Logs (rotation) | 90 days |
+| Data Category       | Purpose                    | Storage Location | Retention Period         |
+| ------------------- | -------------------------- | ---------------- | ------------------------ |
+| Email Address       | Authentication, Recovery   | db               | Until account deletion   |
+| Wallet Addresses    | Transaction Processing     | db               | Until account deletion   |
+| Transaction History | User Reference, Compliance | db               | 7 years (or as required) |
+| Chain Preferences   | User Experience            | db               | Until account deletion   |
+| IP Addresses        | Security, Fraud Prevention | Logs (rotation)  | 90 days                  |
 
 ## Implementation Guide
 
@@ -180,12 +183,14 @@ MAGIC_SECRET_KEY=sk_live_123...
 ### Package Setup
 
 1. Create the package structure:
+
    ```bash
    mkdir -p packages/wallet/src/{core,adapters,providers,utils}
    mkdir -p packages/wallet/src/adapters/{browser,node}
    ```
 
 2. Add to workspace:
+
    ```json
    // pnpm-workspace.yaml
    packages:
@@ -269,4 +274,4 @@ Before production use:
 
 ---
 
-*This documentation is considered confidential and proprietary to Zyra.*
+_This documentation is considered confidential and proprietary to Zyra._

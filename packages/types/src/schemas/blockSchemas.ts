@@ -250,6 +250,21 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
     encoding: z.enum(["utf8", "base64", "binary"]).default("utf8"),
     append: z.boolean().default(false),
   }),
+  
+  // Wallet Operations
+  [BlockType.MAGIC_WALLET]: z.object({
+    operation: z.enum(["get_balance", "prepare_transaction"]),
+    parameters: z.object({
+      userId: z.string(),
+      asset: z.string(),
+      chainId: z.union([z.string(), z.number()]),
+      // Additional parameters for prepare_transaction
+      to: z.string().optional(),
+      value: z.union([z.string(), z.number()]).optional(),
+      data: z.string().optional(),
+      gasLimit: z.union([z.string(), z.number()]).optional(),
+    }),
+  }),
 };
 
 /**
