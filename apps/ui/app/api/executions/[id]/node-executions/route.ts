@@ -19,20 +19,12 @@ export async function GET(
       );
     }
     
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
     // 1. Fetch execution record to get workflow_id
-    const { data: execRec, error: execError } = await supabase
-      .from('workflow_executions')
-      .select('workflow_id')
-      .eq('id', executionId)
-      .single();
+    // const { data: execRec, error: execError } = await supabase
+    //   .from('workflow_executions')
+    //   .select('workflow_id')
+    //   .eq('id', executionId)
+    //   .single();
     if (execError || !execRec) {
       return NextResponse.json({ error: 'Execution not found' }, { status: 404 });
     }

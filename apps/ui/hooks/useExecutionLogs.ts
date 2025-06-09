@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { executionsApi } from "@/lib/services/api";
 
 // Types for API responses
 export interface WorkflowExecution {
@@ -52,26 +53,18 @@ export function useWorkflowExecutions(
         throw new Error("Workflow ID is required");
       }
       
-      const params = new URLSearchParams({
-        workflowId,
-        limit: limit.toString(),
-        offset: offset.toString(),
-        sort,
-        order,
-      });
-      
-      if (status !== "all") {
-        params.append("status", status);
+      try {
+        return await executionsApi.getWorkflowExecutions(
+          workflowId,
+          limit,
+          offset,
+          status,
+          sort,
+          order
+        );
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : "Failed to fetch workflow executions");
       }
-      
-      const response = await fetch(`/api/executions/logs?${params.toString()}`);
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to fetch workflow executions");
-      }
-      
-      return response.json();
     },
     enabled: !!workflowId && enabled,
   });
@@ -86,14 +79,11 @@ export function useNodeExecutions(executionId: string | undefined, enabled: bool
         throw new Error("Execution ID is required");
       }
       
-      const response = await fetch(`/api/executions/nodes?executionId=${executionId}`);
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to fetch node executions");
+      try {
+        return await executionsApi.getNodeExecutions(executionId);
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : "Failed to fetch node executions");
       }
-      
-      return response.json();
     },
     enabled: !!executionId && enabled,
   });
@@ -108,14 +98,11 @@ export function useNodeLogs(nodeExecutionId: string | undefined, enabled: boolea
         throw new Error("Node Execution ID is required");
       }
       
-      const response = await fetch(`/api/executions/node-logs?nodeExecutionId=${nodeExecutionId}`);
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to fetch node logs");
+      try {
+        return await executionsApi.getNodeLogs(nodeExecutionId);
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : "Failed to fetch node logs");
       }
-      
-      return response.json();
     },
     enabled: !!nodeExecutionId && enabled,
   });

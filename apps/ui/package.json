@@ -61,6 +61,7 @@
     "@zyra/types": "workspace:*",
     "ai": "^4.3.13",
     "amqplib": "^0.10.7",
+    "axios": "^1.9.0",
     "bs58": "^5.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

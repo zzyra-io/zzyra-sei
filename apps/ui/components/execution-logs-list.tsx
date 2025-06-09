@@ -63,6 +63,7 @@ import {
   type NodeExecution,
   type NodeLog,
 } from "@/hooks/useExecutionLogs";
+import { executionsApi } from "@/lib/services/api";
 import { Workflow } from "@/hooks/use-workflows";
 
 interface ExecutionLogsListProps {
@@ -152,15 +153,7 @@ export function ExecutionLogsList({
       setLoadingExecutionIds((prev) => new Set(prev).add(executionId));
 
       try {
-        const response = await fetch(
-          `/api/executions/nodes?executionId=${executionId}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch node executions");
-        }
-
-        const nodeExecutions = await response.json();
+        const nodeExecutions = await executionsApi.getNodeExecutions(executionId);
 
         if (nodeExecutions) {
           setNodeExecutionsCache((prev) => ({
@@ -169,16 +162,14 @@ export function ExecutionLogsList({
           }));
 
           for (const nodeExecution of nodeExecutions) {
-            const logsResponse = await fetch(
-              `/api/executions/node-logs?nodeExecutionId=${nodeExecution.id}`
-            );
-
-            if (logsResponse.ok) {
-              const logs = await logsResponse.json();
+            try {
+              const logs = await executionsApi.getNodeLogs(nodeExecution.id);
               setNodeLogsCache((prev) => ({
                 ...prev,
                 [nodeExecution.id]: logs,
               }));
+            } catch (error) {
+              console.error("Error loading node logs:", error);
             }
           }
         }
@@ -321,26 +312,22 @@ export function ExecutionLogsList({
   const handleAction = useCallback(
     async (action: string, logId: string, nodeId?: string) => {
       try {
-        let endpoint = `/api/executions/${logId}`;
-
+        let result;
+        
         if (action === "retry") {
-          endpoint += "/retry";
+          result = await executionsApi.retryExecution(logId, nodeId);
         } else if (action === "cancel") {
-          endpoint += "/cancel";
+          result = await executionsApi.cancelExecution(logId, nodeId);
         } else if (action === "pause") {
-          endpoint += "/pause";
+          result = await executionsApi.pauseExecution(logId, nodeId);
         } else if (action === "resume") {
-          endpoint += "/resume";
+          result = await executionsApi.resumeExecution(logId, nodeId);
+        } else {
+          throw new Error(`Unknown action: ${action}`);
         }
-
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nodeId }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to ${action} execution`);
+        
+        if (!result.success) {
+          throw new Error(`Failed to ${action} execution: ${result.message || 'Unknown error'}`);
         }
 
         toast({
