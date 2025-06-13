@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
 import { DatabaseService } from '../services/database.service';
+import { MagicAdminService } from '../services/magic-admin.service';
 import { ExecutionLogger } from './execution-logger';
 import { BlockExecutionContext, BlockHandler, BlockType } from '@zyra/types';
 import { BlockHandlerRegistry } from './handlers/BlockHandlerRegistry';
@@ -74,12 +75,14 @@ export class NodeExecutor {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly executionLogger: ExecutionLogger,
+    private readonly magicAdminService: MagicAdminService,
   ) {
     this.circuitBreaker = new CircuitBreaker();
     // Initialize BlockHandlerRegistry with class-level logger and database service
     this.blockHandlerRegistry = new BlockHandlerRegistry(
       this.logger,
       this.databaseService,
+      this.magicAdminService,
     );
     this.handlers = this.blockHandlerRegistry.getAllHandlers();
   }
@@ -118,7 +121,9 @@ export class NodeExecutor {
         );
 
         // Get handler using the registry (case-insensitive)
-        const handler = this.blockHandlerRegistry.getHandler(blockType as BlockType);
+        const handler = this.blockHandlerRegistry.getHandler(
+          blockType as BlockType,
+        );
         if (!handler) {
           throw new Error(
             `No handler found for block type: ${blockType}. Available: ${Object.keys(this.handlers).join(', ')}`,

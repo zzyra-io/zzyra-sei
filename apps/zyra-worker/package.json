@@ -6,11 +6,6 @@
   "private": true,
   "license": "UNLICENSED",
   "main": "dist/main.js",
-  "pnpm": {
-    "overrides": {
-      "jose": "4.14.4"
-    }
-  },
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\"",
@@ -86,7 +81,6 @@
     "socket.io-client": "^4.8.1",
     "uuid": "^11.1.0",
     "viem": "^2.28.0",
-    "vm2": "^3.9.19",
     "winston": "^3.11.0",
     "zod": "^3.23.0"
   },

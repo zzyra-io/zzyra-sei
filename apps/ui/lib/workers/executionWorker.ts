@@ -17,7 +17,7 @@ import {
   validateOrphans,
   validateTerminals,
 } from "@/lib/utils/graph";
-import { NodeVM } from "vm2";
+import vm from "vm";
 import { workflowService } from "@/lib/services/workflow-service";
 
 // Metrics for node execution
@@ -40,26 +40,33 @@ async function startWorker() {
     "execution_queue",
     async (msg: any) => {
       if (!msg) return;
-      const { executionId, workflowId, userId } = JSON.parse(msg.content.toString());
+      const { executionId, workflowId, userId } = JSON.parse(
+        msg.content.toString()
+      );
       console.log(`[Worker] Processing job: ${executionId}`);
       const supabase = createServiceClient();
 
       try {
         // Check if execution is already completed or failed
         const { data: execution } = await supabase
-          .from('workflow_executions')
-          .select('status')
-          .eq('id', executionId)
+          .from("workflow_executions")
+          .select("status")
+          .eq("id", executionId)
           .single();
 
-        if (execution?.status === 'completed' || execution?.status === 'failed') {
-          console.log(`[Worker] Skipping already ${execution.status} job: ${executionId}`);
+        if (
+          execution?.status === "completed" ||
+          execution?.status === "failed"
+        ) {
+          console.log(
+            `[Worker] Skipping already ${execution.status} job: ${executionId}`
+          );
           channel.ack(msg);
           return;
         }
 
         // Check if execution is paused - if so, don't process yet
-        if (execution?.status === 'paused') {
+        if (execution?.status === "paused") {
           console.log(`[Worker] Skipping paused job: ${executionId}`);
           // Requeue with a delay for paused jobs
           channel.nack(msg, false, true);
@@ -83,14 +90,14 @@ async function startWorker() {
         }
 
         const results = await executeWorkflow(wf.nodes, wf.edges);
-        
+
         // Mark workflow completed with outputs
         await executionService.updateExecutionStatus(
           executionId,
           "completed",
           results
         );
-        
+
         // Add completion log
         await supabase.from("execution_logs").insert({
           execution_id: executionId,
@@ -99,20 +106,21 @@ async function startWorker() {
           message: "Execution completed successfully",
           timestamp: new Date().toISOString(),
         });
-        
+
         console.log(`[Worker] Completed job: ${executionId}`);
         channel.ack(msg);
       } catch (error) {
         console.error(`[Worker] Job ${executionId} failed:`, error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+
         // Update execution status
         await executionService.updateExecutionStatus(
           executionId,
           "failed",
           errorMessage
         );
-        
+
         // Add error log
         await supabase.from("execution_logs").insert({
           execution_id: executionId,
@@ -121,7 +129,7 @@ async function startWorker() {
           message: `Execution failed: ${errorMessage}`,
           timestamp: new Date().toISOString(),
         });
-        
+
         // Don't requeue failed jobs
         channel.nack(msg, false, false);
       }
@@ -139,40 +147,38 @@ async function executeNode(node: any): Promise<any> {
   const blockType = getBlockType(cfg);
   const { config } = cfg;
   const executionId = cfg.executionId;
-  
+
   // Create or update node execution record
   if (executionId) {
     try {
       // Check if node execution record exists
       const { data } = await supabase
-        .from('node_executions')
-        .select('id')
-        .eq('execution_id', executionId)
-        .eq('node_id', node.id)
+        .from("node_executions")
+        .select("id")
+        .eq("execution_id", executionId)
+        .eq("node_id", node.id)
         .maybeSingle();
-      
+
       if (data) {
         // Update existing record
         await supabase
-          .from('node_executions')
+          .from("node_executions")
           .update({
-            status: 'running',
+            status: "running",
             started_at: new Date().toISOString(),
           })
-          .eq('execution_id', executionId)
-          .eq('node_id', node.id);
+          .eq("execution_id", executionId)
+          .eq("node_id", node.id);
       } else {
         // Create new record
-        await supabase
-          .from('node_executions')
-          .insert({
-            execution_id: executionId,
-            node_id: node.id,
-            status: 'running',
-            started_at: new Date().toISOString(),
-          });
+        await supabase.from("node_executions").insert({
+          execution_id: executionId,
+          node_id: node.id,
+          status: "running",
+          started_at: new Date().toISOString(),
+        });
       }
-      
+
       // Log node execution start
       await supabase.from("node_logs").insert({
         execution_id: executionId,
@@ -369,11 +375,39 @@ async function executeNode(node: any): Promise<any> {
       if (transformType !== "javascript" || !code) {
         throw new Error("Transform block missing code or unsupported type");
       }
-      // sandbox JS to prevent infinite loops
-      const vm = new NodeVM({ timeout: 500, sandbox: {} });
-      const fn = vm.run(`module.exports = function(data){ ${code} }`);
-      const result = fn(node.data);
-      return { result };
+      // Create a safe sandbox context
+      const context = vm.createContext({
+        // Only provide safe built-ins
+        JSON: JSON,
+        Math: Math,
+        Date: Date,
+        Array: Array,
+        Object: Object,
+        String: String,
+        Number: Number,
+        Boolean: Boolean,
+        RegExp: RegExp,
+        // Prevent access to require, process, etc.
+      });
+
+      try {
+        // Execute with timeout
+        const result = vm.runInContext(
+          `
+          (function(data) {
+            ${code}
+          })
+        `,
+          context,
+          { timeout: 500 }
+        );
+        const transformedResult = result(node.data);
+        return { result: transformedResult };
+      } catch (error) {
+        throw new Error(
+          `Transform execution failed: ${error instanceof Error ? error.message : "Unknown error"}`
+        );
+      }
     }
     case BlockType.CONDITION: {
       // Conditional branching
@@ -381,11 +415,38 @@ async function executeNode(node: any): Promise<any> {
       if (!cond) {
         throw new Error("Condition block missing expression");
       }
-      // sandbox condition
-      const vm = new NodeVM({ timeout: 200, sandbox: {} });
-      const fn = vm.run(`module.exports = function(data){ return (${cond}); }`);
-      const outcome = fn(node.data);
-      return { outcome: Boolean(outcome) };
+      // Create a safe sandbox context for condition evaluation
+      const context = vm.createContext({
+        // Only provide safe built-ins for conditions
+        JSON: JSON,
+        Math: Math,
+        Date: Date,
+        Array: Array,
+        Object: Object,
+        String: String,
+        Number: Number,
+        Boolean: Boolean,
+        RegExp: RegExp,
+      });
+
+      try {
+        // Execute condition with timeout
+        const result = vm.runInContext(
+          `
+          (function(data) {
+            return (${cond});
+          })
+        `,
+          context,
+          { timeout: 200 }
+        );
+        const outcome = result(node.data);
+        return { outcome: Boolean(outcome) };
+      } catch (error) {
+        throw new Error(
+          `Condition evaluation failed: ${error instanceof Error ? error.message : "Unknown error"}`
+        );
+      }
     }
     case BlockType.CUSTOM: {
       // Execute custom block logic
@@ -449,56 +510,56 @@ export async function executeWorkflow(
   executionId?: string
 ): Promise<Record<string, any>> {
   const supabase = createServiceClient();
-  
+
   try {
     // Graph validations
     validateAcyclic(nodes, edges);
     validateOrphans(nodes, edges);
     validateTerminals(nodes, edges);
-    
+
     // Topologically sorted run
     const sorted = topologicalSort(nodes, edges);
     const outputs: Record<string, any> = {};
-    
+
     for (const node of sorted) {
       // Check if execution is paused before each node
       if (executionId) {
         const { data: execution } = await supabase
-          .from('workflow_executions')
-          .select('status')
-          .eq('id', executionId)
+          .from("workflow_executions")
+          .select("status")
+          .eq("id", executionId)
           .single();
-          
-        if (execution?.status === 'paused') {
-          throw new Error('EXECUTION_PAUSED');
+
+        if (execution?.status === "paused") {
+          throw new Error("EXECUTION_PAUSED");
         }
       }
-      
+
       // attach previous outputs and execution ID if needed
-      const inputNode = { 
-        ...node, 
-        data: { 
-          ...node.data, 
+      const inputNode = {
+        ...node,
+        data: {
+          ...node.data,
           previous: outputs,
-          executionId: executionId 
-        } 
+          executionId: executionId,
+        },
       };
-      
+
       try {
         outputs[node.id] = await executeNode(inputNode);
-        
+
         // Update node execution status to completed
         if (executionId) {
           await supabase
-            .from('node_executions')
+            .from("node_executions")
             .update({
-              status: 'completed',
+              status: "completed",
               completed_at: new Date().toISOString(),
               output: outputs[node.id] || {},
             })
-            .eq('execution_id', executionId)
-            .eq('node_id', node.id);
-            
+            .eq("execution_id", executionId)
+            .eq("node_id", node.id);
+
           // Log node completion
           await supabase.from("node_logs").insert({
             execution_id: executionId,
@@ -511,18 +572,19 @@ export async function executeWorkflow(
       } catch (error) {
         // Update node execution status to failed
         if (executionId) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error";
+
           await supabase
-            .from('node_executions')
+            .from("node_executions")
             .update({
-              status: 'failed',
+              status: "failed",
               completed_at: new Date().toISOString(),
               error: errorMessage,
             })
-            .eq('execution_id', executionId)
-            .eq('node_id', node.id);
-            
+            .eq("execution_id", executionId)
+            .eq("node_id", node.id);
+
           // Log node failure
           await supabase.from("node_logs").insert({
             execution_id: executionId,
@@ -532,7 +594,7 @@ export async function executeWorkflow(
             timestamp: new Date().toISOString(),
           });
         }
-        
+
         // Rethrow to fail the whole workflow
         throw error;
       }
@@ -540,9 +602,9 @@ export async function executeWorkflow(
     return outputs;
   } catch (error) {
     // Special handling for paused executions
-    if (error instanceof Error && error.message === 'EXECUTION_PAUSED') {
+    if (error instanceof Error && error.message === "EXECUTION_PAUSED") {
       console.log(`Execution ${executionId} is paused`);
-      return { status: 'paused' };
+      return { status: "paused" };
     }
     throw error;
   }

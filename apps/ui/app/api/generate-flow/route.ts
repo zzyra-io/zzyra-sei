@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { generateFlowWithAI } from "@/lib/ai";
-import type { Node, Edge } from "@/components/flow-canvas";
+import type { Node, Edge } from "@xyflow/react";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {

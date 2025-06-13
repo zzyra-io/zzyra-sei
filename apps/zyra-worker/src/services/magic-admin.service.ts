@@ -15,10 +15,10 @@ export class MagicAdminService {
     const secretKey = process.env.MAGIC_SECRET_KEY;
     if (!secretKey) {
       this.logger.warn(
-        'MAGIC_SECRET_KEY environment variable is not set, some functionality may be limited'
+        'MAGIC_SECRET_KEY environment variable is not set, some functionality may be limited',
       );
     }
-    
+
     try {
       this.magic = new Magic(secretKey);
       this.logger.log('Magic Admin SDK initialized');
@@ -36,16 +36,16 @@ export class MagicAdminService {
   async validateToken(didToken: string) {
     try {
       this.logger.debug('Validating Magic DID token');
-      
+
       // Validate the token
       await this.magic.token.validate(didToken);
-      
+
       // Get issuer from token
       const issuer = this.magic.token.getIssuer(didToken);
-      
+
       // Get public address from token
       const publicAddress = this.magic.token.getPublicAddress(didToken);
-      
+
       return { issuer, publicAddress };
     } catch (error) {
       this.logger.error(`Token validation failed: ${error}`);
@@ -78,16 +78,16 @@ export class MagicAdminService {
     try {
       this.logger.debug(`Getting ${walletType} wallet for issuer: ${issuer}`);
       const metadata = await this.magic.users.getMetadataByIssuer(issuer);
-      
+
       // Find the wallet of the specified type
-      const wallet = metadata.data?.wallets?.find(w => 
-        w.walletType.toLowerCase() === walletType.toLowerCase()
+      const wallet = metadata.wallets?.find(
+        (w) => w.walletType.toLowerCase() === walletType.toLowerCase(),
       );
-      
+
       if (!wallet) {
         throw new Error(`No ${walletType} wallet found for user`);
       }
-      
+
       return wallet;
     } catch (error) {
       this.logger.error(`Failed to get user wallet: ${error}`);
