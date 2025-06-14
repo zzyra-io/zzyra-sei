@@ -1,13 +1,27 @@
-# Netlify configuration for Next.js app
+# Netlify configuration for Next.js app in turbo monorepo
 [build]
-  command   = "pnpm run build"
+  command   = "pnpm install --frozen-lockfile && pnpm run build --filter=zyra-web3-automation"
   publish   = "apps/ui/.next"
   functions = "apps/ui/.netlify/functions"
+  ignore    = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/ui/"
+
+# Environment variables
+[build.environment]
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+  NODE_VERSION = "20"
+  PNPM_VERSION = "9.15.2"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+# Handle client-side routing
 [[redirects]]
-from = "/*"
-to = "/"
-type = "rewrite"
+  from = "/*"
+  to = "/"
+  status = 200
+
+# Cache control for static assets
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
