@@ -2,7 +2,12 @@
 [build]
   command   = "npm run build"
   publish   = "apps/ui/.next"
-  functions = ".netlify/functions"
+  functions = "apps/ui/.netlify/functions"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[[redirects]]
+from = "/*"
+to = "/"
+type = "rewrite"
