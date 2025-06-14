@@ -169,7 +169,7 @@ export function BlockCard({
                   </TooltipTrigger>
                   <TooltipContent>
                     <p className='text-sm'>
-                      This block has been verified by the Zyra team
+                      This block has been verified by the Zzyra team
                     </p>
                   </TooltipContent>
                 </Tooltip>

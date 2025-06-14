@@ -1,5 +1,5 @@
 /**
- * Type definitions for wallet integration in Zyra
+ * Type definitions for wallet integration in Zzyra
  * These types are used across UI and worker components for consistency
  */
 
@@ -7,8 +7,8 @@
  * Supported blockchain types
  */
 export enum ChainType {
-  EVM = 'evm',
-  SOLANA = 'solana'
+  EVM = "evm",
+  SOLANA = "solana",
 }
 
 /**
@@ -20,9 +20,9 @@ export interface WalletInfo {
   chainType: ChainType;
   chainId: string | number;
   provider: string;
-  
+
   // Database compatibility fields
-  network_id?: string;          // Maps to chain_id in database
+  network_id?: string; // Maps to chain_id in database
   smart_wallet_address?: string; // Maps to address in database
   userInfo?: {
     email?: string;

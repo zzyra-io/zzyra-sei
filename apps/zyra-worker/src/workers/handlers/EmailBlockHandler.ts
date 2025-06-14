@@ -159,8 +159,8 @@ export class EmailBlockHandler implements BlockHandler {
     );
 
     // Add standard email footer if none exists
-    if (!processed.includes('Powered by Zyra')) {
-      processed += '\n\n--\nPowered by Zyra | Automated Workflows';
+    if (!processed.includes('Powered by Zzyra')) {
+      processed += '\n\n--\nPowered by Zzyra | Automated Workflows';
     }
 
     return processed;

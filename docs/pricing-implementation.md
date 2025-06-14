@@ -1,8 +1,8 @@
-# Zyra Pricing Implementation Guide
+# Zzyra Pricing Implementation Guide
 
 ## Summary of Changes
 
-This document outlines the implementation of Zyra's new strategic pricing structure, transforming from a 3-tier to 5-tier system with enhanced value proposition.
+This document outlines the implementation of Zzyra's new strategic pricing structure, transforming from a 3-tier to 5-tier system with enhanced value proposition.
 
 ## Database Updates ✅
 

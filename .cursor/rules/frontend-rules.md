@@ -1,4 +1,4 @@
-# Frontend Rules for Zyra
+# Frontend Rules for Zzyra
 
 ## Next.js Architecture
 

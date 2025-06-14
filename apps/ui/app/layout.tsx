@@ -7,12 +7,12 @@ import { PostHogProvider } from "@/components/PostHogProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import "@/styles/flow-components.css";
-import { Space_Grotesk } from "next/font/google";
+import { Montserrat, Space_Grotesk } from "next/font/google";
 import type React from "react";
 import { WagmiProviders } from "../components/wagmi-providers";
 import "./globals.css";
 
-const inter = Space_Grotesk({
+const inter = Montserrat({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
   display: "swap",
@@ -20,7 +20,7 @@ const inter = Space_Grotesk({
 });
 
 export const metadata = {
-  title: "Zyra - Web3 Automation",
+  title: "Zzyra - Web3 Automation",
   description: "Build powerful Web3 automation workflows",
   metadataBase: new URL("https://zyra.vercel.app"),
   generator: "v0.dev",

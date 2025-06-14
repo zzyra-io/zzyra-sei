@@ -4,7 +4,7 @@
 # Exit on error
 set -e
 
-echo "=== Preparing Zyra Worker Deployment Package ==="
+echo "=== Preparing Zzyra Worker Deployment Package ==="
 
 # Create deployment directory
 DEPLOY_DIR="./deployment-package"
@@ -28,9 +28,9 @@ cp .env.example $DEPLOY_DIR/ || echo "Warning: .env.example not found. You'll ne
 
 # Create README for deployment
 cat > $DEPLOY_DIR/README.md << EOL
-# Zyra Worker Deployment Package
+# Zzyra Worker Deployment Package
 
-This package contains everything needed to deploy the Zyra worker to Oracle Cloud Infrastructure.
+This package contains everything needed to deploy the Zzyra worker to Oracle Cloud Infrastructure.
 
 ## Quick Start
 

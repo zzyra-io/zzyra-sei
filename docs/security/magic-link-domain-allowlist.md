@@ -4,32 +4,32 @@
 
 Domain Allowlist is a critical security feature for Magic Link authentication that establishes a strong security posture by default. It only permits communication with specific domains and redirect URIs that have been explicitly approved, protecting your public API keys from unauthorized usage.
 
-## Why Domain Allowlist is Important for Zyra
+## Why Domain Allowlist is Important for Zzyra
 
-For Zyra as a production-ready SAAS platform:
+For Zzyra as a production-ready SAAS platform:
 
 1. **Security by Default**: Prevents unauthorized domains from using your Magic Link API keys
 2. **Protection Against Phishing**: Ensures authentication flows only occur on trusted domains
 3. **Compliance**: Helps meet security requirements for enterprise customers
 4. **Required for New Projects**: Mandatory for all new Magic Link applications
 
-## Implementation in Zyra
+## Implementation in Zzyra
 
 ### 1. Dashboard Configuration
 
 1. Navigate to the [Magic dashboard](https://dashboard.magic.link/)
-2. Select your Zyra application
+2. Select your Zzyra application
 3. Go to the "Settings" tab
 4. Scroll to "Allowed Origins & Redirects"
 5. Toggle on the domain allowlist feature
-6. Add all domains that will be used with your Zyra application:
+6. Add all domains that will be used with your Zzyra application:
    - Production domain (e.g., `https://app.zyra.com`)
    - Staging/testing domains (e.g., `https://staging.zyra.com`)
    - Development domains (e.g., `http://localhost:3000`)
 
 ### 2. Domains to Include
 
-For a complete implementation, ensure you add all domains where Zyra will be accessed:
+For a complete implementation, ensure you add all domains where Zzyra will be accessed:
 
 - **Production**: Your main application domain
 - **Staging/QA**: Any pre-production environments
@@ -45,7 +45,8 @@ If you're using OAuth with Magic Link, ensure you add all redirect URIs:
 
 ## Technical Implementation
 
-The Magic SDK in Zyra has been updated to work with domain allowlisting. The implementation is in:
+The Magic SDK in Zzyra has been updated to work with domain allowlisting. The implementation is in:
+
 - `packages/wallet/src/adapters/browser/magic-browser.ts`
 
 The SDK automatically respects the allowlist settings configured in the Magic dashboard, so no additional code changes are needed beyond what's already implemented.

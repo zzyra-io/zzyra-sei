@@ -1,4 +1,4 @@
-# **Zyra Development Costs - Nepal Market**
+# **Zzyra Development Costs - Nepal Market**
 
 ## **📊 Nepal Developer Market Analysis (2025)**
 

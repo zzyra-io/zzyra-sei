@@ -1,4 +1,4 @@
-# Zyra User Segment Analysis & Pricing Alignment
+# Zzyra User Segment Analysis & Pricing Alignment
 
 ## Multi-Vertical Web3 Automation Platform
 
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-Based on analysis of user stories and market research, Zyra serves 8 distinct user segments across the Web3 ecosystem. This document provides detailed analysis of each segment, their specific needs, pain points, and optimal pricing alignment.
+Based on analysis of user stories and market research, Zzyra serves 8 distinct user segments across the Web3 ecosystem. This document provides detailed analysis of each segment, their specific needs, pain points, and optimal pricing alignment.
 
 ---
 
@@ -55,7 +55,7 @@ Based on analysis of user stories and market research, Zyra serves 8 distinct us
 - **Opportunity Cost**: Missing yield farming opportunities
 - **Complexity**: Managing multiple wallets and protocols
 
-#### Value Delivered by Zyra
+#### Value Delivered by Zzyra
 
 - **Time Savings**: 20+ hours/week → 2 hours/week
 - **Risk Reduction**: Automated liquidation protection
@@ -111,7 +111,7 @@ Based on analysis of user stories and market research, Zyra serves 8 distinct us
 - **Floor Price Volatility**: Missing optimal buy/sell moments
 - **Gas Wars**: Overpaying during mint events
 
-#### Value Delivered by Zyra
+#### Value Delivered by Zzyra
 
 - **Never Miss Drops**: 24/7 monitoring and auto-claiming
 - **Floor Price Alerts**: Instant notifications for opportunities
@@ -161,7 +161,7 @@ Based on analysis of user stories and market research, Zyra serves 8 distinct us
 - **Reporting Burden**: Time-intensive governance reporting
 - **Scalability Issues**: Process bottlenecks as team grows
 
-#### Value Delivered by Zyra
+#### Value Delivered by Zzyra
 
 - **Treasury Automation**: Automated yield strategies and rebalancing
 - **Team Coordination**: Shared workflows and approvals
@@ -211,7 +211,7 @@ Based on analysis of user stories and market research, Zyra serves 8 distinct us
 - **Risk Management**: Difficulty monitoring all portfolios 24/7
 - **Client Expectations**: Demand for professional-grade service
 
-#### Value Delivered by Zyra
+#### Value Delivered by Zzyra
 
 - **Portfolio Scaling**: Manage 10x more clients efficiently
 - **Automated Rebalancing**: AI-powered optimization strategies
@@ -262,7 +262,7 @@ Based on analysis of user stories and market research, Zyra serves 8 distinct us
 - **Time Constraints**: Limited time to learn complex systems
 - **Security Concerns**: Unsure about wallet security
 
-#### Value Delivered by Zyra
+#### Value Delivered by Zzyra
 
 - **Simplified Interface**: Easy-to-use automation setup
 - **Guided Workflows**: AI assistance for strategy creation
@@ -312,7 +312,7 @@ Based on analysis of user stories and market research, Zyra serves 8 distinct us
 - **Information Fragmentation**: Data spread across platforms
 - **Manual Execution**: Time-intensive claim processes
 
-#### Value Delivered by Zyra
+#### Value Delivered by Zzyra
 
 - **Automated Tracking**: Monitor 100+ protocols simultaneously
 - **Eligibility Optimization**: Automated requirement fulfillment
@@ -446,7 +446,7 @@ Based on analysis of user stories and market research, Zyra serves 8 distinct us
 
 ## Conclusion
 
-Zyra's multi-segment approach enables capturing value across the entire Web3 ecosystem. The pricing structure aligns with user value and provides clear upgrade paths. Success depends on:
+Zzyra's multi-segment approach enables capturing value across the entire Web3 ecosystem. The pricing structure aligns with user value and provides clear upgrade paths. Success depends on:
 
 1. **Segment-specific value delivery**
 2. **Clear tier differentiation**

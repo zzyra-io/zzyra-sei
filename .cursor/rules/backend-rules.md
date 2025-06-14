@@ -1,4 +1,4 @@
-# Backend Rules for Zyra
+# Backend Rules for Zzyra
 
 ## NestJS Architecture
 

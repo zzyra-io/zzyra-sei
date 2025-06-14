@@ -1,8 +1,8 @@
-# Zyra Block System Architecture
+# Zzyra Block System Architecture
 
 ## Overview
 
-This document outlines the architecture for Zyra's modular block system, which enables creating, configuring, and executing workflow blocks in a maintainable and extensible manner. The architecture follows Zyra's monorepo structure principles, separating shared logic into packages while keeping specific implementations in the appropriate apps.
+This document outlines the architecture for Zzyra's modular block system, which enables creating, configuring, and executing workflow blocks in a maintainable and extensible manner. The architecture follows Zzyra's monorepo structure principles, separating shared logic into packages while keeping specific implementations in the appropriate apps.
 
 ## 1. Core Principles
 
@@ -42,12 +42,12 @@ export interface BlockDefinition {
   description: string;
   icon: string;
   category: NodeCategory;
-  
+
   // Configuration and validation
   schema: z.ZodObject<any>;
   defaultConfig: Record<string, any>;
   validate: (config: Record<string, any>) => ValidationResult;
-  
+
   // UI components
   ConfigComponent: React.FC<BlockConfigProps>;
   LiveComponent?: React.FC<BlockLiveProps>;
@@ -75,7 +75,7 @@ The registry is a centralized system for registering and accessing blocks:
 
 ```typescript
 // packages/blocks/src/registry.ts
-import { BlockDefinition } from './types';
+import { BlockDefinition } from "./types";
 
 const blockRegistry = new Map<BlockType, BlockDefinition>();
 
@@ -100,20 +100,22 @@ The Flow Canvas component in the UI app integrates with the block registry to cr
 
 ```typescript
 // apps/ui/components/flow-canvas.tsx
-import { getBlock } from '@zyra/blocks';
+import { getBlock } from "@zyra/blocks";
 
 // When adding a new node from drag-and-drop
 const onDrop = useCallback((event) => {
   const blockType = event.dataTransfer.getData("application/reactflow");
   const blockDef = getBlock(blockType as BlockType);
-  
+
   if (!blockDef) return;
-  
+
   // Create node with block's default config
   const newNode = {
     id: `${blockType}-${Date.now()}`,
     type: "custom",
-    position: { /* ... */ },
+    position: {
+      /* ... */
+    },
     data: {
       blockType,
       label: blockDef.name,
@@ -122,10 +124,10 @@ const onDrop = useCallback((event) => {
       isValid: false,
       isEnabled: true,
       config: { ...blockDef.defaultConfig },
-      status: "unconfigured"
-    }
+      status: "unconfigured",
+    },
   };
-  
+
   addNode(newNode);
   validateNode(newNode.id);
 }, []);
@@ -142,19 +144,19 @@ import { getBlock } from '@zyra/blocks';
 export const BlockConfigPanel: React.FC<{ nodeId: string }> = ({ nodeId }) => {
   const { nodes, updateNode } = useWorkflowStore();
   const node = nodes.find(n => n.id === nodeId);
-  
+
   if (!node) return null;
-  
+
   const { blockType, config } = node.data;
   const blockDef = getBlock(blockType);
-  
+
   if (!blockDef) return <div>Unknown block type</div>;
-  
+
   const ConfigComponent = blockDef.ConfigComponent;
-  
+
   const handleConfigChange = (newConfig: Record<string, any>) => {
     const validation = blockDef.validate(newConfig);
-    
+
     updateNode(nodeId, {
       data: {
         config: newConfig,
@@ -162,13 +164,13 @@ export const BlockConfigPanel: React.FC<{ nodeId: string }> = ({ nodeId }) => {
       }
     });
   };
-  
+
   return (
     <div className="block-config-panel">
       <h2>{blockDef.name} Configuration</h2>
-      <ConfigComponent 
-        config={config} 
-        onChange={handleConfigChange} 
+      <ConfigComponent
+        config={config}
+        onChange={handleConfigChange}
       />
     </div>
   );
@@ -185,18 +187,18 @@ import { getBlock } from '@zyra/blocks';
 
 export const CustomNode: React.FC = ({ data, id }) => {
   const blockDef = getBlock(data.blockType);
-  
+
   return (
     <div className={`custom-node ${data.isValid ? 'valid' : 'invalid'}`}>
       <div className="node-header">
         <div className="node-icon">{blockDef?.icon}</div>
         <div className="node-title">{data.label}</div>
       </div>
-      
+
       <div className="node-body">
         {/* Render live component if available */}
         {blockDef?.LiveComponent && data.isEnabled && (
-          <blockDef.LiveComponent 
+          <blockDef.LiveComponent
             id={id}
             config={data.config}
           />
@@ -215,21 +217,18 @@ The worker uses a registry to manage handlers for different block types:
 
 ```typescript
 // apps/zyra-worker/src/workers/handlers/BlockHandlerRegistry.ts
-import { getAllBlocks } from '@zyra/blocks';
+import { getAllBlocks } from "@zyra/blocks";
 
 class BlockHandlerRegistry {
   private handlers: Map<BlockType, BlockHandler> = new Map();
-  
+
   constructor() {
     // Register handlers for all known blocks
-    getAllBlocks().forEach(blockDef => {
-      this.handlers.set(
-        blockDef.type, 
-        new GenericBlockHandler(blockDef.type)
-      );
+    getAllBlocks().forEach((blockDef) => {
+      this.handlers.set(blockDef.type, new GenericBlockHandler(blockDef.type));
     });
   }
-  
+
   getHandler(blockType: BlockType): BlockHandler {
     const handler = this.handlers.get(blockType);
     if (!handler) {
@@ -246,25 +245,27 @@ Each block handler validates and executes block logic using the block's schema a
 
 ```typescript
 // apps/zyra-worker/src/workers/handlers/GenericBlockHandler.ts
-import { getBlock } from '@zyra/blocks';
+import { getBlock } from "@zyra/blocks";
 
 export class GenericBlockHandler implements BlockHandler {
   constructor(private blockType: BlockType) {}
-  
+
   async execute(node: any, context: BlockExecutionContext): Promise<any> {
     const blockDef = getBlock(this.blockType);
     if (!blockDef) {
       throw new Error(`Unknown block type: ${this.blockType}`);
     }
-    
+
     // Validate configuration
     const config = node.data?.config || {};
     const validation = blockDef.validate(config);
-    
+
     if (!validation.isValid) {
-      throw new Error(`Invalid configuration: ${validation.errors?.join(', ')}`);
+      throw new Error(
+        `Invalid configuration: ${validation.errors?.join(", ")}`
+      );
     }
-    
+
     // Execute block logic
     return await executeBlockRuntime(this.blockType, config, context);
   }
@@ -275,12 +276,12 @@ export class GenericBlockHandler implements BlockHandler {
 
 ```typescript
 // packages/blocks/src/blocks/webhook/index.ts
-import { z } from 'zod';
-import { BlockType, NodeCategory } from '@zyra/types';
-import { WebhookConfigComponent } from './ui';
-import { defaultConfig } from './defaults';
-import { validate } from './validator';
-import { registerBlock } from '../../registry';
+import { z } from "zod";
+import { BlockType, NodeCategory } from "@zyra/types";
+import { WebhookConfigComponent } from "./ui";
+import { defaultConfig } from "./defaults";
+import { validate } from "./validator";
+import { registerBlock } from "../../registry";
 
 // Webhook schema
 export const schema = z.object({
@@ -299,7 +300,7 @@ registerBlock({
   schema,
   defaultConfig,
   ConfigComponent: WebhookConfigComponent,
-  validate
+  validate,
 });
 ```
 

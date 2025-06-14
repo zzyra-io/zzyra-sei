@@ -1,4 +1,4 @@
-// Prisma schema for Zyra platform
+// Prisma schema for Zzyra platform
 // This schema represents a migration from Supabase to Prisma
 
 generator client {

@@ -4,7 +4,7 @@ participant UI as Builder UI
 participant ValidationHook as useWorkflowValidation
 participant API as /api/execute-workflow
 participant Queue as RabbitMQ Queue
-participant Worker as Zyra Worker
+participant Worker as Zzyra Worker
 participant Executor as WorkflowExecutor
 participant DB as Database (Prisma)
 participant WS as WebSocket/SSE

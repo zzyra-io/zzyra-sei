@@ -1,4 +1,4 @@
-# **Zyra Development Costs - Global Market**
+# **Zzyra Development Costs - Global Market**
 
 ## **📊 Global Developer Market Analysis (2025)**
 

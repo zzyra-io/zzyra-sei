@@ -1,4 +1,4 @@
-# Monorepo Rules for Zyra
+# Monorepo Rules for Zzyra
 
 ## Workspace Structure
 
@@ -213,7 +213,7 @@ describe("User", () => {
 ````markdown
 # @zyra/types
 
-Shared TypeScript types for Zyra.
+Shared TypeScript types for Zzyra.
 
 ## Installation
 
@@ -253,7 +253,7 @@ interface User {
 - Use proper development docs
 - Use proper deployment docs
 ```markdown
-# Zyra
+# Zzyra
 
 AI-driven, blockchain-focused workflow automation platform.
 

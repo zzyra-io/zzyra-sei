@@ -1,10 +1,10 @@
 # Authentication and Policy Enforcement
 
-This document provides an overview of the JWT-based authentication system and policy enforcement mechanisms implemented in the Zyra platform.
+This document provides an overview of the JWT-based authentication system and policy enforcement mechanisms implemented in the Zzyra platform.
 
 ## Overview
 
-The Zyra platform uses a custom JWT-based authentication system and application-level policy enforcement to secure access to resources. This replaces Supabase's Row-Level Security (RLS) with a more flexible and powerful approach that works with Prisma.
+The Zzyra platform uses a custom JWT-based authentication system and application-level policy enforcement to secure access to resources. This replaces Supabase's Row-Level Security (RLS) with a more flexible and powerful approach that works with Prisma.
 
 ## Authentication
 
@@ -65,15 +65,15 @@ The `BaseRepository` integrates policy enforcement into all database operations:
 ```typescript
 // Authenticate with email
 const authResult = await authService.authenticateWithMagic({
-  email: 'user@example.com',
-  didToken: 'magic-link-token',
+  email: "user@example.com",
+  didToken: "magic-link-token",
 });
 
 // Authenticate with wallet
 const walletAuthResult = await authService.authenticateWithWallet(
-  '0x123456789abcdef',
-  '1',
-  'ethereum'
+  "0x123456789abcdef",
+  "1",
+  "ethereum"
 );
 
 // Verify a token
@@ -88,7 +88,7 @@ await authService.signOut(userId);
 ```typescript
 // In Next.js API route
 export const config = {
-  matcher: ['/api/workflows/:path*', '/api/executions/:path*'],
+  matcher: ["/api/workflows/:path*", "/api/executions/:path*"],
 };
 
 export async function middleware(req: NextRequest) {
@@ -106,17 +106,20 @@ export async function GET(req: NextRequest) {
 
 ```typescript
 // Check access to a workflow
-const hasAccess = await policyService.checkWorkflowAccess('workflow-id', context);
+const hasAccess = await policyService.checkWorkflowAccess(
+  "workflow-id",
+  context
+);
 
 // Create a policy context
-const context = await policyService.createContext('user-id');
+const context = await policyService.createContext("user-id");
 
 // Enforce a policy
 const workflow = await enforcePolicy(
-  'workflow-id',
-  'user-id',
+  "workflow-id",
+  "user-id",
   (id, context) => policyService.checkWorkflowAccess(id, context),
-  'Access to workflow denied'
+  "Access to workflow denied"
 );
 ```
 
@@ -124,19 +127,22 @@ const workflow = await enforcePolicy(
 
 ```typescript
 // Find workflows with policy enforcement
-const workflows = await workflowRepository.findByUserId('user-id');
+const workflows = await workflowRepository.findByUserId("user-id");
 
 // Create a workflow with policy enforcement
-const workflow = await workflowRepository.create({
-  name: 'New Workflow',
-  // ... other properties
-}, 'user-id');
+const workflow = await workflowRepository.create(
+  {
+    name: "New Workflow",
+    // ... other properties
+  },
+  "user-id"
+);
 
 // Update a workflow with policy enforcement
 const updatedWorkflow = await workflowRepository.update(
-  'workflow-id',
-  { name: 'Updated Workflow' },
-  'user-id'
+  "workflow-id",
+  { name: "Updated Workflow" },
+  "user-id"
 );
 ```
 

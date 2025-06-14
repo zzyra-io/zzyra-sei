@@ -712,7 +712,7 @@ export class OpenRouterProvider implements AIProvider {
     const blockIntelligence = this.generateBlockIntelligence();
     const availableDataTypes = Object.values(DataType);
 
-    return `You are an EXPERT WORKFLOW AI for Zyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
+    return `You are an EXPERT WORKFLOW AI for Zzyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
 
 🎯 **CORE MISSION**: Transform ANY natural language into sophisticated, executable workflows using our comprehensive generic block system.
 
@@ -1509,7 +1509,7 @@ ${JSON.stringify(intelligence, null, 2)}
     try {
       this.trackEvent("ai_custom_block_generation_attempt", { prompt }, userId);
 
-      const systemPrompt = `You are an AI that creates custom workflow blocks for Zyra platform.
+      const systemPrompt = `You are an AI that creates custom workflow blocks for Zzyra platform.
 
 Available Data Types: ${JSON.stringify(Object.values(DataType), null, 2)}
 
@@ -1633,7 +1633,7 @@ Return ONLY the JSON object.`;
 
       const systemPrompt = context
         ? `You are a helpful AI assistant. Context: ${context}`
-        : "You are a helpful AI assistant for the Zyra automation platform.";
+        : "You are a helpful AI assistant for the Zzyra automation platform.";
 
       const { text } = await generateText({
         model: this.openrouter(MODEL_TO_USE),

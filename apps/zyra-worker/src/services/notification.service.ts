@@ -558,7 +558,7 @@ export class NotificationService {
     }
     const payload = { timestamp: new Date().toISOString() };
     const title = 'Test Notification';
-    const message = 'This is a test notification from Zyra.';
+    const message = 'This is a test notification from Zzyra.';
     const notification = await this.databaseService.prisma.notification.create({
       data: {
         userId: userId,

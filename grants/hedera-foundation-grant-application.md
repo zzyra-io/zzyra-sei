@@ -1,8 +1,8 @@
-# **Hedera Foundation Grant Application: Zyra**
+# **Hedera Foundation Grant Application: Zzyra**
 
 ## **Company / Project Name**
 
-Zyra - AI-Driven Universal Workflow Automation Platform
+Zzyra - AI-Driven Universal Workflow Automation Platform
 
 ## **Website URL**
 
@@ -12,9 +12,9 @@ Zyra - AI-Driven Universal Workflow Automation Platform
 
 AI + DeFi (Multi-Category Innovation)
 
-## **About Your Project: Why Zyra Will Succeed**
+## **About Your Project: Why Zzyra Will Succeed**
 
-Zyra will succeed because it's building the **universal automation infrastructure** for the digital economy—a chain-agnostic platform where Hedera becomes a first-class automation citizen alongside Web2 services, other blockchains, and AI capabilities.
+Zzyra will succeed because it's building the **universal automation infrastructure** for the digital economy—a chain-agnostic platform where Hedera becomes a first-class automation citizen alongside Web2 services, other blockchains, and AI capabilities.
 
 **Universal Platform Architecture:**
 
@@ -24,7 +24,7 @@ Zyra will succeed because it's building the **universal automation infrastructur
 - **Enterprise-grade foundation** ready for mission-critical operations across industries
 
 **Hedera's Strategic Advantage:**
-Unlike chain-specific tools, Zyra will **bridge ecosystems**, bringing users from Web2, Ethereum, Solana, and other chains **into Hedera** when Hedera offers the best solution for their specific use case (enterprise features, low fees, sustainability, governance).
+Unlike chain-specific tools, Zzyra will **bridge ecosystems**, bringing users from Web2, Ethereum, Solana, and other chains **into Hedera** when Hedera offers the best solution for their specific use case (enterprise features, low fees, sustainability, governance).
 
 **Market Validation:**
 
@@ -68,7 +68,7 @@ Our team understands that the future is multi-chain and multi-service. By buildi
 
 ## **About Your Solution: Hedera's Gateway to Universal Automation**
 
-Zyra will transform how users interact with Hedera by making it part of a **universal automation ecosystem** where Hedera competes based on its unique advantages.
+Zzyra will transform how users interact with Hedera by making it part of a **universal automation ecosystem** where Hedera competes based on its unique advantages.
 
 **1. Cross-Ecosystem Bridge to Hedera**
 Our platform brings users from **every digital ecosystem** into contact with Hedera:
@@ -86,7 +86,7 @@ Generic block architecture enables unlimited Hedera-specific automation:
 - **Custom Hedera Blocks**: Community-created blocks for specific protocols and use cases
 
 **3. Competitive Advantage Through Choice**
-Unlike single-chain platforms, Zyra lets users **choose the best tool for each job**:
+Unlike single-chain platforms, Zzyra lets users **choose the best tool for each job**:
 
 - "Use Ethereum for DeFi liquidity, Hedera for payments, and AWS for notifications"
 - Users naturally migrate to Hedera when it offers superior solutions
@@ -167,7 +167,7 @@ Unlike single-chain platforms, Zyra lets users **choose the best tool for each j
 - Most tools force users into single-ecosystem thinking
 - **Gap**: No platform positions blockchains as competing automation tools
 
-**Zyra's Unique Position:**
+**Zzyra's Unique Position:**
 
 - ✅ **Only universal platform** where Hedera competes alongside all digital services
 - ✅ **AI-powered workflow generation** creating cross-ecosystem automation
@@ -215,8 +215,8 @@ $200,000
 
 ---
 
-**Confirmation:** ✅ I confirm that I am permitted to act on behalf of Zyra and am submitting this application of my own volition and initiative.
+**Confirmation:** ✅ I confirm that I am permitted to act on behalf of Zzyra and am submitting this application of my own volition and initiative.
 
 ---
 
-This application positions Zyra as the **universal automation platform** that brings users from across the digital ecosystem to discover Hedera's unique advantages, creating a much larger addressable market and sustainable competitive positioning for Hedera within the broader automation landscape.
+This application positions Zzyra as the **universal automation platform** that brings users from across the digital ecosystem to discover Hedera's unique advantages, creating a much larger addressable market and sustainable competitive positioning for Hedera within the broader automation landscape.

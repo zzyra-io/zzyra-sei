@@ -49,7 +49,7 @@ export function DashboardHeader() {
         <div className='flex items-center'>
           <Link href='/dashboard' className='flex items-center'>
             <Logo className='h-8 w-8' />
-            <span className='ml-2 text-xl font-bold'>Zyra</span>
+            <span className='ml-2 text-xl font-bold'>Zzyra</span>
           </Link>
         </div>
 
@@ -120,7 +120,7 @@ export function DashboardHeader() {
                   className='flex items-center'
                   onClick={() => setIsMobileMenuOpen(false)}>
                   <Logo className='h-6 w-6' />
-                  <span className='ml-2 text-lg font-bold'>Zyra</span>
+                  <span className='ml-2 text-lg font-bold'>Zzyra</span>
                 </Link>
                 <Button
                   variant='ghost'

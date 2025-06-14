@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `@zyra/wallet` library provides a unified wallet management solution for the Zyra platform, enabling blockchain interactions across both UI (browser) and worker (Node.js) environments. It offers Magic Link integration for a passwordless wallet experience, supports multiple blockchain networks, and ensures secure key management.
+The `@zyra/wallet` library provides a unified wallet management solution for the Zzyra platform, enabling blockchain interactions across both UI (browser) and worker (Node.js) environments. It offers Magic Link integration for a passwordless wallet experience, supports multiple blockchain networks, and ensures secure key management.
 
 ## Table of Contents
 
@@ -23,7 +23,7 @@ The `@zyra/wallet` library provides a unified wallet management solution for the
 - **Enterprise-Grade Security**: Delegated key management with no client-side key storage
 - **Persistent Identification**: Maintains consistent wallet identity across sessions and devices
 - **Transaction Management**: Streamlined sending and signing of blockchain transactions
-- **db Integration**: First-class support for Zyra's database infrastructure
+- **db Integration**: First-class support for Zzyra's database infrastructure
 - **Comprehensive TypeScript Support**: Full type definitions for improved developer experience
 
 ## Supported Chains
@@ -40,7 +40,7 @@ The `@zyra/wallet` library provides a unified wallet management solution for the
 
 ## Architecture
 
-The `@zyra/wallet` package is designed as a shared library that can be used by both the UI (Next.js) and worker (NestJS) components of the Zyra platform:
+The `@zyra/wallet` package is designed as a shared library that can be used by both the UI (Next.js) and worker (NestJS) components of the Zzyra platform:
 
 ```
 @zyra/wallet/
@@ -237,12 +237,12 @@ Before production use:
 
 ### New User Onboarding
 
-1. User signs up for Zyra account with email
+1. User signs up for Zzyra account with email
 2. User clicks "Connect Wallet" in dashboard
 3. User selects "Magic Wallet" option
 4. User receives Magic Link email
 5. Upon clicking link, user is authenticated and wallet is created
-6. User's wallet is now accessible across all Zyra features
+6. User's wallet is now accessible across all Zzyra features
 
 ### Cross-Chain Asset Management
 
@@ -255,7 +255,7 @@ Before production use:
 
 ### Transaction Execution in Workflows
 
-1. User creates workflow in Zyra builder
+1. User creates workflow in Zzyra builder
 2. User adds blockchain transaction node to workflow
 3. User configures transaction parameters
 4. When workflow executes:
@@ -265,7 +265,7 @@ Before production use:
 
 ### Enterprise Multi-User Wallet Access
 
-1. Admin creates organization in Zyra
+1. Admin creates organization in Zzyra
 2. Admin invites team members with specific roles
 3. Admin configures spending limits and approval thresholds
 4. Team members use their own Magic Link authentication
@@ -274,4 +274,4 @@ Before production use:
 
 ---
 
-_This documentation is considered confidential and proprietary to Zyra._
+_This documentation is considered confidential and proprietary to Zzyra._

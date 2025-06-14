@@ -1,6 +1,6 @@
 # DeFi Portfolio Management on Base Sepolia
 
-This guide explains how to use Zyra's DeFi portfolio management workflow on Base Sepolia.
+This guide explains how to use Zzyra's DeFi portfolio management workflow on Base Sepolia.
 
 ## Overview
 
