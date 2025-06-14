@@ -66,20 +66,18 @@ export class WorkflowsService {
     const workflow = await this.workflowRepository.create({
       name: createWorkflowDto.name,
       description: createWorkflowDto.description,
-      nodes: createWorkflowDto.nodes,
-      edges: createWorkflowDto.edges,
-      userId,
+      nodes: createWorkflowDto.nodes as any, // Type assertion for JSON compatibility
+      edges: createWorkflowDto.edges as any, // Type assertion for JSON compatibility
+      user: { connect: { id: userId } }, // Connect to user by ID instead of using userId directly
     });
 
     return {
       id: workflow.id,
       name: workflow.name,
-      description: workflow.description,
+      description: workflow.description || undefined,
       nodes: workflow.nodes as Record<string, unknown>[],
       edges: workflow.edges as Record<string, unknown>[],
       userId: workflow.userId,
-      createdAt: workflow.createdAt,
-      updatedAt: workflow.updatedAt,
     };
   }
 
@@ -90,19 +88,17 @@ export class WorkflowsService {
     const workflow = await this.workflowRepository.update(id, {
       name: updateWorkflowDto.name,
       description: updateWorkflowDto.description,
-      nodes: updateWorkflowDto.nodes,
-      edges: updateWorkflowDto.edges,
+      nodes: updateWorkflowDto.nodes as any, // Type assertion for JSON compatibility
+      edges: updateWorkflowDto.edges as any, // Type assertion for JSON compatibility
     });
 
     return {
       id: workflow.id,
       name: workflow.name,
-      description: workflow.description,
+      description: workflow.description || undefined,
       nodes: workflow.nodes as Record<string, unknown>[],
       edges: workflow.edges as Record<string, unknown>[],
       userId: workflow.userId,
-      createdAt: workflow.createdAt,
-      updatedAt: workflow.updatedAt,
     };
   }
 

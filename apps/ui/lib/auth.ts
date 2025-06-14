@@ -3,6 +3,16 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { jwtDecode } from "jwt-decode";
+import axios from "axios";
+
+// Configure axios instance for auth
+const authApi = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002/api",
+  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -72,21 +82,13 @@ export const authOptions: NextAuthOptions = {
           const now = Math.floor(Date.now() / 1000);
           if (decoded.exp < now && token.refreshToken) {
             try {
-              const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/refresh-token`,
-                {
-                  method: "POST",
-                  body: JSON.stringify({ refreshToken: token.refreshToken }),
-                  headers: { "Content-Type": "application/json" },
-                }
-              );
+              const response = await authApi.post("/auth/refresh-token", {
+                refreshToken: token.refreshToken,
+              });
 
-              if (!response.ok) throw new Error("Failed to refresh token");
+              const refreshedTokens = response.data;
 
-              const { accessToken, refreshToken: newRefreshToken } =
-                await response.json();
-
-              cookieStore.set("token", accessToken, {
+              cookieStore.set("token", refreshedTokens.accessToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production",
                 sameSite: "strict",
@@ -94,20 +96,20 @@ export const authOptions: NextAuthOptions = {
                 path: "/",
               });
 
-              if (newRefreshToken) {
-                cookieStore.set("refresh_token", newRefreshToken, {
+              if (refreshedTokens.refreshToken) {
+                cookieStore.set("refresh_token", refreshedTokens.refreshToken, {
                   httpOnly: true,
                   secure: process.env.NODE_ENV === "production",
                   sameSite: "strict",
                   maxAge: 60 * 60 * 24 * 7,
                   path: "/",
                 });
-                token.refreshToken = newRefreshToken;
+                token.refreshToken = refreshedTokens.refreshToken;
               }
 
-              token.accessToken = accessToken;
+              token.accessToken = refreshedTokens.accessToken;
               const newDecoded = jwtDecode<{ userId: string; email: string }>(
-                accessToken
+                refreshedTokens.accessToken
               );
               token.sub = newDecoded.userId;
               token.email = newDecoded.email;

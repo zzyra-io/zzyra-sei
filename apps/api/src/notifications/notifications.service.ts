@@ -29,7 +29,7 @@ export class NotificationsService {
       type: string;
       data?: any;
     }
-  ) {
+  ): Promise<any> {
     return this.notificationRepository.createForUser(userId, {
       title: data.title,
       message: data.message,
@@ -51,7 +51,7 @@ export class NotificationsService {
       title: string;
       message: string;
     }
-  ) {
+  ): Promise<{ success: boolean; notification: any }> {
     // Create test notification
     const notification = await this.createNotification(userId, data);
 

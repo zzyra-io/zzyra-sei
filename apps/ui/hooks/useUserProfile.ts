@@ -1,5 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
-import { useMagicAuth } from '@/lib/hooks/use-magic-auth';
+import { useQuery } from "@tanstack/react-query";
+import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
+import axios from "axios";
+
+// Configure axios instance
+const userApi = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002/api",
+  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
 export interface UserProfile {
   id: string;
@@ -29,19 +39,23 @@ export const useUserProfile = () => {
     error,
     refetch,
   } = useQuery<UserProfile>({
-    queryKey: ['userProfile', user?.issuer],
+    queryKey: ["userProfile", user?.issuer],
     queryFn: async () => {
       if (!isAuthenticated || !user?.issuer) {
-        throw new Error('User not authenticated');
+        throw new Error("User not authenticated");
       }
 
-      const response = await fetch('/api/user/profile');
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch user profile');
+      try {
+        const response = await userApi.get("/user/profile");
+        return response.data;
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          throw new Error(
+            error.response?.data?.message || "Failed to fetch user profile"
+          );
+        }
+        throw new Error("Failed to fetch user profile");
       }
-
-      return response.json();
     },
     enabled: !!isAuthenticated && !!user?.issuer,
     staleTime: 5 * 60 * 1000, // 5 minutes

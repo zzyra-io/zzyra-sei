@@ -348,4 +348,17 @@ export class WalletRepository extends BaseRepository<
     // For now, return a placeholder
     return "0";
   }
+
+  /**
+   * Alias for findTransactionsByUserId for backward compatibility
+   * @param userId The user ID
+   * @param limit The maximum number of transactions to return
+   * @returns An array of transactions
+   */
+  async getTransactions(
+    userId: string,
+    limit = 10
+  ): Promise<WalletTransaction[]> {
+    return this.findTransactionsByUserId(userId, limit);
+  }
 }

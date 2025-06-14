@@ -2,12 +2,13 @@ import {
   Controller,
   Get,
   Post,
-  Put,
   Delete,
   Body,
   Param,
   Query,
   Request,
+  HttpException,
+  HttpStatus,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -16,6 +17,7 @@ import {
   ApiBearerAuth,
 } from "@nestjs/swagger";
 import { BlocksService, BlockType, CustomBlock } from "./blocks.service";
+import { Public } from "../auth/decorators/public.decorator";
 
 @ApiTags("blocks")
 @Controller()
@@ -23,110 +25,113 @@ import { BlocksService, BlockType, CustomBlock } from "./blocks.service";
 export class BlocksController {
   constructor(private readonly blocksService: BlocksService) {}
 
+  @Public()
   @Get("block-types")
-  @ApiOperation({ summary: "Get available block types" })
-  @ApiResponse({
-    status: 200,
-    description: "Returns available block types",
-  })
-  async getBlockTypes(): Promise<BlockType[]> {
-    return this.blocksService.getBlockTypes();
+  @ApiOperation({ summary: "Get all available block types" })
+  async getBlockTypes() {
+    try {
+      return this.blocksService.getBlockTypes();
+    } catch (error) {
+      console.error("Error in block-types API:", error);
+      throw new HttpException(
+        "Internal server error",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
+  @Public()
   @Get("block-schema")
-  @ApiOperation({ summary: "Get block schema" })
-  @ApiResponse({
-    status: 200,
-    description: "Returns block schema",
-  })
-  async getBlockSchema(@Query("blockType") blockType: string) {
-    return this.blocksService.getBlockSchema(blockType);
+  @ApiOperation({ summary: "Get block schema for a specific type" })
+  async getBlockSchema(@Query("type") type?: string) {
+    try {
+      return this.blocksService.getBlockSchema(type);
+    } catch (error) {
+      console.error("Error in block-schema API:", error);
+      throw new HttpException(
+        "Internal server error",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Get("custom-blocks")
   @ApiOperation({ summary: "Get custom blocks" })
-  @ApiResponse({
-    status: 200,
-    description: "Returns custom blocks",
-  })
   async getCustomBlocks(
-    @Request() req: { user?: { id: string } }
-  ): Promise<CustomBlock[]> {
-    const userId = req.user?.id;
-    return this.blocksService.getCustomBlocks(userId);
+    @Query("is_public") isPublic?: string,
+    @Query("category") category?: string,
+    @Request() req?: any
+  ) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED);
+      }
+
+      return this.blocksService.getCustomBlocks(userId, isPublic, category);
+    } catch (error) {
+      console.error("Error fetching custom blocks:", error);
+      throw new HttpException(
+        "Failed to fetch custom blocks",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Get("custom-blocks/:id")
   @ApiOperation({ summary: "Get custom block by ID" })
-  @ApiResponse({
-    status: 200,
-    description: "Returns custom block",
-  })
-  async getCustomBlock(
-    @Param("id") id: string,
-    @Request() req: { user?: { id: string } }
-  ): Promise<CustomBlock | null> {
-    const userId = req.user?.id;
-    return this.blocksService.getCustomBlock(id, userId);
+  async getCustomBlock(@Param("id") id: string, @Request() req: any) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED);
+      }
+
+      return this.blocksService.getCustomBlock(id, userId);
+    } catch (error) {
+      console.error("Error fetching custom block:", error);
+      throw new HttpException(
+        "Failed to fetch custom block",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Post("custom-blocks")
   @ApiOperation({ summary: "Create custom block" })
-  @ApiResponse({
-    status: 201,
-    description: "Custom block created successfully",
-  })
-  async createCustomBlock(
-    @Request() req: { user?: { id: string } },
-    @Body()
-    data: {
-      name: string;
-      description?: string;
-      code: string;
-      inputs: any[];
-      outputs: any[];
-      isPublic?: boolean;
-    }
-  ): Promise<CustomBlock> {
-    const userId = req.user?.id || "user1";
-    return this.blocksService.createCustomBlock(userId, data);
-  }
+  async createCustomBlock(@Body() data: any, @Request() req: any) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED);
+      }
 
-  @Put("custom-blocks/:id")
-  @ApiOperation({ summary: "Update custom block" })
-  @ApiResponse({
-    status: 200,
-    description: "Custom block updated successfully",
-  })
-  async updateCustomBlock(
-    @Param("id") id: string,
-    @Request() req: { user?: { id: string } },
-    @Body()
-    data: {
-      name?: string;
-      description?: string;
-      code?: string;
-      inputs?: any[];
-      outputs?: any[];
-      isPublic?: boolean;
+      return this.blocksService.createCustomBlock(userId, data);
+    } catch (error) {
+      console.error("Error creating custom block:", error);
+      throw new HttpException(
+        "Failed to create custom block",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
-  ): Promise<CustomBlock | null> {
-    const userId = req.user?.id || "user1";
-    return this.blocksService.updateCustomBlock(id, userId, data);
   }
 
   @Delete("custom-blocks/:id")
   @ApiOperation({ summary: "Delete custom block" })
-  @ApiResponse({
-    status: 200,
-    description: "Custom block deleted successfully",
-  })
-  async deleteCustomBlock(
-    @Param("id") id: string,
-    @Request() req: { user?: { id: string } }
-  ): Promise<{ success: boolean }> {
-    const userId = req.user?.id || "user1";
-    const success = await this.blocksService.deleteCustomBlock(id, userId);
-    return { success };
+  async deleteCustomBlock(@Param("id") id: string, @Request() req: any) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED);
+      }
+
+      return this.blocksService.deleteCustomBlock(id, userId);
+    } catch (error) {
+      console.error("Error deleting custom block:", error);
+      throw new HttpException(
+        "Failed to delete custom block",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 }

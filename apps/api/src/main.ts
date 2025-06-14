@@ -1,16 +1,19 @@
 import { NestFactory } from "@nestjs/core";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { ValidationPipe } from "@nestjs/common";
+import * as cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Enable cookie parser for authentication
+  app.use(cookieParser());
+
   // Enable CORS for frontend integration
   app.enableCors({
     origin: [
       "http://localhost:3000",
-      "http://localhost:3001",
       process.env.FRONTEND_URL || "http://localhost:3000",
     ],
     credentials: true,
@@ -34,6 +37,7 @@ async function bootstrap() {
     .setDescription("API for Zyra workflow automation platform")
     .setVersion("1.0")
     .addBearerAuth()
+    .setVersion("1.0.0")
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api/docs", app, document);

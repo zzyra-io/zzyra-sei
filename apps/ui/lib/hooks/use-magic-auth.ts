@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { OAuthProvider } from "@magic-ext/oauth2";
 import { useMagic } from "../magic-provider";
+import api from "../services/api";
 
 export type LoginResponse = {
   success: boolean;
@@ -28,36 +29,32 @@ export const useMagicAuth = () => {
         throw new Error("Magic SDK not initialized");
       }
 
-      // Step 1: Authenticate with Magic
-      await magicInstance.auth.loginWithMagicLink({
-        email,
-        showUI: true,
-      });
+      try {
+        // Step 1: Authenticate with Magic
+        await magicInstance.auth.loginWithMagicLink({
+          email,
+          showUI: true,
+        });
 
-      // Step 2: Generate a DID token for backend auth
-      const didToken = await magicInstance.user.generateIdToken();
+        // Step 2: Generate a DID token for backend auth
+        const didToken = await magicInstance.user.generateIdToken();
 
-      // Step 3: Authenticate with backend
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, didToken }),
-      });
+        // Step 3: Authenticate with backend using axios
+        const response = await api.post("/auth/login", {
+          email,
+          didToken,
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || "Failed to authenticate with backend"
-        );
+        // Step 4: Get user metadata
+        const userMetadata = await magicInstance.user.getInfo();
+
+        queryClient.setQueryData(["user"], userMetadata);
+
+        return { success: true, user: userMetadata, ...response.data };
+      } catch (error) {
+        console.error("Login error:", error);
+        throw error;
       }
-
-      // Step 4: Get user metadata
-      const userMetadata = await magicInstance.user.getInfo();
-
-      queryClient.setQueryData(["user"], userMetadata);
-
-      return { success: true, user: userMetadata };
     },
   });
 
@@ -88,24 +85,12 @@ export const useMagicAuth = () => {
         // Step 2: Get user metadata
         const userMetadata = await magicInstance.user.getInfo();
 
-        // Step 3: Authenticate with backend
-        const response = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            phoneNumber,
-            email: userMetadata?.email,
-            didToken,
-          }),
+        // Step 3: Authenticate with backend using axios
+        const response = await api.post("/auth/login", {
+          phoneNumber,
+          email: userMetadata?.email,
+          didToken,
         });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error || "Failed to authenticate with backend"
-          );
-        }
 
         return { success: true, user: userMetadata };
       } catch (error) {
@@ -138,7 +123,7 @@ export const useMagicAuth = () => {
       }
 
       // Redirect to OAuth provider
-      await magicInstance.oauth2.loginWithRedirect({
+      await magicInstance.oauth.loginWithRedirect({
         provider,
         redirectURI:
           "https://auth.magic.link/v1/oauth2/2RZJeTIaH2Q7lLWycJ3PZ5WjAM53Q4rL7VZlfxSxlRo=/callback",
@@ -160,7 +145,7 @@ export const useMagicAuth = () => {
 
       try {
         // Step 1: Handle the callback from the OAuth provider
-        const result = await magicInstance.oauth2.getRedirectResult({});
+        const result = await magicInstance.oauth.getRedirectResult({});
 
         // Step 2: Get provider and user info
         const provider =
@@ -183,25 +168,14 @@ export const useMagicAuth = () => {
           throw new Error("Failed to generate DID token");
         }
 
-        // Step 5: Authenticate with backend
-        const response = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: userMetadata.email,
-            didToken,
-            isOAuth: true,
-            oauthProvider: provider,
-            oauthUserInfo: userInfo,
-          }),
+        // Step 5: Authenticate with backend using axios
+        const response = await api.post("/auth/login", {
+          email: userMetadata.email,
+          didToken,
+          isOAuth: true,
+          oauthProvider: provider,
+          oauthUserInfo: userInfo,
         });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            errorData.error || "Failed to authenticate with backend"
-          );
-        }
 
         return { success: true, userMetadata };
       } catch (error) {
@@ -224,11 +198,8 @@ export const useMagicAuth = () => {
         // Step 1: Log out from Magic
         await magicInstance.user.logout();
 
-        // Step 2: Log out from backend
-        await fetch("/api/auth/logout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        });
+        // Step 2: Log out from backend using axios
+        await api.post("/auth/logout");
       } catch (error) {
         throw error instanceof Error ? error : new Error("Logout failed");
       }

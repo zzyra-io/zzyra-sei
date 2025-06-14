@@ -3,7 +3,7 @@ import { prisma } from "@zyra/database";
 
 @Injectable()
 export class PrismaService implements OnModuleInit {
-  public client = prisma;
+  public client: typeof prisma = prisma;
 
   async onModuleInit() {
     // Connect to the database when the module initializes

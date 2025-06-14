@@ -1,7 +1,7 @@
 /**
  * API service for communicating with the backend
  */
-import axios from 'axios';
+import axios from "axios";
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -39,14 +39,49 @@ export interface NodeLog {
   metadata?: any;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+// Use the NestJS API URL instead of Next.js API routes
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true, // Important: This ensures cookies are sent with requests
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
+
+// Request interceptor to add auth headers if needed
+api.interceptors.request.use(
+  (config) => {
+    // The auth will be handled via cookies, but we can add bearer token if needed
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("auth_token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor to handle auth errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Handle unauthorized errors
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_token");
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const executionsApi = {
   /**
@@ -56,9 +91,9 @@ export const executionsApi = {
     workflowId: string,
     limit = 10,
     offset = 0,
-    status = 'all',
-    sortKey = 'started_at',
-    sortOrder = 'desc'
+    status = "all",
+    sortKey = "started_at",
+    sortOrder = "desc"
   ): Promise<PaginatedResponse<WorkflowExecution>> {
     const params = new URLSearchParams({
       workflowId,
@@ -77,7 +112,9 @@ export const executionsApi = {
    * Get node executions for a workflow execution
    */
   async getNodeExecutions(executionId: string): Promise<NodeExecution[]> {
-    const response = await api.get(`/executions/nodes?executionId=${executionId}`);
+    const response = await api.get(
+      `/executions/nodes?executionId=${executionId}`
+    );
     return response.data.nodes;
   },
 
@@ -85,7 +122,9 @@ export const executionsApi = {
    * Get logs for a node execution
    */
   async getNodeLogs(nodeExecutionId: string): Promise<NodeLog[]> {
-    const response = await api.get(`/executions/node-logs?nodeExecutionId=${nodeExecutionId}`);
+    const response = await api.get(
+      `/executions/node-logs?nodeExecutionId=${nodeExecutionId}`
+    );
     return response.data.logs;
   },
 
@@ -124,58 +163,108 @@ export const workflowsApi = {
     const response = await api.get(`/workflows?page=${page}&limit=${limit}`);
     return response.data;
   },
-  
+
   async getWorkflow(id: string): Promise<any> {
     const response = await api.get(`/workflows/${id}`);
     return response.data;
   },
-  
+
   async createWorkflow(data: any): Promise<any> {
-    const response = await api.post('/workflows', data);
+    const response = await api.post("/workflows", data);
     return response.data;
   },
-  
+
   async updateWorkflow(id: string, data: any): Promise<any> {
     const response = await api.put(`/workflows/${id}`, data);
     return response.data;
   },
-  
+
   async deleteWorkflow(id: string): Promise<void> {
     await api.delete(`/workflows/${id}`);
   },
-  
-  async executeWorkflow(workflowId: string): Promise<{executionId: string}> {
-    const response = await api.post('/executions', { workflowId });
+
+  async executeWorkflow(workflowId: string): Promise<{ executionId: string }> {
+    const response = await api.post("/executions", { workflowId });
     return response.data;
-  }
+  },
 };
 
 export const authApi = {
   async login(credentials: any): Promise<any> {
-    const response = await api.post('/auth/login', credentials);
+    const response = await api.post("/auth/login", credentials);
     return response.data;
   },
-  
+
   async logout(): Promise<void> {
-    await api.post('/auth/logout');
+    await api.post("/auth/logout");
   },
-  
+
   async getProfile(): Promise<any> {
-    const response = await api.get('/user/profile');
+    const response = await api.get("/user/profile");
     return response.data;
-  }
+  },
 };
 
 export const usageApi = {
   async getUsage(): Promise<any> {
-    const response = await api.get('/usage');
+    const response = await api.get("/usage");
     return response.data;
   },
-  
+
   async getUserUsage(): Promise<any> {
-    const response = await api.get('/user/usage');
+    const response = await api.get("/user/usage");
     return response.data;
-  }
+  },
+};
+
+export const userApi = {
+  async getProfile(): Promise<any> {
+    const response = await api.get("/user/profile");
+    return response.data;
+  },
+
+  async updateProfile(data: any): Promise<any> {
+    const response = await api.put("/user/profile", data);
+    return response.data;
+  },
+
+  async getUsage(): Promise<any> {
+    const response = await api.get("/user/usage");
+    return response.data;
+  },
+};
+
+export const blockApi = {
+  async getBlockTypes(): Promise<any> {
+    const response = await api.get("/block-types");
+    return response.data;
+  },
+
+  async getBlockSchema(type?: string): Promise<any> {
+    const url = type ? `/block-schema?type=${type}` : "/block-schema";
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async getCustomBlocks(params?: any): Promise<any> {
+    const response = await api.get("/custom-blocks", { params });
+    return response.data;
+  },
+
+  async createCustomBlock(data: any): Promise<any> {
+    const response = await api.post("/custom-blocks", data);
+    return response.data;
+  },
+
+  async getCustomBlock(id: string): Promise<any> {
+    const response = await api.get(`/custom-blocks/${id}`);
+    return response.data;
+  },
+
+  async deleteCustomBlock(id: string): Promise<any> {
+    const response = await api.delete(`/custom-blocks/${id}`);
+    return response.data;
+  },
 };
 
 export default api;

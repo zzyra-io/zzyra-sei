@@ -181,4 +181,53 @@ export class UserRepository extends BaseRepository<
       },
     });
   }
+
+  /**
+   * Get user profile by user ID
+   * @param userId The user ID
+   * @returns The user profile or null
+   */
+  async getProfile(userId: string): Promise<Profile | null> {
+    return this.prisma.profile.findUnique({
+      where: { id: userId },
+    });
+  }
+
+  /**
+   * Get user usage statistics
+   * @param userId The user ID
+   * @returns The user usage data
+   */
+  async getUsage(userId: string): Promise<any> {
+    // Get workflow execution count
+    const executionCount = await this.prisma.workflowExecution.count({
+      where: { userId },
+    });
+
+    // Get workflow count
+    const workflowCount = await this.prisma.workflow.count({
+      where: { userId },
+    });
+
+    // Get current month usage
+    const currentMonth = new Date();
+    currentMonth.setDate(1);
+    currentMonth.setHours(0, 0, 0, 0);
+
+    const monthlyExecutions = await this.prisma.workflowExecution.count({
+      where: {
+        userId,
+        createdAt: {
+          gte: currentMonth,
+        },
+      },
+    });
+
+    return {
+      totalExecutions: executionCount,
+      totalWorkflows: workflowCount,
+      monthlyExecutions,
+      monthlyLimit: 1000, // Default limit, could be from profile
+    };
+  }
 }

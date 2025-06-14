@@ -3,17 +3,8 @@ import { Injectable } from "@nestjs/common";
 export interface BlockType {
   id: string;
   name: string;
-  category: string;
   description: string;
-  inputs: Array<{
-    name: string;
-    type: string;
-    required: boolean;
-  }>;
-  outputs: Array<{
-    name: string;
-    type: string;
-  }>;
+  category: string;
 }
 
 export interface CustomBlock {
@@ -31,95 +22,74 @@ export interface CustomBlock {
 
 @Injectable()
 export class BlocksService {
-  // Mock data for now - in production this would come from database
-  private blockTypes: BlockType[] = [
-    {
-      id: "fetch",
-      name: "HTTP Request",
-      category: "communication",
-      description: "Make HTTP requests to external APIs",
-      inputs: [
-        { name: "url", type: "string", required: true },
-        { name: "method", type: "string", required: true },
-        { name: "headers", type: "object", required: false },
-        { name: "body", type: "any", required: false },
-      ],
-      outputs: [
-        { name: "response", type: "object" },
-        { name: "status", type: "number" },
-      ],
-    },
-    {
-      id: "transform",
-      name: "Data Transform",
-      category: "data",
-      description: "Transform data using JavaScript code",
-      inputs: [
-        { name: "data", type: "any", required: true },
-        { name: "code", type: "string", required: true },
-      ],
-      outputs: [{ name: "result", type: "any" }],
-    },
-    // Add more block types as needed
-  ];
-
   private customBlocks: CustomBlock[] = [];
 
   async getBlockTypes(): Promise<BlockType[]> {
-    return this.blockTypes;
-  }
-
-  async getBlockSchema(blockType: string) {
-    const block = this.blockTypes.find((b) => b.id === blockType);
-    if (!block) {
-      throw new Error(`Block type ${blockType} not found`);
+    try {
+      // For now, return a simple mock response
+      // This will be replaced with actual shared types later
+      return [
+        {
+          id: "HTTP_REQUEST",
+          name: "HTTP Request",
+          description: "Make HTTP requests to external APIs",
+          category: "action",
+        },
+        {
+          id: "EMAIL",
+          name: "Email",
+          description: "Send email notifications",
+          category: "action",
+        },
+      ];
+    } catch (error) {
+      console.error("Error in block-types service:", error);
+      throw new Error("Internal server error");
     }
-
-    return {
-      type: "object",
-      properties: {
-        inputs: {
-          type: "object",
-          properties: block.inputs.reduce((acc, input) => {
-            acc[input.name] = {
-              type: input.type,
-              description: `Input: ${input.name}`,
-            };
-            return acc;
-          }, {} as any),
-          required: block.inputs.filter((i) => i.required).map((i) => i.name),
-        },
-        outputs: {
-          type: "object",
-          properties: block.outputs.reduce((acc, output) => {
-            acc[output.name] = {
-              type: output.type,
-              description: `Output: ${output.name}`,
-            };
-            return acc;
-          }, {} as any),
-        },
-      },
-    };
   }
 
-  async getCustomBlocks(userId?: string): Promise<CustomBlock[]> {
-    if (userId) {
-      return this.customBlocks.filter(
+  async getBlockSchema(type?: string) {
+    try {
+      // For now, return a simple mock response
+      if (!type) {
+        return {
+          HTTP_REQUEST: { type: "object", properties: {} },
+          EMAIL: { type: "object", properties: {} },
+        };
+      }
+
+      // Return schema for specific block type
+      return { type: "object", properties: {} };
+    } catch (error) {
+      console.error("Error in block-schema service:", error);
+      throw error;
+    }
+  }
+
+  async getCustomBlocks(userId: string, isPublic?: string, category?: string) {
+    let filteredBlocks = this.customBlocks;
+
+    if (isPublic === "true") {
+      filteredBlocks = filteredBlocks.filter((block) => block.isPublic);
+    } else {
+      filteredBlocks = filteredBlocks.filter(
         (block) => block.userId === userId || block.isPublic
       );
     }
-    return this.customBlocks.filter((block) => block.isPublic);
+
+    return filteredBlocks.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }
 
   async getCustomBlock(
     id: string,
-    userId?: string
+    userId: string
   ): Promise<CustomBlock | null> {
     const block = this.customBlocks.find((b) => b.id === id);
     if (!block) return null;
 
-    // Check access permissions
     if (!block.isPublic && block.userId !== userId) {
       return null;
     }
@@ -127,17 +97,7 @@ export class BlocksService {
     return block;
   }
 
-  async createCustomBlock(
-    userId: string,
-    data: {
-      name: string;
-      description?: string;
-      code: string;
-      inputs: any[];
-      outputs: any[];
-      isPublic?: boolean;
-    }
-  ): Promise<CustomBlock> {
+  async createCustomBlock(userId: string, data: any): Promise<CustomBlock> {
     const customBlock: CustomBlock = {
       id: `custom_${Date.now()}`,
       userId,
@@ -155,40 +115,19 @@ export class BlocksService {
     return customBlock;
   }
 
-  async updateCustomBlock(
+  async deleteCustomBlock(
     id: string,
-    userId: string,
-    data: {
-      name?: string;
-      description?: string;
-      code?: string;
-      inputs?: any[];
-      outputs?: any[];
-      isPublic?: boolean;
+    userId: string
+  ): Promise<{ success: boolean }> {
+    const blockIndex = this.customBlocks.findIndex(
+      (b) => b.id === id && b.userId === userId
+    );
+
+    if (blockIndex === -1) {
+      throw new Error("Custom block not found or not owned by user");
     }
-  ): Promise<CustomBlock | null> {
-    const blockIndex = this.customBlocks.findIndex(
-      (b) => b.id === id && b.userId === userId
-    );
-    if (blockIndex === -1) return null;
-
-    const block = this.customBlocks[blockIndex];
-    this.customBlocks[blockIndex] = {
-      ...block,
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
-
-    return this.customBlocks[blockIndex];
-  }
-
-  async deleteCustomBlock(id: string, userId: string): Promise<boolean> {
-    const blockIndex = this.customBlocks.findIndex(
-      (b) => b.id === id && b.userId === userId
-    );
-    if (blockIndex === -1) return false;
 
     this.customBlocks.splice(blockIndex, 1);
-    return true;
+    return { success: true };
   }
 }

@@ -287,10 +287,7 @@ export class AppController {
     try {
       const updatedProfile = await this.userRepository.updateProfile(user.id, {
         fullName: body.full_name,
-        emailNotifications: body.email_notifications,
-        telegramHandle: body.telegram_handle,
-        discordWebhook: body.discord_webhook,
-        darkMode: body.dark_mode,
+        discordWebhookUrl: body.discord_webhook,
       });
 
       return updatedProfile;
@@ -320,7 +317,7 @@ export class AppController {
 
   @Get("user/wallets")
   @ApiOperation({ summary: "Get user wallets" })
-  async getUserWallets(@Request() req: any) {
+  async getUserWallets(@Request() req: any): Promise<any> {
     const user = await this.getUserFromSession(req);
 
     try {
@@ -346,7 +343,7 @@ export class AppController {
       metadata?: any;
     },
     @Request() req: any
-  ) {
+  ): Promise<any> {
     const user = await this.getUserFromSession(req);
 
     const { walletAddress, chainId, walletType, chainType, metadata } = body;
@@ -378,7 +375,7 @@ export class AppController {
           walletType,
           chainType,
           metadata: {
-            ...existingWallet.metadata,
+            ...((existingWallet.metadata as any) || {}),
             ...metadata,
             lastUpdated: new Date().toISOString(),
           },
@@ -476,10 +473,7 @@ export class AppController {
 
       const recentExecutions = await this.executionRepository.findByUserId(
         user.id,
-        {
-          startDate: oneWeekAgo,
-          endDate: now,
-        }
+        50
       );
 
       const workflows = await this.workflowRepository.findByUserId(user.id);
@@ -499,9 +493,9 @@ export class AppController {
       let completedWithDuration = 0;
 
       for (const exec of successfulExecutions) {
-        if (exec.completedAt && exec.startedAt) {
+        if (exec.finishedAt && exec.startedAt) {
           const duration =
-            new Date(exec.completedAt).getTime() -
+            new Date(exec.finishedAt).getTime() -
             new Date(exec.startedAt).getTime();
           totalDurationMs += duration;
           completedWithDuration++;
@@ -590,30 +584,29 @@ export class AppController {
 
     try {
       const createData = {
-        name: body.name || "New Workflow",
-        description: body.description || "",
-        nodes: body.nodes || [],
-        edges: body.edges || [],
+        name: body.name || "Untitled Workflow",
+        description: body.description || null,
+        nodes: (body.nodes as any) || [],
+        edges: (body.edges as any) || [],
         isPublic: body.is_public || false,
         tags: body.tags || [],
-        userId: user.id,
+        user: {
+          connect: { id: user.id },
+        },
       };
 
-      const newWorkflow = await this.workflowRepository.create(
-        createData,
-        user.id
-      );
+      const workflow = await this.workflowRepository.create(createData);
 
       // Map to frontend format
       return {
-        ...newWorkflow,
-        is_public: newWorkflow.isPublic,
-        user_id: newWorkflow.userId,
+        ...workflow,
+        is_public: workflow.isPublic,
+        user_id: workflow.userId,
         created_at:
-          newWorkflow.createdAt?.toISOString() || new Date().toISOString(),
+          workflow.createdAt?.toISOString() || new Date().toISOString(),
         updated_at:
-          newWorkflow.updatedAt?.toISOString() ||
-          newWorkflow.createdAt?.toISOString() ||
+          workflow.updatedAt?.toISOString() ||
+          workflow.createdAt?.toISOString() ||
           new Date().toISOString(),
       };
     } catch (error) {
@@ -666,7 +659,7 @@ export class AppController {
     @Param("id") id: string,
     @Body() body: any,
     @Request() req: any
-  ) {
+  ): Promise<any> {
     const user = await this.getUserFromSession(req);
 
     try {
@@ -716,17 +709,14 @@ export class AppController {
     @Query("sortKey") sortKey?: string,
     @Query("sortOrder") sortOrder?: string,
     @Request() req?: any
-  ) {
+  ): Promise<any> {
     const user = await this.getUserFromSession(req);
 
     try {
-      const executions = await this.executionRepository.findByUserId(user.id, {
-        limit,
-        offset,
-        status,
-        sortKey,
-        sortOrder,
-      });
+      const executions = await this.executionRepository.findByUserId(
+        user.id,
+        limit || 10
+      );
 
       return {
         data: executions,
@@ -752,11 +742,13 @@ export class AppController {
 
     try {
       const execution = await this.executionRepository.create({
-        workflowId: body.workflowId,
-        userId: user.id,
-        triggeredBy: user.id,
+        workflow: {
+          connect: { id: body.workflowId },
+        },
+        user: {
+          connect: { id: user.id },
+        },
         status: "pending",
-        startedAt: new Date(),
       });
 
       return { executionId: execution.id };
@@ -946,12 +938,12 @@ export class AppController {
       );
 
       return {
-        data: notifications,
+        data: notifications.data,
         pagination: {
-          total: notifications.length,
+          total: notifications.metadata.total,
           page: page || 1,
           limit: limit || 50,
-          pages: Math.ceil(notifications.length / (limit || 50)),
+          pages: Math.ceil(notifications.metadata.total / (limit || 50)),
         },
       };
     } catch (error) {

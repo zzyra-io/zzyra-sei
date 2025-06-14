@@ -50,7 +50,7 @@ export class NotificationsController {
   async testNotification(
     @Request() req: { user?: { id: string } },
     @Body() data: { type: string; title: string; message: string }
-  ) {
+  ): Promise<{ success: boolean; notification: any }> {
     const userId = req.user?.id || "user1";
     return this.notificationsService.testNotification(userId, data);
   }

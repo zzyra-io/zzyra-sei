@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
-import { Workflow } from '@prisma/client';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma.service";
+import { Workflow } from "@zyra/database";
 
 @Injectable()
 export class WorkflowRepository {
@@ -9,16 +9,16 @@ export class WorkflowRepository {
   async findAll(
     userId: string,
     page = 1,
-    limit = 10,
+    limit = 10
   ): Promise<{ data: Workflow[]; total: number; page: number; limit: number }> {
     const skip = (page - 1) * limit;
-    
+
     const [workflows, total] = await Promise.all([
       this.prisma.client.workflow.findMany({
         where: { userId },
         skip,
         take: limit,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updatedAt: "desc" },
       }),
       this.prisma.client.workflow.count({
         where: { userId },
@@ -36,6 +36,12 @@ export class WorkflowRepository {
   async findById(id: string): Promise<Workflow | null> {
     return this.prisma.client.workflow.findUnique({
       where: { id },
+    });
+  }
+
+  async findByUserId(userId: string): Promise<Workflow[]> {
+    return this.prisma.client.workflow.findMany({
+      where: { userId },
     });
   }
 
@@ -64,7 +70,7 @@ export class WorkflowRepository {
       description: string;
       nodes: Record<string, unknown>[];
       edges: Record<string, unknown>[];
-    }>,
+    }>
   ): Promise<Workflow> {
     return this.prisma.client.workflow.update({
       where: { id },

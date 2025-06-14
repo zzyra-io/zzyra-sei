@@ -30,24 +30,22 @@ export class ExecutionsController {
     @Query('status') status = 'all',
     @Query('sortKey') sortKey = 'started_at',
     @Query('sortOrder') sortOrder = 'desc',
-  ) {
+  ): Promise<{ executions: any[]; total: number }> {
     try {
+      // Adjust parameters to match the service method signature
       const executions = await this.executionsService.findAll(
         workflowId,
-        +limit,
-        +offset,
-        status,
-        sortKey,
-        sortOrder,
+        +limit
       );
       
       return {
         executions,
         total: executions.length, // In a real implementation, you'd have a separate count query
       };
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new HttpException(
-        `Failed to get workflow executions: ${error.message}`,
+        `Failed to get workflow executions: ${errorMessage}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -57,12 +55,13 @@ export class ExecutionsController {
   @ApiOperation({ summary: 'Get node executions for a workflow execution' })
   @ApiQuery({ name: 'executionId', required: true, description: 'ID of the workflow execution' })
   @ApiResponse({ status: 200, description: 'Returns node executions', type: [NodeExecutionDto] })
-  async getNodeExecutions(@Query('executionId') executionId: string) {
+  async getNodeExecutions(@Query('executionId') executionId: string): Promise<any[]> {
     try {
       return await this.nodeExecutionsService.findByExecutionId(executionId);
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new HttpException(
-        `Failed to get node executions: ${error.message}`,
+        `Failed to get node executions: ${errorMessage}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -72,12 +71,13 @@ export class ExecutionsController {
   @ApiOperation({ summary: 'Get logs for a node execution' })
   @ApiQuery({ name: 'nodeExecutionId', required: true, description: 'ID of the node execution' })
   @ApiResponse({ status: 200, description: 'Returns node logs', type: [NodeLogDto] })
-  async getNodeLogs(@Query('nodeExecutionId') nodeExecutionId: string) {
+  async getNodeLogs(@Query('nodeExecutionId') nodeExecutionId: string): Promise<any[]> {
     try {
       return await this.nodeLogsService.findByNodeExecutionId(nodeExecutionId);
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new HttpException(
-        `Failed to get node logs: ${error.message}`,
+        `Failed to get node logs: ${errorMessage}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -90,12 +90,13 @@ export class ExecutionsController {
   async retryExecution(
     @Param('id') id: string,
     @Body() actionDto: ExecutionActionDto,
-  ) {
+  ): Promise<any> {
     try {
       return await this.executionsService.retry(id, actionDto.nodeId);
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new HttpException(
-        `Failed to retry execution: ${error.message}`,
+        `Failed to retry execution: ${errorMessage}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -108,12 +109,13 @@ export class ExecutionsController {
   async cancelExecution(
     @Param('id') id: string,
     @Body() actionDto: ExecutionActionDto,
-  ) {
+  ): Promise<any> {
     try {
       return await this.executionsService.cancel(id, actionDto.nodeId);
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new HttpException(
-        `Failed to cancel execution: ${error.message}`,
+        `Failed to cancel execution: ${errorMessage}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -126,12 +128,13 @@ export class ExecutionsController {
   async pauseExecution(
     @Param('id') id: string,
     @Body() actionDto: ExecutionActionDto,
-  ) {
+  ): Promise<any> {
     try {
       return await this.executionsService.pause(id, actionDto.nodeId);
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new HttpException(
-        `Failed to pause execution: ${error.message}`,
+        `Failed to pause execution: ${errorMessage}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -144,12 +147,13 @@ export class ExecutionsController {
   async resumeExecution(
     @Param('id') id: string,
     @Body() actionDto: ExecutionActionDto,
-  ) {
+  ): Promise<any> {
     try {
       return await this.executionsService.resume(id, actionDto.nodeId);
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new HttpException(
-        `Failed to resume execution: ${error.message}`,
+        `Failed to resume execution: ${errorMessage}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

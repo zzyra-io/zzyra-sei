@@ -6,7 +6,7 @@ import { CreateExecutionDto, UpdateExecutionDto } from "./dto/execution.dto";
 export class ExecutionsService {
   constructor(private readonly executionRepository: ExecutionRepository) {}
 
-  async findAll(userId?: string, limit = 10) {
+  async findAll(userId?: string, limit = 10): Promise<any[]> {
     if (userId) {
       return this.executionRepository.findByUserId(userId, limit);
     }
@@ -29,7 +29,7 @@ export class ExecutionsService {
     return execution;
   }
 
-  async create(createExecutionDto: CreateExecutionDto, userId: string) {
+  async create(createExecutionDto: CreateExecutionDto, userId: string): Promise<any> {
     return this.executionRepository.createExecution(
       createExecutionDto.workflowId,
       userId,
@@ -42,7 +42,7 @@ export class ExecutionsService {
     id: string,
     updateExecutionDto: UpdateExecutionDto,
     userId?: string
-  ) {
+  ): Promise<any> {
     // Verify execution exists and user has access
     const execution = await this.findOne(id, userId);
 
@@ -54,25 +54,30 @@ export class ExecutionsService {
       );
     }
 
-    return this.executionRepository.update(id, updateExecutionDto);
+    // Convert the string status to the expected enum type
+    const updateData = {
+      ...updateExecutionDto,
+      status: updateExecutionDto.status as any // Type assertion to handle the enum conversion
+    };
+    return this.executionRepository.update(id, updateData);
   }
 
-  async cancel(id: string, userId?: string) {
+  async cancel(id: string, userId?: string): Promise<any> {
     await this.findOne(id, userId); // Verify access
     return this.executionRepository.updateStatus(id, "cancelled" as any);
   }
 
-  async pause(id: string, userId?: string) {
+  async pause(id: string, userId?: string): Promise<any> {
     await this.findOne(id, userId); // Verify access
     return this.executionRepository.updateStatus(id, "paused" as any);
   }
 
-  async resume(id: string, userId?: string) {
+  async resume(id: string, userId?: string): Promise<any> {
     await this.findOne(id, userId); // Verify access
     return this.executionRepository.updateStatus(id, "running" as any);
   }
 
-  async retry(id: string, userId?: string) {
+  async retry(id: string, userId?: string): Promise<any> {
     await this.findOne(id, userId); // Verify access
     return this.executionRepository.updateStatus(id, "pending" as any);
   }

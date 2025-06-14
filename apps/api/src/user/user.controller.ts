@@ -1,4 +1,12 @@
-import { Controller, Get, Put, Body, UseGuards, Request } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Put,
+  Body,
+  Request,
+  HttpException,
+  HttpStatus,
+} from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
@@ -25,12 +33,22 @@ export class UserController {
     description: "Returns user profile",
     type: ProfileResponseDto,
   })
-  async getProfile(
-    @Request() req: { user?: { id: string } }
-  ): Promise<ProfileResponseDto> {
-    // In production, this would come from JWT auth guard
-    const userId = req.user?.id || "user1";
-    return this.userService.getProfile(userId);
+  async getProfile(@Request() req: any) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED);
+      }
+
+      const profile = await this.userService.getProfile(userId);
+      return profile;
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      throw new HttpException(
+        "Failed to fetch user profile",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Put("profile")
@@ -41,12 +59,31 @@ export class UserController {
     type: ProfileResponseDto,
   })
   async updateProfile(
-    @Request() req: { user?: { id: string } },
-    @Body() updateData: UpdateProfileDto
-  ): Promise<ProfileResponseDto> {
-    // In production, this would come from JWT auth guard
-    const userId = req.user?.id || "user1";
-    return this.userService.updateProfile(userId, updateData);
+    @Body()
+    data: {
+      full_name?: string;
+      email_notifications?: boolean;
+      telegram_handle?: string;
+      discord_webhook?: string;
+      dark_mode?: boolean;
+    },
+    @Request() req: any
+  ) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED);
+      }
+
+      const profile = await this.userService.updateProfile(userId, data);
+      return profile;
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      throw new HttpException(
+        "Failed to update user profile",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Get("usage")
@@ -56,11 +93,21 @@ export class UserController {
     description: "Returns user usage data",
     type: UsageResponseDto,
   })
-  async getUsage(
-    @Request() req: { user?: { id: string } }
-  ): Promise<UsageResponseDto> {
-    // In production, this would come from JWT auth guard
-    const userId = req.user?.id || "user1";
-    return this.userService.getUsage(userId);
+  async getUsage(@Request() req: any) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED);
+      }
+
+      const usage = await this.userService.getUsage(userId);
+      return usage;
+    } catch (error) {
+      console.error("Error fetching usage data:", error);
+      throw new HttpException(
+        "Failed to fetch usage data",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 }
