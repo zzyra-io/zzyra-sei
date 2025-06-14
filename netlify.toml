@@ -1,8 +1,8 @@
 # Netlify configuration for Next.js app in turbo monorepo
 [build]
   command   = "pnpm install --frozen-lockfile && cd apps/ui && pnpm run build"
-  publish   = "apps/ui/.next"
-  functions = "apps/ui/.netlify/functions"
+  publish   = ".next"
+  functions = ".netlify/functions"
   ignore    = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/ui/"
 
 # Environment variables
