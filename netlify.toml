@@ -1,7 +1,7 @@
 # Netlify configuration for Next.js app
 [build]
   command   = "npm run build"
-  publish   = ".next"
+  publish   = "apps/ui/.next"
   functions = ".netlify/functions"
 
 [[plugins]]
