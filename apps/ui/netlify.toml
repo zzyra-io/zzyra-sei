@@ -2,9 +2,9 @@
 [build]
   base      = "/"
   command   = "pnpm install && pnpm run build --filter=zyra-web3-automation"
-  publish   = "apps/ui/.next"
-  functions = "apps/ui/.netlify/functions"
-  ignore    = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/ui/"
+  publish   = ".next"
+  functions = ".netlify/functions"
+  ignore    = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."
 
 # Environment variables
 [build.environment]
