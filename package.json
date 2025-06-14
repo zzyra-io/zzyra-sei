@@ -2,6 +2,9 @@
   "name": "zyra",
   "private": true,
   "packageManager": "pnpm@9.15.2",
+  "prisma": {
+    "schema": "packages/db/schema.prisma"
+  },
   "pnpm": {
     "overrides": {
       "jose": ">=4.15.5",
