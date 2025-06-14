@@ -1,7 +1,7 @@
 /**
  * Authentication Service
  *
- * This service provides authentication functionality for the Zyra platform.
+ * This service provides authentication functionality for the Zzyra platform.
  * It integrates with the JWT service, Magic service, and user repository to manage user authentication.
  */
 
@@ -28,11 +28,14 @@ export class AuthService {
     this.prisma = prismaClient || new PrismaClient();
     this.jwtService = new JwtService();
     this.userRepository = new UserRepository(prismaClient);
-    
+
     try {
       this.magicService = getMagicService();
     } catch (error) {
-      console.warn("Magic Service initialization failed, some auth features may be limited", error);
+      console.warn(
+        "Magic Service initialization failed, some auth features may be limited",
+        error
+      );
     }
   }
 
@@ -43,17 +46,14 @@ export class AuthService {
   async signOut(userId: string): Promise<void> {
     try {
       console.log(`AuthService: Signing out user with ID: ${userId}`);
-      
+
       // Invalidate all JWT tokens for this user
       await this.jwtService.invalidateAllTokens(userId);
-      
+
       console.log(`AuthService: User ${userId} signed out successfully`);
     } catch (error) {
       console.error(`AuthService: Failed to sign out user ${userId}:`, error);
-      throw new AuthError(
-        "Failed to sign out user",
-        "auth/logout-failed"
-      );
+      throw new AuthError("Failed to sign out user", "auth/logout-failed");
     }
   }
 
@@ -128,7 +128,7 @@ export class AuthService {
   async authenticateWithMagic(payload: MagicAuthPayload): Promise<AuthResult> {
     try {
       console.log("AuthService: Starting Magic authentication");
-      
+
       // Validate required parameters
       if (!payload.didToken) {
         console.error("DID token is missing");
@@ -137,7 +137,7 @@ export class AuthService {
           "auth/missing-token"
         );
       }
-      
+
       if (!payload.email) {
         console.error("Email is missing");
         throw new AuthError(
@@ -145,7 +145,7 @@ export class AuthService {
           "auth/missing-email"
         );
       }
-      
+
       // Verify DID token with Magic Admin SDK
       if (!this.magicService) {
         console.error("Magic service is not available");
@@ -154,7 +154,7 @@ export class AuthService {
           "auth/service-unavailable"
         );
       }
-      
+
       try {
         // Basic validation of DID token
         await this.magicService.validateToken(payload.didToken);
@@ -162,31 +162,33 @@ export class AuthService {
       } catch (validationError) {
         console.error("DID token validation failed:", validationError);
         throw new AuthError(
-          "Failed to validate Magic Link token", 
+          "Failed to validate Magic Link token",
           "auth/invalid-token"
         );
       }
-      
+
       // Use the email from the payload
       const email = payload.email;
       console.log("AuthService: Using email for authentication:", email);
-      
+
       // Detect if this is an OAuth login
       const isOAuth = payload.isOAuth === true;
       const oauthProvider = payload.oauthProvider || "unknown";
       const oauthUserInfo = payload.oauthUserInfo;
-      
+
       if (isOAuth) {
-        console.log(`AuthService: Processing OAuth login from provider: ${oauthProvider}`);
+        console.log(
+          `AuthService: Processing OAuth login from provider: ${oauthProvider}`
+        );
         if (oauthUserInfo) {
           console.log("OAuth user info available:", {
             name: oauthUserInfo.name,
             email: oauthUserInfo.email,
-            hasProfilePicture: !!oauthUserInfo.picture
+            hasProfilePicture: !!oauthUserInfo.picture,
           });
         }
       }
-      
+
       // Find user
       let user;
       try {
@@ -195,7 +197,7 @@ export class AuthService {
       } catch (dbError) {
         console.error("Error finding user:", dbError);
         throw new AuthError(
-          "Database error while looking up user", 
+          "Database error while looking up user",
           "auth/database-error"
         );
       }
@@ -206,7 +208,7 @@ export class AuthService {
         try {
           // Prepare user data - include OAuth info if available
           const userData: { email: string; authProvider?: string } = { email };
-          
+
           // Prepare profile data
           const profileData: any = {
             email,
@@ -215,86 +217,99 @@ export class AuthService {
             monthlyExecutionQuota: 100,
             monthlyExecutionCount: 0,
           };
-          
+
           // Enhance with OAuth information if available
           if (isOAuth && oauthUserInfo) {
             // Add OAuth provider information
             userData.authProvider = oauthProvider;
-            
+
             // Add name from OAuth if available
             if (oauthUserInfo.name) {
               profileData.name = oauthUserInfo.name;
             }
-            
+
             // Add profile picture from OAuth if available
             if (oauthUserInfo.picture) {
               profileData.avatarUrl = oauthUserInfo.picture;
             }
-            
-            console.log(`Creating new user with OAuth ${oauthProvider} data`, { 
+
+            console.log(`Creating new user with OAuth ${oauthProvider} data`, {
               provider: oauthProvider,
               hasName: !!profileData.name,
-              hasAvatar: !!profileData.avatarUrl
+              hasAvatar: !!profileData.avatarUrl,
             });
           }
-          
+
           user = await this.userRepository.createWithProfile(
             userData,
             profileData
           );
-          
+
           console.log("New user created:", user?.id);
         } catch (createError) {
           console.error("Error creating new user:", createError);
           throw new AuthError(
-            "Failed to create new user account", 
+            "Failed to create new user account",
             "auth/user-creation-failed"
           );
         }
       } else if (isOAuth && oauthUserInfo) {
         // User exists but might need profile updates from OAuth
         try {
-          console.log(`Updating existing user with OAuth data from ${oauthProvider}`);
-          
+          console.log(
+            `Updating existing user with OAuth data from ${oauthProvider}`
+          );
+
           // Get user profile
           const profile = await this.prisma.profile.findFirst({
-            where: { user: { id: user.id } }
+            where: { user: { id: user.id } },
           });
-          
+
           if (profile) {
             // Only update if fields are empty or missing
             const updates: { fullName?: string; avatarUrl?: string } = {};
-            
+
             // Add name if not set
-            if (oauthUserInfo.name && (!profile.fullName || profile.fullName === '')) {
+            if (
+              oauthUserInfo.name &&
+              (!profile.fullName || profile.fullName === "")
+            ) {
               updates.fullName = oauthUserInfo.name;
             }
-            
+
             // Add avatar if not set
-            if (oauthUserInfo.picture && (!profile.avatarUrl || profile.avatarUrl === '')) {
+            if (
+              oauthUserInfo.picture &&
+              (!profile.avatarUrl || profile.avatarUrl === "")
+            ) {
               updates.avatarUrl = oauthUserInfo.picture;
             }
-            
+
             // Apply updates if needed
             if (Object.keys(updates).length > 0) {
               await this.prisma.profile.update({
                 where: { id: profile.id },
-                data: updates
+                data: updates,
               });
-              console.log("Updated user profile with OAuth data", { fields: Object.keys(updates) });
+              console.log("Updated user profile with OAuth data", {
+                fields: Object.keys(updates),
+              });
             }
           }
         } catch (updateError) {
           // Log but don't fail authentication
-          console.error("Error updating user profile with OAuth data:", updateError);
+          console.error(
+            "Error updating user profile with OAuth data:",
+            updateError
+          );
         }
       }
-      
+
       // Verify user exists before proceeding
       if (!user) {
         console.error("User is null after find/create operations");
         throw new AuthError(
-          "User account could not be accessed or created", 
+          "User account could not be accessed or created",
           "auth/user-not-found"
         );
       }
@@ -307,7 +322,7 @@ export class AuthService {
       } catch (sessionError) {
         console.error("Error creating session:", sessionError);
         throw new AuthError(
-          "Failed to create authentication session", 
+          "Failed to create authentication session",
           "auth/session-creation-failed"
         );
       }
@@ -425,7 +440,6 @@ export class AuthService {
     }
   }
 
-  
   /**
    * Logout a user by token
    * @param token The user's JWT token
@@ -437,7 +451,7 @@ export class AuthService {
       if (!payload?.userId) {
         throw new Error("Invalid token");
       }
-      
+
       // Invalidate all tokens for this user
       await this.jwtService.invalidateAllTokens(payload.userId);
     } catch (error) {

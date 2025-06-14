@@ -8,7 +8,7 @@ export const prisma = new PrismaClient({
   log: ["query", "error", "warn"],
   datasources: {
     db: {
-      url: "postgresql://zzyra:zzyra@localhost:5432/zzyra?schema=public",
+      url: "postgresql://zzyra:zzyra@localhost:5433/zzyra?schema=public",
     },
   },
 });

@@ -1,6 +1,6 @@
 # Data Models & Database Schema
 
-This document provides an overview of the primary data models and database tables used in the Zyra application, managed via Supabase (PostgreSQL).
+This document provides an overview of the primary data models and database tables used in the Zzyra application, managed via Supabase (PostgreSQL).
 
 **Note:** The definitive source of truth for the database schema is the collection of SQL migration files located in the `ui/supabase/migrations/` directory. This document provides a descriptive summary.
 
@@ -150,7 +150,7 @@ updated_at timestamptz DEFAULT now()
 
 ## Relationships
 
--   A `user` can have many `workflows` and `custom_blocks`.
--   A `workflow` can have many `workflow_executions`.
--   A `workflow_execution` typically involves multiple `node_logs` (one per executed node).
--   Notification tables link back to `users` and potentially `workflow_executions`.
+- A `user` can have many `workflows` and `custom_blocks`.
+- A `workflow` can have many `workflow_executions`.
+- A `workflow_execution` typically involves multiple `node_logs` (one per executed node).
+- Notification tables link back to `users` and potentially `workflow_executions`.

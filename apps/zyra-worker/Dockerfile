@@ -1,4 +1,4 @@
-# Dockerfile for Zyra Worker
+# Dockerfile for Zzyra Worker
 # Using Node.js v20.3.0 Alpine for a lightweight base image
 
 # Build stage

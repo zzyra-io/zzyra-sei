@@ -1,6 +1,6 @@
 # @zyra/database
 
-This package provides a centralized database access layer for the Zyra platform, replacing Supabase with Prisma. It handles all database operations and is designed to be used by both the UI and worker components.
+This package provides a centralized database access layer for the Zzyra platform, replacing Supabase with Prisma. It handles all database operations and is designed to be used by both the UI and worker components.
 
 ## Features
 
@@ -71,10 +71,10 @@ REFRESH_TOKEN_EXPIRES_IN="7"
 
 ```typescript
 // Import the entire package
-import * as db from '@zyra/database';
+import * as db from "@zyra/database";
 
 // Or import specific components
-import { prisma, UserRepository, WorkflowRepository } from '@zyra/database';
+import { prisma, UserRepository, WorkflowRepository } from "@zyra/database";
 ```
 
 #### Using repositories
@@ -84,11 +84,11 @@ import { prisma, UserRepository, WorkflowRepository } from '@zyra/database';
 const userRepo = new UserRepository();
 
 // Find a user by email
-const user = await userRepo.findByEmail('user@example.com');
+const user = await userRepo.findByEmail("user@example.com");
 
 // Create a new user
 const newUser = await userRepo.create({
-  email: 'newuser@example.com',
+  email: "newuser@example.com",
 });
 ```
 
@@ -100,15 +100,15 @@ const authService = new AuthService();
 
 // Authenticate with email
 const authResult = await authService.authenticateWithMagic({
-  email: 'user@example.com',
-  didToken: 'magic-link-token',
+  email: "user@example.com",
+  didToken: "magic-link-token",
 });
 
 // Authenticate with wallet
 const walletAuthResult = await authService.authenticateWithWallet(
-  '0x123456789abcdef',
-  '1',
-  'ethereum'
+  "0x123456789abcdef",
+  "1",
+  "ethereum"
 );
 
 // Verify a session token
@@ -119,7 +119,7 @@ const userId = authService.verifySession(token);
 
 ```typescript
 // In your API route
-import { authMiddleware, getUserId, getPolicyContext } from '@zyra/database';
+import { authMiddleware, getUserId, getPolicyContext } from "@zyra/database";
 
 export async function middleware(req: NextRequest) {
   return authMiddleware(req);
@@ -139,22 +139,28 @@ The database package includes a robust policy enforcement system to replace Supa
 ### Using the PolicyService
 
 ```typescript
-import { PolicyService, PolicyContext } from '@zyra/database';
+import { PolicyService, PolicyContext } from "@zyra/database";
 
 const policyService = new PolicyService();
 
 // Create a policy context
 const context: PolicyContext = {
-  userId: 'user-123',
+  userId: "user-123",
   isAdmin: false,
-  teamIds: ['team-456']
+  teamIds: ["team-456"],
 };
 
 // Check access to a workflow
-const hasAccess = await policyService.checkWorkflowAccess('workflow-789', context);
+const hasAccess = await policyService.checkWorkflowAccess(
+  "workflow-789",
+  context
+);
 
 // Check access to an execution
-const hasExecutionAccess = await policyService.checkExecutionAccess('execution-123', context);
+const hasExecutionAccess = await policyService.checkExecutionAccess(
+  "execution-123",
+  context
+);
 ```
 
 ### Policy Enforcement in Repositories
@@ -165,13 +171,16 @@ All repositories automatically enforce policies when provided with a user ID:
 const workflowRepo = new WorkflowRepository();
 
 // This will only return workflows the user has access to
-const workflows = await workflowRepo.findByUserId('user-123');
+const workflows = await workflowRepo.findByUserId("user-123");
 
 // This will enforce policies during creation
-const newWorkflow = await workflowRepo.create({
-  name: 'New Workflow',
-  // ... other properties
-}, 'user-123');
+const newWorkflow = await workflowRepo.create(
+  {
+    name: "New Workflow",
+    // ... other properties
+  },
+  "user-123"
+);
 ```
 
 ## Migration from Supabase
@@ -179,11 +188,11 @@ const newWorkflow = await workflowRepo.create({
 To migrate data from Supabase to Prisma:
 
 ```typescript
-import { MigrationService } from '@zyra/database';
+import { MigrationService } from "@zyra/database";
 
 const migrationService = new MigrationService({
-  supabaseUrl: 'https://your-project.supabase.co',
-  supabaseKey: 'your-supabase-key',
+  supabaseUrl: "https://your-project.supabase.co",
+  supabaseKey: "your-supabase-key",
 });
 
 // Migrate all data

@@ -37,6 +37,9 @@ export enum BlockType {
   DATABASE_WRITE = "DATABASE_WRITE",
   BLOCKCHAIN_WRITE = "BLOCKCHAIN_WRITE",
   FILE_WRITE = "FILE_WRITE",
+  
+  // Wallet Operations
+  MAGIC_WALLET = "MAGIC_WALLET",
 }
 
 /**

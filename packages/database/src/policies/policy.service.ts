@@ -1,7 +1,7 @@
 /**
  * Policy Service
  *
- * This service handles access control policies for the Zyra platform.
+ * This service handles access control policies for the Zzyra platform.
  * It replaces Supabase RLS with application-level access control.
  */
 
@@ -142,17 +142,14 @@ export class PolicyService {
           // { userId: context.userId },
           {
             execution: {
-              userId: context.userId
-            }
+              userId: context.userId,
+            },
           },
           {
             execution: {
               workflow: {
-                OR: [
-                  { userId: context.userId },
-                  { isPublic: true },
-                ],
-              }
+                OR: [{ userId: context.userId }, { isPublic: true }],
+              },
             },
           },
         ],
@@ -331,7 +328,7 @@ export class PolicyService {
       data: {
         action,
         resource: tableName,
-        resourceId: "",  // Optional field, can be filled later if needed
+        resourceId: "", // Optional field, can be filled later if needed
         userId,
         metadata: {},
         createdAt: new Date(),

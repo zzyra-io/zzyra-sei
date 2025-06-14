@@ -1,5 +1,5 @@
 /**
- * AI Prompt Builder for Zyra Custom Blocks
+ * AI Prompt Builder for Zzyra Custom Blocks
  * Creates structured prompts for different types of custom blocks
  */
 
@@ -19,21 +19,21 @@ export function buildCustomBlockPrompt(blockData: BlockPromptData): string {
   const parsedInputs = blockData.blockInputs
     ? blockData.blockInputs
         .split(/[,\n]/)
-        .map(i => i.trim())
+        .map((i) => i.trim())
         .filter(Boolean)
         .join("\n- ")
     : "Default input: A string input parameter";
-    
+
   const parsedOutputs = blockData.blockOutputs
     ? blockData.blockOutputs
         .split(/[,\n]/)
-        .map(o => o.trim())
+        .map((o) => o.trim())
         .filter(Boolean)
         .join("\n- ")
     : "Default output: A processed result parameter";
 
   return `
-Create a production-ready custom workflow block for the Zyra platform with the following specifications:
+Create a production-ready custom workflow block for the Zzyra platform with the following specifications:
 
 NAME: ${blockData.blockName}
 DESCRIPTION: ${blockData.blockDescription}
@@ -65,21 +65,21 @@ export function buildFinanceBlockPrompt(blockData: BlockPromptData): string {
   const parsedInputs = blockData.blockInputs
     ? blockData.blockInputs
         .split(/[,\n]/)
-        .map(i => i.trim())
+        .map((i) => i.trim())
         .filter(Boolean)
         .join("\n- ")
     : "walletAddress: The address to use for transactions";
-    
+
   const parsedOutputs = blockData.blockOutputs
     ? blockData.blockOutputs
         .split(/[,\n]/)
-        .map(o => o.trim())
+        .map((o) => o.trim())
         .filter(Boolean)
         .join("\n- ")
     : "transactionResult: The result of the transaction";
 
   return `
-Create a production-ready DeFi/Finance block for the Zyra blockchain workflow platform:
+Create a production-ready DeFi/Finance block for the Zzyra blockchain workflow platform:
 
 NAME: ${blockData.blockName}
 DESCRIPTION: ${blockData.blockDescription}
@@ -113,26 +113,28 @@ The code should be complete, secure, and ready for production use in financial w
 /**
  * Builds a specialized prompt for data transformation blocks
  */
-export function buildTransformerBlockPrompt(blockData: BlockPromptData): string {
+export function buildTransformerBlockPrompt(
+  blockData: BlockPromptData
+): string {
   // Parse raw inputs/outputs for better context
   const parsedInputs = blockData.blockInputs
     ? blockData.blockInputs
         .split(/[,\n]/)
-        .map(i => i.trim())
+        .map((i) => i.trim())
         .filter(Boolean)
         .join("\n- ")
     : "inputData: The data to transform";
-    
+
   const parsedOutputs = blockData.blockOutputs
     ? blockData.blockOutputs
         .split(/[,\n]/)
-        .map(o => o.trim())
+        .map((o) => o.trim())
         .filter(Boolean)
         .join("\n- ")
     : "transformedData: The transformed data";
 
   return `
-Create a high-performance data transformation block for the Zyra workflow automation platform:
+Create a high-performance data transformation block for the Zzyra workflow automation platform:
 
 NAME: ${blockData.blockName}
 DESCRIPTION: ${blockData.blockDescription}
@@ -160,11 +162,13 @@ The code should be production-ready with excellent performance characteristics a
 /**
  * Gets the appropriate prompt builder based on block category
  */
-export function getPromptBuilderForCategory(category: string): (data: BlockPromptData) => string {
+export function getPromptBuilderForCategory(
+  category: string
+): (data: BlockPromptData) => string {
   switch (category.toUpperCase()) {
-    case 'FINANCE':
+    case "FINANCE":
       return buildFinanceBlockPrompt;
-    case 'TRANSFORMER':
+    case "TRANSFORMER":
       return buildTransformerBlockPrompt;
     default:
       return buildCustomBlockPrompt;

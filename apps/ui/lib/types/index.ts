@@ -3,7 +3,7 @@
 import { BlockType } from "@zyra/types";
 
 /**
- * Core type definitions for Zyra workflow system
+ * Core type definitions for Zzyra workflow system
  */
 
 // Export BlockType from the types package to ensure consistency

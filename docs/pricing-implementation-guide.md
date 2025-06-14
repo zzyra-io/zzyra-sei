@@ -1,4 +1,4 @@
-# Zyra Pricing Implementation Guide
+# Zzyra Pricing Implementation Guide
 
 ## Step-by-Step Migration to New Pricing Structure
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-This guide provides step-by-step instructions for implementing Zyra's new 5-tier pricing structure, migrating existing users, and updating all related systems.
+This guide provides step-by-step instructions for implementing Zzyra's new 5-tier pricing structure, migrating existing users, and updating all related systems.
 
 ## Database Changes Applied
 
@@ -289,7 +289,7 @@ async function syncStripeProducts() {
   for (const tier of tiers) {
     // Create or update Stripe product
     const product = await stripe.products.create({
-      name: `Zyra ${tier.name}`,
+      name: `Zzyra ${tier.name}`,
       description: tier.description,
       metadata: {
         tier_id: tier.id,

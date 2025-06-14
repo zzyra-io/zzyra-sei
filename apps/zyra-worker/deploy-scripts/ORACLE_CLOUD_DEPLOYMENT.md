@@ -1,11 +1,11 @@
-# Deploying Zyra Worker to Oracle Cloud Infrastructure
+# Deploying Zzyra Worker to Oracle Cloud Infrastructure
 
-This guide provides step-by-step instructions for deploying the Zyra worker to an Oracle Cloud Infrastructure (OCI) Compute instance.
+This guide provides step-by-step instructions for deploying the Zzyra worker to an Oracle Cloud Infrastructure (OCI) Compute instance.
 
 ## Prerequisites
 
 - Oracle Cloud Infrastructure account
-- Access to the Zyra worker codebase
+- Access to the Zzyra worker codebase
 - Basic knowledge of Linux commands
 
 ## Step 1: Create a Compartment (if not already created)
@@ -63,7 +63,7 @@ This guide provides step-by-step instructions for deploying the Zyra worker to a
    sudo yum install -y git
    ```
 
-## Step 6: Deploy the Zyra Worker
+## Step 6: Deploy the Zzyra Worker
 
 1. Clone your repository (or upload the code to the instance):
    ```bash
@@ -154,19 +154,23 @@ This guide provides step-by-step instructions for deploying the Zyra worker to a
 ## Best Practices
 
 1. **Security**:
+
    - Restrict SSH access to specific IP addresses
    - Use strong passwords and key-based authentication
    - Regularly update the system and dependencies
 
 2. **Backup**:
+
    - Regularly back up your configuration and data
    - Set up automated backups using Oracle Cloud Backup Service
 
 3. **Monitoring**:
+
    - Set up monitoring for the instance and application
    - Configure alerts for critical events
 
 4. **Scaling**:
+
    - Consider using an instance pool for horizontal scaling
    - Monitor resource usage and adjust instance shape as needed
 

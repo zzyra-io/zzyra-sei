@@ -1,8 +1,8 @@
-# Zyra Development Rules & Standards
+# Zzyra Development Rules & Standards
 
 ## 1. Project Overview
 
-Zyra is an AI-driven, blockchain-focused workflow automation platform. It enables users to build, execute, and monitor complex workflows, integrating AI and blockchain capabilities.
+Zzyra is an AI-driven, blockchain-focused workflow automation platform. It enables users to build, execute, and monitor complex workflows, integrating AI and blockchain capabilities.
 
 ## 2. Monorepo Structure
 

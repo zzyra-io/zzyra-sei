@@ -1,11 +1,11 @@
 #!/bin/bash
-# Setup script for Zyra Worker on Oracle Cloud Infrastructure
-# This script installs Node.js, pnpm, and sets up the Zyra worker as a service
+# Setup script for Zzyra Worker on Oracle Cloud Infrastructure
+# This script installs Node.js, pnpm, and sets up the Zzyra worker as a service
 
 # Exit on error
 set -e
 
-echo "=== Starting Zyra Worker Setup ==="
+echo "=== Starting Zzyra Worker Setup ==="
 
 # Update system packages
 echo "Updating system packages..."
@@ -112,7 +112,7 @@ echo "Configuring firewall..."
 sudo firewall-cmd --permanent --add-port=3000/tcp
 sudo firewall-cmd --reload
 
-echo "=== Zyra Worker Setup Complete ==="
+echo "=== Zzyra Worker Setup Complete ==="
 echo "The worker is now running and configured to start automatically on boot."
 echo "You can manage the worker using PM2 commands:"
 echo "  - Check status: pm2 status"

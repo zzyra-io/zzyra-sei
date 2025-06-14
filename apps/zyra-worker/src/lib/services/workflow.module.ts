@@ -6,10 +6,11 @@ import { NodeExecutor } from '../../workers/node-executor';
 import { ExecutionLogger } from '../../workers/execution-logger';
 import { ErrorHandler } from '../../workers/error-handler';
 import { NotificationModule } from '../../services/notification.module';
+import { MagicModule } from '../../services/magic.module';
 
 @Global()
 @Module({
-  imports: [NotificationModule],
+  imports: [NotificationModule, MagicModule],
   providers: [
     WorkflowService,
     WorkflowExecutor,

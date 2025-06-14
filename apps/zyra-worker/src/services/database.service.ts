@@ -8,7 +8,7 @@ import {
 } from '@zyra/database';
 
 /**
- * Database Service for Zyra Worker
+ * Database Service for Zzyra Worker
  *
  * This service provides access to database repositories from the @zyra/database package.
  * It acts as a facade for the worker's database operations.

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Zyra Development Environment Setup Script
-# This script helps set up the development environment for Zyra
+# Zzyra Development Environment Setup Script
+# This script helps set up the development environment for Zzyra
 
 # Color codes for better readability
 GREEN='\033[0;32m'
@@ -9,8 +9,8 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}=== Zyra Development Environment Setup ===${NC}"
-echo "This script will set up your development environment for Zyra."
+echo -e "${GREEN}=== Zzyra Development Environment Setup ===${NC}"
+echo "This script will set up your development environment for Zzyra."
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -74,5 +74,5 @@ cd packages/database && npx prisma migrate dev --name init
 echo -e "${GREEN}Database migrations applied.${NC}"
 
 echo -e "${GREEN}=== Setup Complete ===${NC}"
-echo "You can now start developing with Zyra!"
+echo "You can now start developing with Zzyra!"
 echo "Run 'npm run dev' to start the development server."

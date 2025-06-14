@@ -1,6 +1,6 @@
-# Zyra - AI-Driven Blockchain Workflow Automation Platform
+# Zzyra - AI-Driven Blockchain Workflow Automation Platform
 
-Zyra is a revolutionary no-code workflow automation platform that combines AI and blockchain capabilities. Build, execute, and monitor complex workflows across DeFi, Enterprise AI, Gaming, IoT, and 20+ other industries without writing code.
+Zzyra is a revolutionary no-code workflow automation platform that combines AI and blockchain capabilities. Build, execute, and monitor complex workflows across DeFi, Enterprise AI, Gaming, IoT, and 20+ other industries without writing code.
 
 ## 🚀 Features
 
@@ -14,7 +14,7 @@ Zyra is a revolutionary no-code workflow automation platform that combines AI an
 
 ## 📋 Prerequisites
 
-Before installing Zyra, ensure you have the following installed:
+Before installing Zzyra, ensure you have the following installed:
 
 - **Node.js** v20.3.0 or higher
 - **pnpm** package manager (`npm install -g pnpm`)

@@ -1,4 +1,4 @@
-# TypeScript Rules for Zyra
+# TypeScript Rules for Zzyra
 
 ## Type Definitions
 

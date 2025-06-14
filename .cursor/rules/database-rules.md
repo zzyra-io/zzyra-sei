@@ -1,4 +1,4 @@
-# Database Rules for Zyra
+# Database Rules for Zzyra
 
 ## Prisma Usage
 

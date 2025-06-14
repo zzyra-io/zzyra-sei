@@ -11,6 +11,7 @@ import { AIModule } from './modules/ai.module';
 import { BlockchainModule } from './lib/blockchain/BlockchainModule';
 import { DatabaseModule } from './services/database.module';
 import { RabbitMQService } from './services/rabbitmq.service';
+import { MagicModule } from './services/magic.module';
 
 // Configuration validation schema
 const configValidationSchema = {
@@ -57,6 +58,7 @@ const configValidationSchema = {
     WorkflowModule,
     HealthModule,
     NotificationModule,
+    MagicModule,
 
     // Conditional module imports for better startup performance
     ...(process.env.ENABLE_AI_MODULE !== 'false' ? [AIModule] : []),

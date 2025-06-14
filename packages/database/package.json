@@ -1,7 +1,7 @@
 {
   "name": "@zyra/database",
   "version": "0.1.0",
-  "description": "Database package for Zyra platform",
+  "description": "Database package for Zzyra platform",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

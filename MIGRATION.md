@@ -1,4 +1,4 @@
-# Migrating to Shared Types in the Zyra Monorepo
+# Migrating to Shared Types in the Zzyra Monorepo
 
 This guide outlines the steps to migrate your existing DeFi block handlers and UI components to use the shared types from the `@zyra/types` package.
 

@@ -566,7 +566,7 @@ export default function SettingsPage() {
                     <div className='space-y-4'>
                       <p>
                         Connect a wallet to manage your crypto assets and
-                        interact with Zyra.
+                        interact with Zzyra.
                       </p>
                       {connectors.map((conn) => (
                         <Button

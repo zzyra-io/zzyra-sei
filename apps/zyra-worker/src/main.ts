@@ -27,7 +27,7 @@ async function bootstrap() {
   });
 
   try {
-    logger.log('🚀 Starting Zyra Worker application...');
+    logger.log('🚀 Starting Zzyra Worker application...');
     logger.log(`Node.js version: ${process.version}`);
     logger.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 

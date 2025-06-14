@@ -2,14 +2,14 @@
  * JWT Service
  *
  * This service handles JWT token generation, verification, and management.
- * It provides a secure authentication mechanism for the Zyra platform.
+ * It provides a secure authentication mechanism for the Zzyra platform.
  */
 
-import * as jwt from 'jsonwebtoken';
-import type { Secret, SignOptions } from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
-import { JwtPayload } from './types';
-import prisma from '../client';
+import * as jwt from "jsonwebtoken";
+import type { Secret, SignOptions } from "jsonwebtoken";
+import { v4 as uuidv4 } from "uuid";
+import { JwtPayload } from "./types";
+import prisma from "../client";
 
 // Define RefreshToken interface until Prisma generates it
 interface RefreshToken {
@@ -42,9 +42,13 @@ export class JwtService {
    * @returns The signed JWT token
    */
   generateToken(payload: JwtPayload): string {
-    return jwt.sign(payload, this.JWT_SECRET as Secret, {
-      expiresIn: this.JWT_EXPIRES_IN,
-    } as SignOptions);
+    return jwt.sign(
+      payload,
+      this.JWT_SECRET as Secret,
+      {
+        expiresIn: this.JWT_EXPIRES_IN,
+      } as SignOptions
+    );
   }
 
   /**
@@ -69,17 +73,17 @@ export class JwtService {
     const token = uuidv4();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + this.REFRESH_TOKEN_EXPIRES_IN);
-    
+
     // Delete any existing refresh tokens for this user
     await prisma.$executeRaw`DELETE FROM refresh_tokens WHERE user_id = ${userId}`;
-    
+
     // Create new refresh token with raw SQL until Prisma client is regenerated
     const result = await prisma.$executeRaw`
       INSERT INTO refresh_tokens (id, user_id, token, expires_at, created_at, updated_at)
       VALUES (${uuidv4()}, ${userId}, ${token}, ${expiresAt}, NOW(), NOW())
       RETURNING id, user_id, token, expires_at, created_at, updated_at
     `;
-    
+
     // Return a structured refresh token object
     return {
       id: uuidv4(), // This will be different from the actual DB ID until client is regenerated
@@ -87,7 +91,7 @@ export class JwtService {
       token,
       expiresAt,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
   }
 
@@ -105,7 +109,7 @@ export class JwtService {
       WHERE token = ${token}
       LIMIT 1
     `;
-    
+
     const refreshToken = tokens && tokens.length > 0 ? tokens[0] : null;
     if (!refreshToken) return null;
 
@@ -124,7 +128,9 @@ export class JwtService {
    * @param token The refresh token
    * @returns The new JWT token and refresh token or null if invalid
    */
-  async refreshToken(token: string): Promise<{ token: string; refreshToken: RefreshToken } | null> {
+  async refreshToken(
+    token: string
+  ): Promise<{ token: string; refreshToken: RefreshToken } | null> {
     const verifiedToken = await this.verifyRefreshToken(token);
     if (!verifiedToken) return null;
 
