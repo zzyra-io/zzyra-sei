@@ -3,11 +3,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { OAuthProvider } from "@magic-ext/oauth2";
 import { useMagic } from "../magic-provider";
 import api from "../services/api";
+import { useRouter } from "next/navigation";
 
 export type LoginResponse = {
   success: boolean;
   user?: any;
   error?: string;
+  callbackUrl?: string;
 };
 
 /**
@@ -19,6 +21,7 @@ export type LoginResponse = {
 export const useMagicAuth = () => {
   const { magic: magicInstance } = useMagic();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // Login with email - complete flow including backend authentication
   const loginWithEmail = useMutation({
@@ -48,9 +51,25 @@ export const useMagicAuth = () => {
         // Step 4: Get user metadata
         const userMetadata = await magicInstance.user.getInfo();
 
+        // Update both Magic auth state and query cache
         queryClient.setQueryData(["user"], userMetadata);
+        queryClient.setQueryData(["auth"], response.data);
 
-        return { success: true, user: userMetadata, ...response.data };
+        const result = {
+          success: true,
+          user: userMetadata,
+          ...response.data,
+        };
+
+        // Step 5: Handle redirect after successful login
+        if (result.callbackUrl) {
+          // Use setTimeout to allow the current mutation to complete first
+          setTimeout(() => {
+            router.push(result.callbackUrl!);
+          }, 100);
+        }
+
+        return result;
       } catch (error) {
         console.error("Login error:", error);
         throw error;

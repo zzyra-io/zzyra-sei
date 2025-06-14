@@ -1,18 +1,15 @@
-import { NextAuthOptions, Session } from "next-auth";
+import { NextAuthOptions, Session, User } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { jwtDecode } from "jwt-decode";
-import axios from "axios";
+import api from "./services/api";
 
-// Configure axios instance for auth
-const authApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002/api",
-  withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+// Extend the User type to include auth tokens
+interface AuthUser extends User {
+  accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: Date;
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -43,7 +40,7 @@ export const authOptions: NextAuthOptions = {
           expiresAt: credentials.expiresAt
             ? new Date(credentials.expiresAt)
             : undefined,
-        };
+        } as AuthUser;
       },
     }),
   ],
@@ -55,15 +52,16 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       // Initial sign-in: populate token from user
       if (user) {
-        token.sub = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.accessToken = user.accessToken;
-        token.refreshToken = user.refreshToken;
-        token.expiresAt = user.expiresAt;
+        const authUser = user as AuthUser;
+        token.sub = authUser.id;
+        token.email = authUser.email;
+        token.name = authUser.name;
+        token.accessToken = authUser.accessToken;
+        token.refreshToken = authUser.refreshToken;
+        token.expiresAt = authUser.expiresAt;
       }
 
-      // Validate existing token
+      // Validate existing token with NestJS API
       const cookieStore = await cookies();
       const existingToken = cookieStore.get("token")?.value;
       if (existingToken) {
@@ -75,14 +73,14 @@ export const authOptions: NextAuthOptions = {
             exp: number;
           }>(existingToken);
 
-          token.sub = decoded.userId; // Use userId from accessToken
+          token.sub = decoded.userId;
           token.email = decoded.email;
           token.accessToken = existingToken;
 
           const now = Math.floor(Date.now() / 1000);
           if (decoded.exp < now && token.refreshToken) {
             try {
-              const response = await authApi.post("/auth/refresh-token", {
+              const response = await api.post("/auth/refresh-token", {
                 refreshToken: token.refreshToken,
               });
 
@@ -126,41 +124,44 @@ export const authOptions: NextAuthOptions = {
 
       return token;
     },
-    async session({ session, token }: { session: Session; token: any }) {
-      if (token.sub) {
+    async session({
+      session,
+      token,
+    }: {
+      session: Session;
+      token: Record<string, unknown>;
+    }) {
+      if (token.sub && token.accessToken) {
         try {
-          const user = await prisma.user.findUnique({
-            where: { id: token.sub },
-            select: {
-              id: true,
-              email: true,
-              phone: true,
-              createdAt: true,
-              updatedAt: true,
-              userWallets: {
-                select: { walletAddress: true },
-                take: 1,
-              },
+          // Validate session with NestJS API instead of direct Prisma access
+          const response = await api.get("/user/profile", {
+            headers: {
+              Authorization: `Bearer ${token.accessToken}`,
             },
           });
 
-          if (user) {
+          if (response.data && response.data.user) {
+            const userData = response.data.user;
             session.user = {
-              id: user.id,
-              email: user.email,
-              phone: user.phone,
-              createdAt: user.createdAt,
-              updatedAt: user.updatedAt,
-              walletAddress: user.userWallets?.[0]?.walletAddress,
+              id: userData.id,
+              email: userData.email,
+              phone: userData.phone,
+              createdAt: userData.createdAt,
+              updatedAt: userData.updatedAt,
+              walletAddress: userData.userWallets?.[0]?.walletAddress,
+              // Include profile data if available
+              profile: userData.profile,
             };
-            session.accessToken = token.accessToken;
+            session.accessToken = token.accessToken as string;
             session.magicAuthenticated = true;
             session.expires = token.expiresAt
-              ? new Date(token.expiresAt).toISOString()
+              ? new Date(token.expiresAt as string).toISOString()
               : session.expires;
           }
         } catch (error) {
-          console.error("Session callback error:", error);
+          console.error("Session validation error with NestJS API:", error);
+          // If API validation fails, clear the session but maintain required properties
+          return { ...session, user: undefined };
         }
       }
       return session;
@@ -181,6 +182,25 @@ declare module "next-auth" {
       createdAt?: Date;
       updatedAt?: Date;
       walletAddress?: string;
+      profile?: {
+        id: string;
+        email: string;
+        fullName?: string | null;
+        avatarUrl?: string | null;
+        subscriptionTier: string;
+        subscriptionStatus: string;
+        subscriptionExpiresAt?: Date | null;
+        monthlyExecutionQuota: number;
+        monthlyExecutionCount: number;
+        stripeCustomerId?: string | null;
+        stripeSubscriptionId?: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        lastSeenAt?: Date | null;
+        monthlyExecutionsUsed: number;
+        telegramChatId?: string | null;
+        discordWebhookUrl?: string | null;
+      };
     };
     accessToken?: string;
     refreshToken?: string;
