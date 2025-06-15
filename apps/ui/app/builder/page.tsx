@@ -618,6 +618,70 @@ export default function BuilderPage() {
     { enableOnFormTags: true }
   );
 
+  // Additional keyboard shortcuts for toolbar functions
+  useHotkeys(
+    "Delete",
+    (e) => {
+      e.preventDefault();
+      toolbar.delete();
+    },
+    { enableOnFormTags: true }
+  );
+
+  useHotkeys(
+    "mod+d",
+    (e) => {
+      e.preventDefault();
+      toolbar.copy();
+    },
+    { enableOnFormTags: true }
+  );
+
+  useHotkeys(
+    "mod+shift+r",
+    (e) => {
+      e.preventDefault();
+      toolbar.reset();
+    },
+    { enableOnFormTags: true }
+  );
+
+  useHotkeys(
+    "mod+0",
+    (e) => {
+      e.preventDefault();
+      toolbar.fitView();
+    },
+    { enableOnFormTags: true }
+  );
+
+  useHotkeys(
+    "mod+plus",
+    (e) => {
+      e.preventDefault();
+      toolbar.zoomIn();
+    },
+    { enableOnFormTags: true }
+  );
+
+  useHotkeys(
+    "mod+minus",
+    (e) => {
+      e.preventDefault();
+      toolbar.zoomOut();
+    },
+    { enableOnFormTags: true }
+  );
+
+  useHotkeys(
+    "mod+g",
+    (e) => {
+      e.preventDefault();
+      toolbar.toggleGrid();
+    },
+    { enableOnFormTags: true }
+  );
+
   // Validation (example) - with null check to prevent errors during drag operations
   console.log("nodes", nodes);
   const hasInvalidConfig = Array.isArray(nodes)

@@ -4,10 +4,8 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { useCallback, useMemo } from "react";
 import { subscribeWithSelector } from "zustand/middleware";
 import { nanoid } from "nanoid";
-import type { Node, Edge } from "@xyflow/react";
 
 import { WorkflowStore } from "./types";
 import { createCanvasSlice } from "./canvas-slice";
@@ -19,7 +17,11 @@ import { createResetSlice } from "./reset-slice";
 
 // Error handling utility for store operations
 class StoreError extends Error {
-  constructor(message: string, public operation: string, public data?: any) {
+  constructor(
+    message: string,
+    public operation: string,
+    public data?: unknown
+  ) {
     super(message);
     this.name = "StoreError";
 
@@ -228,17 +230,18 @@ export function useFlowToolbar() {
   return {
     canUndo,
     canRedo,
+    isGridVisible,
     undo,
     redo,
     zoomIn: () => reactFlowInstance?.zoomIn(),
     zoomOut: () => reactFlowInstance?.zoomOut(),
     fitView: () => reactFlowInstance?.fitView(),
     toggleGrid: () => setGridVisible(!isGridVisible),
-    deleteSelected: () => {
+    delete: () => {
       if (selectedNode) removeNode(selectedNode.id);
       if (selectedEdge) removeEdge(selectedEdge.id);
     },
-    duplicateSelected: () => {
+    copy: () => {
       if (selectedNode) {
         try {
           const newNode = {
@@ -370,6 +373,6 @@ export function useFlowToolbar() {
         );
       }
     },
-    resetCanvas,
+    reset: resetCanvas,
   };
 }
