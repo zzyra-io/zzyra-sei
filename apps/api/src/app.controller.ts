@@ -19,6 +19,7 @@ import {
   ApiParam,
   ApiQuery,
 } from "@nestjs/swagger";
+import { JwtService } from "@nestjs/jwt";
 import {
   UserRepository,
   WalletRepository,
@@ -68,6 +69,7 @@ export class AppController {
     @Request() req: any,
     @Response() res: any
   ) {
+    console.log("=== UPDATED LOGIN METHOD RUNNING ===>");
     try {
       const {
         email,
@@ -117,8 +119,17 @@ export class AppController {
         );
       }
 
-      // Create JWT token (in NestJS, you'd use JwtService)
-      const token = {
+      // Create JWT token using the JWT service
+      console.log("Creating JWT token with payload");
+      const jwtSecret = process.env.JWT_SECRET || "your-secret-key";
+      console.log("Using JWT secret:", jwtSecret.substring(0, 3) + '...' + (jwtSecret.length > 10 ? jwtSecret.substring(jwtSecret.length - 3) : ''));
+      
+      const jwtService = new JwtService({
+        secret: jwtSecret,
+        signOptions: { expiresIn: "30d" },
+      });
+
+      const tokenPayload = {
         sub: user.id,
         email: user.email || "",
         name: user.email ? user.email.split("@")[0] : "User",
@@ -126,6 +137,11 @@ export class AppController {
         refreshToken: session.refreshToken,
         expiresAt: session.expiresAt,
       };
+      console.log("Token payload:", { ...tokenPayload, accessToken: '[REDACTED]', refreshToken: '[REDACTED]' });
+
+      // Sign the token with JWT
+      const signedToken = jwtService.sign(tokenPayload);
+      console.log("Generated JWT Session Token:", signedToken.substring(0, 20) + '...');
 
       // Set cookies using NestJS response
       const cookieName =
@@ -133,8 +149,8 @@ export class AppController {
           ? "__Secure-next-auth.session-token"
           : "next-auth.session-token";
 
-      // Set session cookie
-      res.cookie(cookieName, "encoded-session-token", {
+      // Set session cookie with the JWT token
+      res.cookie(cookieName, signedToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
@@ -142,8 +158,17 @@ export class AppController {
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       });
 
-      // Set access token cookie
-      res.cookie("token", session.accessToken, {
+      // Also set the token in the Authorization cookie for API requests
+      res.cookie("token", signedToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 1000, // 1 day
+      });
+
+      // Set access token in a separate cookie for backward compatibility
+      res.cookie("access_token", session.accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
@@ -178,20 +203,32 @@ export class AppController {
         // Use default if invalid
       }
 
-      // Return response matching Next.js format
-      return res.json({
-        session: {
-          expiresAt: session.expiresAt,
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.email ? user.email.split("@")[0] : "User",
-          },
+      // Create a simplified response object with all necessary data
+      const responseData = {
+        token: signedToken,
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        expiresAt: session.expiresAt,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.email ? user.email.split("@")[0] : "User",
+          profile: user.profile
         },
-        user,
         success: true,
-        callbackUrl: finalCallbackUrl,
+        callbackUrl: finalCallbackUrl
+      };
+      
+      // Log the response we're about to send
+      console.log("Sending login response:", {
+        ...responseData,
+        token: responseData.token.substring(0, 20) + '...',
+        accessToken: '[REDACTED]',
+        refreshToken: '[REDACTED]'
       });
+      
+      // Return response with explicit status
+      return res.status(200).json(responseData);
     } catch (error) {
       console.error("Login error:", error);
       const errorMessage =
@@ -224,13 +261,24 @@ export class AppController {
         }
       }
 
-      // Clear the authentication cookies
-      res.clearCookie("token");
-      res.clearCookie("refresh_token");
-      res.clearCookie("next-auth.session-token");
-      res.clearCookie("__Secure-next-auth.session-token");
+      // Clear all authentication cookies
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+      };
 
-      return res.json({
+      // Clear session token cookies (both secure and non-secure versions)
+      res.clearCookie("next-auth.session-token", cookieOptions);
+      res.clearCookie("__Secure-next-auth.session-token", cookieOptions);
+
+      // Clear access and refresh token cookies
+      res.clearCookie("token", cookieOptions);
+      res.clearCookie("access_token", cookieOptions);
+      res.clearCookie("refresh_token", cookieOptions);
+
+      // Return success response
+      return res.status(HttpStatus.OK).json({
         success: true,
         message: "Logged out successfully",
       });
