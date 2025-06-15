@@ -1,30 +1,45 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { IsString, IsOptional, IsArray, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
 
 export class CreateWorkflowDto {
   @ApiProperty({ description: "Name of the workflow" })
+  @IsString()
   name: string;
 
-  @ApiProperty({ description: "Description of the workflow" })
+  @ApiProperty({ description: "Description of the workflow", required: false })
+  @IsOptional()
+  @IsString()
   description?: string;
 
   @ApiProperty({ description: "Workflow nodes configuration" })
+  @IsArray()
   nodes: Record<string, unknown>[];
 
   @ApiProperty({ description: "Workflow edges configuration" })
+  @IsArray()
   edges: Record<string, unknown>[];
 }
 
 export class UpdateWorkflowDto {
-  @ApiProperty({ description: "Name of the workflow" })
+  @ApiProperty({ description: "Name of the workflow", required: false })
+  @IsOptional()
+  @IsString()
   name?: string;
 
-  @ApiProperty({ description: "Description of the workflow" })
+  @ApiProperty({ description: "Description of the workflow", required: false })
+  @IsOptional()
+  @IsString()
   description?: string;
 
-  @ApiProperty({ description: "Workflow nodes configuration" })
+  @ApiProperty({ description: "Workflow nodes configuration", required: false })
+  @IsOptional()
+  @IsArray()
   nodes?: Record<string, unknown>[];
 
-  @ApiProperty({ description: "Workflow edges configuration" })
+  @ApiProperty({ description: "Workflow edges configuration", required: false })
+  @IsOptional()
+  @IsArray()
   edges?: Record<string, unknown>[];
 }
 

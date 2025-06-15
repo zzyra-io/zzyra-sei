@@ -184,9 +184,13 @@ export class WorkflowRepository extends BaseRepository<
       return super.create(data);
     }
 
-    // Ensure the workflow belongs to the user
+    // Ensure the workflow belongs to the user using relation connection
     const workflowData: any = { ...data };
-    workflowData.userId = userId;
+    // Use relation connection instead of direct userId field
+    workflowData.user = { connect: { id: userId } };
+    
+    // Remove userId if it exists to avoid conflict
+    delete workflowData.userId;
 
     // Create the workflow with audit logging
     return this.executeWithTransaction(

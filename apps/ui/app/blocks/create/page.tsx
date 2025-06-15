@@ -24,7 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { OpenRouterProvider } from "@/lib/ai-providers/openrouter";
+import { generateCustomBlock } from "@/lib/ai";
 import { saveBlock } from "@/lib/block-library-api";
 import { cn } from "@/lib/utils";
 import {
@@ -97,29 +97,23 @@ export default function CreateBlockPage() {
     try {
       setGenerating(true);
 
-      // Create OpenRouter instance
-      // const openRouter = new OpenRouterProvider();
+      // Generate block definition using AI API
+      const generatedBlock = await generateCustomBlock(
+        `Create a ${data.category} block called "${data.name}" that ${data.description}. ${data.prompt || ""}`,
+        "user-id" // TODO: Get actual user ID from auth context
+      );
 
-      // Generate block definition using AI
-      // const generatedBlock = await openRouter.generateCustomBlock({
-      //   category: data.category,
-      //   blockType: data.blockType,
-      //   name: data.name,
-      //   description: data.description,
-      //   additionalContext: data.prompt || "",
-      // });
+      if (!generatedBlock) {
+        throw new Error("Failed to generate block");
+      }
 
-      // if (!generatedBlock) {
-      //   throw new Error("Failed to generate block");
-      // }
-
-      // setGeneratedBlock(generatedBlock);
+      setGeneratedBlock(generatedBlock);
       setStep("review");
 
       toast({
         title: "Block generated",
         description:
-          "Your custom DeFi block has been generated. Review it before saving.",
+          "Your custom block has been generated. Review it before saving.",
       });
     } catch (error) {
       console.error("Error generating block:", error);

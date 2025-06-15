@@ -25,6 +25,7 @@ import {
   PaginatedWorkflowsResponseDto,
 } from "./dto/workflow.dto";
 import { WorkflowsService } from "./workflows.service";
+import { Public } from "../auth/decorators/public.decorator";
 
 @ApiTags("workflows")
 @Controller("workflows")
@@ -42,14 +43,11 @@ export class WorkflowsController {
   @ApiQuery({ name: "page", required: false, type: Number })
   @ApiQuery({ name: "limit", required: false, type: Number })
   async findAll(
-    @Request() req: { user?: { id: string } },
+    @Request() req: { user: { id: string } },
     @Query("page") page = 1,
     @Query("limit") limit = 10
   ): Promise<PaginatedWorkflowsResponseDto> {
-    // In a real implementation, we would get the userId from the authenticated user
-    // For now, we'll use a hardcoded userId until auth is fully implemented
-    const userId = req.user?.id || "user1";
-    return this.workflowsService.findAll(userId, +page, +limit);
+    return this.workflowsService.findAll(req.user.id, +page, +limit);
   }
 
   @Get(":id")
@@ -63,8 +61,11 @@ export class WorkflowsController {
     status: HttpStatus.NOT_FOUND,
     description: "Workflow not found",
   })
-  async findOne(@Param("id") id: string): Promise<WorkflowDto> {
-    return this.workflowsService.findOne(id);
+  async findOne(
+    @Request() req: { user: { id: string } },
+    @Param("id") id: string
+  ): Promise<WorkflowDto> {
+    return this.workflowsService.findOne(id, req.user.id);
   }
 
   @Post()
@@ -75,13 +76,10 @@ export class WorkflowsController {
     type: WorkflowDto,
   })
   async create(
-    @Request() req: { user?: { id: string } },
+    @Request() req: { user: { id: string } },
     @Body() createWorkflowDto: CreateWorkflowDto
   ): Promise<WorkflowDto> {
-    // In a real implementation, we would get the userId from the authenticated user
-    // For now, we'll use a hardcoded userId until auth is fully implemented
-    const userId = req.user?.id || "user1";
-    return this.workflowsService.create(createWorkflowDto, userId);
+    return this.workflowsService.create(createWorkflowDto, req.user.id);
   }
 
   @Put(":id")
@@ -96,10 +94,11 @@ export class WorkflowsController {
     description: "Workflow not found",
   })
   async update(
+    @Request() req: { user: { id: string } },
     @Param("id") id: string,
     @Body() updateWorkflowDto: UpdateWorkflowDto
   ): Promise<WorkflowDto> {
-    return this.workflowsService.update(id, updateWorkflowDto);
+    return this.workflowsService.update(id, updateWorkflowDto, req.user.id);
   }
 
   @Delete(":id")
@@ -112,7 +111,10 @@ export class WorkflowsController {
     status: HttpStatus.NOT_FOUND,
     description: "Workflow not found",
   })
-  async remove(@Param("id") id: string): Promise<void> {
-    return this.workflowsService.remove(id);
+  async remove(
+    @Request() req: { user: { id: string } },
+    @Param("id") id: string
+  ): Promise<void> {
+    return this.workflowsService.remove(id, req.user.id);
   }
 }

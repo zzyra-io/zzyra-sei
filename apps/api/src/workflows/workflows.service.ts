@@ -43,8 +43,8 @@ export class WorkflowsService {
     };
   }
 
-  async findOne(id: string): Promise<WorkflowDto> {
-    const workflow = await this.workflowRepository.findById(id);
+  async findOne(id: string, userId: string): Promise<WorkflowDto> {
+    const workflow = await this.workflowRepository.findById(id, userId);
     if (!workflow) {
       throw new NotFoundException(`Workflow with ID ${id} not found`);
     }
@@ -83,8 +83,15 @@ export class WorkflowsService {
 
   async update(
     id: string,
-    updateWorkflowDto: UpdateWorkflowDto
+    updateWorkflowDto: UpdateWorkflowDto,
+    userId: string
   ): Promise<WorkflowDto> {
+    // First verify the user owns this workflow
+    const existingWorkflow = await this.workflowRepository.findById(id, userId);
+    if (!existingWorkflow) {
+      throw new NotFoundException(`Workflow with ID ${id} not found`);
+    }
+
     const workflow = await this.workflowRepository.update(id, {
       name: updateWorkflowDto.name,
       description: updateWorkflowDto.description,
@@ -102,7 +109,13 @@ export class WorkflowsService {
     };
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, userId: string): Promise<void> {
+    // First verify the user owns this workflow
+    const existingWorkflow = await this.workflowRepository.findById(id, userId);
+    if (!existingWorkflow) {
+      throw new NotFoundException(`Workflow with ID ${id} not found`);
+    }
+
     await this.workflowRepository.delete(id);
   }
 }
