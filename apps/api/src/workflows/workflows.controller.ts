@@ -117,4 +117,27 @@ export class WorkflowsController {
   ): Promise<void> {
     return this.workflowsService.remove(id, req.user.id);
   }
+
+  @Post(":id/execute")
+  @ApiOperation({ summary: "Execute a workflow" })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: "Workflow execution started successfully",
+    schema: {
+      type: "object",
+      properties: {
+        executionId: { type: "string" },
+      },
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: "Workflow not found",
+  })
+  async execute(
+    @Request() req: { user: { id: string } },
+    @Param("id") id: string
+  ): Promise<{ executionId: string }> {
+    return this.workflowsService.execute(id, req.user.id);
+  }
 }

@@ -1,23 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-
-// Define the Workflow type based on the API response
-export interface Workflow {
-  id: string;
-  userId: string;
-  user_id: string; // Legacy field for compatibility
-  name: string;
-  description?: string;
-  nodes?: any;
-  edges?: any;
-  isPublic?: boolean;
-  is_public?: boolean; // Legacy field for compatibility
-  tags?: string[];
-  createdAt?: Date;
-  updatedAt?: Date;
-  created_at: string; // ISO string format
-  updated_at: string; // ISO string format
-  isFavorite: boolean;
-}
+import { workflowService, type Workflow } from '@/lib/services/workflow-service';
 
 /**
  * Hook for fetching all workflows
@@ -26,11 +8,7 @@ export function useWorkflows() {
   return useQuery<Workflow[]>({
     queryKey: ['workflows'],
     queryFn: async () => {
-      const response = await fetch('/api/workflows');
-      if (!response.ok) {
-        throw new Error('Failed to fetch workflows');
-      }
-      return response.json();
+      return await workflowService.getWorkflows();
     },
   });
 }
@@ -43,19 +21,7 @@ export function useCreateWorkflow() {
 
   return useMutation({
     mutationFn: async (workflow: Partial<Workflow>) => {
-      const response = await fetch('/api/workflows', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(workflow),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create workflow');
-      }
-
-      return response.json();
+      return await workflowService.createWorkflow(workflow);
     },
     onSuccess: () => {
       // Invalidate the workflows query to refetch the updated list
@@ -72,19 +38,7 @@ export function useUpdateWorkflow() {
 
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<Workflow> & { id: string }) => {
-      const response = await fetch(`/api/workflows/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update workflow');
-      }
-
-      return response.json();
+      return await workflowService.updateWorkflow(id, data);
     },
     onSuccess: () => {
       // Invalidate the workflows query to refetch the updated list
@@ -101,15 +55,8 @@ export function useDeleteWorkflow() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/workflows/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete workflow');
-      }
-
-      return response.json();
+      await workflowService.deleteWorkflow(id);
+      return { success: true };
     },
     onSuccess: () => {
       // Invalidate the workflows query to refetch the updated list
@@ -120,25 +67,16 @@ export function useDeleteWorkflow() {
 
 /**
  * Hook for toggling a workflow's favorite status
+ * TODO: Implement favorite functionality in the backend
  */
 export function useToggleFavorite() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, isFavorite }: { id: string; isFavorite: boolean }) => {
-      const response = await fetch(`/api/workflows/${id}/favorite`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ isFavorite }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update favorite status');
-      }
-
-      return response.json();
+      // TODO: Implement favorite endpoint in backend
+      console.warn('Favorite functionality not yet implemented in backend');
+      return { success: true, id, isFavorite };
     },
     onSuccess: () => {
       // Invalidate the workflows query to refetch the updated list

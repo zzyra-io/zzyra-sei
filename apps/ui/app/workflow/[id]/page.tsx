@@ -61,14 +61,15 @@ export default function WorkflowDetailPage() {
   const handleExecute = async () => {
     try {
       setIsExecuting(true);
-      const res = await fetch("/api/execute-workflow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workflowId: id }),
-        credentials: "include",
+      
+      // Import workflow service dynamically
+      const { workflowService } = await import("@/lib/services/workflow-service");
+      
+      await workflowService.executeWorkflow({
+        id: id as string,
+        nodes: workflow?.nodes || [],
+        edges: workflow?.edges || [],
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to start execution");
 
       // Invalidate and refetch execution logs
       await queryClient.invalidateQueries({

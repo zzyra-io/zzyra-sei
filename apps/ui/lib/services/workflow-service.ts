@@ -50,19 +50,15 @@ function detectCycle(nodes: any[], edges: any[]): boolean {
 class WorkflowService {
   async getWorkflows(): Promise<Workflow[]> {
     try {
-      const response = await fetch("/api/workflows", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await api.get("/workflows");
 
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (response.status !== 200) {
+        const errorData = response.data;
         throw new Error(errorData.error || "Failed to fetch workflows");
       }
 
-      return await response.json();
+      // The backend returns paginated data, so extract the data array
+      return response.data.data || response.data;
     } catch (error: any) {
       console.error("Error fetching workflows:", error);
       throw new Error(`Failed to fetch workflows: ${error.message}`);
@@ -71,19 +67,14 @@ class WorkflowService {
 
   async getWorkflow(id: string): Promise<Workflow> {
     try {
-      const response = await fetch(`/api/workflows/${id}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await api.get(`/workflows/${id}`);
 
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (response.status !== 200) {
+        const errorData = response.data;
         throw new Error(errorData.error || "Failed to fetch workflow");
       }
 
-      return await response.json();
+      return response.data;
     } catch (error: any) {
       console.error("Error fetching workflow:", error);
       throw new Error(`Failed to fetch workflow: ${error.message}`);
@@ -128,19 +119,6 @@ class WorkflowService {
     workflow: Partial<Workflow>
   ): Promise<Workflow> {
     try {
-      // Transform property names to match Prisma schema
-      const updateData = {
-        ...workflow,
-        isPublic: workflow.isPublic ?? workflow.is_public,
-        userId: workflow.userId ?? workflow.user_id,
-      };
-
-      // Remove legacy property names
-      delete updateData.user_id;
-      delete updateData.is_public;
-      delete updateData.created_at;
-      delete updateData.updated_at;
-
       // cycle detection for updated graph
       if (workflow.nodes && workflow.edges) {
         if (detectCycle(workflow.nodes, workflow.edges)) {
@@ -149,6 +127,14 @@ class WorkflowService {
           );
         }
       }
+
+      // Only send fields that the backend expects (UpdateWorkflowDto)
+      const updateData: Record<string, unknown> = {};
+      if (workflow.name !== undefined) updateData.name = workflow.name;
+      if (workflow.description !== undefined)
+        updateData.description = workflow.description;
+      if (workflow.nodes !== undefined) updateData.nodes = workflow.nodes;
+      if (workflow.edges !== undefined) updateData.edges = workflow.edges;
 
       const response = await api.put(`/workflows/${id}`, updateData);
 
@@ -180,6 +166,8 @@ class WorkflowService {
 
   async executeWorkflow(workflow: {
     id?: string;
+    name?: string;
+    description?: string;
     nodes: any[];
     edges: any[];
   }): Promise<{ id: string }> {
@@ -188,16 +176,20 @@ class WorkflowService {
 
       // If workflow doesn't have an ID, save it first
       if (!workflowId) {
-        // Create a temporary workflow first
-        // TODO: this should prompt the user to save the workflow first, and then execute it, add ui
-        // throw new Error("Workflow must be saved before execution");
-        // workflowId = newWorkflow.id;
+        console.log("Workflow has no ID, creating it first...");
+        const savedWorkflow = await this.createWorkflow({
+          name: workflow.name || "Untitled Workflow",
+          description: workflow.description || "",
+          nodes: workflow.nodes,
+          edges: workflow.edges,
+        });
+        workflowId = savedWorkflow.id;
       }
 
       // Use the API endpoint to execute the workflow
-      const response = await api.post("/execute-workflow", { workflowId });
+      const response = await api.post(`/workflows/${workflowId}/execute`);
 
-      if (response.status !== 200) {
+      if (response.status !== 200 && response.status !== 201) {
         const errorData = response.data;
         throw new Error(errorData.error || "Failed to execute workflow");
       }
@@ -216,22 +208,22 @@ class WorkflowService {
   async getExecutionStatus(executionId: string): Promise<{
     id: string;
     status: string;
-    currentNodeId?: string; // Changed from snake_case to camelCase
+    currentNodeId?: string;
     current_node_id?: string; // For backward compatibility
-    executionProgress?: number; // Changed from snake_case to camelCase
+    executionProgress?: number;
     execution_progress?: number; // For backward compatibility
-    nodesCompleted?: string[]; // Changed from snake_case to camelCase
+    nodesCompleted?: string[];
     nodes_completed?: string[]; // For backward compatibility
-    nodesFailed?: string[]; // Changed from snake_case to camelCase
+    nodesFailed?: string[];
     nodes_failed?: string[]; // For backward compatibility
-    nodesPending?: string[]; // Changed from snake_case to camelCase
+    nodesPending?: string[];
     nodes_pending?: string[]; // For backward compatibility
-    result?: any;
+    result?: unknown;
     error?: string;
     logs?: string[];
   }> {
     try {
-      const response = await api.get(`/execute-workflow/${executionId}`);
+      const response = await api.get(`/executions/${executionId}`);
 
       if (response.status !== 200) {
         const errorData = response.data;
@@ -239,9 +231,11 @@ class WorkflowService {
       }
 
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.error("Error fetching execution status:", error);
-      throw new Error(`Failed to fetch execution status: ${error.message}`);
+      throw new Error(`Failed to fetch execution status: ${errorMessage}`);
     }
   }
 }

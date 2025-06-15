@@ -5,11 +5,16 @@ import {
   UpdateWorkflowDto,
   WorkflowDto,
 } from "./dto/workflow.dto";
-import { WorkflowRepository } from "@zyra/database";
+import { QueueService } from "../queue/queue.service";
+import { WorkflowRepository, ExecutionRepository } from "@zyra/database";
 
 @Injectable()
 export class WorkflowsService {
-  constructor(private workflowRepository: WorkflowRepository) {}
+  constructor(
+    private workflowRepository: WorkflowRepository,
+    private executionRepository: ExecutionRepository,
+    private queueService: QueueService
+  ) {}
 
   async findAll(
     userId: string,
@@ -117,5 +122,48 @@ export class WorkflowsService {
     }
 
     await this.workflowRepository.delete(id);
+  }
+
+  async execute(id: string, userId: string): Promise<{ executionId: string }> {
+    // First verify the user owns this workflow
+    const workflow = await this.workflowRepository.findById(id, userId);
+    if (!workflow) {
+      throw new NotFoundException(`Workflow with ID ${id} not found`);
+    }
+
+    // Create workflow execution using the execution repository
+    const execution = await this.executionRepository.createExecution(
+      id,
+      userId,
+      {}, // No input data for now
+      "manual" // Trigger type
+    );
+
+    if (!execution) {
+      throw new Error("Failed to create workflow execution");
+    }
+
+    const executionId = execution.id;
+
+    console.log(
+      `Created execution ${executionId} for workflow ${id} by user ${userId}`
+    );
+
+    // Queue the execution job
+    try {
+      await this.queueService.addExecutionJob(executionId, id, userId);
+      console.log(`Successfully queued execution ${executionId}`);
+    } catch (error) {
+      console.error(`Failed to queue execution ${executionId}:`, error);
+      // Update execution status to failed
+      await this.executionRepository.updateStatus(
+        executionId,
+        "failed" as any,
+        "Failed to queue execution"
+      );
+      throw new Error("Failed to queue workflow execution");
+    }
+
+    return { executionId };
   }
 }

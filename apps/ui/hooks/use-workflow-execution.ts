@@ -89,43 +89,33 @@ export function useWorkflowExecution() {
           title: "Executing unsaved workflow",
           description:
             "This workflow hasn't been saved. A temporary copy will be created for execution.",
-          variant: "warning",
         });
       }
 
-      // Prepare workflow execution data
-      const workflowExecutionData = {
-        workflowId,
-      };
-
-      // Call the execution API
+      // Call the execution API using workflow service
       try {
         console.log("Executing workflow:", workflowId || "(unsaved)");
-        const response = await fetch("/api/execute-workflow", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(workflowExecutionData),
+        
+        // Import workflow service dynamically to avoid circular dependencies
+        const { workflowService } = await import("@/lib/services/workflow-service");
+        
+        const data = await workflowService.executeWorkflow({
+          id: workflowId,
+          nodes: nodes || [],
+          edges: edges || [],
         });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to execute workflow");
-        }
-
-        const data = await response.json();
+        
         console.log("Execution response:", data);
 
-        if (data?.executionId) {
-          setExecutionId(data.executionId);
+        if (data?.id) {
+          setExecutionId(data.id);
 
           // Immediately trigger a query for the execution status
           queryClient.invalidateQueries({
-            queryKey: ["executionStatus", data.executionId],
+            queryKey: ["executionStatus", data.id],
           });
 
-          return data;
+          return { executionId: data.id };
         } else {
           throw new Error("Failed to start workflow execution");
         }

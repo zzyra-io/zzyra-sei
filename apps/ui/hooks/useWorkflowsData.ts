@@ -2,21 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/use-toast";
-
-export interface Workflow {
-  id: string;
-  user_id: string;
-  name: string;
-  description: string | null;
-  nodes: Record<string, unknown>[];
-  edges: Record<string, unknown>[];
-  is_public: boolean;
-  tags: string[];
-  created_at: string;
-  updated_at: string;
-  isFavorite: boolean;
-  last_run?: string;
-}
+import { workflowService, type Workflow } from "@/lib/services/workflow-service";
 
 /**
  * Custom hook for fetching all workflows
@@ -25,11 +11,7 @@ export function useWorkflows() {
   return useQuery({
     queryKey: ['workflows'],
     queryFn: async (): Promise<Workflow[]> => {
-      const response = await fetch('/api/workflows');
-      if (!response.ok) {
-        throw new Error('Failed to fetch workflows');
-      }
-      return response.json();
+      return await workflowService.getWorkflows();
     },
   });
 }
@@ -41,11 +23,7 @@ export function useWorkflow(id: string) {
   return useQuery({
     queryKey: ['workflow', id],
     queryFn: async (): Promise<Workflow> => {
-      const response = await fetch(`/api/workflows/${id}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch workflow with ID ${id}`);
-      }
-      return response.json();
+      return await workflowService.getWorkflow(id);
     },
     enabled: !!id,
   });
