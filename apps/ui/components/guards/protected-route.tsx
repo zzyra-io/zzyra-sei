@@ -3,8 +3,7 @@
 import type React from "react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useMagic } from "@/lib/magic-provider";
-import { useNextAuthSession } from "@/hooks/useNextAuthSession";
+import useAuthStore from "@/lib/store/auth-store";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,77 +18,42 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated, isLoading, error } = useAuthStore();
 
-  // Get authentication state from both Magic Link and NextAuth.js
-  const {
-    isAuthenticated: isMagicAuthenticated,
-    isInitializing: isMagicInitializing,
-  } = useMagic();
-  const {
-    isAuthenticated: isNextAuthAuthenticated,
-    isLoading: isNextAuthLoading,
-  } = useNextAuthSession();
-
-  // Combined authentication state - simplified to prevent loops
-  // We prioritize Magic authentication since that's your primary system
-  const isAuthenticated = isMagicAuthenticated;
-  const isAuthLoading = isMagicInitializing;
-
-  // Set client-side flag and handle authentication check
+  // Set client-side flag
   useEffect(() => {
-    try {
-      setIsClient(true);
-      setIsLoading(isAuthLoading);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "An unexpected error occurred"
-      );
-    }
-  }, [isAuthLoading]);
+    setIsClient(true);
+  }, []);
 
   // Handle unauthenticated users with redirect
   useEffect(() => {
-    if (isClient && !isAuthenticated && !isAuthLoading) {
+    if (isClient && !isAuthenticated && !isLoading) {
       try {
         // Don't redirect if we're already on the login page
-        if (window.location.pathname === "/login") {
+        if (window.location.pathname === redirectPath) {
           return;
         }
 
         // Store current path for post-login redirect
-        if (typeof window !== "undefined") {
-          const currentPath = window.location.pathname;
-          const query =
-            currentPath !== redirectPath
-              ? `?redirect=${encodeURIComponent(currentPath)}`
-              : "";
-          router.push(`${redirectPath}${query}`);
-        }
+        const currentPath = window.location.pathname;
+        const query =
+          currentPath !== redirectPath
+            ? `?redirect=${encodeURIComponent(currentPath)}`
+            : "";
+        router.push(`${redirectPath}${query}`);
       } catch (err) {
         console.error("Navigation error:", err);
-        router.push(redirectPath); // Fallback to redirectPath on error
+        router.push(redirectPath);
       }
     }
-  }, [isClient, isAuthenticated, isAuthLoading, router, redirectPath]);
-
-  console.log("ProtectedRoute auth state:", {
-    isClient,
-    isMagicAuthenticated,
-    isNextAuthAuthenticated,
-    isAuthenticated,
-    isMagicInitializing,
-    isNextAuthLoading,
-    isAuthLoading,
-  });
+  }, [isClient, isAuthenticated, isLoading, router, redirectPath]);
 
   if (!isClient || isLoading) {
     return fallback;
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div>Authentication Error: {error}</div>;
   }
 
   return isAuthenticated ? children : null;

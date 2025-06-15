@@ -4,6 +4,7 @@ import { OAuthProvider } from "@magic-ext/oauth2";
 import { useMagic } from "../magic-provider";
 import api from "../services/api";
 import { useRouter } from "next/navigation";
+import useAuthStore, { User } from "../store/auth-store";
 
 export type LoginResponse = {
   success: boolean;
@@ -22,6 +23,7 @@ export const useMagicAuth = () => {
   const { magic: magicInstance } = useMagic();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { setUser, setIsAuthenticated, setToken } = useAuthStore();
 
   // Login with email - complete flow including backend authentication
   const loginWithEmail = useMutation({
@@ -50,6 +52,18 @@ export const useMagicAuth = () => {
 
         // Step 4: Get user metadata
         const userMetadata = await magicInstance.user.getInfo();
+
+        console.log("userMetadata", userMetadata, "response", response);
+
+        setUser({
+          ...userMetadata,
+          ...response.data.user,
+        } as unknown as User);
+        setIsAuthenticated(true);
+        setToken({
+          accessToken: response.data.session.accessToken,
+          refreshToken: response.data.session.refreshToken,
+        });
 
         // Update both Magic auth state and query cache
         queryClient.setQueryData(["user"], userMetadata);

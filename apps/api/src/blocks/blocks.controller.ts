@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
   Body,
   Param,
@@ -16,17 +17,21 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from "@nestjs/swagger";
-import { BlocksService, BlockType, CustomBlock } from "./blocks.service";
+import {
+  BlocksService,
+  BlockType,
+  CreateCustomBlockRequest,
+} from "./blocks.service";
 import { Public } from "../auth/decorators/public.decorator";
 
 @ApiTags("blocks")
-@Controller()
+@Controller("blocks")
 @ApiBearerAuth()
 export class BlocksController {
   constructor(private readonly blocksService: BlocksService) {}
 
   @Public()
-  @Get("block-types")
+  @Get("types")
   @ApiOperation({ summary: "Get all available block types" })
   async getBlockTypes() {
     try {
@@ -41,7 +46,7 @@ export class BlocksController {
   }
 
   @Public()
-  @Get("block-schema")
+  @Get("schema")
   @ApiOperation({ summary: "Get block schema for a specific type" })
   async getBlockSchema(@Query("type") type?: string) {
     try {
@@ -55,7 +60,7 @@ export class BlocksController {
     }
   }
 
-  @Get("custom-blocks")
+  @Get("custom")
   @ApiOperation({ summary: "Get custom blocks" })
   async getCustomBlocks(
     @Query("is_public") isPublic?: string,
@@ -78,7 +83,7 @@ export class BlocksController {
     }
   }
 
-  @Get("custom-blocks/:id")
+  @Get("custom/:id")
   @ApiOperation({ summary: "Get custom block by ID" })
   async getCustomBlock(@Param("id") id: string, @Request() req: any) {
     try {
@@ -97,9 +102,12 @@ export class BlocksController {
     }
   }
 
-  @Post("custom-blocks")
+  @Post("custom")
   @ApiOperation({ summary: "Create custom block" })
-  async createCustomBlock(@Body() data: any, @Request() req: any) {
+  async createCustomBlock(
+    @Body() data: CreateCustomBlockRequest,
+    @Request() req: any
+  ) {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -116,7 +124,30 @@ export class BlocksController {
     }
   }
 
-  @Delete("custom-blocks/:id")
+  @Put("custom/:id")
+  @ApiOperation({ summary: "Update custom block" })
+  async updateCustomBlock(
+    @Param("id") id: string,
+    @Body() data: Partial<CreateCustomBlockRequest>,
+    @Request() req: any
+  ) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED);
+      }
+
+      return this.blocksService.updateCustomBlock(id, userId, data);
+    } catch (error) {
+      console.error("Error updating custom block:", error);
+      throw new HttpException(
+        "Failed to update custom block",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Delete("custom/:id")
   @ApiOperation({ summary: "Delete custom block" })
   async deleteCustomBlock(@Param("id") id: string, @Request() req: any) {
     try {

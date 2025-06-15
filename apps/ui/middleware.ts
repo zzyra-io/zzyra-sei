@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
 
 const PUBLIC_PATHS = [
   "/login",
   "/auth/callback",
   "/api/auth/login",
   "/api/auth/logout",
-  "/api/auth/signin",
-  "/api/auth/callback",
   "/api/health",
   "/",
 ];
@@ -15,9 +12,27 @@ const PUBLIC_PATHS = [
 const GUEST_PATHS = ["/login"];
 const STATIC_ASSET_REGEX = /\.(?:jpg|jpeg|png|webp|svg|ico|css|js)$/i;
 
-// Add a simple cache to prevent redirect loops
+// Simple cache to prevent redirect loops
 const redirectCache = new Map<string, number>();
-const REDIRECT_CACHE_TTL = 2000; // 2 seconds in milliseconds
+const REDIRECT_CACHE_TTL = 2000;
+
+const isAuthenticated = (req: NextRequest): boolean => {
+  // Check for access token in cookies
+  const accessToken = req.cookies.get("token")?.value;
+
+  if (!accessToken) {
+    return false;
+  }
+
+  try {
+    // Simple JWT validation (check if it exists and isn't expired)
+    const payload = JSON.parse(atob(accessToken.split(".")[1]));
+    const now = Math.floor(Date.now() / 1000);
+    return payload.exp > now;
+  } catch {
+    return false;
+  }
+};
 
 export async function middleware(req: NextRequest) {
   const { pathname, origin, searchParams } = req.nextUrl;
@@ -40,7 +55,7 @@ export async function middleware(req: NextRequest) {
     console.warn(
       `Potential redirect loop detected for ${requestUrl}. Allowing request to proceed.`
     );
-    return response; // Allow the request to proceed to prevent loops
+    return response;
   }
 
   // Allow public paths
@@ -55,24 +70,12 @@ export async function middleware(req: NextRequest) {
     return response;
   }
 
-  // Get session token
-  const cookieName =
-    process.env.NODE_ENV === "production"
-      ? "__Secure-next-auth.session-token"
-      : "next-auth.session-token";
-  const token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-    cookieName,
-  });
-
-  // Check for token validity
-  const isAuthenticated = !!token?.sub;
+  // Check authentication
+  const userIsAuthenticated = isAuthenticated(req);
 
   // Handle guest routes (like login page)
   const isGuestPath = GUEST_PATHS.includes(pathname);
-  if (isGuestPath && isAuthenticated) {
-    // User is authenticated and trying to access login page
+  if (isGuestPath && userIsAuthenticated) {
     const callbackUrl =
       searchParams.get("callbackUrl") || `${origin}/dashboard`;
     try {
@@ -81,7 +84,6 @@ export async function middleware(req: NextRequest) {
         redirectUrl.origin === origin &&
         !GUEST_PATHS.includes(redirectUrl.pathname)
       ) {
-        // Record this redirect to detect loops
         redirectCache.set(requestUrl, now);
         return NextResponse.redirect(redirectUrl);
       }
@@ -89,18 +91,16 @@ export async function middleware(req: NextRequest) {
       // Invalid callbackUrl
     }
 
-    // Record this redirect to detect loops
     redirectCache.set(requestUrl, now);
     return NextResponse.redirect(new URL("/dashboard", origin));
   }
 
   // Handle private routes
-  if (!isAuthenticated) {
+  if (!userIsAuthenticated) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Don't redirect to login if we're already on a public path
     if (isPublicPath) {
       return response;
     }
@@ -108,7 +108,6 @@ export async function middleware(req: NextRequest) {
     const loginUrl = new URL("/login", origin);
     loginUrl.searchParams.set("callbackUrl", req.url);
 
-    // Record this redirect to detect loops
     redirectCache.set(requestUrl, now);
     return NextResponse.redirect(loginUrl);
   }

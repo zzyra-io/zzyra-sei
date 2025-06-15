@@ -1,29 +1,42 @@
-import type { Database } from "@/types/supabase";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CustomBlockDefinition } from "@zyra/types";
 import { DataType, LogicType, NodeCategory } from "@zyra/types";
+import api from "./api";
+
+interface CreateCustomBlockRequest {
+  name: string;
+  description: string;
+  category: NodeCategory;
+  configFields: Array<{
+    name: string;
+    label: string;
+    type: string;
+    options?: string[];
+    required: boolean;
+  }>;
+  inputs: Array<{
+    name: string;
+    description: string;
+    type: DataType;
+    required: boolean;
+    defaultValue?: unknown;
+  }>;
+  outputs: Array<{
+    name: string;
+    description: string;
+    type: DataType;
+    required: boolean;
+  }>;
+  logicType: LogicType;
+  code: string;
+  isPublic?: boolean;
+  tags?: string[];
+}
 
 class CustomBlockService {
-  private supabase: SupabaseClient<Database> = createClient();
-
   async getCustomBlocks(): Promise<CustomBlockDefinition[]> {
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await this.supabase.auth.getUser();
-      if (authError || !user) throw new Error("Not authenticated");
-      // Only public blocks or those created by user
-      const { data, error } = await this.supabase
-        .from("custom_blocks")
-        .select("*")
-        .or(`created_by.eq.${user.id},is_public.eq.true`);
-
-      if (error) {
-        throw error;
-      }
-
-      return data as CustomBlockDefinition[];
+      const response = await api.get("/blocks/custom");
+      return response.data.blocks || [];
     } catch (error) {
       console.error("Error fetching custom blocks:", error);
       return this.getExampleBlocks();
@@ -32,23 +45,8 @@ class CustomBlockService {
 
   async getCustomBlockById(id: string): Promise<CustomBlockDefinition | null> {
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await this.supabase.auth.getUser();
-      if (authError || !user) throw new Error("Not authenticated");
-      const { data, error } = await this.supabase
-        .from("custom_blocks")
-        .select("*")
-        .eq("id", id)
-        .eq("created_by", user.id)
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      return data as CustomBlockDefinition;
+      const response = await api.get(`/blocks/custom/${id}`);
+      return response.data.block || null;
     } catch (error) {
       console.error(`Error fetching custom block with id ${id}:`, error);
       return null;
@@ -56,67 +54,33 @@ class CustomBlockService {
   }
 
   async createCustomBlock(
-    block: Omit<CustomBlockDefinition, "id" | "createdAt" | "updatedAt">
+    block: CreateCustomBlockRequest
   ): Promise<CustomBlockDefinition> {
-    const now = new Date().toISOString();
-    const newBlock: CustomBlockDefinition = {
-      ...block,
-      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await this.supabase.auth.getUser();
-      if (authError || !user) throw new Error("Not authenticated");
-      const { data, error } = await this.supabase
-        .from("custom_blocks")
-        .insert({ ...newBlock, created_by: user.id })
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      return data as CustomBlockDefinition;
+      const response = await api.post("/blocks/custom", block);
+      return response.data.block;
     } catch (error) {
       console.error("Error creating custom block:", error);
-      return newBlock; // Return the local version as fallback
+      // Return a local version as fallback
+      const now = new Date().toISOString();
+      return {
+        ...block,
+        id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: now,
+        updatedAt: now,
+        inputs: block.inputs,
+        outputs: block.outputs,
+      };
     }
   }
 
   async updateCustomBlock(
     id: string,
-    block: Partial<CustomBlockDefinition>
+    block: Partial<CreateCustomBlockRequest>
   ): Promise<CustomBlockDefinition | null> {
-    const updates = {
-      ...block,
-      updatedAt: new Date().toISOString(),
-    };
-
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await this.supabase.auth.getUser();
-      if (authError || !user) throw new Error("Not authenticated");
-      const { data, error } = await this.supabase
-        .from("custom_blocks")
-        .update(updates)
-        .eq("id", id)
-        .eq("created_by", user.id)
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      return data as CustomBlockDefinition;
+      const response = await api.put(`/blocks/custom/${id}`, block);
+      return response.data.block || null;
     } catch (error) {
       console.error(`Error updating custom block with id ${id}:`, error);
       return null;
@@ -125,21 +89,7 @@ class CustomBlockService {
 
   async deleteCustomBlock(id: string): Promise<boolean> {
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await this.supabase.auth.getUser();
-      if (authError || !user) throw new Error("Not authenticated");
-      const { error } = await this.supabase
-        .from("custom_blocks")
-        .delete()
-        .eq("id", id)
-        .eq("created_by", user.id);
-
-      if (error) {
-        throw error;
-      }
-
+      await api.delete(`/blocks/custom/${id}`);
       return true;
     } catch (error) {
       console.error(`Error deleting custom block with id ${id}:`, error);
@@ -156,43 +106,31 @@ class CustomBlockService {
         name: "Data Formatter",
         description: "Format data into a specific structure",
         category: NodeCategory.LOGIC,
-        configFields: [
-          {
-            name: "format",
-            label: "Format",
-            type: "select",
-            options: ["json", "csv", "xml"],
-            required: true,
-          },
-        ],
         inputs: [
           {
-            id: "input_1",
             name: "data",
             description: "The data to format",
-            dataType: DataType.OBJECT,
+            type: DataType.OBJECT,
             required: true,
           },
           {
-            id: "input_2",
             name: "format",
             description: "The format to apply",
-            dataType: DataType.STRING,
+            type: DataType.STRING,
             required: false,
             defaultValue: "json",
           },
         ],
         outputs: [
           {
-            id: "output_1",
             name: "formattedData",
             description: "The formatted data",
-            dataType: DataType.STRING,
+            type: DataType.STRING,
             required: true,
           },
         ],
         logicType: LogicType.JAVASCRIPT,
-        logic: `function process(inputs) {
+        code: `function process(inputs) {
   const { data, format } = inputs;
   
   if (format === 'json') {
@@ -216,49 +154,37 @@ class CustomBlockService {
         name: "Conditional Router",
         description: "Route data based on conditions",
         category: NodeCategory.LOGIC,
-        configFields: [
-          {
-            name: "condition",
-            label: "Condition",
-            type: "string",
-            required: true,
-          },
-        ],
         inputs: [
           {
-            id: "input_1",
             name: "value",
             description: "The value to evaluate",
-            dataType: DataType.ANY,
+            type: DataType.ANY,
             required: true,
           },
           {
-            id: "input_2",
             name: "condition",
             description: "The condition to check",
-            dataType: DataType.STRING,
+            type: DataType.STRING,
             required: true,
             defaultValue: "value > 10",
           },
         ],
         outputs: [
           {
-            id: "output_1",
             name: "result",
             description: "The result of the condition",
-            dataType: DataType.BOOLEAN,
+            type: DataType.BOOLEAN,
             required: true,
           },
           {
-            id: "output_2",
             name: "route",
             description: "The route to take (true/false)",
-            dataType: DataType.STRING,
+            type: DataType.STRING,
             required: true,
           },
         ],
         logicType: LogicType.CONDITION,
-        logic: `value > 10`,
+        code: `value > 10`,
         isPublic: true,
         createdAt: now,
         updatedAt: now,
@@ -269,61 +195,42 @@ class CustomBlockService {
         name: "Email Template",
         description: "Generate an email from a template",
         category: NodeCategory.ACTION,
-        configFields: [
-          {
-            name: "subject",
-            label: "Subject",
-            type: "string",
-            required: true,
-          },
-          {
-            name: "body",
-            label: "Body",
-            type: "string",
-            required: true,
-          },
-        ],
         inputs: [
           {
-            id: "input_1",
             name: "name",
             description: "Recipient name",
-            dataType: DataType.STRING,
+            type: DataType.STRING,
             required: true,
           },
           {
-            id: "input_2",
             name: "company",
             description: "Company name",
-            dataType: DataType.STRING,
+            type: DataType.STRING,
             required: false,
           },
           {
-            id: "input_3",
             name: "product",
             description: "Product name",
-            dataType: DataType.STRING,
+            type: DataType.STRING,
             required: true,
           },
         ],
         outputs: [
           {
-            id: "output_1",
             name: "subject",
             description: "Email subject",
-            dataType: DataType.STRING,
+            type: DataType.STRING,
             required: true,
           },
           {
-            id: "output_2",
             name: "body",
             description: "Email body",
-            dataType: DataType.STRING,
+            type: DataType.STRING,
             required: true,
           },
         ],
         logicType: LogicType.TEMPLATE,
-        logic: `Subject: Information about {{product}}
+        code: `Subject: Information about {{product}}
 
 Dear {{name}},
 

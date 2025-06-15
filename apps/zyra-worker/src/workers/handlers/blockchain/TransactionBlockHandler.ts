@@ -10,7 +10,6 @@ import {
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createServiceClient } from '../../../lib/supabase/serviceClient';
 import { CircuitBreaker } from '../../../lib/blockchain/CircuitBreaker';
 import { CircuitBreakerDbService } from '../../../lib/blockchain/CircuitBreakerDbService';
 import { isRecoverableError } from './isRecoverableError';

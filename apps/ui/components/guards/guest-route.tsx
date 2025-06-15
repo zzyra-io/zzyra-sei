@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useMagic } from "@/lib/magic-provider";
-import { useNextAuthSession } from "@/hooks/useNextAuthSession";
+import useAuthStore from "@/lib/store/auth-store";
 
 interface GuestRouteProps {
   children: React.ReactNode;
@@ -13,39 +12,16 @@ interface GuestRouteProps {
 export function GuestRoute({ children, fallback = null }: GuestRouteProps) {
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated, isLoading, error } = useAuthStore();
 
-  // Get authentication state from both Magic Link and NextAuth.js
-  const {
-    isAuthenticated: isMagicAuthenticated,
-    isInitializing: isMagicInitializing,
-  } = useMagic();
-  const {
-    isAuthenticated: isNextAuthAuthenticated,
-    isLoading: isNextAuthLoading,
-  } = useNextAuthSession();
-
-  // Combined authentication state - simplified to prevent loops
-  // We prioritize Magic authentication since that's your primary system
-  const isAuthenticated = isMagicAuthenticated;
-  const isAuthLoading = isMagicInitializing;
-
-  // Set client-side flag and handle authentication check
+  // Set client-side flag
   useEffect(() => {
-    try {
-      setIsClient(true);
-      setIsLoading(isAuthLoading);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "An unexpected error occurred"
-      );
-    }
-  }, [isAuthLoading]);
+    setIsClient(true);
+  }, []);
 
-  // Handle authenticated users by redirecting to previous page or home
+  // Handle authenticated users by redirecting to dashboard
   useEffect(() => {
-    if (isClient && isAuthenticated && !isAuthLoading) {
+    if (isClient && isAuthenticated && !isLoading) {
       try {
         // Don't redirect if we're already on the login page
         if (window.location.pathname === "/login") {
@@ -60,27 +36,17 @@ export function GuestRoute({ children, fallback = null }: GuestRouteProps) {
         }
       } catch (err) {
         console.error("Navigation error:", err);
-        router.push("/dashboard"); // Fallback to home on error
+        router.push("/dashboard");
       }
     }
-  }, [isClient, isAuthenticated, isAuthLoading, router]);
-
-  console.log("GuestRoute auth state:", {
-    isClient,
-    isMagicAuthenticated,
-    isNextAuthAuthenticated,
-    isAuthenticated,
-    isMagicInitializing,
-    isNextAuthLoading,
-    isAuthLoading,
-  });
+  }, [isClient, isAuthenticated, isLoading, router]);
 
   if (!isClient || isLoading) {
     return fallback;
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div>Authentication Error: {error}</div>;
   }
 
   return !isAuthenticated ? children : null;

@@ -12,18 +12,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
-import { signOut, useSession } from "next-auth/react";
+import { useAuth } from "@/lib/hooks/use-auth";
 
 export function UserMenu() {
-  const { data: session } = useSession();
   const router = useRouter();
   const { toast } = useToast();
+  const { user, executeLogout, isLoading } = useAuth();
 
-  const handleSignOut = async () => {
+  const handleSignOut = async (): Promise<void> => {
     try {
-      await signOut();
-      router.push("/login");
+      await executeLogout();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out.",
+      });
     } catch (error) {
+      console.error("Sign out error:", error);
       toast({
         title: "Error signing out",
         description: "Please try again.",
@@ -32,7 +36,7 @@ export function UserMenu() {
     }
   };
 
-  const handleSettings = () => {
+  const handleSettings = (): void => {
     router.push("/settings");
   };
 
@@ -45,15 +49,15 @@ export function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end'>
-        <DropdownMenuLabel>{session?.user?.email || "User"}</DropdownMenuLabel>
+        <DropdownMenuLabel>{user?.email || "User"}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSettings}>
           <Settings className='mr-2 h-4 w-4' />
           <span>Settings</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleSignOut}>
+        <DropdownMenuItem onClick={handleSignOut} disabled={isLoading}>
           <LogOut className='mr-2 h-4 w-4' />
-          <span>Sign out</span>
+          <span>{isLoading ? "Signing out..." : "Sign out"}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

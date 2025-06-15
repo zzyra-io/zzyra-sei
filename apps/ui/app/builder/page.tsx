@@ -66,6 +66,7 @@ export default function BuilderPage() {
     addToHistory,
     setRecentPrompts,
     setGenerationStatus,
+    setPartialNodes,
   } = useWorkflowStore();
 
   const toolbar = useFlowToolbar();

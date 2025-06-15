@@ -2,12 +2,12 @@
  * Magic Login Form
  *
  * A form component for Magic Link authentication with email, SMS, or OAuth providers.
- * Integrates with @zyra/wallet for Magic Link authentication.
+ * Uses the unified auth system with Zustand store.
  */
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react"; // Added for loading indicator
+import { Loader2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -19,8 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useState } from "react";
-import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
-import { useSession } from "next-auth/react";
+import { useAuth } from "@/lib/hooks/use-auth";
 
 /**
  * Magic Login Form Props
@@ -34,119 +33,41 @@ interface MagicLoginFormProps {
  * This doesn't depend on Wagmi so it works even if WagmiProvider is missing
  */
 export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
-  // Initialize state for form
   const [email, setEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [activeTab, setActiveTab] = useState<string>("email");
-  const [formLoading] = useState(false); // Used for UI state
-  const [formError, setFormError] = useState<Error | null>(null);
+  const { isAuthenticated, isLoading, error, executeLogin, clearError } =
+    useAuth();
 
-  // Magic auth hook for direct authentication
-  const {
-    loginWithEmail,
-    // isLoading and isAuthenticated are now primarily from useMagic()
-    error: authError, // This is error from loginWithEmail mutation
-  } = useMagicAuth();
-  const { status } = useSession();
-
-  // // Check for authentication success
+  // Handle authentication success
   useEffect(() => {
-    if (status === "authenticated" && onSuccess) {
+    if (isAuthenticated && onSuccess) {
       console.log("Authentication successful, redirecting...");
       onSuccess();
     }
-  }, [status, onSuccess]);
+  }, [isAuthenticated, onSuccess]);
 
   // Handle email login with Magic Link
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || loginWithEmail.isPending) return; // Use mutation's pending state
+    if (!email || isLoading) return;
 
-    // setFormLoading(true); // Mutation's isPending can be used directly for UI
-    setFormError(null);
+    clearError();
 
     try {
-      console.log("MagicLoginForm: Starting Magic Link login for", email);
-
       // Validate email format
       if (!email.includes("@") || !email.includes(".")) {
         throw new Error("Please enter a valid email address");
       }
 
-      // Use Magic Auth directly with more detailed logging
-      console.log("Calling loginWithEmail.mutateAsync with email:", email);
-      const result = await loginWithEmail.mutateAsync(email);
-      console.log("Login result:", result);
-
-      // If we get here, the login was successful
-      console.log("Magic Link login successful");
+      console.log("MagicLoginForm: Starting Magic Link login for", email);
+      await executeLogin({ email });
     } catch (err) {
       console.error("MagicLoginForm: Email login failed:", err);
-      setFormError(
-        err instanceof Error
-          ? err
-          : new Error(
-              "Email login failed. Please check your connection and try again."
-            )
-      );
-    } finally {
-      // setFormLoading(false); // isPending will update automatically
     }
   };
 
-  // Handle SMS login
-  // const handleSMSLogin = async (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   if (!phoneNumber || formLoading) return;
-
-  //   setFormLoading(true);
-  //   setFormError(null);
-
-  //   try {
-  //     console.log("MagicLoginForm: Starting SMS login for", phoneNumber);
-
-  //     // Use Magic Auth directly
-  //     await loginWithSMS.mutateAsync({ phoneNumber });
-  //   } catch (err) {
-  //     setFormError(err instanceof Error ? err : new Error("SMS login failed"));
-  //     console.error("SMS login failed:", err);
-  //   } finally {
-  //     setFormLoading(false);
-  //   }
-  // };
-
-  // Handle OAuth login
-  // const handleOAuthLogin = async (provider: OAuthProvider) => {
-  //   setFormLoading(true);
-  //   setFormError(null);
-
-  //   try {
-  //     console.log(`MagicLoginForm: Starting OAuth login with ${provider}`);
-
-  //     // Save provider in sessionStorage for OAuth callback handling
-  //     // Using sessionStorage for consistency with magic-auth.ts implementation
-  //     sessionStorage.setItem("MAGIC_OAUTH_PROVIDER", provider);
-
-  //     // Use the OAuth provider from Magic Auth
-  //     await loginWithOAuth.mutateAsync({ provider });
-  //   } catch (err) {
-  //     setFormError(
-  //       err instanceof Error ? err : new Error(`${provider} login failed`)
-  //     );
-  //     console.error(`${provider} login failed:`, err);
-  //   } finally {
-  //     setFormLoading(false);
-  //   }
-  // };
-
-  // Determine loading state
-  const isLoading = formLoading;
-
-  // Determine error state
-  const displayError = formError || authError;
-
-  // Only show loading state when we're in the process of authenticating
-  if (loginWithEmail.isPending) {
+  // Show loading state when authenticating
+  if (isLoading) {
     return (
       <Card className='w-full max-w-md mx-auto'>
         <CardHeader>
@@ -168,8 +89,8 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
     );
   }
 
-  // If already authenticated, show a success message with redirect info
-  if (status === "authenticated") {
+  // Show success state if already authenticated
+  if (isAuthenticated) {
     return (
       <Card className='w-full max-w-md mx-auto'>
         <CardHeader>
@@ -196,157 +117,46 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
         </CardDescription>
       </CardHeader>
 
-      {displayError && (
+      {error && (
         <Alert variant='destructive' className='mx-6 mb-4'>
-          <AlertDescription>{displayError.message}</AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       <CardContent>
-        <Tabs
-          defaultValue='email'
-          value={activeTab}
-          onValueChange={setActiveTab}>
-          <TabsList className='grid w-full grid-cols-3'>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className='grid w-full grid-cols-1'>
             <TabsTrigger value='email'>Email</TabsTrigger>
-            <TabsTrigger value='sms'>SMS</TabsTrigger>
-            <TabsTrigger value='social'>Social</TabsTrigger>
           </TabsList>
 
-          {/* Email Login */}
-          <TabsContent value='email'>
-            <form onSubmit={handleEmailLogin}>
-              <div className='space-y-4'>
-                <div className='space-y-2'>
-                  <Label htmlFor='email'>Email</Label>
-                  <Input
-                    id='email'
-                    type='email'
-                    placeholder='your@email.com'
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={
-                      loginWithEmail.isPending || status === "authenticated"
-                    }
-                    required
-                  />
-                </div>
-
-                <Button
-                  type='submit'
-                  className='w-full'
-                  disabled={
-                    !email ||
-                    loginWithEmail.isPending ||
-                    status === "authenticated"
-                  }>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                      Sending Magic Link...
-                    </>
-                  ) : (
-                    "Login with Email"
-                  )}
-                </Button>
+          <TabsContent value='email' className='space-y-4'>
+            <form onSubmit={handleEmailLogin} className='space-y-4'>
+              <div className='space-y-2'>
+                <Label htmlFor='email'>Email</Label>
+                <Input
+                  id='email'
+                  type='email'
+                  placeholder='Enter your email'
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
               </div>
+              <Button
+                type='submit'
+                className='w-full'
+                disabled={!email || isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    Sending Magic Link...
+                  </>
+                ) : (
+                  "Send Magic Link"
+                )}
+              </Button>
             </form>
-          </TabsContent>
-
-          {/* SMS Login */}
-          <TabsContent value='sms'>
-            <form
-              onSubmit={() => {
-                console.log("handleSMSLogin not implemented");
-              }}>
-              <div className='space-y-4'>
-                <div className='space-y-2'>
-                  <Label htmlFor='phone'>Phone Number</Label>
-                  <Input
-                    id='phone'
-                    type='tel'
-                    placeholder='+1 (555) 123-4567'
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    disabled={status === "authenticated"} // Assuming SMS login would have its own mutation.isPending
-                    required
-                  />
-                </div>
-
-                <Button
-                  type='submit'
-                  className='w-full'
-                  disabled={!phoneNumber || status === "authenticated"}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                      Sending SMS...
-                    </>
-                  ) : (
-                    "Login with SMS"
-                  )}
-                </Button>
-              </div>
-            </form>
-          </TabsContent>
-
-          {/* Social Login */}
-          <TabsContent value='social'>
-            <div className='space-y-4'>
-              <Button
-                type='button'
-                className='w-full'
-                variant='outline'
-                onClick={() => {
-                  console.log("handleOAuthLogin not implemented");
-                }}
-                disabled={status === "authenticated"}>
-                {status === "authenticated" ? (
-                  <>
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    Connecting...
-                  </>
-                ) : (
-                  "Continue with Google"
-                )}
-              </Button>
-
-              <Button
-                type='button'
-                className='w-full'
-                variant='outline'
-                onClick={() => {
-                  console.log("handleOAuthLogin not implemented");
-                }}
-                disabled={status === "authenticated"}>
-                {status === "authenticated" ? (
-                  <>
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    Connecting...
-                  </>
-                ) : (
-                  "Continue with Apple"
-                )}
-              </Button>
-
-              <Button
-                type='button'
-                className='w-full'
-                variant='outline'
-                onClick={() => {
-                  console.log("handleOAuthLogin not implemented");
-                }}
-                disabled={status === "authenticated"}>
-                {status === "authenticated" ? (
-                  <>
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    Connecting...
-                  </>
-                ) : (
-                  "Continue with GitHub"
-                )}
-              </Button>
-            </div>
           </TabsContent>
         </Tabs>
       </CardContent>

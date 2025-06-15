@@ -34,6 +34,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { BlockType } from "@zyra/types";
 import { NodeCategory, getCategoryColor, BlockMetadata } from "@zyra/types";
+import api from "@/lib/services/api";
 
 interface BlockCatalogProps {
   onDragStart?: (
@@ -68,10 +69,15 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
     localStorage.setItem(RECENT_KEY, JSON.stringify(recents));
   }, [recents]);
   useEffect(() => {
-    fetch("/api/block-types")
-      .then((res) => res.json())
-      .then((data: BlockMetadata[]) => setBlocks(data))
-      .catch((err) => console.error("Failed to load block types", err));
+    api
+      .get("/blocks/types")
+      .then((res: any) => {
+        setBlocks(res.data || []);
+      })
+      .catch((err: any) => {
+        console.error("Failed to load block types", err);
+        setBlocks([]);
+      });
   }, []);
   const toggleFavorite = (type: BlockType) =>
     setFavorites((f) =>
