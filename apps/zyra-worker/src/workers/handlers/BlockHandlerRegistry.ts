@@ -84,11 +84,79 @@ export class BlockHandlerRegistry {
       ),
 
       // Logic blocks with dedicated handlers
-
+      [BlockType.SCHEDULE]: new MetricsBlockHandler(
+        BlockType.SCHEDULE,
+        new ScheduleBlockHandler(),
+      ),
       [BlockType.DELAY]: new MetricsBlockHandler(
         BlockType.DELAY,
         new ScheduleBlockHandler(),
       ),
+
+      // Additional block types mapped to existing handlers
+      [BlockType.HTTP_CALL]: new MetricsBlockHandler(
+        BlockType.HTTP_CALL,
+        new HttpRequestHandler(),
+      ),
+      [BlockType.WEBHOOK]: new MetricsBlockHandler(
+        BlockType.WEBHOOK,
+        new HttpRequestHandler(),
+      ),
+      [BlockType.MESSAGE_SEND]: new MetricsBlockHandler(
+        BlockType.MESSAGE_SEND,
+        new NotificationBlockHandler(this.databaseService, {} as any),
+      ),
+
+      // Placeholder handlers for unimplemented block types
+      [BlockType.DATABASE_QUERY]: new MetricsBlockHandler(
+        BlockType.DATABASE_QUERY,
+        {
+          execute: () => {
+            throw new Error('DATABASE_QUERY block type not yet implemented');
+          },
+        },
+      ),
+      [BlockType.FILE_READ]: new MetricsBlockHandler(BlockType.FILE_READ, {
+        execute: () => {
+          throw new Error('FILE_READ block type not yet implemented');
+        },
+      }),
+      [BlockType.TRANSFORMER]: new MetricsBlockHandler(BlockType.TRANSFORMER, {
+        execute: () => {
+          throw new Error('TRANSFORMER block type not yet implemented');
+        },
+      }),
+      [BlockType.AGGREGATOR]: new MetricsBlockHandler(BlockType.AGGREGATOR, {
+        execute: () => {
+          throw new Error('AGGREGATOR block type not yet implemented');
+        },
+      }),
+      [BlockType.LOOP]: new MetricsBlockHandler(BlockType.LOOP, {
+        execute: () => {
+          throw new Error('LOOP block type not yet implemented');
+        },
+      }),
+      [BlockType.DATABASE_WRITE]: new MetricsBlockHandler(
+        BlockType.DATABASE_WRITE,
+        {
+          execute: () => {
+            throw new Error('DATABASE_WRITE block type not yet implemented');
+          },
+        },
+      ),
+      [BlockType.BLOCKCHAIN_WRITE]: new MetricsBlockHandler(
+        BlockType.BLOCKCHAIN_WRITE,
+        {
+          execute: () => {
+            throw new Error('BLOCKCHAIN_WRITE block type not yet implemented');
+          },
+        },
+      ),
+      [BlockType.FILE_WRITE]: new MetricsBlockHandler(BlockType.FILE_WRITE, {
+        execute: () => {
+          throw new Error('FILE_WRITE block type not yet implemented');
+        },
+      }),
 
       // Magic Wallet handler for blockchain operations via Magic Link
       [BlockType.MAGIC_WALLET]: new MetricsBlockHandler(
@@ -97,8 +165,11 @@ export class BlockHandlerRegistry {
       ),
 
       [BlockType.UNKNOWN]: new MetricsBlockHandler(BlockType.UNKNOWN, {
-        execute: () => {
-          throw new Error('Unknown block type');
+        execute: (inputs: any, context: any) => {
+          const blockType = context?.blockType || 'unknown';
+          throw new Error(
+            `Unknown block type: ${blockType}. Available types: ${Object.keys(this.handlers).join(', ')}`,
+          );
         },
       }),
     };
@@ -126,6 +197,12 @@ export class BlockHandlerRegistry {
         return this.handlers[handlerKey];
       }
     }
+
+    // Log the unknown block type for debugging
+    this.logger.error(`Unknown block type encountered: ${type}`);
+    this.logger.error(
+      `Available block types: ${Object.keys(this.handlers).join(', ')}`,
+    );
 
     // Fall back to unknown handler
     return this.handlers[BlockType.UNKNOWN];

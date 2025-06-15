@@ -3,6 +3,7 @@ import { workflowService } from '@/lib/services/workflow-service';
 import { executionService } from '@/lib/services/execution-service';
 import { useState, useEffect } from 'react';
 import type { ExecutionResult } from '@/lib/services/execution-service';
+import api from '../services/api';
 
 // Use the Workflow type from the service to ensure compatibility
 type Workflow = ReturnType<typeof workflowService.getWorkflow> extends Promise<infer T> ? T : never;
@@ -21,6 +22,8 @@ interface WorkflowDetailHookResult {
     date: string;
     avgDuration: number;
     failureRate: number;
+    nodeLabel: string;
+    executionCount: number;
   }>;
   isWorkflowLoading: boolean;
   isLogsLoading: boolean;
@@ -52,6 +55,8 @@ export function useWorkflowDetail(workflowId: string | undefined): WorkflowDetai
       date: string;
       avgDuration: number;
       failureRate: number;
+      nodeLabel: string;
+      executionCount: number;
     }>
   >([]);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
@@ -71,7 +76,7 @@ export function useWorkflowDetail(workflowId: string | undefined): WorkflowDetai
   // Fetch execution logs
   const { data: logsData, isLoading: isLogsQueryLoading } = useQuery({
     queryKey: ['workflow-executions', workflowId],
-    queryFn: () => executionService.getWorkflowExecutions(workflowId!),
+    queryFn: () => executionService.getExecutions({ workflowId }),
     enabled: !!workflowId,
   });
 
@@ -79,9 +84,8 @@ export function useWorkflowDetail(workflowId: string | undefined): WorkflowDetai
   const { data: statsData, isLoading: isStatsQueryLoading } = useQuery({
     queryKey: ['workflow-stats', workflowId],
     queryFn: async () => {
-      const res = await fetch(`/api/executions/stats?workflowId=${workflowId}`);
-      if (!res.ok) return null;
-      return res.json();
+      const res = await api.get(`/executions/stats?workflowId=${workflowId}`);
+      return res.data;
     },
     enabled: !!workflowId,
   });
@@ -90,9 +94,8 @@ export function useWorkflowDetail(workflowId: string | undefined): WorkflowDetai
   const { data: trendsData, isLoading: isTrendsQueryLoading } = useQuery({
     queryKey: ['workflow-trends', workflowId],
     queryFn: async () => {
-      const res = await fetch(`/api/executions/trends?workflowId=${workflowId}`);
-      if (!res.ok) return [];
-      return res.json();
+      const res = await api.get(`/executions/trends?workflowId=${workflowId}`);
+      return res.data;
     },
     enabled: !!workflowId,
   });
@@ -101,9 +104,8 @@ export function useWorkflowDetail(workflowId: string | undefined): WorkflowDetai
   const { data: heatmapData, isLoading: isHeatmapQueryLoading } = useQuery({
     queryKey: ['workflow-heatmap', workflowId],
     queryFn: async () => {
-      const res = await fetch(`/api/executions/heatmap?workflowId=${workflowId}`);
-      if (!res.ok) return [];
-      return res.json();
+      const res = await api.get(`/executions/heatmap?workflowId=${workflowId}`);
+      return res.data;
     },
     enabled: !!workflowId,
   });
@@ -119,14 +121,27 @@ export function useWorkflowDetail(workflowId: string | undefined): WorkflowDetai
   useEffect(() => {
     if (workflowData) setWorkflow(workflowData);
     if (logsData) {
-      setExecutionLogs(logsData);
-      if (logsData.length > 0 && !selectedExecutionId) {
-        setSelectedExecutionId(logsData[0].id);
+        setExecutionLogs(logsData.executions);
+      if (logsData.executions.length > 0 && !selectedExecutionId) {
+        setSelectedExecutionId(logsData.executions[0].id);
       }
     }
     if (statsData) setStats(statsData);
     if (trendsData) setTrends(trendsData);
-    if (heatmapData) setHeatmap(heatmapData);
+    if (heatmapData) {
+      // Transform heatmap data to match UI expectations
+      const transformedHeatmap = heatmapData.map((item: {
+        nodeId: string;
+        date: string;
+        avgDuration: number;
+        failureRate: number;
+        executionCount: number;
+      }) => ({
+        ...item,
+        nodeLabel: item.nodeId === 'workflow' ? 'Workflow' : item.nodeId, // Transform nodeId to nodeLabel
+      }));
+      setHeatmap(transformedHeatmap);
+    }
 
     // Update loading states
     setIsWorkflowLoading(isWorkflowQueryLoading);
@@ -168,9 +183,9 @@ export function useWorkflowDetail(workflowId: string | undefined): WorkflowDetai
     if (activeTab === 'history' && workflowId) {
       const pollInterval = setInterval(async () => {
         try {
-          const updatedLogs = await executionService.getWorkflowExecutions(workflowId);
-          if (updatedLogs && updatedLogs.length !== executionLogs.length) {
-            setExecutionLogs(updatedLogs);
+          const updatedLogs = await executionService.getExecutions({ workflowId });
+          if (updatedLogs && updatedLogs.executions.length !== executionLogs.length) {
+            setExecutionLogs(updatedLogs.executions);
           }
         } catch (error) {
           console.error('Error polling execution logs:', error);
@@ -179,7 +194,7 @@ export function useWorkflowDetail(workflowId: string | undefined): WorkflowDetai
 
       return () => clearInterval(pollInterval);
     }
-  }, [activeTab, workflowId, executionLogs.length]);
+    }, [activeTab, workflowId, executionLogs]);
 
   // Calculate execution summary
   const executionSummary = {

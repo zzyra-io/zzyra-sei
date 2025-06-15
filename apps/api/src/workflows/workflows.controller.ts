@@ -24,6 +24,10 @@ import {
   WorkflowDto,
   PaginatedWorkflowsResponseDto,
 } from "./dto/workflow.dto";
+import {
+  ExecuteWorkflowDto,
+  ExecuteWorkflowResponseDto,
+} from "./dto/execute-workflow.dto";
 import { WorkflowsService } from "./workflows.service";
 import { Public } from "../auth/decorators/public.decorator";
 
@@ -119,16 +123,13 @@ export class WorkflowsController {
   }
 
   @Post(":id/execute")
-  @ApiOperation({ summary: "Execute a workflow" })
+  @ApiOperation({
+    summary: "Execute a workflow immediately or schedule for later",
+  })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    description: "Workflow execution started successfully",
-    schema: {
-      type: "object",
-      properties: {
-        executionId: { type: "string" },
-      },
-    },
+    description: "Workflow execution started or scheduled successfully",
+    type: ExecuteWorkflowResponseDto,
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,
@@ -136,8 +137,24 @@ export class WorkflowsController {
   })
   async execute(
     @Request() req: { user: { id: string } },
-    @Param("id") id: string
-  ): Promise<{ executionId: string }> {
-    return this.workflowsService.execute(id, req.user.id);
+    @Param("id") id: string,
+    @Body() executeDto: ExecuteWorkflowDto = {}
+  ): Promise<ExecuteWorkflowResponseDto> {
+    const scheduledTime = executeDto.scheduledTime
+      ? new Date(executeDto.scheduledTime)
+      : undefined;
+
+    const result = await this.workflowsService.execute(
+      id,
+      req.user.id,
+      scheduledTime,
+      executeDto.input
+    );
+
+    return {
+      executionId: result.executionId,
+      status: scheduledTime ? "scheduled" : "immediate",
+      scheduledTime: scheduledTime?.toISOString(),
+    };
   }
 }

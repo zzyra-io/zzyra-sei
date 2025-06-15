@@ -23,24 +23,21 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { WorkflowCard } from "@/components/workflow-card";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetricsData";
-import { 
-  useWorkflows, 
-  useDeleteWorkflow, 
-  useToggleFavorite, 
-  type Workflow 
+import {
+  useDeleteWorkflow,
+  useToggleFavorite,
+  useWorkflows,
 } from "@/hooks/useWorkflowsData";
 import {
-  Activity,
   ArrowUpDown,
   ChevronDown,
-  Clock,
   LayoutGrid,
   List,
   PlusCircle,
   RefreshCw,
   Search,
   Star,
-  X,
+  X
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";

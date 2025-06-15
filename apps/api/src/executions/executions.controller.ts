@@ -7,6 +7,8 @@ import {
   Body,
   HttpStatus,
   HttpException,
+  Request,
+  UseGuards,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -14,7 +16,9 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
+  ApiBearerAuth,
 } from "@nestjs/swagger";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ExecutionsService } from "./executions.service";
 import { NodeExecutionsService } from "./node-executions.service";
 import { NodeLogsService } from "./node-logs.service";
@@ -27,34 +31,14 @@ import {
 
 @ApiTags("executions")
 @Controller("executions")
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class ExecutionsController {
   constructor(
     private readonly executionsService: ExecutionsService,
     private readonly nodeExecutionsService: NodeExecutionsService,
     private readonly nodeLogsService: NodeLogsService
   ) {}
-
-  @Get(":id")
-  @ApiOperation({ summary: "Get execution by ID" })
-  @ApiParam({ name: "id", description: "ID of the execution" })
-  @ApiResponse({
-    status: 200,
-    description: "Returns execution details",
-    type: WorkflowExecutionDto,
-  })
-  @ApiResponse({ status: 404, description: "Execution not found" })
-  async getExecution(@Param("id") id: string): Promise<any> {
-    try {
-      return await this.executionsService.findOne(id);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      throw new HttpException(
-        `Failed to get execution: ${errorMessage}`,
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
-    }
-  }
 
   @Get()
   @ApiOperation({ summary: "Get workflow executions" })
@@ -94,6 +78,7 @@ export class ExecutionsController {
     type: [WorkflowExecutionDto],
   })
   async getWorkflowExecutions(
+    @Request() req: { user: { id: string } },
     @Query("workflowId") workflowId: string,
     @Query("limit") limit = 10,
     @Query("offset") offset = 0,
@@ -102,21 +87,116 @@ export class ExecutionsController {
     @Query("sortOrder") sortOrder = "desc"
   ): Promise<{ executions: any[]; total: number }> {
     try {
-      // Adjust parameters to match the service method signature
+      // Get executions for the authenticated user
       const executions = await this.executionsService.findAll(
-        workflowId,
+        req.user.id,
         +limit
       );
 
+      // Filter by workflowId if provided
+      const filteredExecutions = workflowId
+        ? executions.filter((exec) => exec.workflowId === workflowId)
+        : executions;
+
       return {
-        executions,
-        total: executions.length, // In a real implementation, you'd have a separate count query
+        executions: filteredExecutions,
+        total: filteredExecutions.length,
       };
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       throw new HttpException(
         `Failed to get workflow executions: ${errorMessage}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get("stats")
+  @ApiOperation({ summary: "Get execution statistics" })
+  @ApiQuery({
+    name: "workflowId",
+    required: false,
+    description: "Filter by workflow ID",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Returns execution statistics",
+  })
+  async getStats(
+    @Request() req: { user?: { id: string } },
+    @Query("workflowId") workflowId?: string
+  ): Promise<any> {
+    try {
+      const userId = req.user?.id;
+      return await this.executionsService.getStats(userId, workflowId);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new HttpException(
+        `Failed to get execution stats: ${errorMessage}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get("trends")
+  @ApiOperation({ summary: "Get execution trends" })
+  @ApiQuery({
+    name: "days",
+    required: false,
+    description: "Number of days to get trends for",
+  })
+  @ApiQuery({
+    name: "workflowId",
+    required: false,
+    description: "Filter by workflow ID",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Returns execution trends",
+  })
+  async getTrends(
+    @Request() req: { user?: { id: string } },
+    @Query("days") days = 7,
+    @Query("workflowId") workflowId?: string
+  ): Promise<any> {
+    try {
+      const userId = req.user?.id;
+      return await this.executionsService.getTrends(userId, +days, workflowId);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new HttpException(
+        `Failed to get execution trends: ${errorMessage}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get("heatmap")
+  @ApiOperation({ summary: "Get execution heatmap" })
+  @ApiQuery({
+    name: "workflowId",
+    required: false,
+    description: "Filter by workflow ID",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Returns execution heatmap",
+  })
+  async getHeatmap(
+    @Request() req: { user?: { id: string } },
+    @Query("workflowId") workflowId?: string
+  ): Promise<any> {
+    try {
+      const userId = req.user?.id;
+      return await this.executionsService.getHeatmap(userId, workflowId);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new HttpException(
+        `Failed to get execution heatmap: ${errorMessage}`,
         HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
@@ -176,16 +256,42 @@ export class ExecutionsController {
     }
   }
 
+  @Get(":id")
+  @ApiOperation({ summary: "Get execution by ID" })
+  @ApiParam({ name: "id", description: "ID of the execution" })
+  @ApiResponse({
+    status: 200,
+    description: "Returns execution details",
+    type: WorkflowExecutionDto,
+  })
+  @ApiResponse({ status: 404, description: "Execution not found" })
+  async getExecution(
+    @Request() req: { user: { id: string } },
+    @Param("id") id: string
+  ): Promise<any> {
+    try {
+      return await this.executionsService.findOne(id, req.user.id);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new HttpException(
+        `Failed to get execution: ${errorMessage}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   @Post(":id/retry")
   @ApiOperation({ summary: "Retry a workflow execution" })
   @ApiParam({ name: "id", description: "ID of the workflow execution" })
   @ApiResponse({ status: 200, description: "Execution retried successfully" })
   async retryExecution(
+    @Request() req: { user: { id: string } },
     @Param("id") id: string,
     @Body() actionDto: ExecutionActionDto
   ): Promise<any> {
     try {
-      return await this.executionsService.retry(id, actionDto.nodeId);
+      return await this.executionsService.retry(id, req.user.id);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";

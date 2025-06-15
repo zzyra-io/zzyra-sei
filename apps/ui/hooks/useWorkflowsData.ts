@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/use-toast";
 import { workflowService, type Workflow } from "@/lib/services/workflow-service";
+import api from "@/lib/services/api";
 
 /**
  * Custom hook for fetching all workflows
@@ -37,20 +38,9 @@ export function useCreateWorkflow() {
   
   return useMutation({
     mutationFn: async (workflowData: Partial<Workflow>) => {
-      const response = await fetch('/api/workflows', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(workflowData),
-      });
+      const response = await api.post('/workflows', workflowData);
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create workflow');
-      }
-      
-      return response.json();
+      return response.data;
     },
     onSuccess: () => {
       // Invalidate workflows query to refresh the list
@@ -78,20 +68,9 @@ export function useUpdateWorkflow() {
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: string, data: Partial<Workflow> }) => {
-      const response = await fetch(`/api/workflows/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      const response = await api.put(`/workflows/${id}`, data);
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update workflow');
-      }
-      
-      return response.json();
+      return response.data;
     },
     onSuccess: (data) => {
       // Invalidate specific workflow query and all workflows query
@@ -120,16 +99,9 @@ export function useDeleteWorkflow() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/workflows/${id}`, {
-        method: 'DELETE',
-      });
+        await api.delete(`/workflows/${id}`);
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to delete workflow');
-      }
-      
-      return id;
+      return { id };
     },
     onSuccess: (id) => {
       // Invalidate specific workflow query and all workflows query
@@ -158,20 +130,9 @@ export function useToggleFavorite() {
   
   return useMutation({
     mutationFn: async ({ id, isFavorite }: { id: string, isFavorite: boolean }) => {
-      const response = await fetch(`/api/workflows/${id}/favorite`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ isFavorite }),
-      });
+          const response = await api.put(`/workflows/${id}/favorite`, { isFavorite });
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update favorite status');
-      }
-      
-      return { id, isFavorite };
+      return response.data;
     },
     onSuccess: ({ id }) => {
       // Invalidate specific workflow query and all workflows query

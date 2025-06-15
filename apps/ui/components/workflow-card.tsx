@@ -23,7 +23,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import type { WorkflowSummary } from "@/lib/supabase/schema"
 import {
   MoreHorizontal,
   Play,
@@ -40,7 +39,7 @@ import {
 import { cn } from "@/lib/utils"
 
 interface WorkflowCardProps {
-  workflow: WorkflowSummary
+  workflow: any
   viewMode?: "grid" | "list"
   onDelete: () => Promise<void>
   onFavoriteToggle: (isFavorite: boolean) => void
@@ -92,7 +91,12 @@ export function WorkflowCard({ workflow, viewMode = "grid", onDelete, onFavorite
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="flex items-center">
                 <Clock className="mr-1 h-3.5 w-3.5" />
-                {formatDistanceToNow(new Date(workflow.updated_at), { addSuffix: true })}
+                {(() => {
+                  if (!workflow.updated_at) return 'Unknown';
+                  const date = new Date(workflow.updated_at);
+                  if (isNaN(date.getTime())) return 'Unknown';
+                  return formatDistanceToNow(date, { addSuffix: true });
+                })()}
               </span>
               {workflow.last_status && (
                 <span className="flex items-center">
@@ -165,7 +169,12 @@ export function WorkflowCard({ workflow, viewMode = "grid", onDelete, onFavorite
           <div>
             <CardTitle className="line-clamp-1">{workflow.name}</CardTitle>
             <CardDescription className="line-clamp-1">
-              {formatDistanceToNow(new Date(workflow.updated_at), { addSuffix: true })}
+              {(() => {
+                if (!workflow.updated_at) return 'Unknown';
+                const date = new Date(workflow.updated_at);
+                if (isNaN(date.getTime())) return 'Unknown';
+                return formatDistanceToNow(date, { addSuffix: true });
+              })()}
             </CardDescription>
           </div>
           <div className="flex items-center">
@@ -212,7 +221,7 @@ export function WorkflowCard({ workflow, viewMode = "grid", onDelete, onFavorite
       <CardFooter className="flex flex-col items-start gap-2 pt-2">
         {workflow.tags && workflow.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {workflow.tags.slice(0, 3).map((tag) => (
+            {workflow.tags.slice(0, 3).map((tag: string) => (
               <Badge key={tag} variant="secondary" className="text-xs">
                 {tag}
               </Badge>
@@ -259,5 +268,5 @@ export function WorkflowCard({ workflow, viewMode = "grid", onDelete, onFavorite
         </AlertDialogContent>
       </AlertDialog>
     </Card>
-  )
+  );
 }

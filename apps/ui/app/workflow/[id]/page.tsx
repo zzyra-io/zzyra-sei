@@ -56,6 +56,7 @@ export default function WorkflowDetailPage() {
     executionSummary,
     activeTab,
     setActiveTab,
+    executionLogs,
   } = useWorkflowDetail(id);
 
   const handleExecute = async () => {
@@ -201,45 +202,258 @@ export default function WorkflowDetailPage() {
 
             <TabsContent value='overview' className='space-y-4'>
               <Card>
-                <CardHeader>
-                  <CardTitle>Workflow Details</CardTitle>
-                  <CardDescription>
-                    Created on{" "}
-                    {new Date(workflow.created_at).toLocaleDateString()}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className='space-y-4'>
+                <CardHeader className="pb-4">
+                  <div className="flex items-start justify-between">
                     <div>
-                      <h3 className='text-sm font-medium'>Description</h3>
-                      <p className='mt-1 text-sm text-muted-foreground'>
-                        {workflow.description || "No description provided."}
-                      </p>
+                      <CardTitle className="text-xl font-semibold">Workflow Details</CardTitle>
+                      <CardDescription className="mt-1 flex items-center gap-2">
+                        <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Created {workflow.created_at 
+                          ? new Date(workflow.created_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })
+                          : 'Unknown date'
+                        }
+                      </CardDescription>
                     </div>
-                    {workflow.tags && workflow.tags.length > 0 && (
-                      <div>
-                        <h3 className='text-sm font-medium'>Tags</h3>
-                        <div className='mt-1 flex flex-wrap gap-1'>
-                          {workflow.tags.map((tag) => (
-                            <div
-                              key={tag}
-                              className='rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground'>
-                              {tag}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <div>
-                      <h3 className='text-sm font-medium'>
-                        Workflow Structure
-                      </h3>
-                      <p className='mt-1 text-sm text-muted-foreground'>
-                        This workflow contains {workflow.nodes.length} nodes and{" "}
-                        {workflow.edges.length} connections.
-                      </p>
+                    <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ${
+                      executionSummary.total === 0 
+                        ? 'bg-gray-100 text-gray-700'
+                        : executionSummary.failed === 0 
+                          ? 'bg-green-100 text-green-700'
+                          : executionSummary.successful > executionSummary.failed 
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${
+                        executionSummary.total === 0 
+                          ? 'bg-gray-400'
+                          : executionSummary.failed === 0 
+                            ? 'bg-green-500'
+                            : executionSummary.successful > executionSummary.failed 
+                              ? 'bg-yellow-500'
+                              : 'bg-red-500'
+                      }`} />
+                      {executionSummary.total === 0 
+                        ? 'Never executed'
+                        : executionSummary.failed === 0 
+                          ? 'Healthy'
+                          : executionSummary.successful > executionSummary.failed 
+                            ? 'Mostly successful'
+                            : 'Needs attention'
+                      }
                     </div>
                   </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Description Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <h3 className='font-medium text-foreground'>Description</h3>
+                    </div>
+                    <p className='text-sm text-muted-foreground leading-relaxed pl-6'>
+                      {workflow.description || "No description provided."}
+                    </p>
+                  </div>
+
+                  {/* Tags Section */}
+                  {workflow.tags && workflow.tags.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        <h3 className='font-medium text-foreground'>Tags</h3>
+                      </div>
+                      <div className='flex flex-wrap gap-2 pl-6'>
+                        {workflow.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className='inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10'>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stats Grid */}
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {/* Workflow Structure Card */}
+                    <Card className="border-0 bg-slate-50/50">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                          <h4 className="font-medium text-sm">Structure</h4>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Nodes</span>
+                            <span className="font-semibold text-blue-600">{workflow.nodes.length}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Connections</span>
+                            <span className="font-semibold text-blue-600">{workflow.edges.length}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Complexity</span>
+                            <span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${
+                              workflow.nodes.length <= 3 
+                                ? 'bg-green-100 text-green-700' 
+                                : workflow.nodes.length <= 8 
+                                  ? 'bg-yellow-100 text-yellow-700' 
+                                  : 'bg-red-100 text-red-700'
+                            }`}>
+                              {workflow.nodes.length <= 3 
+                                ? 'Simple' 
+                                : workflow.nodes.length <= 8 
+                                  ? 'Medium' 
+                                  : 'Complex'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Execution Stats Card */}
+                    <Card className="border-0 bg-green-50/50">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <svg className="h-4 w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                          <h4 className="font-medium text-sm">Executions</h4>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Total</span>
+                            <span className="font-semibold text-green-600">{executionSummary.total}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Successful</span>
+                            <span className="font-semibold text-green-600">{executionSummary.successful}</span>
+                          </div>
+                          {executionSummary.total > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Success Rate</span>
+                              <span className="font-semibold text-green-600">
+                                {Math.round((executionSummary.successful / executionSummary.total) * 100)}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Node Types Card */}
+                    {workflow.nodes && workflow.nodes.length > 0 && (
+                      <Card className="border-0 bg-purple-50/50">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <svg className="h-4 w-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            <h4 className="font-medium text-sm">Node Types</h4>
+                          </div>
+                          <div className="space-y-2 max-h-20 overflow-y-auto">
+                            {Object.entries(
+                              workflow.nodes.reduce((acc: Record<string, number>, node: { type?: string }) => {
+                                const type = node.type || 'Unknown';
+                                acc[type] = (acc[type] || 0) + 1;
+                                return acc;
+                              }, {})
+                            ).slice(0, 3).map(([type, count]) => (
+                              <div key={type} className='flex justify-between text-sm'>
+                                <span className='text-muted-foreground capitalize truncate'>
+                                  {type.replace(/([A-Z])/g, ' $1').trim()}
+                                </span>
+                                <span className='font-semibold text-purple-600'>{count as number}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Last Execution Card */}
+                    {executionLogs.length > 0 && (
+                      <Card className="border-0 bg-orange-50/50">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <svg className="h-4 w-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <h4 className="font-medium text-sm">Last Run</h4>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                executionLogs[0].status === 'completed' 
+                                  ? 'bg-green-100 text-green-800'
+                                  : executionLogs[0].status === 'failed'
+                                    ? 'bg-red-100 text-red-800'
+                                    : executionLogs[0].status === 'running'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {executionLogs[0].status}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {executionLogs[0].startedAt 
+                                ? new Date(executionLogs[0].startedAt).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })
+                                : 'Unknown time'
+                              }
+                            </div>
+                            {executionLogs[0].finishedAt && executionLogs[0].startedAt && (
+                              <div className="text-xs text-muted-foreground">
+                                Duration: {Math.round(
+                                  (new Date(executionLogs[0].finishedAt).getTime() - 
+                                   new Date(executionLogs[0].startedAt).getTime()) / 1000
+                                )}s
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+
+                  {/* Metadata Section */}
+                  {workflow.updated_at && (
+                    <div className="pt-4 border-t border-border/50">
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <span>Last modified</span>
+                        </div>
+                        <span className="font-medium">
+                          {new Date(workflow.updated_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -260,7 +474,7 @@ export default function WorkflowDetailPage() {
                           Total Executions
                         </div>
                         <div className='mt-1 text-2xl font-bold'>
-                          {stats?.statusCounts || 0}
+                          {executionSummary.total}
                         </div>
                       </div>
                       <div className='rounded-lg border p-4'>

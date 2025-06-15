@@ -124,7 +124,12 @@ export class WorkflowsService {
     await this.workflowRepository.delete(id);
   }
 
-  async execute(id: string, userId: string): Promise<{ executionId: string }> {
+  async execute(
+    id: string,
+    userId: string,
+    scheduledTime?: Date,
+    input?: Record<string, any>
+  ): Promise<{ executionId: string }> {
     // First verify the user owns this workflow
     const workflow = await this.workflowRepository.findById(id, userId);
     if (!workflow) {
@@ -135,7 +140,7 @@ export class WorkflowsService {
     const execution = await this.executionRepository.createExecution(
       id,
       userId,
-      {}, // No input data for now
+      input || {}, // Use provided input or empty object
       "manual" // Trigger type
     );
 
@@ -149,10 +154,22 @@ export class WorkflowsService {
       `Created execution ${executionId} for workflow ${id} by user ${userId}`
     );
 
-    // Queue the execution job
+    // Queue the execution job (immediate or scheduled)
     try {
-      await this.queueService.addExecutionJob(executionId, id, userId);
-      console.log(`Successfully queued execution ${executionId}`);
+      if (scheduledTime) {
+        await this.queueService.addScheduledExecutionJob(
+          executionId,
+          id,
+          userId,
+          scheduledTime
+        );
+        console.log(
+          `Successfully scheduled execution ${executionId} for ${scheduledTime.toISOString()}`
+        );
+      } else {
+        await this.queueService.addExecutionJob(executionId, id, userId);
+        console.log(`Successfully queued execution ${executionId}`);
+      }
     } catch (error) {
       console.error(`Failed to queue execution ${executionId}:`, error);
       // Update execution status to failed
