@@ -1,27 +1,13 @@
-# Netlify configuration for Next.js app in turbo monorepo
 [build]
-  base      = "apps/ui"
-  command   = "pnpm install && pnpm run build"
-  publish   = ".next"
-  functions = ".netlify/functions"
-  ignore    = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."
-
-# Environment variables
-[build.environment]
-  NODE_VERSION = "20"
-  PNPM_VERSION = "9.15.2"
+  # Base directory is the root of the monorepo where dependencies are installed
+  base = ""
+  # Command to install dependencies and build the Next.js app in apps/ui
+  command = "npm install && cd apps/ui && npm run build"
+  # Publish directory is the Next.js output directory in apps/ui
+  publish = "apps/ui/.next"
+  # Use Node.js 20 for compatibility with modern Next.js versions
+  environment = { NODE_VERSION = "20" }
 
 [[plugins]]
-  package = "@netlify/plugin-nextjs@5.11.2"
-
-# Handle client-side routing
-[[redirects]]
-  from = "/*"
-  to = "/"
-  status = 200
-
-# Cache control for static assets
-[[headers]]
-  for = "/static/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+  # Essential Next.js plugin for server-side rendering and other features
+  package = "@netlify/plugin-nextjs"
