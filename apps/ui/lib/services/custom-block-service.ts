@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CustomBlockDefinition } from "@zyra/types";

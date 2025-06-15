@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   "/api/auth/signin",
   "/api/auth/callback",
   "/api/health",
+  "/",
 ];
 
 const GUEST_PATHS = ["/login"];
@@ -32,10 +33,13 @@ export async function middleware(req: NextRequest) {
   // Check for potential redirect loops
   const now = Date.now();
   const lastRedirectTime = redirectCache.get(requestUrl);
-  const isPotentialLoop = lastRedirectTime && now - lastRedirectTime < REDIRECT_CACHE_TTL;
+  const isPotentialLoop =
+    lastRedirectTime && now - lastRedirectTime < REDIRECT_CACHE_TTL;
 
   if (isPotentialLoop) {
-    console.warn(`Potential redirect loop detected for ${requestUrl}. Allowing request to proceed.`);
+    console.warn(
+      `Potential redirect loop detected for ${requestUrl}. Allowing request to proceed.`
+    );
     return response; // Allow the request to proceed to prevent loops
   }
 
@@ -69,7 +73,8 @@ export async function middleware(req: NextRequest) {
   const isGuestPath = GUEST_PATHS.includes(pathname);
   if (isGuestPath && isAuthenticated) {
     // User is authenticated and trying to access login page
-    const callbackUrl = searchParams.get("callbackUrl") || `${origin}/dashboard`;
+    const callbackUrl =
+      searchParams.get("callbackUrl") || `${origin}/dashboard`;
     try {
       const redirectUrl = new URL(callbackUrl, origin);
       if (
@@ -83,7 +88,7 @@ export async function middleware(req: NextRequest) {
     } catch {
       // Invalid callbackUrl
     }
-    
+
     // Record this redirect to detect loops
     redirectCache.set(requestUrl, now);
     return NextResponse.redirect(new URL("/dashboard", origin));
@@ -94,15 +99,15 @@ export async function middleware(req: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
+
     // Don't redirect to login if we're already on a public path
     if (isPublicPath) {
       return response;
     }
-    
+
     const loginUrl = new URL("/login", origin);
     loginUrl.searchParams.set("callbackUrl", req.url);
-    
+
     // Record this redirect to detect loops
     redirectCache.set(requestUrl, now);
     return NextResponse.redirect(loginUrl);

@@ -1,7 +1,9 @@
 // Service to fetch paused input snapshot for a node execution
-import { createClient } from "@/lib/supabase/client";
 
-export async function getPausedNodeSnapshot(executionId: string, nodeId: string) {
+export async function getPausedNodeSnapshot(
+  executionId: string,
+  nodeId: string
+) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("workflow_pauses")

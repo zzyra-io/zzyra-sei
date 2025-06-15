@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { BlockLibraryEntry } from "@zyra/types";
+import { BlockLibraryEntry } from "@/types/block-library";
+import { BlockType } from "@zyra/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
+import Link from "next/link";
+import { AlertTriangle, ArrowLeft, Loader2, Search } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -11,26 +17,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import {
-  Loader2,
-  ArrowLeft,
-  Copy,
-  ExternalLink,
-  Star,
-  AlertTriangle,
-  Search,
-} from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
-import Link from "next/link";
-import { BlockType } from "@zyra/types";
 import { BlockCard } from "@/components/block-card";
 
-export default function SharedBlocksPage() {
+function SharedBlocksPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -59,15 +48,7 @@ export default function SharedBlocksPage() {
     try {
       setLoading(true);
 
-      const supabase = createClient();
-
       // Get public shared blocks
-      const { data, error } = await supabase
-        .from("block_library")
-        .select("*")
-        .eq("is_public", true)
-        .order("rating", { ascending: false })
-        .limit(50);
 
       if (error) {
         console.error("Error fetching shared blocks:", error);
@@ -76,7 +57,7 @@ export default function SharedBlocksPage() {
       }
 
       // Transform data
-      const transformedBlocks = data.map((block) => ({
+      const transformedBlocks = ([] as any[]).map((block) => ({
         id: block.id,
         userId: block.user_id,
         name: block.name,
@@ -280,5 +261,18 @@ export default function SharedBlocksPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SharedBlocksPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className='flex justify-center py-12'>
+          <Loader2 className='h-8 w-8 animate-spin' />
+        </div>
+      }>
+      <SharedBlocksPageContent />
+    </Suspense>
   );
 }
