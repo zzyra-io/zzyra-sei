@@ -1,7 +1,7 @@
 # Netlify configuration for Next.js app in turbo monorepo
 [build]
-  base      = "/"
-  command   = "pnpm install && pnpm run build --filter=zyra-web3-automation"
+  base      = "apps/ui"
+  command   = "pnpm install && pnpm run build"
   publish   = ".next"
   functions = ".netlify/functions"
   ignore    = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- ."
