@@ -693,7 +693,11 @@ export default function WorkflowDetailPage() {
             </TabsContent>
 
             <TabsContent value='timeline' className='space-y-4'>
-              <WorkflowTimeline />
+              <WorkflowTimeline
+                workflowId={id as string}
+                autoRefresh={true}
+                refreshInterval={5000}
+              />
             </TabsContent>
 
             <TabsContent value='history'>

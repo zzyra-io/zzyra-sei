@@ -163,3 +163,8 @@ Security & RLS
 [ ] NodeExecutions are created for every node at the start of the execution (not just when a node starts running).
 [ ] API returns all nodes (with status) for an execution.
 [ ] Worker creates node_executions records for every node at the start.
+
+
+
+
+# NEED TO Save ai prompts to the db (workflow, blocks,) and then use them to generate the workflow.

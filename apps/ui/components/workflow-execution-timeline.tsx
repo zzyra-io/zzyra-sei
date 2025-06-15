@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { format } from "date-fns";
 import {
   BarChart,
@@ -26,6 +26,7 @@ import {
   Info,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   Card,
@@ -64,31 +65,38 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LogEntry } from "@zyra/types";
+import { executionService } from "@/lib/services/execution-service";
+import { workflowsApi, executionsApi, type NodeExecution as ApiNodeExecution, type NodeLog as ApiNodeLog } from "@/lib/services/api";
 
 // Types
 interface NodeExecution {
+  id: string;
   node_id: string;
+  node_type?: string;
   status: "pending" | "running" | "completed" | "failed" | "paused";
-  started_at?: string;
-  completed_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
   duration?: number;
+  error?: string | null;
+  logs?: LogEntry[];
 }
 
 interface LogEntry {
   id: string;
-  node_id: string;
+  node_id?: string;
   timestamp: string;
-  level: "info" | "warning" | "error";
+  level: "info" | "warning" | "error" | "debug";
   message: string;
   data?: any;
 }
 
 interface ExecutionDetail {
   id: string;
+  workflowId: string;
   status: string;
-  started_at: string;
-  completed_at?: string;
+  startedAt: string;
+  finishedAt?: string;
+  error?: string;
   nodeExecutions: NodeExecution[];
   logs: LogEntry[];
 }
@@ -115,175 +123,169 @@ interface Workflow {
   nodes: WorkflowNode[];
 }
 
-export default function WorkflowTimeline() {
+interface WorkflowTimelineProps {
+  workflowId: string;
+  autoRefresh?: boolean;
+  refreshInterval?: number;
+}
+
+export default function WorkflowTimeline({ 
+  workflowId, 
+  autoRefresh = true, 
+  refreshInterval = 5000 
+}: WorkflowTimelineProps) {
   // State
-  const [executionLogs, setExecutionLogs] = useState<any[]>([]);
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(
-    null
-  );
-  const [execDetail, setExecDetail] = useState<ExecutionDetail | null>(null);
-  const [workflow, setWorkflow] = useState<Workflow | null>(null);
-  const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>([]);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [levelFilter, setLevelFilter] = useState<
-    "all" | "info" | "warning" | "error"
-  >("all");
+  const [levelFilter, setLevelFilter] = useState<"all" | "info" | "warning" | "error" | "debug">("all");
   const [modalLog, setModalLog] = useState<LogEntry | null>(null);
   const [pausedSnapshot, setPausedSnapshot] = useState<any>(null);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [replaying, setReplaying] = useState(false);
   const [replayIndex, setReplayIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [isNodeExpanded, setIsNodeExpanded] = useState(false);
   const pausedInputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Fetch executions on component mount
-  useEffect(() => {
-    fetchExecutions();
-  }, []);
+  // Fetch workflow details
+  const {
+    data: workflow,
+    isLoading: workflowLoading,
+    error: workflowError,
+  } = useQuery({
+    queryKey: ['workflow', workflowId],
+    queryFn: () => workflowsApi.getWorkflow(workflowId),
+    enabled: !!workflowId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Fetch executions for the workflow
+  const {
+    data: executionsData,
+    isLoading: executionsLoading,
+    error: executionsError,
+    refetch: refetchExecutions,
+  } = useQuery({
+    queryKey: ['executions', workflowId],
+    queryFn: () => executionService.getExecutions({ 
+      workflowId, 
+      limit: 50, 
+      sortKey: 'startedAt', 
+      sortOrder: 'desc' 
+    }),
+    enabled: !!workflowId,
+    refetchInterval: autoRefresh ? refreshInterval : false,
+    staleTime: 30 * 1000, // 30 seconds
+  });
 
   // Fetch execution details when selection changes
-  useEffect(() => {
-    if (selectedExecutionId) {
-      fetchExecutionDetail(selectedExecutionId);
-    } else {
-      setExecDetail(null);
-      setTimelineData([]);
-      setSelectedNodeId(null);
-    }
-  }, [selectedExecutionId]);
+  const {
+    data: execDetail,
+    isLoading: executionDetailLoading,
+    error: executionDetailError,
+  } = useQuery({
+    queryKey: ['executionDetail', selectedExecutionId],
+    queryFn: async (): Promise<ExecutionDetail | null> => {
+      if (!selectedExecutionId) return null;
 
-  // Handle replay animation
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (replaying && timelineData.length > 0) {
-      timer = setTimeout(() => {
-        setReplayIndex((prev) => {
-          const next = prev + 1;
-          if (next >= timelineData.length) {
-            setReplaying(false);
-            return 0;
-          }
-          return next;
-        });
-      }, 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [replaying, replayIndex, timelineData]);
+      try {
+        // Get the execution
+        const execution = executionsData?.executions.find(e => e.id === selectedExecutionId);
+        if (!execution) throw new Error('Execution not found');
 
-  // Fetch all executions
-  const fetchExecutions = async () => {
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 800));
+        // Get node executions
+        const nodeExecutions = await executionsApi.getNodeExecutions(selectedExecutionId);
 
-      // Mock data - in a real app, this would be an API call
-      const mockExecutions = generateMockExecutions();
-      setExecutionLogs(mockExecutions);
+        // Get logs for each node execution and transform the data
+        const nodeExecutionsWithLogs = await Promise.all(
+          nodeExecutions.map(async (nodeExec: ApiNodeExecution, index: number) => {
+            try {
+              // Use a generated ID since API doesn't provide one
+              const nodeExecutionId = `${selectedExecutionId}-${nodeExec.node_id}-${index}`;
+              const logs = await executionsApi.getNodeLogs(nodeExecutionId);
+              
+              return {
+                id: nodeExecutionId,
+                node_id: nodeExec.node_id,
+                node_type: nodeExec.node_type,
+                status: nodeExec.status as "pending" | "running" | "completed" | "failed" | "paused",
+                started_at: nodeExec.started_at,
+                completed_at: nodeExec.completed_at,
+                error: nodeExec.error,
+                logs: logs.map((log: ApiNodeLog, logIndex: number) => ({
+                  id: `${nodeExecutionId}-log-${logIndex}`,
+                  node_id: nodeExec.node_id,
+                  timestamp: log.timestamp,
+                  level: log.level as "info" | "warning" | "error" | "debug",
+                  message: log.message,
+                  data: log.metadata,
+                })),
+              };
+            } catch (error) {
+              console.warn(`Failed to fetch logs for node ${nodeExec.node_id}:`, error);
+              return {
+                id: `${selectedExecutionId}-${nodeExec.node_id}-${index}`,
+                node_id: nodeExec.node_id,
+                node_type: nodeExec.node_type,
+                status: nodeExec.status as "pending" | "running" | "completed" | "failed" | "paused",
+                started_at: nodeExec.started_at,
+                completed_at: nodeExec.completed_at,
+                error: nodeExec.error,
+                logs: [],
+              };
+            }
+          })
+        );
 
-      // Auto-select the first execution
-      if (mockExecutions.length > 0 && !selectedExecutionId) {
-        setSelectedExecutionId(mockExecutions[0].id);
+        // Aggregate all logs from all nodes
+        const allLogs: LogEntry[] = nodeExecutionsWithLogs
+          .flatMap(nodeExec => 
+            (nodeExec.logs || []).map((log) => ({
+              id: log.id || `${nodeExec.node_id}-${log.timestamp}`,
+              node_id: nodeExec.node_id,
+              timestamp: log.timestamp,
+              level: log.level as "info" | "warning" | "error" | "debug",
+              message: log.message,
+              data: log.data,
+            }))
+          )
+          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+        return {
+          id: execution.id,
+          workflowId: execution.workflowId,
+          status: execution.status,
+          startedAt: execution.startedAt || new Date().toISOString(),
+          finishedAt: execution.finishedAt,
+          error: execution.error,
+          nodeExecutions: nodeExecutionsWithLogs,
+          logs: allLogs,
+        };
+      } catch (error) {
+        console.error('Failed to fetch execution detail:', error);
+        throw error;
       }
-    } catch (error) {
-      toast({
-        title: "Failed to fetch executions",
-        description: "There was an error loading the execution logs.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+    },
+    enabled: !!selectedExecutionId,
+    refetchInterval: autoRefresh && selectedExecutionId ? refreshInterval : false,
+    staleTime: 10 * 1000, // 10 seconds for active execution details
+  });
+
+  // Auto-select first execution when data loads
+  useEffect(() => {
+    if (executionsData?.executions.length && !selectedExecutionId) {
+      setSelectedExecutionId(executionsData.executions[0].id);
     }
-  };
-
-  // Fetch execution details
-  const fetchExecutionDetail = async (executionId: string) => {
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock data - in a real app, this would be an API call
-      const mockDetail = generateMockExecutionDetail(executionId);
-      const mockWorkflow = generateMockWorkflow();
-
-      setExecDetail(mockDetail);
-      setWorkflow(mockWorkflow);
-
-      // Generate timeline data
-      const timeline = generateTimelineData(mockDetail, mockWorkflow);
-      setTimelineData(timeline);
-
-      // Auto-select the first node if none is selected
-      if (timeline.length > 0 && !selectedNodeId) {
-        setSelectedNodeId(timeline[0].name);
-      }
-    } catch (error) {
-      toast({
-        title: "Failed to fetch execution details",
-        description: "There was an error loading the execution details.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Get paused node snapshot
-  const getPausedNodeSnapshot = async (executionId: string, nodeId: string) => {
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      // Mock data - in a real app, this would be an API call
-      return {
-        inputData: {
-          parameters: {
-            threshold: 0.85,
-            maxItems: 10,
-          },
-          data: {
-            items: [
-              { id: 1, name: "Item 1", value: 42 },
-              { id: 2, name: "Item 2", value: 18 },
-            ],
-          },
-        },
-      };
-    } catch (error) {
-      toast({
-        title: "Failed to fetch node snapshot",
-        description: "There was an error loading the node snapshot.",
-        variant: "destructive",
-      });
-      return null;
-    }
-  };
-
-  // Format time for chart
-  const formatTime = (time: number) => {
-    if (!execDetail) return "";
-    const date = new Date(new Date(execDetail.started_at).getTime() + time);
-    return format(date, "HH:mm:ss");
-  };
-
-  // Format duration for tooltip
-  const formatDuration = (duration: number) => {
-    return `${(duration / 1000).toFixed(2)}s`;
-  };
+  }, [executionsData, selectedExecutionId]);
 
   // Generate timeline data from execution detail
-  const generateTimelineData = (
-    detail: ExecutionDetail,
-    workflow: Workflow | null
-  ) => {
-    if (!detail || !workflow) return [];
+  const timelineData = React.useMemo(() => {
+    if (!execDetail || !workflow) return [];
 
-    const startTime = new Date(detail.started_at).getTime();
+    const startTime = new Date(execDetail.startedAt).getTime();
 
-    return detail.nodeExecutions
+    return execDetail.nodeExecutions
       .filter((node) => node.started_at) // Only include nodes that have started
       .map((node) => {
         const start = new Date(node.started_at!).getTime() - startTime;
@@ -306,12 +308,49 @@ export default function WorkflowTimeline() {
         };
       })
       .sort((a, b) => a.start - b.start);
+  }, [execDetail, workflow]);
+
+  // Auto-select first node when timeline data changes
+  useEffect(() => {
+    if (timelineData.length > 0 && !selectedNodeId) {
+      setSelectedNodeId(timelineData[0].name);
+    }
+  }, [timelineData, selectedNodeId]);
+
+  // Handle replay animation
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (replaying && timelineData.length > 0) {
+      timer = setTimeout(() => {
+        setReplayIndex((prev) => {
+          const next = prev + 1;
+          if (next >= timelineData.length) {
+            setReplaying(false);
+            return 0;
+          }
+          return next;
+        });
+      }, 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [replaying, replayIndex, timelineData]);
+
+  // Format time for chart
+  const formatTime = (time: number) => {
+    if (!execDetail) return "";
+    const date = new Date(new Date(execDetail.startedAt).getTime() + time);
+    return format(date, "HH:mm:ss");
+  };
+
+  // Format duration for tooltip
+  const formatDuration = (duration: number) => {
+    return `${(duration / 1000).toFixed(2)}s`;
   };
 
   // Get node name from ID
   const getNodeName = (nodeId: string) => {
     if (!workflow) return nodeId;
-    const node = workflow.nodes.find((n) => n.id === nodeId);
+    const node = workflow.nodes?.find((n: WorkflowNode) => n.id === nodeId);
     return node?.data?.label || node?.data?.name || node?.type || nodeId;
   };
 
@@ -367,7 +406,6 @@ export default function WorkflowTimeline() {
   const CustomTooltip = ({
     active,
     payload,
-    label,
   }: TooltipProps<number, string>) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -393,23 +431,23 @@ export default function WorkflowTimeline() {
   const handleNodeAction = async (action: string, nodeId?: string) => {
     if (!selectedExecutionId) return;
 
-    setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
       let message = "";
       switch (action) {
         case "pause":
+          await executionsApi.pauseExecution(selectedExecutionId, nodeId);
           message = "Execution paused successfully";
           break;
         case "cancel":
+          await executionsApi.cancelExecution(selectedExecutionId, nodeId);
           message = "Execution canceled successfully";
           break;
         case "retry":
+          await executionsApi.retryExecution(selectedExecutionId, nodeId);
           message = "Retry initiated successfully";
           break;
         case "resume":
+          await executionsApi.resumeExecution(selectedExecutionId, nodeId);
           message = "Execution resumed successfully";
           break;
       }
@@ -420,15 +458,42 @@ export default function WorkflowTimeline() {
       });
 
       // Refresh execution detail
-      fetchExecutionDetail(selectedExecutionId);
+      queryClient.invalidateQueries({ queryKey: ['executionDetail', selectedExecutionId] });
     } catch (error) {
       toast({
         title: `Failed to ${action} execution`,
         description: "There was an error processing your request.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+    }
+  };
+
+  // Get paused node snapshot
+  const getPausedNodeSnapshot = async (executionId: string, nodeId: string) => {
+    try {
+      // This would be a real API call in production
+      // For now, return mock data since the API endpoint doesn't exist yet
+      return {
+        inputData: {
+          parameters: {
+            threshold: 0.85,
+            maxItems: 10,
+          },
+          data: {
+            items: [
+              { id: 1, name: "Item 1", value: 42 },
+              { id: 2, name: "Item 2", value: 18 },
+            ],
+          },
+        },
+      };
+    } catch (error) {
+      toast({
+        title: "Failed to fetch node snapshot",
+        description: "There was an error loading the node snapshot.",
+        variant: "destructive",
+      });
+      return null;
     }
   };
 
@@ -450,8 +515,7 @@ export default function WorkflowTimeline() {
         return;
       }
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await executionsApi.resumeExecution(selectedExecutionId, selectedNodeId);
 
       toast({
         title: "Execution resumed successfully",
@@ -459,7 +523,7 @@ export default function WorkflowTimeline() {
       });
 
       setPausedSnapshot(null);
-      fetchExecutionDetail(selectedExecutionId);
+      queryClient.invalidateQueries({ queryKey: ['executionDetail', selectedExecutionId] });
     } catch (error) {
       toast({
         title: "Failed to resume execution",
@@ -484,6 +548,7 @@ export default function WorkflowTimeline() {
       const nodeDef = workflow.nodes.find((n) => n.id === selectedNodeId);
       if (nodeDef) {
         nodeExec = {
+          id: `pending-${selectedNodeId}`,
           node_id: selectedNodeId,
           status: "pending",
         } as NodeExecution;
@@ -496,7 +561,6 @@ export default function WorkflowTimeline() {
   // Get filtered logs for selected node
   const getFilteredLogs = () => {
     if (!execDetail || !selectedNodeId) return [];
-    console.log("execDetail", execDetail);
 
     return execDetail.logs
       .filter(
@@ -527,6 +591,9 @@ export default function WorkflowTimeline() {
         return "#a3a3a3";
     }
   };
+
+  const isLoading = executionsLoading || executionDetailLoading;
+  const executionLogs = executionsData?.executions || [];
 
   return (
     <TabsContent value='timeline' className='space-y-6'>
@@ -580,7 +647,7 @@ export default function WorkflowTimeline() {
               <Button
                 size='sm'
                 variant='outline'
-                onClick={fetchExecutions}
+                onClick={() => refetchExecutions()}
                 disabled={isLoading}>
                 <RotateCcw
                   className={`h-4 w-4 mr-1 ${isLoading ? "animate-spin" : ""}`}
@@ -614,7 +681,7 @@ export default function WorkflowTimeline() {
                     {executionLogs.map((log) => (
                       <SelectItem key={log.id} value={log.id}>
                         {log.id.substring(0, 8)} –{" "}
-                        {format(new Date(log.started_at), "MMM d, h:mm:ss a")}
+                        {log.startedAt && format(new Date(log.startedAt), "MMM d, h:mm:ss a")}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -732,6 +799,7 @@ export default function WorkflowTimeline() {
                     <SelectItem value='info'>Info</SelectItem>
                     <SelectItem value='warning'>Warning</SelectItem>
                     <SelectItem value='error'>Error</SelectItem>
+                    <SelectItem value='debug'>Debug</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -1008,159 +1076,4 @@ export default function WorkflowTimeline() {
       </Dialog>
     </TabsContent>
   );
-}
-
-// Mock data generator functions
-function generateMockExecutions() {
-  const executions = [];
-  const now = new Date();
-
-  for (let i = 0; i < 5; i++) {
-    const startDate = new Date(now.getTime() - i * 3600000); // Each execution 1 hour apart
-
-    executions.push({
-      id: `exec_${Math.random().toString(36).substring(2, 10)}`,
-      started_at: startDate.toISOString(),
-      status: ["completed", "failed", "running", "paused"][
-        Math.floor(Math.random() * 4)
-      ],
-    });
-  }
-
-  return executions;
-}
-
-function generateMockExecutionDetail(executionId: string) {
-  const nodeTypes = [
-    "fetch_data",
-    "transform",
-    "analyze",
-    "validate",
-    "store_results",
-  ];
-  const now = new Date();
-  const startTime = new Date(now.getTime() - 3600000); // Execution started 1 hour ago
-
-  const nodeExecutions: NodeExecution[] = [];
-  const logs: LogEntry[] = [];
-
-  // Generate 5 node executions
-  for (let i = 0; i < 5; i++) {
-    const nodeStartTime = new Date(startTime.getTime() + i * 300000); // Each node starts 5 minutes after the previous
-    const status = i < 3 ? "completed" : i === 3 ? "paused" : "pending";
-
-    const nodeExecution: NodeExecution = {
-      node_id: nodeTypes[i],
-      status: status as any,
-      started_at: i < 4 ? nodeStartTime.toISOString() : undefined,
-    };
-
-    if (status === "completed") {
-      const completionTime = new Date(
-        nodeStartTime.getTime() + 120000 + Math.random() * 180000
-      ); // 2-5 minutes to complete
-      nodeExecution.completed_at = completionTime.toISOString();
-      nodeExecution.duration =
-        completionTime.getTime() - nodeStartTime.getTime();
-    }
-
-    nodeExecutions.push(nodeExecution);
-
-    // Generate 3-8 logs per node
-    if (i < 4) {
-      // Only generate logs for nodes that have started
-      const logCount = Math.floor(Math.random() * 6) + 3;
-
-      for (let j = 0; j < logCount; j++) {
-        const logTime = new Date(nodeStartTime.getTime() + j * 30000); // Each log 30 seconds apart
-        const level =
-          Math.random() > 0.8
-            ? "error"
-            : Math.random() > 0.6
-              ? "warning"
-              : "info";
-
-        logs.push({
-          id: `log_${i}_${j}_${Math.random().toString(36).substring(2, 10)}`,
-          node_id: nodeTypes[i],
-          timestamp: logTime.toISOString(),
-          level: level as any,
-          message: `${
-            level === "error"
-              ? "Error"
-              : level === "warning"
-                ? "Warning"
-                : "Info"
-          }: ${nodeTypes[i]} operation ${j + 1}`,
-          data:
-            Math.random() > 0.5
-              ? {
-                  details: `Additional information for ${nodeTypes[i]} operation`,
-                  metrics: {
-                    duration: Math.floor(Math.random() * 1000),
-                    itemsProcessed: Math.floor(Math.random() * 100),
-                  },
-                }
-              : undefined,
-        });
-      }
-    }
-  }
-
-  return {
-    id: executionId,
-    status: "running",
-    started_at: startTime.toISOString(),
-    nodeExecutions,
-    logs,
-  };
-}
-
-function generateMockWorkflow() {
-  return {
-    id: "workflow_1",
-    name: "Data Processing Workflow",
-    nodes: [
-      {
-        id: "fetch_data",
-        type: "http_request",
-        data: {
-          label: "Fetch Data",
-          name: "API Request",
-        },
-      },
-      {
-        id: "transform",
-        type: "data_transform",
-        data: {
-          label: "Transform Data",
-          name: "JSON Transform",
-        },
-      },
-      {
-        id: "analyze",
-        type: "data_analysis",
-        data: {
-          label: "Analyze Results",
-          name: "Statistical Analysis",
-        },
-      },
-      {
-        id: "validate",
-        type: "validation",
-        data: {
-          label: "Validate Output",
-          name: "Schema Validation",
-        },
-      },
-      {
-        id: "store_results",
-        type: "database",
-        data: {
-          label: "Store Results",
-          name: "Database Insert",
-        },
-      },
-    ],
-  };
 }
