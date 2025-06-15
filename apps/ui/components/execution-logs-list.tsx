@@ -143,11 +143,15 @@ export function ExecutionLogsList({
 
   const loadNodeData = useCallback(
     async (executionId: string) => {
-      if (
-        loadingExecutionIds.has(executionId) ||
-        nodeExecutionsCache[executionId]
-      ) {
+      // Check if already loading or loaded using current state
+      if (loadingExecutionIds.has(executionId)) {
         return;
+      }
+
+      // Check cache without including it in dependencies
+      const currentCache = nodeExecutionsCache[executionId];
+      if (currentCache !== undefined) {
+        return; // Already cached (including empty arrays)
       }
 
       setLoadingExecutionIds((prev) => new Set(prev).add(executionId));
@@ -188,20 +192,19 @@ export function ExecutionLogsList({
         });
       }
     },
-    [loadingExecutionIds, nodeExecutionsCache, toast]
+    [toast] // Removed nodeExecutionsCache and loadingExecutionIds from dependencies
   );
 
-  const loadAll = useCallback(() => {
+  // Load node data when executions are expanded
+  useEffect(() => {
     executions.forEach((log) => {
-      if (expandedLogs[log.id]) {
+      if (expandedLogs[log.id] && 
+          nodeExecutionsCache[log.id] === undefined && // Only load if not cached (including empty arrays)
+          !loadingExecutionIds.has(log.id)) {
         loadNodeData(log.id);
       }
     });
-  }, [executions, expandedLogs, loadNodeData]);
-
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  }, [executions, expandedLogs, loadNodeData, nodeExecutionsCache, loadingExecutionIds]);
 
   useEffect(() => {
     refetchExecutions();
@@ -245,16 +248,27 @@ export function ExecutionLogsList({
     }
   }, [activeTab]);
 
-  const formatDate = useCallback((date: string) => {
-    const dateObject = new Date(date);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    }).format(dateObject);
+  const formatDate = useCallback((date: string | null | undefined) => {
+    if (!date) return 'Unknown time';
+    
+    try {
+      const dateObject = new Date(date);
+      if (isNaN(dateObject.getTime())) {
+        return 'Invalid date';
+      }
+      
+      return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }).format(dateObject);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
   }, []);
 
   const formatDuration = useCallback((start: string, end?: string | null) => {
@@ -548,7 +562,7 @@ interface ExecutionLogCardProps {
   setExpandedLogs: React.Dispatch<
     React.SetStateAction<Record<string, boolean>>
   >;
-  formatDate: (date: string) => string;
+  formatDate: (date: string | null | undefined) => string;
   formatDuration: (start: string, end?: string | null) => string;
   getStatusBadge: (status: string) => JSX.Element;
   handleAction: (
@@ -581,11 +595,20 @@ export const ExecutionLogCard = React.memo(
     isLoading,
     // Removed unused workflow parameter
   }: ExecutionLogCardProps) => {
-    const duration = useMemo(() => {
-      return log.completed_at
-        ? formatDistance(new Date(log.started_at), new Date(log.completed_at))
-        : "In progress";
-    }, [log.completed_at, log.started_at]);
+      const duration = useMemo(() => {
+    const startTime = log.startedAt || log.started_at;
+    const endTime = log.finishedAt || log.completed_at;
+    
+    if (!startTime) return "Unknown";
+    if (!endTime) return "In progress";
+    
+    try {
+      return formatDistance(new Date(startTime), new Date(endTime));
+    } catch (error) {
+      console.error('Error calculating duration:', error);
+      return "Invalid duration";
+    }
+  }, [log.finishedAt, log.completed_at, log.startedAt, log.started_at]);
 
     return (
       <Card
@@ -611,7 +634,7 @@ export const ExecutionLogCard = React.memo(
                   Execution {log.id.substring(0, 8)}
                 </CardTitle>
                 <CardDescription>
-                  Started: {formatDate(log.started_at)}
+                  Started: {formatDate(log.startedAt || log.started_at)}
                 </CardDescription>
               </div>
             </div>
@@ -661,15 +684,15 @@ export const ExecutionLogCard = React.memo(
                       <p className='text-xs font-medium text-muted-foreground'>
                         Started
                       </p>
-                      <p className='text-sm'>{formatDate(log.started_at)}</p>
+                      <p className='text-sm'>{formatDate(log.startedAt || log.started_at)}</p>
                     </div>
-                    {log.completed_at && (
+                    {(log.finishedAt || log.completed_at) && (
                       <div>
                         <p className='text-xs font-medium text-muted-foreground'>
                           Completed
                         </p>
                         <p className='text-sm'>
-                          {formatDate(log.completed_at)}
+                          {formatDate(log.finishedAt || log.completed_at)}
                         </p>
                       </div>
                     )}
@@ -763,7 +786,7 @@ const NodeExecutionItem = React.memo(
       React.SetStateAction<Record<string, boolean>>
     >;
     getStatusBadge: (status: string) => JSX.Element;
-    formatDate: (dateString: string) => string;
+    formatDate: (dateString: string | null | undefined) => string;
     handleAction: (
       action: string,
       logId: string,
