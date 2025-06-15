@@ -2,7 +2,7 @@
   # Base directory is the root of the monorepo where dependencies are installed
   base = ""
   # Command to install dependencies and build the Next.js app in apps/ui
-  command = "npm install && cd apps/ui && npm run build"
+  command = "pnpm install && cd apps/ui && pnpm run build"
   # Publish directory is the Next.js output directory in apps/ui
   publish = "apps/ui/.next"
   # Use Node.js 20 for compatibility with modern Next.js versions
