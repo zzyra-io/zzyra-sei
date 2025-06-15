@@ -9,7 +9,6 @@ import React, {
   useRef,
 } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { createClient } from "@/lib/supabase/client";
 import { io, Socket } from "socket.io-client";
 
 interface NotificationContextType {

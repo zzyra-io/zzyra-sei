@@ -26,9 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { OpenRouterProvider } from "@/lib/ai-providers/openrouter";
 import { saveBlock } from "@/lib/block-library-api";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { zodResolver } from "@hookform/resolvers/zod";
 import {
   AICustomBlockData,
   BlockType,
@@ -48,32 +46,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import * as z from "zod";
-
-// Form schema for block creation
-const blockFormSchema = z.object({
-  name: z
-    .string()
-    .min(3, {
-      message: "Block name must be at least 3 characters.",
-    })
-    .max(50, {
-      message: "Block name must not exceed 50 characters.",
-    }),
-  description: z
-    .string()
-    .min(10, {
-      message: "Description must be at least 10 characters.",
-    })
-    .max(200, {
-      message: "Description must not exceed 200 characters.",
-    }),
-  blockType: z.nativeEnum(BlockType),
-  category: z.nativeEnum(NodeCategory).default(NodeCategory.ACTION),
-  isPublic: z.boolean().default(false),
-  prompt: z.string().optional(),
-  tags: z.array(z.string()).default([]),
-});
 
 export default function CreateBlockPage() {
   const router = useRouter();
@@ -87,12 +59,11 @@ export default function CreateBlockPage() {
   const [step, setStep] = useState<"config" | "generate" | "review">("config");
 
   // Create form
-  const form = useForm<z.infer<typeof blockFormSchema>>({
-    resolver: zodResolver(blockFormSchema),
+  const form = useForm<any>({
     defaultValues: {
       name: "",
       description: "",
-      blockType: BlockType.CUSTOM,
+      blockType: BlockType.AGGREGATOR,
       category: NodeCategory.ACTION,
       isPublic: false,
       prompt: "",
@@ -122,33 +93,27 @@ export default function CreateBlockPage() {
     );
   };
 
-  const handleGenerateBlock = async (data: z.infer<typeof blockFormSchema>) => {
+  const handleGenerateBlock = async (data: any) => {
     try {
       setGenerating(true);
 
-      // Get current user ID for tracking purposes
-      const supabase = createClient();
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id || "anonymous";
-
       // Create OpenRouter instance
-      const openRouter = new OpenRouterProvider();
+      // const openRouter = new OpenRouterProvider();
 
       // Generate block definition using AI
-      const generatedBlock = await openRouter.generateBlock({
-        category: data.category,
-        blockType: data.blockType,
-        name: data.name,
-        description: data.description,
-        additionalContext: data.prompt || "",
-        userId,
-      });
+      // const generatedBlock = await openRouter.generateCustomBlock({
+      //   category: data.category,
+      //   blockType: data.blockType,
+      //   name: data.name,
+      //   description: data.description,
+      //   additionalContext: data.prompt || "",
+      // });
 
-      if (!generatedBlock) {
-        throw new Error("Failed to generate block");
-      }
+      // if (!generatedBlock) {
+      //   throw new Error("Failed to generate block");
+      // }
 
-      setGeneratedBlock(generatedBlock);
+      // setGeneratedBlock(generatedBlock);
       setStep("review");
 
       toast({
@@ -204,7 +169,7 @@ export default function CreateBlockPage() {
 
   const getBlockTypeLabel = (type: BlockType) => {
     const metadata = getBlockMetadata(type);
-    return metadata.label || type.replace("_", " ").toLowerCase();
+    return metadata?.label || type.replace("_", " ").toLowerCase();
   };
 
   const renderConfigStep = () => (
@@ -418,7 +383,13 @@ export default function CreateBlockPage() {
 
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit(handleGenerateBlock)}
+          onSubmit={form.handleSubmit((data) => {
+            toast({
+              title: "Block NOT generated",
+              description:
+                "Your custom DeFi block has NOT been generated. Implement the function",
+            });
+          })}
           className='space-y-6'>
           <FormField
             control={form.control}
@@ -553,14 +524,14 @@ export default function CreateBlockPage() {
                   </div>
                 )}
 
-                {generatedBlock?.configuration && (
+                {generatedBlock?.configFields && (
                   <div>
                     <div className='text-sm font-medium mb-1'>
                       Configuration
                     </div>
                     <div className='bg-muted rounded-md p-3 overflow-auto max-h-60'>
                       <pre className='text-xs'>
-                        {JSON.stringify(generatedBlock.configuration, null, 2)}
+                        {JSON.stringify(generatedBlock.configFields, null, 2)}
                       </pre>
                     </div>
                   </div>
@@ -584,7 +555,7 @@ export default function CreateBlockPage() {
             <CardContent>
               <div className='bg-muted rounded-md p-3 overflow-auto max-h-[400px]'>
                 <pre className='text-xs'>
-                  {generatedBlock?.executionCode || "No code generated"}
+                  {generatedBlock?.code || "No code generated"}
                 </pre>
               </div>
             </CardContent>
@@ -664,8 +635,8 @@ export default function CreateBlockPage() {
                   step === "config"
                     ? "border border-muted-foreground/30"
                     : step === "generate"
-                      ? "bg-primary text-white"
-                      : "bg-primary"
+                    ? "bg-primary text-white"
+                    : "bg-primary"
                 )}>
                 2
               </span>

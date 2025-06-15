@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 // import Stripe from 'stripe'
-import { createClient } from "@/lib/supabase/server";
 
 // const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 //   apiVersion: '2025-03-31.basil',
@@ -8,14 +7,6 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   // Authenticate user
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user || !user.email) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
   // try {
   //   // Create Stripe Checkout Session
   //   const session = await stripe.checkout.sessions.create({
