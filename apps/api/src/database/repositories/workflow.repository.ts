@@ -18,6 +18,13 @@ export class WorkflowRepository {
         where: { userId },
         skip,
         take: limit,
+        include: {
+          _count: {
+            select: {
+              executions: true,
+            },
+          },
+        },
         orderBy: { updatedAt: "desc" },
       }),
       this.prisma.client.workflow.count({
@@ -42,6 +49,13 @@ export class WorkflowRepository {
   async findByUserId(userId: string): Promise<Workflow[]> {
     return this.prisma.client.workflow.findMany({
       where: { userId },
+      include: {
+        _count: {
+          select: {
+            executions: true,
+          },
+        },
+      },
     });
   }
 

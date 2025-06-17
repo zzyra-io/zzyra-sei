@@ -86,7 +86,7 @@ export function DashboardHeader() {
         </nav>
 
         {/* Search Bar - Desktop */}
-        <div className='ml-auto hidden md:flex items-center relative max-w-md w-full mr-4'>
+        <div className='ml-auto   w-auto  hidden md:flex items-center relative max-w-md  mr-4'>
           <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-2 text-muted-foreground' />
           <Input
             placeholder='Search workflows, templates...'

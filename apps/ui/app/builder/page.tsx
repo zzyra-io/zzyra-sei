@@ -24,11 +24,28 @@ import { workflowService } from "@/lib/services/workflow-service";
 import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
 import { ArrowLeft, Loader2, Play, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
 import { useSaveAndExecute } from "@/hooks/use-save-and-execute";
 import { BlockType } from "@zyra/types";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+
+// Add new save state interface and state
+interface SaveState {
+  isOpen: boolean;
+  mode: "new" | "update" | "save-as";
+  shouldExecuteAfterSave: boolean;
+}
 
 export default function BuilderPage() {
   // Store hooks replacing local useState
@@ -43,19 +60,13 @@ export default function BuilderPage() {
     workflowDescription,
     hasUnsavedChanges,
     executionId,
-    tags,
     setWorkflowId,
     setWorkflowName,
     setWorkflowDescription,
     setHasUnsavedChanges,
-    isSaveDialogOpen,
-    isExitDialogOpen,
-    // isExecuting is no longer needed as we're using isExecutionPending from the hook
     isGenerating,
     isRefining,
     isLoading,
-    setSaveDialogOpen,
-    setExitDialogOpen,
     setGenerating,
     setRefining,
     setLoading,
@@ -71,17 +82,25 @@ export default function BuilderPage() {
 
   const toolbar = useFlowToolbar();
   const { validateWorkflow } = useWorkflowValidation();
-  const { mutateAsync: saveAndExecute, isPending: isSaveAndExecutePending } =
-    useSaveAndExecute();
+  const { mutateAsync: saveAndExecute } = useSaveAndExecute();
 
   // Other hooks
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialId = searchParams.get("id") || undefined;
-  const toolbarRef = useRef(null);
 
   const [isClient, setIsClient] = useState(false);
+
+  // Replace isSaveDialogOpen and isUpdateDialogOpen with saveState
+  const [saveState, setSaveState] = useState<SaveState>({
+    isOpen: false,
+    mode: "new",
+    shouldExecuteAfterSave: false,
+  });
+
+  // Add back exit dialog state
+  const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
 
   // Set isClient to true only after the component mounts on the client
   useEffect(() => {
@@ -109,10 +128,11 @@ export default function BuilderPage() {
               description: "Your workflow has been loaded successfully.",
             });
           }
-        } catch (error) {
+        } catch (error: unknown) {
+          const err = error as Error;
           toast({
             title: "Error",
-            description: error.message || "Failed to load workflow.",
+            description: err.message || "Failed to load workflow.",
             variant: "destructive",
           });
         } finally {
@@ -132,6 +152,40 @@ export default function BuilderPage() {
     setHasUnsavedChanges,
     setLoading,
   ]);
+
+  // Add draft persistence effect
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      const draft = {
+        nodes,
+        edges,
+        workflowName,
+        workflowDescription,
+        lastModified: Date.now(),
+      };
+      localStorage.setItem("workflow_draft", JSON.stringify(draft));
+    }
+  }, [nodes, edges, workflowName, workflowDescription, hasUnsavedChanges]);
+
+  // Load draft on mount if no workflowId
+  useEffect(() => {
+    if (!workflowId) {
+      const draft = localStorage.getItem("workflow_draft");
+      if (draft) {
+        const {
+          nodes: draftNodes,
+          edges: draftEdges,
+          workflowName: draftName,
+          workflowDescription: draftDesc,
+        } = JSON.parse(draft);
+        setNodes(draftNodes);
+        setEdges(draftEdges);
+        setWorkflowName(draftName);
+        setWorkflowDescription(draftDesc);
+        setHasUnsavedChanges(true);
+      }
+    }
+  }, [workflowId]);
 
   // Handlers using store actions
   const handleAddBlock = useCallback(
@@ -178,12 +232,6 @@ export default function BuilderPage() {
   // State to control execution panel visibility
   const [showExecutionPanel, setShowExecutionPanel] = useState(false);
 
-  // State to track if we should execute after saving
-  const [shouldExecuteAfterSave, setShouldExecuteAfterSave] = useState(false);
-
-  // State for update dialog (separate from save dialog)
-  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
-
   // Show execution panel when execution is pending or we have a status
   useEffect(() => {
     if (isExecutionPending || executionStatus) {
@@ -214,16 +262,31 @@ export default function BuilderPage() {
     }));
   }
 
-  // Handler for saving new workflows
+  // Update handleSmartSave
+  const handleSmartSave = useCallback(async () => {
+    if (workflowId) {
+      setSaveState({
+        isOpen: true,
+        mode: "update",
+        shouldExecuteAfterSave: false,
+      });
+    } else {
+      setSaveState({
+        isOpen: true,
+        mode: "new",
+        shouldExecuteAfterSave: false,
+      });
+    }
+  }, [workflowId]);
+
+  // Update handleSaveNewWorkflow
   const handleSaveNewWorkflow = useCallback(
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
         const normalizedNodes = normalizeNodesBlockType(nodes);
-        console.log(
-          "🟢 [DEBUG] Saving new workflow. Node blockTypes:",
-          normalizedNodes.map((n) => n.data?.blockType)
-        );
+
+        // Create new workflow
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
@@ -234,30 +297,39 @@ export default function BuilderPage() {
         });
 
         if (savedWorkflow && savedWorkflow.id) {
+          // Reset all workflow-related state
           setWorkflowId(savedWorkflow.id);
-          router.replace(`/builder?id=${savedWorkflow.id}`);
+          setHasUnsavedChanges(false);
+          setSaveState((prev) => ({ ...prev, isOpen: false }));
+
+          // Update URL without triggering a reload
+          router.replace(`/builder?id=${savedWorkflow.id}`, { scroll: false });
+
+          // Clear any draft data
           localStorage.removeItem("workflow_draft");
+
           toast({
             title: "Workflow saved",
             description: "Your workflow has been saved successfully.",
           });
-        }
 
-        setHasUnsavedChanges(false);
-        setSaveDialogOpen(false);
-
-        // Execute the workflow if it was requested before saving
-        if (shouldExecuteAfterSave) {
-          setShouldExecuteAfterSave(false);
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          executeWorkflow();
-          setShowExecutionPanel(true);
+          // Execute if requested
+          if (saveState.shouldExecuteAfterSave) {
+            setSaveState((prev) => ({
+              ...prev,
+              shouldExecuteAfterSave: false,
+            }));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            executeWorkflow();
+            setShowExecutionPanel(true);
+          }
         }
-      } catch (error: any) {
-        console.error("Error saving new workflow:", error);
+      } catch (error: unknown) {
+        const err = error as Error;
+        console.error("Error saving new workflow:", err);
         toast({
           title: "Error",
-          description: error.message || "Failed to save workflow.",
+          description: err.message || "Failed to save workflow.",
           variant: "destructive",
         });
       } finally {
@@ -271,25 +343,20 @@ export default function BuilderPage() {
       toast,
       setWorkflowId,
       setHasUnsavedChanges,
-      setSaveDialogOpen,
-      shouldExecuteAfterSave,
-      setShouldExecuteAfterSave,
+      saveState,
       executeWorkflow,
       setShowExecutionPanel,
       setLoading,
     ]
   );
 
-  // Handler for updating existing workflows
+  // Update handleUpdateWorkflow
   const handleUpdateWorkflow = useCallback(
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
         const normalizedNodes = normalizeNodesBlockType(nodes);
-        console.log(
-          "🟢 [DEBUG] Updating workflow. Node blockTypes:",
-          normalizedNodes.map((n) => n.data?.blockType)
-        );
+
         if (workflowId) {
           await workflowService.updateWorkflow(workflowId, {
             name,
@@ -299,27 +366,32 @@ export default function BuilderPage() {
             is_public: false,
             tags,
           });
+
+          setHasUnsavedChanges(false);
+          setSaveState((prev) => ({ ...prev, isOpen: false }));
+
           toast({
             title: "Workflow updated",
             description: "Your workflow has been updated successfully.",
           });
-        }
 
-        setHasUnsavedChanges(false);
-        setIsUpdateDialogOpen(false);
-
-        // Execute the workflow if it was requested before saving
-        if (shouldExecuteAfterSave) {
-          setShouldExecuteAfterSave(false);
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          executeWorkflow();
-          setShowExecutionPanel(true);
+          // Execute if requested
+          if (saveState.shouldExecuteAfterSave) {
+            setSaveState((prev) => ({
+              ...prev,
+              shouldExecuteAfterSave: false,
+            }));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            executeWorkflow();
+            setShowExecutionPanel(true);
+          }
         }
-      } catch (error: any) {
-        console.error("Error updating workflow:", error);
+      } catch (error: unknown) {
+        const err = error as Error;
+        console.error("Error updating workflow:", err);
         toast({
           title: "Error",
-          description: error.message || "Failed to update workflow.",
+          description: err.message || "Failed to update workflow.",
           variant: "destructive",
         });
       } finally {
@@ -332,9 +404,7 @@ export default function BuilderPage() {
       edges,
       toast,
       setHasUnsavedChanges,
-      setIsUpdateDialogOpen,
-      shouldExecuteAfterSave,
-      setShouldExecuteAfterSave,
+      saveState,
       executeWorkflow,
       setShowExecutionPanel,
       setLoading,
@@ -370,20 +440,21 @@ export default function BuilderPage() {
         }
 
         setHasUnsavedChanges(false);
-        setIsUpdateDialogOpen(false);
+        setSaveState((prev) => ({ ...prev, isOpen: false }));
 
         // Execute the workflow if it was requested before saving
-        if (shouldExecuteAfterSave) {
-          setShouldExecuteAfterSave(false);
+        if (saveState.shouldExecuteAfterSave) {
+          setSaveState((prev) => ({ ...prev, shouldExecuteAfterSave: false }));
           await new Promise((resolve) => setTimeout(resolve, 2000));
           executeWorkflow();
           setShowExecutionPanel(true);
         }
-      } catch (error: any) {
-        console.error("Error saving as new workflow:", error);
+      } catch (error: unknown) {
+        const err = error as Error;
+        console.error("Error saving as new workflow:", err);
         toast({
           title: "Error",
-          description: error.message || "Failed to save as new workflow.",
+          description: err.message || "Failed to save as new workflow.",
           variant: "destructive",
         });
       } finally {
@@ -397,40 +468,19 @@ export default function BuilderPage() {
       toast,
       setWorkflowId,
       setHasUnsavedChanges,
-      setIsUpdateDialogOpen,
-      shouldExecuteAfterSave,
-      setShouldExecuteAfterSave,
+      saveState,
       executeWorkflow,
       setShowExecutionPanel,
       setLoading,
     ]
   );
 
-  // Smart save function that handles both new and existing workflows
-  const handleSmartSave = useCallback(async () => {
-    if (workflowId) {
-      // Existing workflow - show update modal
-      setIsUpdateDialogOpen(true);
-    } else {
-      // New workflow - show save modal
-      setSaveDialogOpen(true);
-    }
-  }, [workflowId, setSaveDialogOpen, setIsUpdateDialogOpen]);
-
-  // Handle workflow execution with proper save logic
+  // Update handleExecuteWorkflow
   const handleExecuteWorkflow = useCallback(async () => {
     try {
-      console.log("🚀 handleExecuteWorkflow called");
-      console.log("  workflowId:", workflowId);
-      console.log("  nodes.length:", nodes.length);
-      console.log("  edges.length:", edges.length);
-
-      // 1. Comprehensive client-side validation using existing hook
+      // 1. Validate workflow
       const validationResult = validateWorkflow(nodes, edges);
-      console.log("  validation result:", validationResult);
-
       if (!validationResult.valid) {
-        console.log("❌ Validation failed:", validationResult.message);
         toast({
           title: "Workflow Validation Failed",
           description:
@@ -438,77 +488,38 @@ export default function BuilderPage() {
             "Please fix the workflow issues before executing.",
           variant: "destructive",
         });
-
-        // Highlight nodes with issues if available
-        if (validationResult.issues) {
-          console.log("Validation issues:", validationResult.issues);
-          // Could add UI highlighting logic here
-        }
         return;
       }
 
-      console.log("✅ Validation passed");
-
-      // 2. Handle saving before execution
+      // 2. Handle unsaved workflow
       if (!workflowId) {
-        // New workflow - show save modal and set flag to execute after save
-        console.log("🔄 New workflow detected - showing save modal");
-        console.log("  Setting shouldExecuteAfterSave to true");
-        console.log("  Setting saveDialogOpen to true");
-
-        setShouldExecuteAfterSave(true);
-        setSaveDialogOpen(true);
-        console.log(
-          "  Modal should now be open. Current isSaveDialogOpen:",
-          isSaveDialogOpen
-        );
-        return;
-      } else if (hasUnsavedChanges) {
-        // Existing workflow with changes - save directly
-        console.log("💾 Existing workflow with changes - saving directly");
-        toast({
-          title: "Saving workflow...",
-          description: "Saving changes before execution.",
+        setSaveState({
+          isOpen: true,
+          mode: "new",
+          shouldExecuteAfterSave: true,
         });
-
-        setShouldExecuteAfterSave(true);
-        setIsUpdateDialogOpen(true);
         return;
-
-        // Give the database a moment to be consistent
-        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
-      // 3. Normalize and update workflow before execution
-      console.log("🔧 Normalizing block types before execution");
-      const normalizedNodes = normalizeNodesBlockType(nodes);
-      console.log(
-        "🟢 [DEBUG] Normalized blockTypes for execution:",
-        normalizedNodes.map((n) => n.data?.blockType)
-      );
-
-      if (workflowId) {
-        // Update the workflow in database with normalized nodes
-        await workflowService.updateWorkflow(workflowId, {
-          name: workflowName,
-          description: workflowDescription,
-          nodes: normalizedNodes,
-          edges,
-          is_public: false,
-          tags: tags || [],
+      // 3. Handle workflow with unsaved changes
+      if (hasUnsavedChanges) {
+        setSaveState({
+          isOpen: true,
+          mode: "update",
+          shouldExecuteAfterSave: true,
         });
-        console.log("✅ Workflow updated with normalized block types");
+        return;
       }
 
-      // 4. Execute workflow - server will do additional validation
-      console.log("▶️ Starting execution");
-      executeWorkflow();
+      // 4. Execute workflow
       setShowExecutionPanel(true);
-    } catch (error: any) {
-      console.error("❌ Error in execution flow:", error);
+      await executeWorkflow();
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error("Error in execution flow:", err);
       toast({
         title: "Execution Error",
-        description: error.message || "Failed to execute workflow",
+        description: err.message || "Failed to execute workflow",
         variant: "destructive",
       });
     }
@@ -516,17 +527,10 @@ export default function BuilderPage() {
     validateWorkflow,
     nodes,
     edges,
-    toast,
     workflowId,
     hasUnsavedChanges,
-    workflowName,
-    workflowDescription,
-    setIsUpdateDialogOpen,
-    setShouldExecuteAfterSave,
-    setSaveDialogOpen,
     executeWorkflow,
-    setShowExecutionPanel,
-    isSaveDialogOpen, // Add this dependency for debug
+    toast,
   ]);
 
   const handleNlGenerate = useCallback(
@@ -542,17 +546,19 @@ export default function BuilderPage() {
           setNodes(newNodes);
           setEdges(newEdges);
           addToHistory(newNodes, newEdges);
-          setRecentPrompts((prev: string[]) => [nlPrompt, ...prev.slice(0, 4)]);
+          const recentPrompts = [nlPrompt];
+          setRecentPrompts(recentPrompts);
           setHasUnsavedChanges(true);
           toast({
             title: "Workflow updated",
             description: `Added ${result.nodes.length} new blocks based on your instructions.`,
           });
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as Error;
         toast({
           title: "Error",
-          description: error.message || "Failed to generate workflow.",
+          description: err.message || "Failed to generate workflow.",
           variant: "destructive",
         });
       } finally {
@@ -573,13 +579,13 @@ export default function BuilderPage() {
     ]
   );
 
-  const handleExit = useCallback(() => {
+  const handleExit = () => {
     if (hasUnsavedChanges) {
-      setExitDialogOpen(true);
+      setIsExitDialogOpen(true);
     } else {
-      router.push("/dashboard");
+      router.push("/workflows");
     }
-  }, [hasUnsavedChanges, setExitDialogOpen, router]);
+  };
 
   // Hotkeys using toolbar actions from store
   useHotkeys(
@@ -864,11 +870,11 @@ export default function BuilderPage() {
                           "Updated workflow based on your refinement request.",
                       });
                     }
-                  } catch (error) {
+                  } catch (error: unknown) {
+                    const err = error as Error;
                     toast({
                       title: "Error",
-                      description:
-                        error.message || "Failed to refine workflow.",
+                      description: err.message || "Failed to refine workflow.",
                       variant: "destructive",
                     });
                   } finally {
@@ -882,16 +888,20 @@ export default function BuilderPage() {
 
         {/* Dialogs */}
         <SaveNewWorkflowDialog
-          open={isSaveDialogOpen}
-          onOpenChange={setSaveDialogOpen}
+          open={saveState.isOpen && saveState.mode === "new"}
+          onOpenChange={(open) =>
+            setSaveState((prev) => ({ ...prev, isOpen: open }))
+          }
           onSave={handleSaveNewWorkflow}
           initialName={workflowName}
           initialDescription={workflowDescription}
         />
 
         <UpdateWorkflowDialog
-          open={isUpdateDialogOpen}
-          onOpenChange={setIsUpdateDialogOpen}
+          open={saveState.isOpen && saveState.mode === "update"}
+          onOpenChange={(open) =>
+            setSaveState((prev) => ({ ...prev, isOpen: open }))
+          }
           onUpdate={handleUpdateWorkflow}
           onSaveAsNew={handleSaveAsNew}
           currentName={workflowName || "Untitled Workflow"}
@@ -900,34 +910,23 @@ export default function BuilderPage() {
         />
 
         {/* Exit Confirmation Dialog */}
-        <Dialog open={isExitDialogOpen} onOpenChange={setExitDialogOpen}>
-          <DialogContent>
-            <h2>Unsaved Changes</h2>
-            <p>You have unsaved changes. Do you want to save before exiting?</p>
-            <div className='flex gap-2'>
-              <Button
-                onClick={async () => {
-                  await handleSaveWorkflow(workflowName, workflowDescription);
-                  router.push("/dashboard");
-                }}>
-                Save and Exit
-              </Button>
-              <Button
-                variant='destructive'
-                onClick={() => {
-                  setExitDialogOpen(false);
-                  router.push("/dashboard");
-                }}>
-                Discard
-              </Button>
-              <Button
-                variant='outline'
-                onClick={() => setExitDialogOpen(false)}>
-                Cancel
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <AlertDialog open={isExitDialogOpen} onOpenChange={setIsExitDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes. Are you sure you want to leave? Your
+                changes will be lost.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => router.push("/workflows")}>
+                Leave Without Saving
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </>
   );
