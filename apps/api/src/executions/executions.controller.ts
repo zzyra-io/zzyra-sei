@@ -216,9 +216,11 @@ export class ExecutionsController {
   })
   async getNodeExecutions(
     @Query("executionId") executionId: string
-  ): Promise<any[]> {
+  ): Promise<{ nodes: any[] }> {
     try {
-      return await this.nodeExecutionsService.findByExecutionId(executionId);
+      const nodes =
+        await this.nodeExecutionsService.findByExecutionId(executionId);
+      return { nodes };
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -243,9 +245,11 @@ export class ExecutionsController {
   })
   async getNodeLogs(
     @Query("nodeExecutionId") nodeExecutionId: string
-  ): Promise<any[]> {
+  ): Promise<{ logs: any[] }> {
     try {
-      return await this.nodeLogsService.findByNodeExecutionId(nodeExecutionId);
+      const logs =
+        await this.nodeLogsService.findByNodeExecutionId(nodeExecutionId);
+      return { logs };
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";

@@ -1,45 +1,44 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { CountdownTimer } from "@/components/countdown-timer";
+import { FeatureCard } from "@/components/feature-card";
+import { FloatingParticles } from "@/components/floating-particles";
+import { GradientButton } from "@/components/gradient-button";
+import { HeroAnimation } from "@/components/hero-animation";
+import { InteractiveDemo } from "@/components/interactive-demo";
+import { PartnerLogos } from "@/components/partner-logos";
+import { StatsCounterGroup } from "@/components/stats-counter";
+import { TestimonialCard } from "@/components/testimonial-card";
+import { TrustBadges } from "@/components/trust-badges";
+import { Button } from "@/components/ui/button";
+import { WorkflowPreview } from "@/components/workflow-preview";
+import useAuthStore from "@/lib/store/auth-store";
 import {
+  AnimatePresence,
+  AnimationControls,
+  HTMLMotionProps,
   motion,
   useAnimation,
   useInView,
-  AnimatePresence,
-  HTMLMotionProps,
   Variants,
-  AnimationControls,
 } from "framer-motion";
 import {
   ArrowRight,
-  LucideLayoutDashboard,
-  Zap,
-  Bot,
-  Layers,
-  Workflow,
-  Sparkles,
-  ChevronRight,
   ArrowUpRight,
-  Cpu,
-  Shield,
-  Star,
+  Bot,
   Check,
+  ChevronRight,
+  Cpu,
+  Layers,
+  LucideLayoutDashboard,
   Settings,
+  Sparkles,
+  Star,
+  Workflow,
+  Zap,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { HeroAnimation } from "@/components/hero-animation";
-import { FeatureCard } from "@/components/feature-card";
-import { WorkflowPreview } from "@/components/workflow-preview";
-import { TestimonialCard } from "@/components/testimonial-card";
-import { GradientButton } from "@/components/gradient-button";
-import { FloatingParticles } from "@/components/floating-particles";
-import { InteractiveDemo } from "@/components/interactive-demo";
-import { StatsCounterGroup } from "@/components/stats-counter";
-import { TrustBadges } from "@/components/trust-badges";
-import { PartnerLogos } from "@/components/partner-logos";
-import { CountdownTimer } from "@/components/countdown-timer";
-import { useSession } from "next-auth/react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 // Define motion component types with proper HTML attributes
 type MotionProps = {
@@ -69,17 +68,8 @@ const MotionA = motion.a as React.ComponentType<
   MotionProps & HTMLMotionProps<"a">
 >;
 
-// Define TestimonialCardProps type
-type TestimonialCardProps = {
-  name: string;
-  role: string;
-  content: string;
-  avatar: string;
-  rating: number;
-};
-
 export default function HomePage() {
-  const { data: session } = useSession();
+  const { user } = useAuthStore();
   const [showInteractiveDemo, setShowInteractiveDemo] = useState(false);
 
   // Refs for scroll animations
@@ -279,7 +269,7 @@ export default function HomePage() {
 
           <div className='flex items-center space-x-4'>
             <AnimatePresence>
-              {session ? (
+              {user && user.email ? (
                 <MotionDiv
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}

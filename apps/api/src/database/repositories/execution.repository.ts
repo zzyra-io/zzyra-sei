@@ -70,7 +70,21 @@ export class ExecutionRepository {
   async findNodeExecutions(executionId: string): Promise<NodeExecution[]> {
     return this.prisma.client.nodeExecution.findMany({
       where: { executionId },
+      include: {
+        nodeInputs: true,
+        nodeOutputs: true,
+      },
       orderBy: { startedAt: "asc" },
+    });
+  }
+
+  async findNodeExecution(id: string): Promise<NodeExecution | null> {
+    return this.prisma.client.nodeExecution.findUnique({
+      where: { id },
+      include: {
+        nodeInputs: true,
+        nodeOutputs: true,
+      },
     });
   }
 
@@ -123,5 +137,49 @@ export class ExecutionRepository {
       take: limit,
       orderBy: { createdAt: "desc" },
     });
+  }
+
+  async findMany(params: { take?: number }): Promise<WorkflowExecution[]> {
+    return this.prisma.client.workflowExecution.findMany({
+      take: params.take || 10,
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async findWithNodesAndLogs(id: string): Promise<WorkflowExecution | null> {
+    return this.prisma.client.workflowExecution.findUnique({
+      where: { id },
+      include: {
+        nodeExecutions: {
+          include: {
+            logs: true,
+            nodeInputs: true,
+            nodeOutputs: true,
+          },
+        },
+        workflow: {
+          select: {
+            name: true,
+            nodes: true,
+            edges: true,
+          },
+        },
+      },
+    });
+  }
+
+  async update(id: string, data: any): Promise<WorkflowExecution> {
+    return this.prisma.client.workflowExecution.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async updateStatus(
+    id: string,
+    status: WorkflowStatus,
+    error?: string
+  ): Promise<WorkflowExecution> {
+    return this.updateExecutionStatus(id, status, error);
   }
 }

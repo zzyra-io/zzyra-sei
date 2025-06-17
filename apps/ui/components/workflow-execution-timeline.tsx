@@ -87,7 +87,7 @@ interface LogEntry {
   timestamp: string;
   level: "info" | "warning" | "error" | "debug";
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 interface ExecutionDetail {

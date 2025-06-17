@@ -1,101 +1,88 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Inject } from "@nestjs/common";
 import { NodeExecutionDto } from "./dto/execution.dto";
-import { BlockType } from "@zyra/types";
+import { ExecutionRepository } from "../database/repositories/execution.repository";
 
 @Injectable()
 export class NodeExecutionsService {
-  // Generate realistic mock node executions based on execution ID
-  private generateNodeExecutionsForExecution(
-    executionId: string
-  ): NodeExecutionDto[] {
-    const baseTime = new Date();
-    const nodeTypes = Object.values(BlockType);
-    const statuses = ["completed", "failed", "running", "paused"] as const;
-
-    // Generate 3-6 nodes per execution
-    const nodeCount = Math.floor(Math.random() * 4) + 3;
-    const nodes: NodeExecutionDto[] = [];
-
-    for (let i = 0; i < nodeCount; i++) {
-      const nodeStartTime = new Date(
-        baseTime.getTime() + i * 2000 + Math.random() * 1000
-      );
-      const isCompleted = i < nodeCount - 1 || Math.random() > 0.3;
-      const isFailed = isCompleted && Math.random() < 0.1;
-      const isPaused = !isCompleted && !isFailed && Math.random() < 0.2;
-      const isRunning = !isCompleted && !isFailed && !isPaused;
-
-      let status: (typeof statuses)[number];
-      let completedAt: string | undefined;
-      let error: string | undefined;
-
-      if (isFailed) {
-        status = "failed";
-        completedAt = new Date(
-          nodeStartTime.getTime() + Math.random() * 5000 + 1000
-        ).toISOString();
-        error = "Node execution failed due to timeout";
-      } else if (isPaused) {
-        status = "paused";
-      } else if (isRunning) {
-        status = "running";
-      } else {
-        status = "completed";
-        completedAt = new Date(
-          nodeStartTime.getTime() + Math.random() * 5000 + 1000
-        ).toISOString();
-      }
-
-      nodes.push({
-        id: `node-exec-${executionId}-${i + 1}`,
-        execution_id: executionId,
-        node_id: `node-${i + 1}`,
-        status,
-        started_at: nodeStartTime.toISOString(),
-        completed_at: completedAt,
-        input_data: {
-          parameters: {
-            url: "https://api.example.com/data",
-            method: "GET",
-            timeout: 30000,
-            nodeType: nodeTypes[i % nodeTypes.length], // Store node type in input_data
-          },
-          data: {
-            userId: 12345,
-            action: "process",
-          },
-        },
-        output_data:
-          status === "completed"
-            ? {
-                result: "success",
-                data: {
-                  processedItems: Math.floor(Math.random() * 100) + 1,
-                  duration: Math.floor(Math.random() * 5000) + 500,
-                },
-              }
-            : undefined,
-        error,
-      });
-    }
-
-    return nodes;
-  }
+  constructor(
+    @Inject("NODE_EXECUTIONS_REPOSITORY")
+    private readonly executionRepository: ExecutionRepository
+  ) {}
 
   async findByExecutionId(executionId: string): Promise<NodeExecutionDto[]> {
-    // Generate consistent mock data based on execution ID
-    return this.generateNodeExecutionsForExecution(executionId);
+    try {
+      // Get node executions from database
+      const nodeExecutions =
+        await this.executionRepository.findNodeExecutions(executionId);
+
+      // Transform database records to DTOs
+      return nodeExecutions.map(
+        (nodeExec) =>
+          new NodeExecutionDto({
+            id: nodeExec.id,
+            execution_id: nodeExec.executionId,
+            node_id: nodeExec.nodeId,
+            status: nodeExec.status as
+              | "pending"
+              | "running"
+              | "completed"
+              | "failed"
+              | "paused",
+            started_at: nodeExec.startedAt?.toISOString() || undefined,
+            completed_at: nodeExec.completedAt?.toISOString() || undefined,
+            error: nodeExec.error || undefined,
+            input_data:
+              ((nodeExec as any).nodeInputs?.[0]?.inputData as Record<
+                string,
+                unknown
+              >) || {},
+            output_data: (nodeExec.outputData as Record<string, unknown>) || {},
+          })
+      );
+    } catch (error) {
+      console.error(
+        `Failed to fetch node executions for execution ${executionId}:`,
+        error
+      );
+      // Return empty array instead of throwing to prevent breaking the UI
+      return [];
+    }
   }
 
   async findById(id: string): Promise<NodeExecutionDto | undefined> {
-    // Extract execution ID from node execution ID
-    const executionIdMatch = id.match(/node-exec-(.+)-\d+/);
-    if (!executionIdMatch) {
+    try {
+      // Get single node execution from database
+      const nodeExecution =
+        await this.executionRepository.findNodeExecution(id);
+
+      if (!nodeExecution) {
+        return undefined;
+      }
+
+      return new NodeExecutionDto({
+        id: nodeExecution.id,
+        execution_id: nodeExecution.executionId,
+        node_id: nodeExecution.nodeId,
+        status: nodeExecution.status as
+          | "pending"
+          | "running"
+          | "completed"
+          | "failed"
+          | "paused",
+        started_at: nodeExecution.startedAt?.toISOString() || undefined,
+        completed_at: nodeExecution.completedAt?.toISOString() || undefined,
+        error: nodeExecution.error || undefined,
+        input_data:
+          ((nodeExecution as any).nodeInputs?.[0]?.inputData as Record<
+            string,
+            unknown
+          >) || {},
+        output_data:
+          (nodeExecution.outputData as Record<string, unknown>) || {},
+      });
+    } catch (error) {
+      console.error(`Failed to fetch node execution ${id}:`, error);
       return undefined;
     }
-
-    const executionId = executionIdMatch[1];
-    const nodes = this.generateNodeExecutionsForExecution(executionId);
-    return nodes.find((node) => node.id === id);
   }
 }
