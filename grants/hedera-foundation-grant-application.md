@@ -108,44 +108,64 @@ Unlike single-chain platforms, Zzyra lets users **choose the best tool for each 
 
 ## **About Your Funding: Building Hedera's Universal Automation Gateway**
 
-**Funding Request: $200,000**
+**Funding Request: $80,000**
 
 **Strategic Investment in Universal Platform:**
 
-**1. Hedera Block Ecosystem Development ($80,000) - Months 1-3**
+**1. Research & Planning Phase ($12,000) - Month 1**
 
-- **HCS Integration Blocks**: Consensus service blocks for audit trails, timestamping, verification
-- **HTS Token Automation**: Complete token lifecycle blocks (mint, burn, transfer, distribution)
-- **HBAR Payment Optimization**: AI-powered payment timing and fee optimization blocks
-- **Hedera Service Blocks**: Specialized blocks for Hedera's unique capabilities and protocols
+- **Hedera Technical Research**: Deep dive into HCS, HTS, and HBAR integration patterns
+- **Platform Architecture Design**: Detailed technical specifications for universal block system
+- **Market Validation**: User interviews and competitive analysis refinement
+- **Development Planning**: Sprint planning, technical requirements, and risk assessment
 
-**2. Chain-Agnostic Platform Foundation ($70,000) - Months 4-6**
+**2. Core Hedera Block Development ($40,000) - Months 2-6**
 
-- **Universal Block Framework**: Generic architecture supporting any blockchain or service
-- **AI Workflow Engine**: Natural language generation for cross-platform automation
-- **Enterprise Integration**: Secure multi-service coordination with audit capabilities
-- **Developer SDK**: Tools for community creation of Hedera-specific blocks
+- **HCS Integration Blocks**: Consensus service blocks for audit trails and verification (Months 2-3)
+- **HTS Token Automation**: Essential token lifecycle blocks with proper error handling (Months 3-4)
+- **HBAR Payment Integration**: Secure payment automation with fee optimization (Months 4-5)
+- **Testing & Refinement**: Comprehensive testing, security audits, and performance optimization (Month 6)
 
-**3. Ecosystem Growth & Adoption ($50,000) - Months 7-12**
+**3. Platform Foundation & AI Engine ($20,000) - Months 7-10**
 
-- **Cross-Chain Templates**: Workflows showcasing Hedera advantages in multi-chain scenarios
-- **Developer Incentives**: Block marketplace and developer rewards for Hedera integrations
-- **Enterprise Partnerships**: Integration with existing enterprise tools that include Hedera blocks
-- **Community Building**: Developer advocacy and cross-ecosystem user acquisition
+- **Universal Block Framework**: Generic architecture supporting multi-service integration (Months 7-8)
+- **AI Workflow Engine**: Natural language processing for automated workflow generation (Months 8-9)
+- **Developer SDK**: Tools and documentation for community block development (Month 9)
+- **Integration Testing**: End-to-end testing with buffer time for iterations (Month 10)
 
-**Why This Approach Maximizes Hedera Value:**
+**4. Launch Preparation & Community ($8,000) - Months 11-12**
 
-- **Broader user acquisition**: Captures users from all ecosystems, not just Hedera natives
-- **Competitive positioning**: Hedera competes on merits within universal workflows
-- **Use case expansion**: Enables Hedera integration in previously unconsidered scenarios
-- **Network effects**: Each new block type increases Hedera's potential use cases
+- **Documentation & Guides**: Comprehensive developer and user documentation
+- **Beta Testing Program**: Controlled rollout with early adopters and feedback collection
+- **Community Infrastructure**: Developer forums, block marketplace foundation
+- **Launch Readiness**: Final testing, deployment preparation, and go-to-market strategy
+
+**Why This Realistic Approach Ensures Success:**
+
+- **Thorough foundation**: Month-long research prevents costly mistakes later
+- **Iterative development**: Each phase builds on validated learnings from previous phases
+- **Built-in buffers**: Conservative timelines account for unexpected challenges
+- **Quality focus**: Dedicated testing phases ensure enterprise-grade reliability
 
 **Milestones:**
 
-- **Month 3**: Complete Hedera block library, cross-chain automation demos
-- **Month 6**: Public platform launch with Hedera blocks featured prominently
-- **Month 9**: 1,000+ workflows using Hedera blocks, 50+ community-created Hedera blocks
-- **Month 12**: 10,000+ users discovered Hedera through universal automation workflows
+- **Month 1**: Complete technical specifications and validated development roadmap
+- **Month 2.5**: Initial HCS blocks functional on Hedera Testnet with basic audit trail capabilities
+- **Month 4**: Core HTS token automation blocks complete with comprehensive error handling
+- **Month 5.5**: HBAR payment integration blocks deployed with fee optimization features
+- **Month 6.5**: Security audit completed and performance optimization validated
+- **Month 8**: Universal block framework operational with multi-service integration capability
+- **Month 9.5**: AI workflow engine functional with natural language processing and developer SDK released
+- **Month 10.5**: End-to-end integration testing complete with all systems validated
+- **Month 11.5**: Beta testing program launched with early adopter feedback collection
+- **Month 12**: Public platform launch with active community and proven automation workflows
+
+**Expected Outcomes:**
+
+- **Proven Hedera integration**: Robust, tested blocks demonstrating real-world utility
+- **Developer adoption**: Early community of block creators and workflow builders
+- **Enterprise validation**: Pilot programs showcasing Hedera automation benefits
+- **Growth foundation**: Platform ready for user acquisition and ecosystem expansion
 
 ## **Competitors**
 
@@ -153,7 +173,8 @@ Unlike single-chain platforms, Zzyra lets users **choose the best tool for each 
 
 - **Zapier/Make**: Web2-only, no blockchain integration capabilities
 - **Microsoft Power Automate**: Enterprise focus but no Web3 integration
-- **Gap**: Cannot integrate any blockchain, let alone Hedera's unique features
+- **n8n**: Open-source workflow automation with limited blockchain nodes, lacks AI generation and cross-chain optimization
+- **Gap**: Cannot integrate any blockchain comprehensively, let alone Hedera's unique features
 
 **Blockchain-Specific Tools:**
 
@@ -211,7 +232,7 @@ This foundation demonstrates our capability to build universal infrastructure wh
 
 ## **Funding Requested**
 
-$200,000
+$80,000
 
 ---
 

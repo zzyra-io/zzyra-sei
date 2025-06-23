@@ -1,0 +1,66 @@
+{
+  "index": {
+    "title": "Introduction",
+    "theme": {
+      "breadcrumb": false,
+      "footer": true,
+      "sidebar": true,
+      "toc": true,
+      "pagination": false
+    }
+  },
+  "getting-started": {
+    "title": "🚀 Getting Started",
+    "type": "page"
+  },
+  "core-concepts": {
+    "title": "📚 Core Concepts",
+    "type": "group",
+    "children": [
+      "architecture/page.mdx",
+      "architecture/block-system.mdx",
+      "architecture/data-models.mdx"
+    ]
+  },
+  "user-guides": {
+    "title": "👥 User Guides",
+    "type": "group"
+  },
+  "workflow-blocks": {
+    "title": "🧩 Workflow Blocks",
+    "type": "group"
+  },
+  "developer-docs": {
+    "title": "💻 Developer Docs",
+    "type": "group"
+  },
+  "api-reference": {
+    "title": "🔧 API Reference",
+    "type": "group"
+  },
+  "security": {
+    "title": "🔒 Security & Compliance",
+    "type": "group"
+  },
+  "pricing": {
+    "title": "💸 Pricing",
+    "type": "group"
+  },
+  "resources": {
+    "title": "📋 Resources",
+    "type": "group"
+  },
+  "-- Extras": {
+    "type": "separator",
+    "title": "More"
+  },
+  "changelog": {
+    "title": "Changelog",
+    "href": "/changelog"
+  },
+  "support": {
+    "title": "Support",
+    "href": "https://discord.gg/zyra",
+    "newWindow": true
+  }
+}
