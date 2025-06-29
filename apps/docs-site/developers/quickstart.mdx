@@ -1,0 +1,364 @@
+---
+title: "Developer Quick Start"
+description: "Get up and running with Zzyra development in minutes"
+---
+
+## Developer Quick Start
+
+Get your Zzyra development environment up and running in minutes. This guide covers the essential steps to start developing with our monorepo architecture.
+
+<Alert type='info'>
+  **Time to Complete**: ~10 minutes | **Prerequisites**: Node.js 20.3.0+, pnpm
+  9.15.2+, Docker
+</Alert>
+
+## 1. Clone and Setup
+
+<Steps>
+  <Step title="Clone Repository">
+```bash
+git clone <repository-url>
+cd zzyra
+```
+  </Step>
+  
+  <Step title="Install Dependencies">
+```bash
+pnpm install
+```
+  </Step>
+  
+  <Step title="Start Infrastructure">
+```bash
+docker-compose -f setup-compose.yml up -d
+```
+  </Step>
+  
+  <Step title="Setup Database">
+```bash
+cd packages/database
+pnpm prisma generate
+pnpm prisma migrate dev --name init
+```
+  </Step>
+  
+  <Step title="Start Development">
+```bash
+pnpm dev
+```
+  </Step>
+</Steps>
+
+## 2. Verify Installation
+
+<div className='verification'>
+  <h3>✅ Check Your Setup</h3>
+
+  <CardGroup cols={3}>
+    <Card title='Frontend' icon='globe'>
+      <div className='check-item'>
+        <span className='check-label'>URL:</span>
+        <span className='check-value'>http://localhost:3000</span>
+      </div>
+      <div className='check-item'>
+        <span className='check-label'>Status:</span>
+        <span className='check-value'>✅ Running</span>
+      </div>
+    </Card>
+
+    <Card title='API Server' icon='server'>
+      <div className='check-item'>
+        <span className='check-label'>URL:</span>
+        <span className='check-value'>http://localhost:3001</span>
+      </div>
+      <div className='check-item'>
+        <span className='check-label'>Status:</span>
+        <span className='check-value'>✅ Running</span>
+      </div>
+    </Card>
+
+    <Card title='Worker Service' icon='cog'>
+      <div className='check-item'>
+        <span className='check-label'>URL:</span>
+        <span className='check-value'>http://localhost:3002</span>
+      </div>
+      <div className='check-item'>
+        <span className='check-label'>Status:</span>
+        <span className='check-value'>✅ Running</span>
+      </div>
+    </Card>
+
+  </CardGroup>
+</div>
+
+## 3. Project Structure
+
+<div className='project-structure'>
+  <h3>📁 Understanding the Monorepo</h3>
+
+  <Tabs>
+    <Tab title='Apps'>
+      ```bash apps/ ├── ui/ # Next.js Frontend (port 3000) │ ├── app/ # Next.js
+      App Router │ ├── components/ # React Components │ └── lib/ # Core Services
+      ├── api/ # NestJS API Server (port 3001) │ ├── src/ # Source Code │ └──
+      test/ # Tests └── zzyra-worker/ # NestJS Worker Service (port 3002) ├──
+      src/ # Source Code └── test/ # Tests ```
+    </Tab>
+
+    <Tab title='Packages'>
+      ```bash packages/ ├── database/ # Prisma Client & Repositories │ ├──
+      prisma/ # Database Schema │ └── src/ # Database Services ├── types/ #
+      Shared TypeScript Types │ └── src/ # Type Definitions └── blocks/ # Block
+      Library └── src/ # Block Definitions ```
+    </Tab>
+
+  </Tabs>
+</div>
+
+## 4. Essential Commands
+
+<div className='essential-commands'>
+  <h3>🚀 Development Commands</h3>
+
+  <CardGroup cols={2}>
+    <Card title='Development' icon='code'>
+      <div className='command-list'>
+        <div className='command'>
+          <span className='cmd'>pnpm dev</span>
+          <span className='desc'>Start all services</span>
+        </div>
+        <div className='command'>
+          <span className='cmd'>pnpm dev:ui</span>
+          <span className='desc'>Frontend only</span>
+        </div>
+        <div className='command'>
+          <span className='cmd'>pnpm dev:api</span>
+          <span className='desc'>API server only</span>
+        </div>
+        <div className='command'>
+          <span className='cmd'>pnpm dev:worker</span>
+          <span className='desc'>Worker service only</span>
+        </div>
+      </div>
+    </Card>
+
+    <Card title='Database' icon='database'>
+      <div className='command-list'>
+        <div className='command'>
+          <span className='cmd'>pnpm prisma studio</span>
+          <span className='desc'>Open database browser</span>
+        </div>
+        <div className='command'>
+          <span className='cmd'>pnpm prisma generate</span>
+          <span className='desc'>Generate Prisma client</span>
+        </div>
+        <div className='command'>
+          <span className='cmd'>pnpm prisma migrate dev</span>
+          <span className='desc'>Create migration</span>
+        </div>
+        <div className='command'>
+          <span className='cmd'>pnpm prisma db seed</span>
+          <span className='desc'>Seed database</span>
+        </div>
+      </div>
+    </Card>
+
+  </CardGroup>
+</div>
+
+## 5. Environment Variables
+
+<div className="environment-setup">
+  <h3>🔧 Essential Environment Variables</h3>
+  
+  <Alert type="warning">
+    **Important**: Create `.env` files in each app directory before starting development
+  </Alert>
+  
+  <Tabs>
+    <Tab title="Frontend (.env.local)">
+```bash
+# API Connection
+NEXT_PUBLIC_API_URL=http://localhost:3001
+
+# Authentication
+
+NEXT*PUBLIC_MAGIC_PUBLISHABLE_KEY=pk_live*...
+
+# Web3
+
+NEXT_PUBLIC_ALCHEMY_API_KEY=...
+NEXT_PUBLIC_INFURA_API_KEY=...
+
+````
+    </Tab>
+
+    <Tab title="API Server (.env)">
+```bash
+# Database
+DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zzyra?schema=public"
+
+# JWT
+JWT_SECRET="your-super-secret-jwt-key-here"
+
+# Magic SDK
+MAGIC_SECRET_KEY="sk_live_..."
+
+# RabbitMQ
+RABBIT_MQ_URL="amqp://guest:guest@localhost:5672"
+````
+
+    </Tab>
+
+    <Tab title="Worker Service (.env)">
+
+```bash
+# Database
+DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zzyra?schema=public"
+
+# RabbitMQ
+RABBIT_MQ_URL="amqp://guest:guest@localhost:5672"
+
+# AI Services
+OPENROUTER_API_KEY="sk-or-v1-..."
+```
+
+    </Tab>
+
+  </Tabs>
+</div>
+
+## 6. First Steps
+
+<div className='first-steps'>
+  <h3>🎯 What to Do Next</h3>
+
+  <CardGroup cols={2}>
+    <Card title='Explore the UI' icon='eye'>
+      <div className='step-list'>
+        <div className='step'>1. Visit http://localhost:3000</div>
+        <div className='step'>2. Create a new account</div>
+        <div className='step'>3. Explore the dashboard</div>
+        <div className='step'>4. Try the workflow builder</div>
+      </div>
+    </Card>
+
+    <Card title='Check the API' icon='api'>
+      <div className='step-list'>
+        <div className='step'>1. Visit http://localhost:3001/health</div>
+        <div className='step'>2. Check Swagger docs</div>
+        <div className='step'>3. Test API endpoints</div>
+        <div className='step'>4. Review API structure</div>
+      </div>
+    </Card>
+
+    <Card title='Database Exploration' icon='database'>
+      <div className='step-list'>
+        <div className='step'>1. Run `pnpm prisma studio`</div>
+        <div className='step'>2. Explore the schema</div>
+        <div className='step'>3. Check sample data</div>
+        <div className='step'>4. Understand relationships</div>
+      </div>
+    </Card>
+
+    <Card title='Worker Service' icon='cog'>
+      <div className='step-list'>
+        <div className='step'>1. Check worker logs</div>
+        <div className='step'>2. Monitor RabbitMQ</div>
+        <div className='step'>3. Test workflow execution</div>
+        <div className='step'>4. Review worker code</div>
+      </div>
+    </Card>
+
+  </CardGroup>
+</div>
+
+## 7. Common Issues
+
+<div className="troubleshooting">
+  <h3>🔧 Quick Fixes</h3>
+  
+  <AccordionGroup>
+    <Accordion title="Port Already in Use" icon="warning">
+```bash
+# Find and kill process
+lsof -i :3000
+kill -9 <PID>
+
+# Or use different port
+
+PORT=3001 pnpm dev:ui
+
+````
+    </Accordion>
+
+    <Accordion title="Database Connection Failed" icon="database">
+```bash
+# Restart database
+docker-compose -f setup-compose.yml restart postgres
+
+# Check logs
+docker-compose -f setup-compose.yml logs postgres
+````
+
+    </Accordion>
+
+    <Accordion title="Prisma Client Issues" icon="prisma">
+
+```bash
+# Regenerate client
+cd packages/database
+pnpm prisma generate
+
+# Clear and reinstall
+rm -rf node_modules
+pnpm install
+```
+
+    </Accordion>
+
+    <Accordion title="Dependencies Not Found" icon="package">
+
+```bash
+# Clean install
+rm -rf node_modules packages/*/node_modules
+pnpm install
+
+# Rebuild packages
+pnpm build:packages
+```
+
+    </Accordion>
+
+  </AccordionGroup>
+</div>
+
+## 8. Next Steps
+
+<div className='next-steps'>
+  <h3>🚀 Continue Your Journey</h3>
+
+  <CardGroup cols={3}>
+    <Card
+      title='Full Setup Guide'
+      icon='book'
+      href='/developers/setup/environment'>
+      Detailed environment setup
+    </Card>
+    <Card title='API Documentation' icon='api' href='/api-reference'>
+      Complete API reference
+    </Card>
+    <Card
+      title='Custom Blocks'
+      icon='puzzle-piece'
+      href='/developers/advanced/custom-blocks'>
+      Build custom automation
+    </Card>
+  </CardGroup>
+</div>
+
+<Note>
+  This quick start guide covers the essentials to get you developing. For
+  detailed information about each component, architecture, and advanced
+  features, explore the full documentation.
+</Note>{" "}

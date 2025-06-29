@@ -1,0 +1,702 @@
+---
+title: "Database Overview"
+description: "Complete database schema documentation for Zzyra's PostgreSQL database"
+---
+
+## Database Schema Overview
+
+Zzyra uses PostgreSQL with Prisma ORM for data persistence. The schema is designed to support all platform features including user management, workflow execution, block system, and billing.
+
+<Alert type='info'>
+  **Database**: PostgreSQL 14 | **ORM**: Prisma 5.22.0 | **Models**: 20+ |
+  **Location**: `packages/database/prisma/schema.prisma`
+</Alert>
+
+## Schema Architecture
+
+<div className='schema-overview'>
+  <div className='schema-diagram'>
+    <div className='schema-layer'>
+      <h4>User Management</h4>
+      <div className='model-group'>
+        <div className='model'>User</div>
+        <div className='model'>Profile</div>
+        <div className='model'>Team</div>
+        <div className='model'>TeamMember</div>
+      </div>
+    </div>
+
+    <div className='schema-layer'>
+      <h4>Workflow System</h4>
+      <div className='model-group'>
+        <div className='model'>Workflow</div>
+        <div className='model'>WorkflowExecution</div>
+        <div className='model'>NodeExecution</div>
+        <div className='model'>ExecutionLog</div>
+      </div>
+    </div>
+
+    <div className='schema-layer'>
+      <h4>Block System</h4>
+      <div className='model-group'>
+        <div className='model'>BlockLibrary</div>
+        <div className='model'>CustomBlock</div>
+        <div className='model'>BlockVersion</div>
+      </div>
+    </div>
+
+    <div className='schema-layer'>
+      <h4>Billing & Notifications</h4>
+      <div className='model-group'>
+        <div className='model'>Subscription</div>
+        <div className='model'>PricingTier</div>
+        <div className='model'>Notification</div>
+        <div className='model'>NotificationPreference</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+## Core Models
+
+### User Management
+
+<div className="model-details">
+  <Tabs>
+    <Tab title="User Model">
+```prisma
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  magicDid          String?  @unique
+  walletAddress     String?  @unique
+  isActive          Boolean  @default(true)
+  emailVerified     Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+// Relations
+profile Profile?
+teams TeamMember[]
+workflows Workflow[]
+executions WorkflowExecution[]
+subscriptions Subscription[]
+notifications Notification[]
+notificationPrefs NotificationPreference[]
+
+@@map("users")
+}
+
+````
+    </Tab>
+
+    <Tab title="Profile Model">
+```prisma
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  firstName   String?
+  lastName    String?
+  avatar      String?
+  bio         String?
+  website     String?
+  twitter     String?
+  github      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+````
+
+    </Tab>
+
+    <Tab title="Team Model">
+
+```prisma
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  slug        String   @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members     TeamMember[]
+  workflows   Workflow[]
+
+  @@map("teams")
+}
+```
+
+    </Tab>
+
+  </Tabs>
+</div>
+
+### Workflow System
+
+<div className="model-details">
+  <Tabs>
+    <Tab title="Workflow Model">
+```prisma
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  version     Int      @default(1)
+  isActive    Boolean  @default(true)
+  isPublic    Boolean  @default(false)
+  config      Json     // Workflow configuration
+  nodes       Json     // Workflow nodes and connections
+  userId      String
+  teamId      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+// Relations
+user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+team Team? @relation(fields: [teamId], references: [id])
+executions WorkflowExecution[]
+
+@@map("workflows")
+}
+
+````
+    </Tab>
+
+    <Tab title="WorkflowExecution Model">
+```prisma
+model WorkflowExecution {
+  id          String   @id @default(cuid())
+  workflowId  String
+  userId      String
+  status      ExecutionStatus @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  error       String?
+  result      Json?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+  nodeExecutions NodeExecution[]
+
+  @@map("workflow_executions")
+}
+````
+
+    </Tab>
+
+    <Tab title="NodeExecution Model">
+
+```prisma
+model NodeExecution {
+  id                String   @id @default(cuid())
+  executionId       String
+  nodeId            String
+  nodeType          String
+  status            ExecutionStatus @default(PENDING)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  input             Json?
+  output            Json?
+  error             String?
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  execution         WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  logs              ExecutionLog[]
+
+  @@map("node_executions")
+}
+```
+
+    </Tab>
+
+  </Tabs>
+</div>
+
+### Block System
+
+<div className="model-details">
+  <Tabs>
+    <Tab title="BlockLibrary Model">
+```prisma
+model BlockLibrary {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  version     String   @default("1.0.0")
+  config      Json     // Block configuration schema
+  code        String?  // Block implementation code
+  isActive    Boolean  @default(true)
+  isBuiltin   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+// Relations
+versions BlockVersion[]
+
+@@map("block_library")
+}
+
+````
+    </Tab>
+
+    <Tab title="CustomBlock Model">
+```prisma
+model CustomBlock {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  version     String   @default("1.0.0")
+  config      Json     // Block configuration
+  code        String   // Block implementation
+  userId      String
+  isActive    Boolean  @default(true)
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("custom_blocks")
+}
+````
+
+    </Tab>
+
+  </Tabs>
+</div>
+
+### Billing & Notifications
+
+<div className="model-details">
+  <Tabs>
+    <Tab title="Subscription Model">
+```prisma
+model Subscription {
+  id            String   @id @default(cuid())
+  userId        String
+  tierId        String
+  status        SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd Boolean @default(false)
+  canceledAt    DateTime?
+  endedAt       DateTime?
+  trialStart    DateTime?
+  trialEnd      DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+// Relations
+user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+tier PricingTier @relation(fields: [tierId], references: [id])
+
+@@map("subscriptions")
+}
+
+````
+    </Tab>
+
+    <Tab title="PricingTier Model">
+```prisma
+model PricingTier {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  currency    String   @default("USD")
+  interval    BillingInterval
+  features    Json     // Tier features and limits
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  subscriptions Subscription[]
+
+  @@map("pricing_tiers")
+}
+````
+
+    </Tab>
+
+  </Tabs>
+</div>
+
+## Enums and Types
+
+<div className="enums-types">
+  <h3>📋 Database Enums</h3>
+  
+  <CardGroup cols={2}>
+    <Card title="ExecutionStatus" icon="status">
+```prisma
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+```
+    </Card>
+    
+    <Card title="SubscriptionStatus" icon="subscription">
+```prisma
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
+  TRIAL
+}
+```
+    </Card>
+    
+    <Card title="BillingInterval" icon="calendar">
+```prisma
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+  ONE_TIME
+}
+```
+    </Card>
+    
+    <Card title="NotificationType" icon="bell">
+```prisma
+enum NotificationType {
+  WORKFLOW_COMPLETED
+  WORKFLOW_FAILED
+  SYSTEM_ALERT
+  BILLING_REMINDER
+  SECURITY_ALERT
+}
+```
+    </Card>
+  </CardGroup>
+</div>
+
+## Database Operations
+
+<div className="database-operations">
+  <h3>🗄️ Common Operations</h3>
+  
+  <Tabs>
+    <Tab title="User Management">
+```typescript
+// Create user with profile
+const user = await prisma.user.create({
+  data: {
+    email: 'user@example.com',
+    magicDid: 'did:magic:...',
+    profile: {
+      create: {
+        firstName: 'John',
+        lastName: 'Doe'
+      }
+    }
+  },
+  include: {
+    profile: true
+  }
+});
+
+// Get user with all relations
+const userWithData = await prisma.user.findUnique({
+where: { id: userId },
+include: {
+profile: true,
+teams: {
+include: {
+team: true
+}
+},
+workflows: true,
+subscriptions: {
+include: {
+tier: true
+}
+}
+}
+});
+
+````
+    </Tab>
+
+    <Tab title="Workflow Operations">
+```typescript
+// Create workflow
+const workflow = await prisma.workflow.create({
+  data: {
+    name: 'My Automation',
+    description: 'Automated trading strategy',
+    config: { /* workflow config */ },
+    nodes: { /* workflow nodes */ },
+    userId: userId
+  }
+});
+
+// Execute workflow
+const execution = await prisma.workflowExecution.create({
+  data: {
+    workflowId: workflow.id,
+    userId: userId,
+    status: 'PENDING'
+  }
+});
+
+// Update execution status
+await prisma.workflowExecution.update({
+  where: { id: execution.id },
+  data: {
+    status: 'RUNNING',
+    startedAt: new Date()
+  }
+});
+````
+
+    </Tab>
+
+    <Tab title="Block Operations">
+
+```typescript
+// Create custom block
+const customBlock = await prisma.customBlock.create({
+  data: {
+    name: "Price Alert",
+    description: "Monitor cryptocurrency prices",
+    category: "Trading",
+    config: {
+      /* block config */
+    },
+    code: "/* block implementation */",
+    userId: userId,
+  },
+});
+
+// Get block library
+const blocks = await prisma.blockLibrary.findMany({
+  where: {
+    isActive: true,
+    category: "Trading",
+  },
+  orderBy: {
+    name: "asc",
+  },
+});
+```
+
+    </Tab>
+
+    <Tab title="Analytics Queries">
+
+```typescript
+// Get user statistics
+const userStats = await prisma.user.aggregate({
+  _count: {
+    workflows: true,
+    executions: true,
+  },
+  _sum: {
+    executions: {
+      select: {
+        // Add execution metrics
+      },
+    },
+  },
+  where: {
+    id: userId,
+  },
+});
+
+// Get workflow execution history
+const executionHistory = await prisma.workflowExecution.findMany({
+  where: {
+    workflowId: workflowId,
+  },
+  include: {
+    nodeExecutions: {
+      orderBy: {
+        createdAt: "desc",
+      },
+    },
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
+  take: 10,
+});
+```
+
+    </Tab>
+
+  </Tabs>
+</div>
+
+## Migration Management
+
+<div className="migration-management">
+  <h3>🔄 Database Migrations</h3>
+  
+  <CardGroup cols={2}>
+    <Card title="Create Migration" icon="plus">
+```bash
+# Create new migration
+cd packages/database
+pnpm prisma migrate dev --name add_user_profile
+
+# Apply migrations
+
+pnpm prisma migrate deploy
+
+# Reset database
+
+pnpm prisma migrate reset
+
+````
+    </Card>
+
+    <Card title="Schema Management" icon="database">
+```bash
+# Generate Prisma client
+pnpm prisma generate
+
+# Push schema changes
+pnpm prisma db push
+
+# Pull schema from database
+pnpm prisma db pull
+````
+
+    </Card>
+
+  </CardGroup>
+  
+  <div className="migration-best-practices">
+    <h4>Best Practices</h4>
+    <ul>
+      <li>Always create migrations for schema changes</li>
+      <li>Test migrations on development database first</li>
+      <li>Use descriptive migration names</li>
+      <li>Backup production database before migrations</li>
+      <li>Review generated SQL before applying</li>
+    </ul>
+  </div>
+</div>
+
+## Performance Optimization
+
+<div className='performance-optimization'>
+  <h3>⚡ Performance Tips</h3>
+
+  <AccordionGroup>
+    <Accordion title='Indexing Strategy' icon='index'>
+      <div className='optimization-content'>
+        <h5>Recommended Indexes:</h5>
+        <ul>
+          <li>
+            <code>users(email)</code> - Unique index for email lookups
+          </li>
+          <li>
+            <code>users(magicDid)</code> - Unique index for Magic authentication
+          </li>
+          <li>
+            <code>workflows(userId, isActive)</code> - Composite index for user
+            workflows
+          </li>
+          <li>
+            <code>workflow_executions(workflowId, status)</code> - Composite
+            index for execution queries
+          </li>
+          <li>
+            <code>node_executions(executionId, status)</code> - Composite index
+            for node execution queries
+          </li>
+        </ul>
+      </div>
+    </Accordion>
+
+    <Accordion title='Query Optimization' icon='query'>
+      <div className='optimization-content'>
+        <h5>Query Best Practices:</h5>
+        <ul>
+          <li>
+            Use <code>select</code> to limit returned fields
+          </li>
+          <li>
+            Use <code>include</code> for related data instead of separate
+            queries
+          </li>
+          <li>Implement pagination for large result sets</li>
+          <li>Use database-level filtering instead of application filtering</li>
+          <li>Consider read replicas for analytics queries</li>
+        </ul>
+      </div>
+    </Accordion>
+
+    <Accordion title='Connection Pooling' icon='connection'>
+      <div className='optimization-content'>
+        <h5>Connection Management:</h5>
+        <ul>
+          <li>Configure appropriate connection pool size</li>
+          <li>Monitor connection usage and performance</li>
+          <li>Use connection pooling in production</li>
+          <li>Implement connection retry logic</li>
+          <li>Monitor query performance with slow query logs</li>
+        </ul>
+      </div>
+    </Accordion>
+
+  </AccordionGroup>
+</div>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card
+    title='Prisma Studio'
+    icon='database'
+    href='/developers/database/studio'>
+    Visual database browser and management
+  </Card>
+  <Card
+    title='Repository Pattern'
+    icon='pattern'
+    href='/developers/database/repositories'>
+    Data access layer implementation
+  </Card>
+  <Card
+    title='Migrations Guide'
+    icon='migration'
+    href='/developers/database/migrations'>
+    Database migration strategies
+  </Card>
+</CardGroup>
+
+<Note>
+  The database schema is designed to be scalable and maintainable. Always use
+  migrations for schema changes and test thoroughly before applying to
+  production. For complex queries or performance optimization, consider using
+  database views or stored procedures.
+</Note>{" "}

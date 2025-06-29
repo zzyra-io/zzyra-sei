@@ -1,0 +1,630 @@
+---
+title: "Platform Architecture"
+description: "Zzyra's hybrid automation platform architecture - monorepo with Next.js, NestJS, and PostgreSQL"
+---
+
+## Architecture Overview
+
+Zzyra is built as a modern, scalable monorepo with three core components working together to deliver seamless hybrid automation. Our architecture prioritizes performance, reliability, and developer experience while supporting both Web3 and traditional enterprise integrations.
+
+<Alert type='info'>
+  **Technology Stack**: Next.js 15 + NestJS 10 + PostgreSQL + Prisma + RabbitMQ
+  | **Deployment**: Netlify + Cloud Infrastructure
+</Alert>
+
+## System Architecture
+
+<div className='architecture-diagram'>
+  <div className='arch-layer'>
+    <h4>Frontend Layer</h4>
+    <div className='layer-components'>
+      <div className='component'>
+        <span className='component-icon'>⚛️</span>
+        <span className='component-name'>Next.js UI</span>
+        <span className='component-desc'>React 19 + TypeScript</span>
+      </div>
+      <div className='component'>
+        <span className='component-icon'>🎨</span>
+        <span className='component-name'>Tailwind CSS</span>
+        <span className='component-desc'>Styling & Components</span>
+      </div>
+      <div className='component'>
+        <span className='component-icon'>🔗</span>
+        <span className='component-name'>Web3 Integration</span>
+        <span className='component-desc'>Wagmi + Viem + ConnectKit</span>
+      </div>
+    </div>
+  </div>
+
+{" "}
+
+<div className='arch-layer'>
+  <h4>API Layer</h4>
+  <div className='layer-components'>
+    <div className='component'>
+      <span className='component-icon'>🚀</span>
+      <span className='component-name'>NestJS API Server</span>
+      <span className='component-desc'>RESTful API + Authentication</span>
+    </div>
+    <div className='component'>
+      <span className='component-icon'>⚙️</span>
+      <span className='component-name'>NestJS Worker</span>
+      <span className='component-desc'>Async Processing + AI</span>
+    </div>
+    <div className='component'>
+      <span className='component-icon'>📨</span>
+      <span className='component-name'>RabbitMQ</span>
+      <span className='component-desc'>Message Queue</span>
+    </div>
+  </div>
+</div>
+
+  <div className='arch-layer'>
+    <h4>Data Layer</h4>
+    <div className='layer-components'>
+      <div className='component'>
+        <span className='component-icon'>🗄️</span>
+        <span className='component-name'>PostgreSQL</span>
+        <span className='component-desc'>Primary Database</span>
+      </div>
+      <div className='component'>
+        <span className='component-icon'>🔧</span>
+        <span className='component-name'>Prisma ORM</span>
+        <span className='component-desc'>Database Client</span>
+      </div>
+      <div className='component'>
+        <span className='component-icon'>📦</span>
+        <span className='component-name'>Shared Packages</span>
+        <span className='component-desc'>Types + Database + Blocks</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+## Monorepo Structure
+
+<div className='monorepo-structure'>
+  <div className='repo-overview'>
+    <h3>📁 Zzyra Monorepo</h3>
+    <p>Organized with Turbo for optimal development experience</p>
+  </div>
+
+  <div className='structure-tree'>
+    <div className='tree-branch'>
+      <div className='branch-header'>
+        <span className='branch-icon'>📱</span>
+        <span className='branch-name'>apps/ui/</span>
+        <span className='branch-desc'>Next.js Frontend Application</span>
+      </div>
+      <div className='branch-items'>
+        <div className='tree-item'>app/ - Next.js App Router</div>
+        <div className='tree-item'>components/ - React Components</div>
+        <div className='tree-item'>lib/ - Core Services</div>
+        <div className='tree-item'>hooks/ - Custom React Hooks</div>
+      </div>
+    </div>
+
+    <div className='tree-branch'>
+      <div className='branch-header'>
+        <span className='branch-icon'>🚀</span>
+        <span className='branch-name'>apps/api/</span>
+        <span className='branch-desc'>NestJS API Server</span>
+      </div>
+      <div className='branch-items'>
+        <div className='tree-item'>src/auth/ - Authentication</div>
+        <div className='tree-item'>src/workflows/ - Workflow Management</div>
+        <div className='tree-item'>src/executions/ - Execution Tracking</div>
+        <div className='tree-item'>src/blocks/ - Block Library</div>
+      </div>
+    </div>
+
+    <div className='tree-branch'>
+      <div className='branch-header'>
+        <span className='branch-icon'>⚙️</span>
+        <span className='branch-name'>apps/zzyra-worker/</span>
+        <span className='branch-desc'>NestJS Worker Service</span>
+      </div>
+      <div className='branch-items'>
+        <div className='tree-item'>src/workers/ - Worker Implementations</div>
+        <div className='tree-item'>src/services/ - Business Services</div>
+        <div className='tree-item'>src/handlers/ - Block Handlers</div>
+      </div>
+    </div>
+
+    <div className='tree-branch'>
+      <div className='branch-header'>
+        <span className='branch-icon'>📦</span>
+        <span className='branch-name'>packages/</span>
+        <span className='branch-desc'>Shared Packages</span>
+      </div>
+      <div className='branch-items'>
+        <div className='tree-item'>@zzyra/database - Prisma Client</div>
+        <div className='tree-item'>@zzyra/types - TypeScript Types</div>
+        <div className='tree-item'>@zzyra/blocks - Block Library</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+## Core Components
+
+### Frontend Application (`apps/ui/`)
+
+<div className='component-detail'>
+  <div className='component-header'>
+    <h4>⚛️ Next.js Frontend</h4>
+    <div className='tech-stack'>
+      <span className='tech-tag'>Next.js 15.3.1</span>
+      <span className='tech-tag'>React 19.0.0</span>
+      <span className='tech-tag'>TypeScript 5.x</span>
+      <span className='tech-tag'>Tailwind CSS 3.4.17</span>
+    </div>
+  </div>
+
+  <div className='component-features'>
+    <CardGroup cols={2}>
+      <Card title='Workflow Builder' icon='workflow'>
+        - Visual drag-and-drop interface - React Flow integration - Real-time
+        collaboration - AI Copilot assistance
+      </Card>
+      <Card title='Web3 Integration' icon='link'>
+        - Magic SDK authentication - Wagmi + Viem integration - Multi-wallet
+        support - Transaction management
+      </Card>
+      <Card title='Block Catalog' icon='puzzle-piece'>
+        - Pre-built automation blocks - Custom block creation - Block
+        marketplace - Version management
+      </Card>
+      <Card title='Dashboard & Analytics' icon='chart-line'>
+        - Execution monitoring - Performance metrics - Real-time updates -
+        Custom reporting
+      </Card>
+    </CardGroup>
+  </div>
+</div>
+
+### API Server (`apps/api/`)
+
+<div className='component-detail'>
+  <div className='component-header'>
+    <h4>🚀 NestJS API Server</h4>
+    <div className='tech-stack'>
+      <span className='tech-tag'>NestJS 10.0.0</span>
+      <span className='tech-tag'>TypeScript 5.1.3</span>
+      <span className='tech-tag'>JWT Authentication</span>
+      <span className='tech-tag'>Swagger/OpenAPI</span>
+    </div>
+  </div>
+
+  <div className='api-modules'>
+    <AccordionGroup>
+      <Accordion title='Authentication Module' icon='key'>
+        - JWT token management - Magic SDK integration - Role-based access
+        control - Session management
+      </Accordion>
+
+      <Accordion title='Workflows Module' icon='workflow'>
+        - CRUD operations - Version control - Template management - Sharing and
+        collaboration
+      </Accordion>
+
+      <Accordion title='Executions Module' icon='play'>
+        - Execution tracking - Status management - Log aggregation - Performance
+        monitoring
+      </Accordion>
+
+      <Accordion title='Blocks Module' icon='puzzle-piece'>
+        - Block library management - Custom block creation - Marketplace
+        integration - Block validation
+      </Accordion>
+
+      <Accordion title='AI Module' icon='brain'>
+        - OpenRouter integration - Workflow generation - Natural language
+        processing - Intelligent suggestions
+      </Accordion>
+    </AccordionGroup>
+
+  </div>
+</div>
+
+### Worker Service (`apps/zzyra-worker/`)
+
+<div className='component-detail'>
+  <div className='component-header'>
+    <h4>⚙️ NestJS Worker Service</h4>
+    <div className='tech-stack'>
+      <span className='tech-tag'>NestJS 10.0.0</span>
+      <span className='tech-tag'>RabbitMQ</span>
+      <span className='tech-tag'>LangChain</span>
+      <span className='tech-tag'>Ethers.js</span>
+    </div>
+  </div>
+
+  <div className='worker-components'>
+    <CardGroup cols={2}>
+      <Card title='Execution Worker' icon='cog'>
+        - Asynchronous workflow execution - Message queue processing - Error
+        handling and retries - Resource management
+      </Card>
+      <Card title='Block Handlers' icon='puzzle-piece'>
+        - Individual block execution - External API integration - Web3
+        transaction handling - AI model interactions
+      </Card>
+      <Card title='Monitoring' icon='chart-line'>
+        - Prometheus metrics - Winston logging - Health checks - Performance
+        tracking
+      </Card>
+      <Card title='Queue Management' icon='list'>
+        - RabbitMQ integration - Message routing - Dead letter queues - Priority
+        handling
+      </Card>
+    </CardGroup>
+  </div>
+</div>
+
+## Data Flow Architecture
+
+<div className='data-flow'>
+  <div className='flow-diagram'>
+    <div className='flow-step'>
+      <div className='step-icon'>👤</div>
+      <div className='step-content'>
+        <h5>User Action</h5>
+        <p>User creates or executes workflow</p>
+      </div>
+    </div>
+
+    <div className='flow-arrow'>→</div>
+
+    <div className='flow-step'>
+      <div className='step-icon'>🚀</div>
+      <div className='step-content'>
+        <h5>API Validation</h5>
+        <p>Request validated and processed</p>
+      </div>
+    </div>
+
+    <div className='flow-arrow'>→</div>
+
+    <div className='flow-step'>
+      <div className='step-icon'>📨</div>
+      <div className='step-content'>
+        <h5>Queue Message</h5>
+        <p>Execution queued in RabbitMQ</p>
+      </div>
+    </div>
+
+    <div className='flow-arrow'>→</div>
+
+    <div className='flow-step'>
+      <div className='step-icon'>⚙️</div>
+      <div className='step-content'>
+        <h5>Worker Processing</h5>
+        <p>Worker executes workflow nodes</p>
+      </div>
+    </div>
+
+    <div className='flow-arrow'>→</div>
+
+    <div className='flow-step'>
+      <div className='step-icon'>🗄️</div>
+      <div className='step-content'>
+        <h5>Database Update</h5>
+        <p>Results stored in PostgreSQL</p>
+      </div>
+    </div>
+
+    <div className='flow-arrow'>→</div>
+
+    <div className='flow-step'>
+      <div className='step-icon'>📱</div>
+      <div className='step-content'>
+        <h5>UI Update</h5>
+        <p>Frontend receives real-time updates</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+## Database Schema
+
+<div className='database-schema'>
+  <div className='schema-overview'>
+    <h3>🗄️ PostgreSQL with Prisma ORM</h3>
+    <p>Comprehensive schema with 20+ models supporting all platform features</p>
+  </div>
+
+  <div className='schema-models'>
+    <Tabs>
+      <Tab title='User Management'>
+        <div className='model-list'>
+          <div className='model-item'>
+            <span className='model-name'>User</span>
+            <span className='model-desc'>
+              Core user accounts and authentication
+            </span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>Profile</span>
+            <span className='model-desc'>
+              Extended user profile information
+            </span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>Team</span>
+            <span className='model-desc'>
+              Team collaboration and permissions
+            </span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>TeamMember</span>
+            <span className='model-desc'>Team membership and roles</span>
+          </div>
+        </div>
+      </Tab>
+
+      <Tab title='Workflow System'>
+        <div className='model-list'>
+          <div className='model-item'>
+            <span className='model-name'>Workflow</span>
+            <span className='model-desc'>
+              Workflow definitions and metadata
+            </span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>WorkflowExecution</span>
+            <span className='model-desc'>Execution instances and status</span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>NodeExecution</span>
+            <span className='model-desc'>
+              Individual node execution tracking
+            </span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>ExecutionLog</span>
+            <span className='model-desc'>
+              Detailed execution logs and errors
+            </span>
+          </div>
+        </div>
+      </Tab>
+
+      <Tab title='Block System'>
+        <div className='model-list'>
+          <div className='model-item'>
+            <span className='model-name'>BlockLibrary</span>
+            <span className='model-desc'>Pre-built block definitions</span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>CustomBlock</span>
+            <span className='model-desc'>User-created custom blocks</span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>BlockVersion</span>
+            <span className='model-desc'>Block versioning and updates</span>
+          </div>
+        </div>
+      </Tab>
+
+      <Tab title='Billing & Notifications'>
+        <div className='model-list'>
+          <div className='model-item'>
+            <span className='model-name'>Subscription</span>
+            <span className='model-desc'>User subscription plans</span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>PricingTier</span>
+            <span className='model-desc'>Available pricing tiers</span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>Notification</span>
+            <span className='model-desc'>System notifications</span>
+          </div>
+          <div className='model-item'>
+            <span className='model-name'>NotificationPreference</span>
+            <span className='model-desc'>User notification settings</span>
+          </div>
+        </div>
+      </Tab>
+    </Tabs>
+
+  </div>
+</div>
+
+## Technology Stack Details
+
+<div className='tech-stack-details'>
+  <div className='stack-category'>
+    <h3>🛠️ Development Tools</h3>
+    <div className='stack-grid'>
+      <div className='stack-item'>
+        <span className='tool-name'>Package Manager</span>
+        <span className='tool-version'>pnpm 9.15.2</span>
+      </div>
+      <div className='stack-item'>
+        <span className='tool-name'>Monorepo</span>
+        <span className='tool-version'>Turbo 2.5.3</span>
+      </div>
+      <div className='stack-item'>
+        <span className='tool-name'>Language</span>
+        <span className='tool-version'>TypeScript 5.x</span>
+      </div>
+      <div className='stack-item'>
+        <span className='tool-name'>Containerization</span>
+        <span className='tool-version'>Docker Compose</span>
+      </div>
+    </div>
+  </div>
+
+{" "}
+
+<div className='stack-category'>
+  <h3>🔐 Authentication & Security</h3>
+  <div className='stack-grid'>
+    <div className='stack-item'>
+      <span className='tool-name'>Web3 Auth</span>
+      <span className='tool-version'>Magic SDK 29.0.6</span>
+    </div>
+    <div className='stack-item'>
+      <span className='tool-name'>JWT</span>
+      <span className='tool-version'>Passport.js</span>
+    </div>
+    <div className='stack-item'>
+      <span className='tool-name'>Validation</span>
+      <span className='tool-version'>class-validator</span>
+    </div>
+  </div>
+</div>
+
+  <div className='stack-category'>
+    <h3>🤖 AI Integration</h3>
+    <div className='stack-grid'>
+      <div className='stack-item'>
+        <span className='tool-name'>AI Provider</span>
+        <span className='tool-version'>OpenRouter AI SDK</span>
+      </div>
+      <div className='stack-item'>
+        <span className='tool-name'>LangChain</span>
+        <span className='tool-version'>AI Framework</span>
+      </div>
+      <div className='stack-item'>
+        <span className='tool-name'>Ollama</span>
+        <span className='tool-version'>Local AI Models</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+## Deployment Architecture
+
+<div className='deployment-architecture'>
+  <div className='deployment-overview'>
+    <h3>🚀 Production Deployment</h3>
+    <p>Multi-environment deployment with monitoring and scaling</p>
+  </div>
+
+  <div className='deployment-components'>
+    <CardGroup cols={2}>
+      <Card title='Frontend' icon='globe'>
+        <div className='deployment-details'>
+          <div className='detail-item'>
+            <span className='detail-label'>Platform:</span>
+            <span className='detail-value'>Netlify</span>
+          </div>
+          <div className='detail-item'>
+            <span className='detail-label'>Framework:</span>
+            <span className='detail-value'>Next.js</span>
+          </div>
+          <div className='detail-item'>
+            <span className='detail-label'>Build:</span>
+            <span className='detail-value'>pnpm build</span>
+          </div>
+        </div>
+      </Card>
+
+      <Card title='API Server' icon='server'>
+        <div className='deployment-details'>
+          <div className='detail-item'>
+            <span className='detail-label'>Platform:</span>
+            <span className='detail-value'>AWS EC2 / GCP</span>
+          </div>
+          <div className='detail-item'>
+            <span className='detail-label'>Process Manager:</span>
+            <span className='detail-value'>PM2</span>
+          </div>
+          <div className='detail-item'>
+            <span className='detail-label'>Health Check:</span>
+            <span className='detail-value'>/health endpoint</span>
+          </div>
+        </div>
+      </Card>
+
+      <Card title='Worker Service' icon='cog'>
+        <div className='deployment-details'>
+          <div className='detail-item'>
+            <span className='detail-label'>Platform:</span>
+            <span className='detail-value'>Container / VM</span>
+          </div>
+          <div className='detail-item'>
+            <span className='detail-label'>Scaling:</span>
+            <span className='detail-value'>Multiple instances</span>
+          </div>
+          <div className='detail-item'>
+            <span className='detail-label'>Monitoring:</span>
+            <span className='detail-value'>Prometheus + Winston</span>
+          </div>
+        </div>
+      </Card>
+
+      <Card title='Database' icon='database'>
+        <div className='deployment-details'>
+          <div className='detail-item'>
+            <span className='detail-label'>Platform:</span>
+            <span className='detail-value'>AWS RDS / GCP SQL</span>
+          </div>
+          <div className='detail-item'>
+            <span className='detail-label'>Type:</span>
+            <span className='detail-value'>PostgreSQL 14</span>
+          </div>
+          <div className='detail-item'>
+            <span className='detail-label'>Backups:</span>
+            <span className='detail-value'>Automated daily</span>
+          </div>
+        </div>
+      </Card>
+    </CardGroup>
+
+  </div>
+</div>
+
+## Development Workflow
+
+<div className='development-workflow'>
+  <Steps>
+    <Step title='Local Development'>
+      - Docker Compose for infrastructure - Hot reloading for all services -
+      Shared TypeScript types - Prisma migrations
+    </Step>
+    <Step title='Testing'>
+      - Unit tests for all components - Integration tests for API - E2E tests
+      for workflows - Performance testing
+    </Step>
+    <Step title='CI/CD Pipeline'>
+      - Automated testing - Type checking - Database migrations - Deployment to
+      staging
+    </Step>
+    <Step title='Production Deployment'>
+      - Blue-green deployment - Health checks - Monitoring setup - Rollback
+      procedures
+    </Step>
+  </Steps>
+</div>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card
+    title='Modular Blocks'
+    icon='puzzle-piece'
+    href='/platform/architecture/modular-blocks'>
+    Learn about our modular block system
+  </Card>
+  <Card
+    title='Chain Agnostic'
+    icon='link'
+    href='/platform/architecture/chain-agnostic'>
+    Multi-chain support architecture
+  </Card>
+  <Card title='AI Engine' icon='brain' href='/platform/architecture/ai-engine'>
+    AI integration and automation
+  </Card>
+</CardGroup>
+
+<Note>
+  This architecture is designed for scalability and maintainability. The
+  monorepo structure enables efficient development while the microservices
+  approach ensures reliable production deployment and operation.
+</Note>

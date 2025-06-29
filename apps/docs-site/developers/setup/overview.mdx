@@ -1,0 +1,550 @@
+---
+title: "Developer Overview"
+description: "Get started building on Zzyra's AI-native automation platform"
+---
+
+## Welcome, Developers!
+
+Zzyra provides a comprehensive development platform for creating custom automation workflows, building specialized blocks, and integrating with the broader ecosystem. Whether you're a Web3 developer, enterprise integration specialist, or AI engineer, Zzyra offers the tools and APIs you need to build powerful automation solutions.
+
+<Info>
+  Zzyra's developer platform is designed to be accessible to developers of all
+  skill levels, from beginners creating their first automation to advanced users
+  building complex enterprise integrations.
+</Info>
+
+## What You Can Build
+
+### Custom Blocks
+
+Extend Zzyra's capabilities with custom functionality:
+
+<CardGroup cols={2}>
+  <Card title='Web3 Integrations' icon='coins'>
+    - Custom DeFi protocol interactions - Multi-chain bridge operations - NFT
+    marketplace integrations - DAO governance automation
+  </Card>
+  <Card title='Enterprise Connectors' icon='building'>
+    - CRM and ERP system integrations - Database connectors and data processing
+    - API integrations and webhook handlers - Legacy system bridges
+  </Card>
+  <Card title='AI-Powered Blocks' icon='brain'>
+    - Custom machine learning models - Natural language processing functions -
+    Predictive analytics and forecasting - Computer vision and image analysis
+  </Card>
+  <Card title='Utility Functions' icon='tools'>
+    - Data transformation and validation - File processing and document handling
+    - Notification and communication systems - Scheduling and timing utilities
+  </Card>
+</CardGroup>
+
+### Workflow Applications
+
+Build complete automation solutions:
+
+<AccordionGroup>
+  <Accordion title='DeFi Trading Bots' icon='chart-line'>
+    - Automated yield farming strategies - Cross-protocol arbitrage systems -
+    Risk management and liquidation protection - Portfolio rebalancing
+    automation
+  </Accordion>
+
+{" "}
+
+<Accordion title='NFT Management Systems' icon='image'>
+  - Automated collection monitoring - Floor price tracking and alerts - Rarity
+  analysis and valuation - Cross-marketplace arbitrage
+</Accordion>
+
+{" "}
+
+<Accordion title='Enterprise Process Automation' icon='cogs'>
+  - Employee onboarding workflows - Financial reporting automation - Supply
+  chain tracking systems - Compliance and audit automation
+</Accordion>
+
+  <Accordion title='Cross-Chain Applications' icon='link'>
+    - Multi-chain portfolio management - Cross-chain asset transfers - Bridge
+    monitoring and optimization - Chain-specific strategy execution
+  </Accordion>
+</AccordionGroup>
+
+## Development Tools & SDKs
+
+### Core Development Kit
+
+Zzyra provides a comprehensive SDK for building custom blocks and integrations:
+
+```typescript
+import { BlockHandler, BlockMetadata, ExecutionContext } from "@zzyra/sdk";
+
+export class CustomBlock extends BlockHandler {
+  getMetadata(): BlockMetadata {
+    return {
+      id: "my-custom-block",
+      name: "Custom Function",
+      description: "My custom automation block",
+      category: "custom",
+      inputs: [
+        {
+          name: "inputData",
+          type: "string",
+          required: true,
+          description: "Input data to process",
+        },
+      ],
+      outputs: [
+        {
+          name: "result",
+          type: "object",
+          description: "Processed result",
+        },
+      ],
+      configFields: [
+        {
+          name: "apiKey",
+          type: "string",
+          label: "API Key",
+          required: true,
+          description: "External service API key",
+        },
+      ],
+    };
+  }
+
+  async execute(
+    inputs: any,
+    config: any,
+    context: ExecutionContext
+  ): Promise<any> {
+    // Your custom logic here
+    const result = await this.processData(inputs.inputData, config.apiKey);
+
+    // Log execution for debugging
+    await context.logger.info("Custom block executed successfully", { result });
+
+    return { result };
+  }
+}
+```
+
+### AI-Assisted Development
+
+Leverage Zzyra's AI to accelerate development:
+
+<Steps>
+  <Step title='Describe Your Block'>
+    Use natural language to describe the functionality you want to build: ```
+    "Create a block that monitors Uniswap V3 liquidity positions and alerts when
+    impermanent loss exceeds 5%" ```
+  </Step>
+
+{" "}
+
+<Step title='AI Code Generation'>
+  Zzyra's AI generates TypeScript code with proper error handling, input
+  validation, and documentation
+</Step>
+
+{" "}
+
+<Step title='Customize & Test'>
+  Modify the generated code, add your business logic, and test with Zzyra's
+  simulation tools
+</Step>
+
+  <Step title='Deploy & Share'>
+    Deploy your block to the Zzyra marketplace or keep it private for your
+    organization
+  </Step>
+</Steps>
+
+## Development Environment Setup
+
+### Prerequisites
+
+<AccordionGroup>
+  <Accordion title='Node.js Environment' icon='node-js'>
+    - Node.js 18+ and npm/yarn/pnpm - TypeScript 5.0+ for type safety - Git for
+    version control - VS Code or preferred IDE
+  </Accordion>
+
+{" "}
+
+<Accordion title='Zzyra Account' icon='user'>
+  - Developer account with API access - API keys for authentication - Test
+  environment access - Marketplace publishing permissions (optional)
+</Accordion>
+
+  <Accordion title='Web3 Tools' icon='wallet'>
+    - MetaMask or similar wallet for testing - Testnet tokens for development -
+    RPC endpoints for target chains - Block explorer access
+  </Accordion>
+</AccordionGroup>
+
+### Quick Setup
+
+```bash
+# Install Zzyra SDK
+npm install @zzyra/sdk
+
+# Initialize a new block project
+npx @zzyra/cli init my-custom-block
+
+# Install dependencies
+cd my-custom-block
+npm install
+
+# Start development server
+npm run dev
+```
+
+### Project Structure
+
+```
+my-custom-block/
+├── src/
+│   ├── index.ts          # Main block implementation
+│   ├── types.ts          # TypeScript type definitions
+│   └── utils.ts          # Utility functions
+├── tests/
+│   ├── unit.test.ts      # Unit tests
+│   └── integration.test.ts # Integration tests
+├── docs/
+│   └── README.md         # Block documentation
+├── package.json          # Dependencies and scripts
+├── tsconfig.json         # TypeScript configuration
+└── zzyra.config.js        # Zzyra-specific configuration
+```
+
+## API Reference
+
+### Core SDK Classes
+
+<Tabs>
+  <Tab title="BlockHandler">
+    ```typescript
+    abstract class BlockHandler {
+      abstract getMetadata(): BlockMetadata;
+      abstract execute(
+        inputs: any, 
+        config: any, 
+        context: ExecutionContext
+      ): Promise<any>;
+      
+      validate(inputs: any, config: any): ValidationResult;
+      onError(error: Error, context: ExecutionContext): Promise<void>;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="ExecutionContext">
+    ```typescript
+    interface ExecutionContext {
+      logger: Logger;
+      cache: Cache;
+      secrets: SecretManager;
+      http: HttpClient;
+      web3: Web3Provider;
+      ai: AIProvider;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="BlockMetadata">
+    ```typescript
+    interface BlockMetadata {
+      id: string;
+      name: string;
+      description: string;
+      category: BlockCategory;
+      inputs: InputDefinition[];
+      outputs: OutputDefinition[];
+      configFields: ConfigField[];
+      version: string;
+      author: string;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Web3 Integration
+
+```typescript
+import { ethers } from "ethers";
+
+class Web3Block extends BlockHandler {
+  async execute(inputs: any, config: any, context: ExecutionContext) {
+    // Get Web3 provider for specific chain
+    const provider = await context.web3.getProvider("ethereum");
+
+    // Create contract instance
+    const contract = new ethers.Contract(
+      inputs.contractAddress,
+      inputs.abi,
+      provider
+    );
+
+    // Execute contract call
+    const result = await contract[inputs.methodName](...inputs.parameters);
+
+    return { result: result.toString() };
+  }
+}
+```
+
+### AI Integration
+
+```typescript
+class AIBlock extends BlockHandler {
+  async execute(inputs: any, config: any, context: ExecutionContext) {
+    // Use Zzyra's AI provider
+    const aiResponse = await context.ai.generate({
+      prompt: inputs.prompt,
+      model: config.model || "gpt-4",
+      temperature: config.temperature || 0.7,
+    });
+
+    return {
+      response: aiResponse.text,
+      tokens: aiResponse.usage,
+    };
+  }
+}
+```
+
+## Testing & Quality Assurance
+
+### Testing Framework
+
+Zzyra provides comprehensive testing tools:
+
+```typescript
+import { BlockTester, TestCase } from "@zzyra/sdk/testing";
+
+describe("My Custom Block", () => {
+  let tester: BlockTester;
+
+  beforeEach(() => {
+    tester = new BlockTester(new MyCustomBlock());
+  });
+
+  it("should process input correctly", async () => {
+    const testCase: TestCase = {
+      inputs: { data: "test input" },
+      config: { apiKey: "test-key" },
+      expectedOutputs: { result: "processed result" },
+    };
+
+    const result = await tester.run(testCase);
+    expect(result.success).toBe(true);
+    expect(result.outputs.result).toBe("processed result");
+  });
+
+  it("should handle errors gracefully", async () => {
+    const testCase: TestCase = {
+      inputs: { data: "invalid input" },
+      config: { apiKey: "invalid-key" },
+      expectError: true,
+    };
+
+    const result = await tester.run(testCase);
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+});
+```
+
+### Quality Standards
+
+<CardGroup cols={2}>
+  <Card title='Code Quality' icon='code'>
+    - TypeScript with strict type checking - Comprehensive error handling -
+    Input validation and sanitization - Performance optimization
+  </Card>
+  <Card title='Testing Coverage' icon='vial'>
+    - Unit tests for all functions - Integration tests for workflows - Error
+    scenario testing - Performance benchmarking
+  </Card>
+  <Card title='Documentation' icon='book'>
+    - Clear API documentation - Usage examples and tutorials - Troubleshooting
+    guides - Best practices documentation
+  </Card>
+  <Card title='Security' icon='shield-check'>
+    - Secure credential handling - Input validation and sanitization - Rate
+    limiting and abuse prevention - Audit trail logging
+  </Card>
+</CardGroup>
+
+## Deployment & Publishing
+
+### Local Development
+
+```bash
+# Test your block locally
+npm run test
+
+# Run in simulation mode
+npm run simulate
+
+# Build for production
+npm run build
+```
+
+### Publishing to Marketplace
+
+<Steps>
+  <Step title='Prepare Your Block'>
+    - Complete documentation and examples - Add comprehensive tests - Optimize
+    performance and security - Create marketing materials
+  </Step>
+
+{" "}
+
+<Step title='Submit for Review'>
+  - Submit through Zzyra developer portal - Undergo security and quality review
+  - Address feedback and make improvements - Receive approval for publishing
+</Step>
+
+  <Step title='Publish & Monetize'>
+    - Block goes live in marketplace - Earn revenue from usage - Receive user
+    feedback and ratings - Iterate and improve based on usage
+  </Step>
+</Steps>
+
+### Private Deployment
+
+For enterprise or private use:
+
+```typescript
+// Deploy to private Zzyra instance
+const deployment = await zzyra.deploy({
+  block: new MyCustomBlock(),
+  environment: "production",
+  access: "private",
+  organization: "my-company",
+});
+```
+
+## Best Practices
+
+### Development Guidelines
+
+<AccordionGroup>
+  <Accordion title='Error Handling' icon='exclamation-triangle'>
+    Always implement comprehensive error handling with meaningful error messages
+    and graceful degradation.
+  </Accordion>
+
+{" "}
+
+<Accordion title='Performance Optimization' icon='gauge'>
+  Optimize for speed and efficiency, especially for frequently executed blocks.
+  Use caching and batch processing where appropriate.
+</Accordion>
+
+{" "}
+
+<Accordion title='Security First' icon='shield'>
+  Never expose sensitive data in logs or error messages. Use secure credential
+  management and validate all inputs.
+</Accordion>
+
+  <Accordion title='User Experience' icon='user'>
+    Design blocks with clear, intuitive interfaces. Provide helpful error
+    messages and comprehensive documentation.
+  </Accordion>
+</AccordionGroup>
+
+### Common Patterns
+
+```typescript
+// Retry pattern for external API calls
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3
+): Promise<T> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1000 * Math.pow(2, i))
+      );
+    }
+  }
+}
+
+// Caching pattern for expensive operations
+async function withCache<T>(
+  key: string,
+  operation: () => Promise<T>,
+  ttl: number = 300000
+): Promise<T> {
+  const cached = await context.cache.get(key);
+  if (cached) return cached;
+
+  const result = await operation();
+  await context.cache.set(key, result, ttl);
+  return result;
+}
+```
+
+## Community & Support
+
+### Developer Resources
+
+<CardGroup cols={2}>
+  <Card title='Documentation' icon='book'>
+    Comprehensive guides, tutorials, and API reference
+  </Card>
+  <Card title='Examples' icon='code'>
+    Sample blocks and workflow templates
+  </Card>
+  <Card title='Community' icon='users'>
+    Discord server for developer discussions
+  </Card>
+  <Card title='Support' icon='life-ring'>
+    Technical support and troubleshooting
+  </Card>
+</CardGroup>
+
+### Getting Help
+
+- **Documentation**: Start with the comprehensive guides and tutorials
+- **Examples**: Browse the example gallery for inspiration
+- **Community**: Join our Discord for peer support and discussions
+- **Support**: Contact our developer support team for technical assistance
+- **GitHub**: Report bugs and request features through our GitHub repository
+
+## Next Steps
+
+Ready to start building? Choose your path:
+
+<CardGroup cols={3}>
+  <Card
+    title='Create Your First Block'
+    icon='rocket'
+    href='/developers/setup/first-workflow'>
+    Step-by-step tutorial for building your first custom block
+  </Card>
+  <Card
+    title='Explore Block Types'
+    icon='cubes'
+    href='/developers/blocks-overview'>
+    Learn about different types of blocks and their use cases
+  </Card>
+  <Card
+    title='Advanced Development'
+    icon='code'
+    href='/developers/advanced/sdk'>
+    Deep dive into advanced SDK features and patterns
+  </Card>
+</CardGroup>
+
+<Note>
+  Zzyra's developer platform is constantly evolving. Stay updated with the
+  latest features, best practices, and community developments to build the most
+  effective automation solutions.
+</Note>

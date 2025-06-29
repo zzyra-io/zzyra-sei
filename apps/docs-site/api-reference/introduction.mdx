@@ -1,0 +1,551 @@
+---
+title: "API Reference"
+description: "Complete API documentation for Zzyra's hybrid automation platform"
+---
+
+## Welcome to Zzyra API
+
+Zzyra's API provides programmatic access to all platform capabilities, enabling you to build custom integrations, automate workflows, and extend the platform's functionality.
+
+<Alert type='info'>
+  **API Version**: v1.0.0 | **Base URL**: `https://api.zzyra.com/v1` | **Rate
+  Limit**: 1000 requests/minute
+</Alert>
+
+## Quick Start
+
+<div className="api-quickstart">
+  <div className="quickstart-tabs">
+    <Tabs>
+      <Tab title="Authentication">
+```bash
+# Get your API key from the dashboard
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://api.zzyra.com/v1/workflows
+```
+      </Tab>
+      
+      <Tab title="Create Workflow">
+```javascript
+const response = await fetch('https://api.zzyra.com/v1/workflows', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: 'My Automation',
+    description: 'Automated trading strategy',
+    blocks: [
+      {
+        type: 'price_monitor',
+        config: {
+          symbol: 'ETH',
+          threshold: 3000
+        }
+      }
+    ]
+  })
+});
+```
+      </Tab>
+      
+      <Tab title="WebSocket Events">
+```javascript
+const ws = new WebSocket('wss://api.zzyra.com/v1/events');
+
+ws.onmessage = (event) => {
+const data = JSON.parse(event.data);
+console.log('Workflow executed:', data);
+};
+
+// Subscribe to workflow events
+ws.send(JSON.stringify({
+type: 'subscribe',
+events: ['workflow.executed', 'workflow.failed']
+}));
+
+````
+      </Tab>
+    </Tabs>
+  </div>
+</div>
+
+## API Overview
+
+<div className="api-overview">
+  <CardGroup cols={3}>
+    <Card title="REST API" icon="globe">
+      <ul>
+        <li>Workflow Management</li>
+        <li>Block Operations</li>
+        <li>User Management</li>
+        <li>Analytics & Reports</li>
+      </ul>
+    </Card>
+
+    <Card title="WebSocket API" icon="broadcast">
+      <ul>
+        <li>Real-time Events</li>
+        <li>Workflow Execution</li>
+        <li>System Notifications</li>
+        <li>Live Data Feeds</li>
+      </ul>
+    </Card>
+
+    <Card title="Web3 Integration" icon="link">
+      <ul>
+        <li>Smart Contract Calls</li>
+        <li>Transaction Management</li>
+        <li>Multi-chain Support</li>
+        <li>DeFi Protocol Access</li>
+      </ul>
+    </Card>
+  </CardGroup>
+</div>
+
+## Authentication
+
+Zzyra uses API keys for authentication. Include your API key in the `Authorization` header with all requests.
+
+<div className="auth-examples">
+  <Tabs>
+    <Tab title="API Key">
+```bash
+curl -H "Authorization: Bearer sk_live_..." \
+  https://api.zzyra.com/v1/workflows
+````
+
+    </Tab>
+
+    <Tab title="OAuth 2.0">
+
+```bash
+# Get access token
+curl -X POST https://api.zzyra.com/oauth/token \
+  -d "grant_type=client_credentials" \
+  -d "client_id=YOUR_CLIENT_ID" \
+  -d "client_secret=YOUR_CLIENT_SECRET"
+
+# Use access token
+curl -H "Authorization: Bearer ACCESS_TOKEN" \
+  https://api.zzyra.com/v1/workflows
+```
+
+    </Tab>
+
+    <Tab title="Web3 Wallet">
+
+```javascript
+// Connect wallet and sign message
+const signature = await wallet.signMessage("Authenticate with Zzyra API");
+const response = await fetch("https://api.zzyra.com/v1/auth/wallet", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    address: wallet.address,
+    signature: signature,
+  }),
+});
+```
+
+    </Tab>
+
+  </Tabs>
+</div>
+
+## Rate Limits
+
+<div className='rate-limits'>
+  <div className='limits-table'>
+    <table>
+      <thead>
+        <tr>
+          <th>Plan</th>
+          <th>Requests/Minute</th>
+          <th>Requests/Hour</th>
+          <th>WebSocket Connections</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Community</td>
+          <td>100</td>
+          <td>1,000</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td>Starter</td>
+          <td>500</td>
+          <td>10,000</td>
+          <td>5</td>
+        </tr>
+        <tr>
+          <td>Pro</td>
+          <td>1,000</td>
+          <td>50,000</td>
+          <td>20</td>
+        </tr>
+        <tr>
+          <td>Business</td>
+          <td>5,000</td>
+          <td>200,000</td>
+          <td>100</td>
+        </tr>
+        <tr>
+          <td>Protocol</td>
+          <td>Unlimited</td>
+          <td>Unlimited</td>
+          <td>Unlimited</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+## Error Handling
+
+<div className="error-handling">
+  <div className="error-examples">
+    <AccordionGroup>
+      <Accordion title="Rate Limit Exceeded" icon="clock">
+```json
+{
+  "error": {
+    "code": "rate_limit_exceeded",
+    "message": "Rate limit exceeded. Try again in 60 seconds.",
+    "retry_after": 60
+  }
+}
+```
+      </Accordion>
+      
+      <Accordion title="Invalid API Key" icon="key">
+```json
+{
+  "error": {
+    "code": "invalid_api_key",
+    "message": "The provided API key is invalid or expired."
+  }
+}
+```
+      </Accordion>
+      
+      <Accordion title="Validation Error" icon="exclamation-triangle">
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Invalid request parameters",
+    "details": {
+      "field": "threshold",
+      "issue": "Must be greater than 0"
+    }
+  }
+}
+```
+      </Accordion>
+      
+      <Accordion title="Workflow Not Found" icon="search">
+```json
+{
+  "error": {
+    "code": "workflow_not_found",
+    "message": "Workflow with ID 'wf_123' not found."
+  }
+}
+```
+      </Accordion>
+    </AccordionGroup>
+  </div>
+</div>
+
+## SDKs & Libraries
+
+<div className="sdk-showcase">
+  <CardGroup cols={2}>
+    <Card title="JavaScript/TypeScript" icon="js">
+      <div className="sdk-info">
+        <div className="sdk-version">v1.0.0</div>
+        <div className="sdk-install">
+```bash
+npm install @zzyra/sdk
+```
+        </div>
+        <div className="sdk-usage">
+```javascript
+import { ZyraClient } from '@zzyra/sdk';
+
+const client = new ZyraClient('YOUR_API_KEY');
+const workflows = await client.workflows.list();
+
+````
+        </div>
+      </div>
+    </Card>
+
+    <Card title="Python" icon="python">
+      <div className="sdk-info">
+        <div className="sdk-version">v1.0.0</div>
+        <div className="sdk-install">
+```bash
+pip install zzyra-sdk
+````
+
+        </div>
+        <div className="sdk-usage">
+
+```python
+from zzyra import ZyraClient
+
+client = ZyraClient('YOUR_API_KEY')
+workflows = client.workflows.list()
+```
+
+        </div>
+      </div>
+    </Card>
+
+    <Card title="Go" icon="go">
+      <div className="sdk-info">
+        <div className="sdk-version">v1.0.0</div>
+        <div className="sdk-install">
+
+```bash
+go get github.com/zzyra/sdk-go
+```
+
+        </div>
+        <div className="sdk-usage">
+
+```go
+import "github.com/zzyra/sdk-go"
+
+client := zzyra.NewClient("YOUR_API_KEY")
+workflows, err := client.Workflows.List()
+```
+
+        </div>
+      </div>
+    </Card>
+
+    <Card title="Rust" icon="rust">
+      <div className="sdk-info">
+        <div className="sdk-version">v1.0.0</div>
+        <div className="sdk-install">
+
+```toml
+[dependencies]
+zzyra-sdk = "1.0.0"
+```
+
+        </div>
+        <div className="sdk-usage">
+
+```rust
+use zyra_sdk::ZyraClient;
+
+let client = ZyraClient::new("YOUR_API_KEY");
+let workflows = client.workflows().list().await?;
+```
+
+        </div>
+      </div>
+    </Card>
+
+  </CardGroup>
+</div>
+
+## API Endpoints
+
+<div className='endpoints-overview'>
+  <div className='endpoint-categories'>
+    <AccordionGroup>
+      <Accordion title='Workflows' icon='workflow'>
+        <div className='endpoint-list'>
+          <div className='endpoint'>
+            <span className='method get'>GET</span>
+            <span className='path'>/workflows</span>
+            <span className='description'>List all workflows</span>
+          </div>
+          <div className='endpoint'>
+            <span className='method post'>POST</span>
+            <span className='path'>/workflows</span>
+            <span className='description'>Create a new workflow</span>
+          </div>
+          <div className='endpoint'>
+            <span className='method get'>GET</span>
+            <span className='path'>/workflows/{id}</span>
+            <span className='description'>Get workflow details</span>
+          </div>
+          <div className='endpoint'>
+            <span className='method put'>PUT</span>
+            <span className='path'>/workflows/{id}</span>
+            <span className='description'>Update workflow</span>
+          </div>
+          <div className='endpoint'>
+            <span className='method delete'>DELETE</span>
+            <span className='path'>/workflows/{id}</span>
+            <span className='description'>Delete workflow</span>
+          </div>
+        </div>
+      </Accordion>
+
+      <Accordion title='Blocks' icon='puzzle-piece'>
+        <div className='endpoint-list'>
+          <div className='endpoint'>
+            <span className='method get'>GET</span>
+            <span className='path'>/blocks</span>
+            <span className='description'>List available blocks</span>
+          </div>
+          <div className='endpoint'>
+            <span className='method post'>POST</span>
+            <span className='path'>/blocks</span>
+            <span className='description'>Create custom block</span>
+          </div>
+          <div className='endpoint'>
+            <span className='method get'>GET</span>
+            <span className='path'>/blocks/{id}</span>
+            <span className='description'>Get block details</span>
+          </div>
+        </div>
+      </Accordion>
+
+      <Accordion title='Executions' icon='play'>
+        <div className='endpoint-list'>
+          <div className='endpoint'>
+            <span className='method get'>GET</span>
+            <span className='path'>/executions</span>
+            <span className='description'>List workflow executions</span>
+          </div>
+          <div className='endpoint'>
+            <span className='method post'>POST</span>
+            <span className='path'>/workflows/{id}/execute</span>
+            <span className='description'>Execute workflow manually</span>
+          </div>
+          <div className='endpoint'>
+            <span className='method get'>GET</span>
+            <span className='path'>/executions/{id}</span>
+            <span className='description'>Get execution details</span>
+          </div>
+        </div>
+      </Accordion>
+
+      <Accordion title='Web3' icon='link'>
+        <div className='endpoint-list'>
+          <div className='endpoint'>
+            <span className='method post'>POST</span>
+            <span className='path'>/web3/transactions</span>
+            <span className='description'>Submit transaction</span>
+          </div>
+          <div className='endpoint'>
+            <span className='method get'>GET</span>
+            <span className='path'>/web3/transactions/{hash}</span>
+            <span className='description'>Get transaction status</span>
+          </div>
+          <div className='endpoint'>
+            <span className='method post'>POST</span>
+            <span className='path'>/web3/contracts/call</span>
+            <span className='description'>Call smart contract</span>
+          </div>
+        </div>
+      </Accordion>
+    </AccordionGroup>
+
+  </div>
+</div>
+
+## WebSocket Events
+
+<div className="websocket-events">
+  <div className="event-types">
+    <CardGroup cols={2}>
+      <Card title="Workflow Events" icon="workflow">
+        <ul>
+          <li><code>workflow.created</code> - New workflow created</li>
+          <li><code>workflow.updated</code> - Workflow configuration changed</li>
+          <li><code>workflow.deleted</code> - Workflow removed</li>
+          <li><code>workflow.executed</code> - Workflow execution started</li>
+          <li><code>workflow.completed</code> - Workflow execution finished</li>
+          <li><code>workflow.failed</code> - Workflow execution failed</li>
+        </ul>
+      </Card>
+      
+      <Card title="System Events" icon="cog">
+        <ul>
+          <li><code>system.maintenance</code> - Scheduled maintenance</li>
+          <li><code>system.update</code> - Platform update</li>
+          <li><code>rate_limit.warning</code> - Approaching rate limit</li>
+          <li><code>security.alert</code> - Security-related events</li>
+        </ul>
+      </Card>
+    </CardGroup>
+  </div>
+  
+  <div className="websocket-example">
+```javascript
+const ws = new WebSocket('wss://api.zzyra.com/v1/events');
+
+// Subscribe to specific events
+ws.onopen = () => {
+ws.send(JSON.stringify({
+type: 'subscribe',
+events: ['workflow.executed', 'workflow.completed', 'workflow.failed']
+}));
+};
+
+// Handle incoming events
+ws.onmessage = (event) => {
+const data = JSON.parse(event.data);
+
+switch (data.type) {
+case 'workflow.executed':
+console.log('Workflow started:', data.workflow_id);
+break;
+case 'workflow.completed':
+console.log('Workflow completed:', data.workflow_id);
+break;
+case 'workflow.failed':
+console.log('Workflow failed:', data.workflow_id, data.error);
+break;
+}
+};
+
+```
+  </div>
+</div>
+
+## Getting Started
+
+<div className="api-getting-started">
+  <CardGroup cols={3}>
+    <Card
+      title="Authentication"
+      icon="key"
+      href="/api-reference/authentication"
+    >
+      Learn about API keys, OAuth, and Web3 authentication
+    </Card>
+    <Card
+      title="Workflows API"
+      icon="workflow"
+      href="/api-reference/workflows"
+    >
+      Create, manage, and execute workflows programmatically
+    </Card>
+    <Card
+      title="Web3 Integration"
+      icon="link"
+      href="/api-reference/web3"
+    >
+      Interact with blockchain networks and smart contracts
+    </Card>
+  </CardGroup>
+</div>
+
+<Note>
+The Zzyra API is designed to be RESTful and follows standard HTTP conventions.
+All responses are in JSON format, and we provide comprehensive error handling
+and rate limiting to ensure reliable service.
+</Note>
+```

@@ -1,0 +1,351 @@
+---
+title: "Custom Blocks Development"
+description: "Build powerful custom automation blocks for Zzyra's hybrid platform"
+---
+
+## Building Custom Blocks
+
+Extend Zzyra's automation capabilities with your own custom blocks. Create powerful integrations, specialized workflows, and unique automation logic tailored to your specific needs.
+
+<Alert type='info'>
+  **Developer Rewards**: Earn up to $5,000 per month by publishing popular
+  blocks to the Zzyra marketplace.
+</Alert>
+
+## Block Architecture
+
+<div className='block-architecture'>
+  <div className='arch-layer'>
+    <h4>User Interface</h4>
+    <div className='layer-components'>
+      <span>Form Fields</span>
+      <span>Configuration</span>
+      <span>Validation</span>
+    </div>
+  </div>
+
+{" "}
+
+<div className='arch-layer'>
+  <h4>Block Logic</h4>
+  <div className='layer-components'>
+    <span>Input Processing</span>
+    <span>Business Logic</span>
+    <span>Output Generation</span>
+  </div>
+</div>
+
+  <div className='arch-layer'>
+    <h4>Integration Layer</h4>
+    <div className='layer-components'>
+      <span>API Calls</span>
+      <span>Web3 Interactions</span>
+      <span>Data Processing</span>
+    </div>
+  </div>
+</div>
+
+## Your First Custom Block
+
+Let's create a simple "Price Alert" block that monitors cryptocurrency prices and sends notifications when thresholds are met.
+
+<CardGroup cols={2}>
+  <Card title="Block Definition" icon="code">
+```typescript
+import { Block, BlockConfig, BlockInput, BlockOutput } from '@zzyra/blocks';
+
+interface PriceAlertConfig {
+symbol: string;
+threshold: number;
+condition: 'above' | 'below';
+notificationChannel: 'email' | 'discord' | 'slack';
+}
+
+@Block({
+name: 'Price Alert',
+description: 'Monitor cryptocurrency prices and send alerts',
+category: 'Trading',
+version: '1.0.0'
+})
+export class PriceAlertBlock {
+
+@BlockConfig()
+config: PriceAlertConfig;
+
+async execute(): Promise<void> {
+const { symbol, threshold, condition } = this.config;
+const { currentPrice } = this.input;
+
+    let alertTriggered = false;
+    let message = '';
+
+    if (condition === 'above' && currentPrice > threshold) {
+      alertTriggered = true;
+      message = `🚀 ${symbol} price is above $${threshold}! Current: $${currentPrice}`;
+    }
+
+    this.output = {
+      alertTriggered,
+      message,
+      timestamp: new Date().toISOString()
+    };
+
+}
+}
+
+````
+  </Card>
+
+  <Card title="Block Preview" icon="eye">
+    <div className="block-preview">
+      <div className="preview-form">
+        <div className="form-group">
+          <label>Cryptocurrency Symbol</label>
+          <input type="text" placeholder="BTC" value="ETH" />
+        </div>
+        <div className="form-group">
+          <label>Price Threshold</label>
+          <input type="number" placeholder="50000" value="3000" />
+        </div>
+        <div className="form-group">
+          <label>Condition</label>
+          <select>
+            <option>Above</option>
+            <option>Below</option>
+          </select>
+        </div>
+      </div>
+      <div className="preview-output">
+        <pre>
+{`{
+  "alertTriggered": true,
+  "message": "🚀 ETH price is above $3000! Current: $3200",
+  "timestamp": "2024-01-15T10:30:00Z"
+}`}
+        </pre>
+      </div>
+    </div>
+  </Card>
+</CardGroup>
+
+## Development Workflow
+
+<Steps>
+  <Step title="Define Requirements">
+    Identify the automation need and define inputs, outputs, and configuration
+  </Step>
+  <Step title="Create Block Structure">
+    Set up the block class with proper decorators and interfaces
+  </Step>
+  <Step title="Implement Logic">
+    Write the core business logic and integration code
+  </Step>
+  <Step title="Test & Validate">
+    Test the block with various inputs and edge cases
+  </Step>
+  <Step title="Deploy & Share">
+    Deploy to Zzyra marketplace and share with the community
+  </Step>
+</Steps>
+
+## Advanced Patterns
+
+### Web3 Integration Block
+
+<AccordionGroup>
+  <Accordion title="DeFi Yield Automation" icon="chart-line">
+```typescript
+@Block({
+  name: 'DeFi Yield Automation',
+  description: 'Automate DeFi yield farming operations',
+  category: 'DeFi',
+  version: '2.0.0'
+})
+export class DeFiYieldBlock {
+
+  async execute(): Promise<void> {
+    const { protocol, action, amount } = this.config;
+
+    // Initialize protocol-specific contract
+    const contract = await this.getProtocolContract(protocol);
+
+    let transaction;
+    switch (action) {
+      case 'deposit':
+        transaction = await this.deposit(amount);
+        break;
+      case 'withdraw':
+        transaction = await this.withdraw(amount);
+        break;
+      case 'harvest':
+        transaction = await this.harvest();
+        break;
+    }
+
+    const receipt = await transaction.wait();
+
+    this.output = {
+      transactionHash: receipt.transactionHash,
+      success: true,
+      gasUsed: receipt.gasUsed.toString()
+    };
+  }
+}
+````
+
+  </Accordion>
+  
+  <Accordion title="AI Trading Advisor" icon="brain">
+```typescript
+@Block({
+  name: 'AI Trading Advisor',
+  description: 'AI-powered trading recommendations',
+  category: 'AI Trading',
+  version: '1.0.0'
+})
+export class AITradingBlock {
+  
+  async execute(): Promise<void> {
+    const { model, strategy } = this.config;
+    const { marketData, portfolio } = this.input;
+    
+    // Prepare context for AI analysis
+    const context = this.prepareAnalysisContext(marketData, portfolio);
+    
+    // Generate AI recommendations
+    const response = await this.openai.chat.completions.create({
+      model: model === 'gpt-4' ? 'gpt-4' : 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert cryptocurrency trading advisor.'
+        },
+        {
+          role: 'user',
+          content: `Analyze this market data: ${JSON.stringify(context)}`
+        }
+      ]
+    });
+    
+    const aiRecommendation = JSON.parse(response.choices[0].message.content);
+    
+    this.output = {
+      recommendations: this.validateRecommendations(aiRecommendation),
+      confidence: aiRecommendation.confidence,
+      reasoning: aiRecommendation.reasoning
+    };
+  }
+}
+```
+  </Accordion>
+</AccordionGroup>
+
+## Testing Framework
+
+<div className="testing-showcase">
+  <Tabs>
+    <Tab title="Unit Tests">
+```typescript
+describe('PriceAlertBlock', () => {
+  let block: PriceAlertBlock;
+  
+  beforeEach(() => {
+    block = new PriceAlertBlock();
+    block.config = {
+      symbol: 'ETH',
+      threshold: 3000,
+      condition: 'above',
+      notificationChannel: 'email'
+    };
+  });
+  
+  it('should trigger alert when price is above threshold', async () => {
+    block.input = {
+      currentPrice: 3200,
+      marketData: {}
+    };
+    
+    await block.execute();
+    
+    expect(block.output.alertTriggered).toBe(true);
+    expect(block.output.message).toContain('🚀 ETH price is above $3000');
+  });
+});
+```
+    </Tab>
+    
+    <Tab title="Integration Tests">
+```typescript
+describe('PriceAlertBlock Integration', () => {
+  it('should send email notification when alert is triggered', async () => {
+    const mockEmailService = jest.fn();
+    const block = new PriceAlertBlock();
+    
+    block.config.notificationChannel = 'email';
+    block.input.currentPrice = 3200;
+    
+    await block.execute();
+    
+    expect(mockEmailService).toHaveBeenCalledWith(
+      expect.stringContaining('ETH price is above $3000')
+    );
+  });
+});
+```
+    </Tab>
+  </Tabs>
+</div>
+
+## Block Marketplace
+
+<div className='marketplace-stats'>
+  <CardGroup cols={3}>
+    <Card title='Published Blocks' icon='package'>
+      <div className='stat-number'>150+</div>
+    </Card>
+    <Card title='Active Users' icon='users'>
+      <div className='stat-number'>2,500+</div>
+    </Card>
+    <Card title='Developer Rewards' icon='dollar-sign'>
+      <div className='stat-number'>$45K</div>
+    </Card>
+  </CardGroup>
+</div>
+
+### Publishing Steps
+
+<Steps>
+  <Step title='Prepare Your Block'>
+    Ensure your block is well-tested and documented
+  </Step>
+  <Step title='Create Listing'>
+    Add description, pricing, and usage examples
+  </Step>
+  <Step title='Submit for Review'>
+    Our team reviews for quality and security
+  </Step>
+  <Step title='Go Live'>Your block is available to the community</Step>
+</Steps>
+
+## Getting Started
+
+<CardGroup cols={3}>
+  <Card
+    title='Setup Environment'
+    icon='rocket'
+    href='/developers/setup/overview'>
+    Get your development environment ready
+  </Card>
+  <Card title='API Reference' icon='book' href='/api-reference'>
+    Complete API documentation
+  </Card>
+  <Card title='Developer Community' icon='users' href='/developers/community'>
+    Join our developer community
+  </Card>
+</CardGroup>
+
+<Note>
+  Custom blocks are the foundation of Zzyra's extensibility. By building and
+  sharing blocks, you contribute to the ecosystem and help others automate their
+  workflows more effectively.
+</Note>

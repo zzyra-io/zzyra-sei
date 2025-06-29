@@ -1,0 +1,711 @@
+---
+title: "Security Framework"
+description: "Enterprise-grade security protecting sensitive operations across Web2 and Web3 domains"
+---
+
+## Enterprise-Grade Security Foundation
+
+Zzyra's security framework is designed with a defense-in-depth approach, protecting sensitive operations across both traditional enterprise systems and blockchain networks. Security considerations are embedded at every architectural layer, ensuring comprehensive protection for mission-critical automation workflows.
+
+<Warning>
+  Security is paramount in hybrid automation. Zzyra implements multiple security
+  layers to protect private keys, sensitive credentials, and business-critical
+  operations without compromising functionality or user experience.
+</Warning>
+
+## Security Architecture Overview
+
+```mermaid
+graph TD
+    US[User Interface] --> AG[API Gateway]
+    AG --> AU[Authentication Layer]
+    AU --> AZ[Authorization Layer]
+    AZ --> EE[Execution Environment]
+
+    EE --> CM[Credential Management]
+    EE --> NI[Network Isolation]
+    EE --> DV[Data Validation]
+    EE --> AL[Audit Logging]
+
+    CM --> HSM[Hardware Security Modules]
+    CM --> KV[Key Vault]
+    CM --> ER[Encryption at Rest]
+    CM --> ET[Encryption in Transit]
+
+    NI --> VPC[Virtual Private Cloud]
+    NI --> FW[Firewall Rules]
+    NI --> IDS[Intrusion Detection]
+
+    style AU fill:#ccf,stroke:#333,stroke-width:2px
+    style AZ fill:#fec,stroke:#333,stroke-width:2px
+    style CM fill:#f9f,stroke:#333,stroke-width:2px
+    style NI fill:#cdf,stroke:#333,stroke-width:2px
+```
+
+## Core Security Principles
+
+### 1. Defense in Depth
+
+Multiple security layers protect against various threat vectors:
+
+<CardGroup cols={2}>
+  <Card title='Perimeter Security' icon='shield'>
+    API gateways, firewalls, and DDoS protection at the network edge
+  </Card>
+  <Card title='Application Security' icon='code'>
+    Secure coding practices, input validation, and output encoding
+  </Card>
+  <Card title='Data Security' icon='database'>
+    Encryption at rest and in transit, secure data handling
+  </Card>
+  <Card title='Infrastructure Security' icon='server'>
+    Hardened systems, network segmentation, monitoring
+  </Card>
+</CardGroup>
+
+### 2. Principle of Least Privilege
+
+Every component has minimal necessary access rights:
+
+<AccordionGroup>
+  <Accordion title='User Access Control' icon='user-check'>
+    Users receive only the permissions necessary for their specific role and
+    responsibilities within the organization.
+  </Accordion>
+
+{" "}
+<Accordion title='Service Permissions' icon='gear'>
+  Each service component has access only to the resources and data required for
+  its specific function.
+</Accordion>
+
+{" "}
+<Accordion title='API Limitations' icon='key'>
+  API keys and service accounts are scoped to specific operations with
+  time-based restrictions where appropriate.
+</Accordion>
+
+  <Accordion title='Network Access' icon='network-wired'>
+    Network connections are restricted to required endpoints with explicit
+    allow-listing and monitoring.
+  </Accordion>
+</AccordionGroup>
+
+### 3. Zero Trust Security Model
+
+No implicit trust is granted based on network location or previous authentication:
+
+- **Continuous Verification**: All requests are authenticated and authorized
+- **Contextual Access**: Access decisions based on user, device, location, and behavior
+- **Micro-Segmentation**: Network traffic is isolated and monitored
+- **Behavioral Analysis**: Anomalous behavior triggers additional verification
+
+## Credential Management
+
+### Secure Storage Architecture
+
+```typescript
+interface CredentialManager {
+  storeCredential(userId: string, credential: Credential): Promise<string>;
+  retrieveCredential(userId: string, credentialId: string): Promise<Credential>;
+  rotateCredential(credentialId: string): Promise<void>;
+  revokeCredential(credentialId: string): Promise<void>;
+}
+
+interface Credential {
+  id: string;
+  type: CredentialType;
+  encryptedValue: string;
+  metadata: CredentialMetadata;
+  permissions: Permission[];
+  expirationDate?: Date;
+}
+
+enum CredentialType {
+  PRIVATE_KEY = "private_key",
+  API_TOKEN = "api_token",
+  DATABASE_PASSWORD = "database_password",
+  SERVICE_ACCOUNT = "service_account",
+}
+```
+
+### Hardware Security Modules (HSMs)
+
+For the highest security requirements:
+
+<Tabs>
+  <Tab title='HSM Integration'>
+    - **Key Generation**: Cryptographic keys generated within HSM - **Secure
+    Operations**: Private key operations never leave HSM - **Tamper
+    Resistance**: Hardware-level protection against physical attacks - **FIPS
+    140-2 Level 3**: Certified security standard compliance
+  </Tab>
+
+{" "}
+<Tab title='Key Management'>
+  - **Hierarchical Keys**: Master keys protect data encryption keys - **Key
+  Rotation**: Automated rotation with zero downtime - **Backup & Recovery**:
+  Secure key backup with geographic distribution - **Audit Trails**: Complete
+  key usage logging
+</Tab>
+
+  <Tab title='Performance'>
+    - **High Throughput**: Support for high-volume operations - **Low Latency**:
+    Optimized for real-time transaction signing - **Scalability**: Horizontal
+    scaling for enterprise workloads - **Availability**: 99.99% uptime with
+    redundancy
+  </Tab>
+</Tabs>
+
+### Credential Isolation
+
+Different credential types are isolated with specific protections:
+
+#### Blockchain Private Keys
+
+```typescript
+class BlockchainKeyManager {
+  private hsmClient: HSMClient;
+
+  async signTransaction(
+    keyId: string,
+    transaction: Transaction
+  ): Promise<SignedTransaction> {
+    // Validate transaction before signing
+    await this.validateTransaction(transaction);
+
+    // Sign within HSM - private key never exposed
+    const signature = await this.hsmClient.sign(keyId, transaction.hash);
+
+    // Log signing operation
+    await this.auditLog.record({
+      operation: "transaction_sign",
+      keyId,
+      transactionHash: transaction.hash,
+      timestamp: Date.now(),
+    });
+
+    return { ...transaction, signature };
+  }
+}
+```
+
+#### Enterprise API Credentials
+
+```typescript
+class EnterpriseCredentialVault {
+  async getAPICredential(
+    userId: string,
+    service: string
+  ): Promise<APICredential> {
+    // Check user permissions
+    await this.verifyAccess(userId, service);
+
+    // Retrieve from encrypted vault
+    const encrypted = await this.vault.get(`${userId}:${service}`);
+
+    // Decrypt only for authorized request
+    const credential = await this.decrypt(encrypted, userId);
+
+    // Return time-limited credential
+    return this.createTemporaryCredential(credential);
+  }
+}
+```
+
+## Role-Based Access Control (RBAC)
+
+### Permission Model
+
+Granular permissions govern all platform operations:
+
+```typescript
+interface Permission {
+  resource: string;
+  actions: Action[];
+  conditions?: Condition[];
+}
+
+interface Role {
+  name: string;
+  description: string;
+  permissions: Permission[];
+  inherits?: string[];
+}
+
+interface UserRole {
+  userId: string;
+  roleId: string;
+  grantedBy: string;
+  grantedAt: Date;
+  expiresAt?: Date;
+}
+
+// Example role definitions
+const ROLES = {
+  ADMIN: {
+    name: "Platform Administrator",
+    permissions: [{ resource: "*", actions: ["*"] }],
+  },
+  WORKFLOW_MANAGER: {
+    name: "Workflow Manager",
+    permissions: [
+      {
+        resource: "workflows",
+        actions: ["create", "read", "update", "delete"],
+      },
+      { resource: "executions", actions: ["read", "trigger"] },
+    ],
+  },
+  VIEWER: {
+    name: "Read-Only User",
+    permissions: [
+      { resource: "workflows", actions: ["read"] },
+      { resource: "executions", actions: ["read"] },
+    ],
+  },
+};
+```
+
+### Dynamic Permission Evaluation
+
+```typescript
+class PermissionEngine {
+  async hasPermission(
+    userId: string,
+    resource: string,
+    action: string,
+    context?: SecurityContext
+  ): Promise<boolean> {
+    const userRoles = await this.getUserRoles(userId);
+    const permissions = await this.aggregatePermissions(userRoles);
+
+    return this.evaluatePermission(permissions, resource, action, context);
+  }
+
+  private evaluatePermission(
+    permissions: Permission[],
+    resource: string,
+    action: string,
+    context?: SecurityContext
+  ): boolean {
+    for (const permission of permissions) {
+      if (
+        this.matchesResource(permission.resource, resource) &&
+        this.matchesAction(permission.actions, action) &&
+        this.matchesConditions(permission.conditions, context)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+```
+
+## Network Security
+
+### Virtual Private Cloud (VPC) Architecture
+
+<AccordionGroup>
+  <Accordion title='Network Segmentation' icon='sitemap'>
+    Separate subnets for different service tiers with controlled inter-subnet
+    communication through security groups and NACLs.
+  </Accordion>
+
+{" "}
+<Accordion title='Private Subnets' icon='lock'>
+  Sensitive services run in private subnets with no direct internet access,
+  communicating through NAT gateways.
+</Accordion>
+
+{" "}
+<Accordion title='Public Subnets' icon='globe'>
+  Only load balancers and API gateways in public subnets, with strict ingress
+  rules and DDoS protection.
+</Accordion>
+
+  <Accordion title='Database Security' icon='database'>
+    Databases in isolated subnets with encryption at rest, backup encryption,
+    and access restricted to application tiers.
+  </Accordion>
+</AccordionGroup>
+
+### Firewall and Intrusion Detection
+
+```typescript
+interface SecurityRule {
+  id: string;
+  type: "allow" | "deny";
+  protocol: "tcp" | "udp" | "icmp";
+  sourceIp?: string;
+  destinationPort?: number;
+  description: string;
+}
+
+interface SecurityEvent {
+  timestamp: Date;
+  sourceIp: string;
+  eventType: SecurityEventType;
+  severity: "low" | "medium" | "high" | "critical";
+  details: any;
+}
+
+class IntrusionDetectionSystem {
+  async analyzeTraffic(packet: NetworkPacket): Promise<SecurityEvent[]> {
+    const events: SecurityEvent[] = [];
+
+    // Check against known attack patterns
+    if (await this.detectSQLInjection(packet)) {
+      events.push(this.createSecurityEvent("sql_injection", "high", packet));
+    }
+
+    // Analyze traffic patterns
+    if (await this.detectDDoS(packet)) {
+      events.push(this.createSecurityEvent("ddos_attempt", "critical", packet));
+    }
+
+    return events;
+  }
+}
+```
+
+## Data Protection
+
+### Encryption Standards
+
+<Tabs>
+  <Tab title='Encryption at Rest'>
+    - **AES-256**: Industry-standard encryption for stored data - **Key
+    Management**: HSM-backed key management system - **Database Encryption**:
+    Transparent data encryption (TDE) - **File System**: Encrypted storage
+    volumes
+  </Tab>
+
+{" "}
+<Tab title='Encryption in Transit'>
+  - **TLS 1.3**: Latest transport layer security - **Certificate Management**:
+  Automated certificate rotation - **End-to-End**: Encryption between all
+  service components - **API Security**: OAuth 2.0 with JWT tokens
+</Tab>
+
+  <Tab title='Application-Level'>
+    - **Field Encryption**: Sensitive fields encrypted separately - **Format
+    Preserving**: Encryption maintaining data format - **Tokenization**: Replace
+    sensitive data with tokens - **Secure Enclaves**: Protected execution
+    environments
+  </Tab>
+</Tabs>
+
+### Data Loss Prevention (DLP)
+
+```typescript
+interface DLPPolicy {
+  name: string;
+  rules: DLPRule[];
+  actions: DLPAction[];
+}
+
+interface DLPRule {
+  pattern: string | RegExp;
+  dataType: "credit_card" | "ssn" | "private_key" | "api_key";
+  sensitivity: "low" | "medium" | "high";
+}
+
+class DataLossPreventionEngine {
+  async scanContent(content: string): Promise<DLPViolation[]> {
+    const violations: DLPViolation[] = [];
+
+    for (const policy of this.policies) {
+      const matches = await this.applyPolicy(policy, content);
+      violations.push(...matches);
+    }
+
+    return violations;
+  }
+
+  private async applyPolicy(
+    policy: DLPPolicy,
+    content: string
+  ): Promise<DLPViolation[]> {
+    // Implementation of policy matching logic
+    return this.detectSensitiveData(policy.rules, content);
+  }
+}
+```
+
+## Audit and Compliance
+
+### Comprehensive Audit Trails
+
+All system activities are logged for security and compliance:
+
+```typescript
+interface AuditEvent {
+  eventId: string;
+  timestamp: Date;
+  userId?: string;
+  sessionId?: string;
+  eventType: AuditEventType;
+  resource: string;
+  action: string;
+  success: boolean;
+  ipAddress: string;
+  userAgent?: string;
+  metadata: any;
+}
+
+enum AuditEventType {
+  AUTHENTICATION = "authentication",
+  AUTHORIZATION = "authorization",
+  DATA_ACCESS = "data_access",
+  WORKFLOW_EXECUTION = "workflow_execution",
+  CREDENTIAL_ACCESS = "credential_access",
+  CONFIGURATION_CHANGE = "configuration_change",
+}
+
+class AuditLogger {
+  async logEvent(event: AuditEvent): Promise<void> {
+    // Encrypt sensitive audit data
+    const encryptedEvent = await this.encryptAuditData(event);
+
+    // Store in tamper-evident log
+    await this.tamperProofStorage.store(encryptedEvent);
+
+    // Send to SIEM if critical event
+    if (this.isCriticalEvent(event)) {
+      await this.siemIntegration.send(event);
+    }
+  }
+}
+```
+
+### Compliance Frameworks
+
+Zzyra supports various compliance requirements:
+
+<AccordionGroup>
+  <Accordion title='SOC 2 Type II' icon='certificate'>
+    Comprehensive controls for security, availability, processing integrity,
+    confidentiality, and privacy of customer data.
+  </Accordion>
+
+{" "}
+<Accordion title='GDPR Compliance' icon='balance-scale'>
+  Data protection controls including right to erasure, data portability, and
+  privacy by design principles.
+</Accordion>
+
+{" "}
+<Accordion title='HIPAA (Healthcare)' icon='user-shield'>
+  Additional controls for healthcare data including business associate
+  agreements and enhanced encryption.
+</Accordion>
+
+  <Accordion title='PCI DSS' icon='credit-card'>
+    Payment card industry security standards for systems handling cardholder
+    data.
+  </Accordion>
+</AccordionGroup>
+
+## Transaction Safety
+
+### Blockchain Transaction Security
+
+Special protections for blockchain operations:
+
+<CardGroup cols={2}>
+  <Card title='Simulation Mode' icon='flask'>
+    Test transactions in simulation before execution to prevent costly mistakes
+  </Card>
+  <Card title='Multi-Signature' icon='users'>
+    Require multiple approvals for high-value or sensitive transactions
+  </Card>
+  <Card title='Spending Limits' icon='credit-card'>
+    Configurable daily/monthly limits for automated transactions
+  </Card>
+  <Card title='Approval Workflows' icon='list-check'>
+    Manual approval requirements for transactions above thresholds
+  </Card>
+</CardGroup>
+
+### Smart Contract Security
+
+```typescript
+interface ContractSecurityCheck {
+  contractAddress: string;
+  abi: any[];
+  securityScore: number;
+  risks: SecurityRisk[];
+  recommendations: string[];
+}
+
+interface SecurityRisk {
+  type: "reentrancy" | "overflow" | "access_control" | "oracle_manipulation";
+  severity: "low" | "medium" | "high" | "critical";
+  description: string;
+  mitigation?: string;
+}
+
+class SmartContractValidator {
+  async validateContract(address: string): Promise<ContractSecurityCheck> {
+    const bytecode = await this.getBytecode(address);
+    const risks = await this.analyzeRisks(bytecode);
+    const auditStatus = await this.checkAuditStatus(address);
+
+    return {
+      contractAddress: address,
+      abi: await this.getABI(address),
+      securityScore: this.calculateSecurityScore(risks, auditStatus),
+      risks,
+      recommendations: this.generateRecommendations(risks),
+    };
+  }
+}
+```
+
+## Incident Response
+
+### Security Incident Management
+
+Structured approach to security incidents:
+
+<Steps>
+  <Step title='Detection'>
+    Automated monitoring systems detect potential security incidents
+  </Step>
+  <Step title='Classification'>
+    Incidents are classified by severity and potential impact
+  </Step>
+  <Step title='Response'>
+    Automated and manual response procedures are triggered
+  </Step>
+  <Step title='Investigation'>
+    Forensic analysis determines scope and root cause
+  </Step>
+  <Step title='Recovery'>Systems are restored to secure operational state</Step>
+  <Step title='Post-Incident'>
+    Lessons learned are incorporated into security improvements
+  </Step>
+</Steps>
+
+### Automated Response Capabilities
+
+```typescript
+interface IncidentResponse {
+  trigger: SecurityEvent;
+  actions: ResponseAction[];
+  escalation: EscalationRule[];
+}
+
+interface ResponseAction {
+  type: "block_ip" | "revoke_credentials" | "quarantine_user" | "alert_admin";
+  parameters: any;
+  automatic: boolean;
+}
+
+class IncidentResponseSystem {
+  async handleIncident(event: SecurityEvent): Promise<void> {
+    const response = this.getResponsePlan(event.eventType);
+
+    for (const action of response.actions) {
+      if (action.automatic) {
+        await this.executeAction(action);
+      } else {
+        await this.requestManualIntervention(action);
+      }
+    }
+
+    // Escalate if necessary
+    if (this.shouldEscalate(event, response)) {
+      await this.escalateIncident(event);
+    }
+  }
+}
+```
+
+## Security Monitoring
+
+### Real-Time Threat Detection
+
+<AccordionGroup>
+  <Accordion title='Behavioral Analytics' icon='chart-line'>
+    AI-powered analysis of user behavior to detect anomalies and potential
+    insider threats.
+  </Accordion>
+
+{" "}
+<Accordion title='Network Monitoring' icon='network-wired'>
+  Continuous monitoring of network traffic for malicious activity and data
+  exfiltration attempts.
+</Accordion>
+
+{" "}
+<Accordion title='Application Security' icon='shield-check'>
+  Runtime application security monitoring (RASP) to detect and prevent attacks.
+</Accordion>
+
+  <Accordion title='Infrastructure Monitoring' icon='server'>
+    System-level monitoring for unauthorized access, privilege escalation, and
+    malware.
+  </Accordion>
+</AccordionGroup>
+
+### Security Metrics and KPIs
+
+- **Mean Time to Detection (MTTD)**: Average time to detect security incidents
+- **Mean Time to Response (MTTR)**: Average time to respond to incidents
+- **Security Score**: Overall security posture measurement
+- **Vulnerability Metrics**: Number and severity of identified vulnerabilities
+- **Compliance Score**: Adherence to regulatory requirements
+
+## Future Security Enhancements
+
+### Roadmap Highlights
+
+<Tabs>
+  <Tab title='2025 Q1-Q2'>
+    - Zero Trust Network Access (ZTNA) - Advanced threat hunting capabilities -
+    Enhanced blockchain security scanning - Quantum-resistant cryptography
+    preparation
+  </Tab>
+
+{" "}
+<Tab title='2025 Q3-Q4'>
+  - AI-powered security operations center - Automated penetration testing -
+  Homomorphic encryption for privacy - Decentralized identity integration
+</Tab>
+
+  <Tab title='2026+'>
+    - Quantum-safe cryptography implementation - Self-healing security
+    architecture - Predictive threat modeling - Blockchain-based audit trails
+  </Tab>
+</Tabs>
+
+<Note>
+  Security is an ongoing process at Zzyra. We continuously evaluate and improve
+  our security posture to protect against emerging threats while maintaining the
+  flexibility and functionality that makes hybrid automation possible.
+</Note>
+
+## Learn More
+
+Explore security across different aspects of Zzyra:
+
+<CardGroup cols={3}>
+  <Card
+    title='Architecture Overview'
+    icon='sitemap'
+    href='/platform/architecture/overview'>
+    Security in overall architecture
+  </Card>
+  <Card
+    title='Best Practices'
+    icon='shield-check'
+    href='/developers/advanced/security'>
+    Security best practices for developers
+  </Card>
+  <Card title='Compliance' icon='balance-scale' href='/business/compliance'>
+    Regulatory compliance features
+  </Card>
+</CardGroup>{" "}

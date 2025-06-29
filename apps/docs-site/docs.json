@@ -1,0 +1,141 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Zzyra Documentation",
+  "colors": {
+    "primary": "#6366F1",
+    "light": "#818CF8",
+    "dark": "#4F46E5"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Getting Started",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["index", "introduction", "quickstart"]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/what-is-zzyra",
+              "concepts/hybrid-automation",
+              "concepts/ai-native-workflows"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Platform",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "platform/architecture/overview",
+              "platform/architecture/modular-blocks",
+              "platform/architecture/chain-agnostic",
+              "platform/architecture/ai-engine",
+              "platform/architecture/security"
+            ]
+          },
+          {
+            "group": "Use Cases",
+            "pages": [
+              "platform/use-cases/overview",
+              "platform/use-cases/web3-automation",
+              "platform/use-cases/enterprise-integration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developers",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "developers/quickstart",
+              "developers/setup/overview",
+              "developers/setup/quickstart",
+              "developers/setup/development-environment",
+              "developers/setup/environment"
+            ]
+          },
+          {
+            "group": "Database",
+            "pages": [
+              "developers/database-overview",
+              "developers/database/schema"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": ["developers/advanced/custom-blocks"]
+          }
+        ]
+      },
+      {
+        "tab": "Business",
+        "groups": [
+          {
+            "group": "Overview & Strategy",
+            "pages": [
+              "business/overview",
+              "business/market-opportunity",
+              "business/pricing"
+            ]
+          },
+          {
+            "group": "Case Studies",
+            "pages": ["business/case-studies"]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Community",
+          "href": "https://discord.gg/zzyra",
+          "icon": "discord"
+        },
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/zzyra-platform",
+          "icon": "github"
+        },
+        {
+          "anchor": "Support",
+          "href": "https://support.zzyra.com",
+          "icon": "life-ring"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Platform",
+        "href": "https://www.zzyra.io"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://www.zzyra.io/login"
+    }
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/zzyra",
+      "github": "https://github.com/zzyra-platform",
+      "linkedin": "https://linkedin.com/company/zzyra"
+    }
+  }
+}

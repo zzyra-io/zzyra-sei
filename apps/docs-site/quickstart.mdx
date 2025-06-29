@@ -1,0 +1,356 @@
+---
+title: "Quick Start Guide"
+description: "Get up and running with Zzyra in minutes - create your first AI-powered automation workflow"
+---
+
+## Welcome to Zzyra
+
+Get started with Zzyra's AI-native workflow automation platform in just a few minutes. This guide will walk you through creating your first automation workflow that bridges Web2 and Web3 systems.
+
+<Note>
+  Zzyra is currently in development. This quickstart guide demonstrates the
+  platform's core capabilities and planned user experience.
+</Note>
+
+## What You'll Build
+
+In this quickstart, you'll create an intelligent DeFi monitoring workflow that:
+
+- Monitors your portfolio across multiple chains
+- Sends alerts when significant price movements occur
+- Uses AI to optimize notification timing and content
+
+<CardGroup cols={2}>
+  <Card title='🎯 For Beginners' icon='graduation-cap'>
+    No coding experience required - use natural language to describe your
+    automation goals
+  </Card>
+  <Card title='🚀 For Developers' icon='code'>
+    Advanced customization with visual workflow builder and custom blocks
+  </Card>
+</CardGroup>
+
+## Prerequisites
+
+Before you begin:
+
+<AccordionGroup>
+  <Accordion title='Account Setup' icon='user-plus'>
+    - Create a Zzyra account (currently in private beta) - Complete email
+    verification - Set up two-factor authentication (recommended)
+  </Accordion>
+
+{" "}
+<Accordion title='Wallet Connection' icon='wallet'>
+  - Connect at least one Web3 wallet (MetaMask, WalletConnect supported) -
+  Ensure you have some assets to monitor - Grant read-only permissions (no
+  signing required for monitoring)
+</Accordion>
+
+  <Accordion title='Optional Integrations' icon='plug'>
+    - Slack or Discord for notifications (optional) - Email notification
+    preferences - Telegram bot connection (optional)
+  </Accordion>
+</AccordionGroup>
+
+## Step 1: Create Your First Workflow
+
+### Using Natural Language (Recommended for Beginners)
+
+<Steps>
+  <Step title='Navigate to AI Workflow Generator'>
+    Click the **"Create with AI"** button on your dashboard to open the
+    intelligent workflow generator.
+  </Step>
+
+{" "}
+<Step title='Describe Your Automation Goal'>
+  Type your goal in plain English: ``` "Monitor my DeFi portfolio and send me a
+  Slack notification when any token drops more than 10% in a day, but only
+  during business hours to avoid spam" ```
+</Step>
+
+{" "}
+<Step title='Review AI-Generated Workflow'>
+  Zzyra's AI will analyze your request and generate a complete workflow with: -
+  Portfolio monitoring blocks - Price change detection logic - Time-based
+  filtering - Slack notification integration
+</Step>
+
+  <Step title='Customize Settings'>
+    Fine-tune the generated workflow: - Adjust percentage thresholds - Select
+    specific tokens to monitor - Set business hours for your timezone -
+    Configure notification preferences
+  </Step>
+</Steps>
+
+### Using Visual Builder (For Advanced Users)
+
+<Steps>
+  <Step title='Open Workflow Builder'>
+    Click **"Create Workflow"** and select **"Visual Builder"** for
+    drag-and-drop workflow creation.
+  </Step>
+
+{" "}
+<Step title='Add Portfolio Monitor Block'>
+  Drag the **"Portfolio Monitor"** block from the Web3 category to the canvas.
+  Configure: - Connected wallets to monitor - Refresh interval (recommended: 5
+  minutes) - Chains to include (Ethereum, Polygon, etc.)
+</Step>
+
+{" "}
+<Step title='Add Price Change Detection'>
+  Connect a **"Price Change Detector"** block: - Set threshold: 10% decrease -
+  Time window: 24 hours - Comparison method: Percentage change
+</Step>
+
+{" "}
+<Step title='Add Time Filter'>
+  Include a **"Time Window Filter"** block: - Business hours: 9 AM - 6 PM -
+  Timezone: Your local timezone - Weekdays only: Optional
+</Step>
+
+  <Step title='Add Notification Block'>
+    Connect a **"Slack Notification"** block: - Channel: #crypto-alerts -
+    Message template: AI-generated with token details - Include portfolio impact
+    analysis
+  </Step>
+</Steps>
+
+## Step 2: Configure Integrations
+
+### Connect Your DeFi Portfolio
+
+<Tabs>
+  <Tab title='Wallet Connection'>
+    - Click **"Connect Wallet"** in the Portfolio Monitor block - Select your
+    wallet provider (MetaMask, WalletConnect, etc.) - Grant read-only
+    permissions - Zzyra will automatically discover your token holdings
+  </Tab>
+
+{" "}
+<Tab title='Multi-Chain Setup'>
+  - Enable monitoring for multiple chains - Zzyra automatically detects assets
+  across: - Ethereum Mainnet - Polygon - Arbitrum - Optimism - Base (and more)
+</Tab>
+
+  <Tab title='Custom Tokens'>
+    - Add specific token contracts for monitoring - Zzyra validates contracts and
+    fetches metadata - Set individual notification thresholds per token
+  </Tab>
+</Tabs>
+
+### Set Up Notifications
+
+<CardGroup cols={2}>
+  <Card title='Slack Integration' icon='slack'>
+    - Install Zzyra Slack app - Select notification channel - Customize message
+    format
+  </Card>
+  <Card title='Email Notifications' icon='envelope'>
+    - Verify email address - Set notification frequency - Choose alert severity
+    levels
+  </Card>
+  <Card title='Discord Integration' icon='discord'>
+    - Connect Discord bot - Configure server permissions - Set up dedicated
+    alerts channel
+  </Card>
+  <Card title='Mobile Push' icon='mobile'>
+    - Download Zzyra mobile app - Enable push notifications - Set quiet hours
+  </Card>
+</CardGroup>
+
+## Step 3: Test Your Workflow
+
+### Simulation Mode
+
+Before going live, test your workflow safely:
+
+<Steps>
+  <Step title='Enable Test Mode'>
+    Toggle **"Simulation Mode"** in your workflow settings to test without real
+    transactions or notifications.
+  </Step>
+
+{" "}
+<Step title='Run Historical Test'>
+  Use the **"Historical Simulation"** feature to see how your workflow would
+  have performed with past market data.
+</Step>
+
+{" "}
+<Step title='Validate Configuration'>
+  Zzyra's AI will analyze your workflow and suggest optimizations: - Threshold
+  adjustments based on volatility - Notification timing optimization -
+  Additional monitoring suggestions
+</Step>
+
+  <Step title='Review Test Results'>
+    Examine the test execution log to ensure everything works as expected before
+    enabling live mode.
+  </Step>
+</Steps>
+
+## Step 4: Deploy and Monitor
+
+### Going Live
+
+<AccordionGroup>
+  <Accordion title='Deploy Workflow' icon='rocket'>
+    Once testing is complete, click **"Deploy Workflow"** to activate live
+    monitoring with real notifications.
+  </Accordion>
+
+{" "}
+<Accordion title='Monitor Performance' icon='chart-line'>
+  View real-time execution status, success rates, and performance metrics on
+  your dashboard.
+</Accordion>
+
+  <Accordion title='Optimize with AI' icon='brain'>
+    Zzyra's AI continuously optimizes your workflow based on execution data and
+    market conditions.
+  </Accordion>
+</AccordionGroup>
+
+### Dashboard Overview
+
+Your Zzyra dashboard provides:
+
+- **Real-time Status**: Current workflow execution status
+- **Performance Metrics**: Success rates, execution times, notification delivery
+- **AI Insights**: Optimization suggestions and pattern recognition
+- **Cost Analysis**: Gas usage and API costs with optimization recommendations
+
+## Next Steps
+
+### Expand Your Automation
+
+<CardGroup cols={3}>
+  <Card title='Add More Workflows' icon='plus'>
+    Create additional automations for yield farming, NFT monitoring, or DAO
+    governance
+  </Card>
+  <Card title='Enterprise Integration' icon='building'>
+    Connect business systems like CRM, ERP, or project management tools
+  </Card>
+  <Card title='Custom Blocks' icon='code'>
+    Build custom functionality using Zzyra's SDK or AI-assisted block generation
+  </Card>
+</CardGroup>
+
+### Explore Advanced Features
+
+<Tabs>
+  <Tab title='Cross-Chain Strategies'>
+    - Multi-chain portfolio rebalancing - Arbitrage opportunity detection -
+    Cross-chain yield optimization
+  </Tab>
+
+{" "}
+<Tab title='AI Enhancement'>
+  - Predictive price alerts - Smart notification timing - Automated strategy
+  optimization
+</Tab>
+
+  <Tab title='Enterprise Features'>
+    - Team collaboration - Role-based access control - Compliance reporting
+  </Tab>
+</Tabs>
+
+## Common Use Cases
+
+Get inspired by what others are building:
+
+### DeFi Automation
+
+- **Yield Farming**: Automatically compound rewards and rebalance positions
+- **Liquidation Protection**: Monitor collateral ratios and manage positions
+- **DEX Arbitrage**: Identify and execute arbitrage opportunities
+
+### NFT Management
+
+- **Floor Price Alerts**: Get notified of floor price movements
+- **Mint Monitoring**: Automated participation in NFT drops
+- **Portfolio Analytics**: Track collection performance and rarity changes
+
+### DAO Operations
+
+- **Governance Participation**: Automated voting based on predefined criteria
+- **Treasury Management**: Automated fund allocation and reporting
+- **Community Engagement**: Automated member onboarding and notifications
+
+### Enterprise Integration
+
+- **Identity Management**: DID-based employee onboarding
+- **Financial Operations**: Cross-ledger accounts payable
+- **Asset Tracking**: IoT-integrated supply chain monitoring
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title='Documentation' icon='book'>
+    Explore comprehensive guides and API documentation
+  </Card>
+  <Card title='Community' icon='users'>
+    Join our Discord community for support and discussions
+  </Card>
+  <Card title='Support' icon='life-ring'>
+    Contact our support team for technical assistance
+  </Card>
+  <Card title='Tutorials' icon='video'>
+    Watch video tutorials for advanced workflow creation
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title='Wallet Connection Issues' icon='wallet'>
+    - Ensure wallet is unlocked and connected to the correct network - Check
+    browser permissions for the wallet extension - Try connecting through
+    WalletConnect if MetaMask fails
+  </Accordion>
+
+{" "}
+<Accordion title='Workflow Not Triggering' icon='exclamation-triangle'>
+  - Verify all required integrations are properly connected - Check that trigger
+  conditions are realistic for current market conditions - Review execution logs
+  for error messages
+</Accordion>
+
+  <Accordion title='Notification Delivery Issues' icon='bell'>
+    - Confirm notification channels are properly configured - Check spam folders
+    for email notifications - Verify Slack/Discord bot permissions
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  Congratulations! You've successfully created your first Zzyra automation
+  workflow. This is just the beginning—explore the platform's advanced features
+  to build increasingly sophisticated automations that save time and optimize
+  your Web3 and business operations.
+</Note>
+
+## What's Next?
+
+<CardGroup cols={3}>
+  <Card
+    title='Explore Use Cases'
+    icon='lightbulb'
+    href='/platform/use-cases/overview'>
+    Discover real-world automation scenarios
+  </Card>
+  <Card
+    title='Learn Architecture'
+    icon='sitemap'
+    href='/platform/architecture/overview'>
+    Understand how Zzyra works under the hood
+  </Card>
+  <Card title='Developer Guide' icon='code' href='/developers/setup'>
+    Build custom integrations and blocks
+  </Card>
+</CardGroup>

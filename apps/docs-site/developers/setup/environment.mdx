@@ -1,0 +1,637 @@
+---
+title: "Development Environment Setup"
+description: "Complete guide to setting up the Zzyra development environment"
+---
+
+## Development Environment Setup
+
+Get your Zzyra development environment up and running with this comprehensive setup guide. Our monorepo structure uses modern tools for optimal development experience.
+
+<Alert type='info'>
+  **Prerequisites**: Node.js 20.3.0+, pnpm 9.15.2+, Docker, Git
+</Alert>
+
+## Quick Start
+
+<Steps>
+  <Step title="Clone Repository">
+```bash
+git clone <repository-url>
+cd zzyra
+```
+  </Step>
+  <Step title="Install Dependencies">
+```bash
+pnpm install
+```
+  </Step>
+  <Step title="Start Infrastructure">
+```bash
+docker-compose -f setup-compose.yml up -d
+```
+  </Step>
+  <Step title="Setup Database">
+```bash
+cd packages/database
+pnpm prisma generate
+pnpm prisma migrate dev --name init
+```
+  </Step>
+  <Step title="Start Development">
+```bash
+pnpm dev
+```
+  </Step>
+</Steps>
+
+## Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="nodejs">
+    <div className="requirement-details">
+      <div className="version">v20.3.0+</div>
+      <div className="install">
+```bash
+# Using nvm (recommended)
+nvm install 20.3.0
+nvm use 20.3.0
+```
+      </div>
+    </div>
+  </Card>
+  
+  <Card title="pnpm" icon="package">
+    <div className="requirement-details">
+      <div className="version">v9.15.2+</div>
+      <div className="install">
+```bash
+npm install -g pnpm@9.15.2
+```
+      </div>
+    </div>
+  </Card>
+  
+  <Card title="Docker" icon="docker">
+    <div className="requirement-details">
+      <div className="version">Latest</div>
+      <div className="install">
+```bash
+# macOS
+brew install --cask docker
+
+# Ubuntu
+
+sudo apt-get install docker.io docker-compose
+
+````
+      </div>
+    </div>
+  </Card>
+
+  <Card title="Git" icon="git">
+    <div className="requirement-details">
+      <div className="version">Latest</div>
+      <div className="install">
+```bash
+# macOS
+brew install git
+
+# Ubuntu
+sudo apt-get install git
+````
+
+      </div>
+    </div>
+
+  </Card>
+</CardGroup>
+
+## Repository Structure
+
+<div className='repo-structure'>
+  <h3>📁 Monorepo Organization</h3>
+  <p>Organized with Turbo for optimal development experience</p>
+  ```bash zzyra/ ├── apps/ │ ├── ui/ # Next.js Frontend │ │ ├── app/ # Next.js
+  App Router │ │ ├── components/ # React Components │ │ ├── lib/ # Core Services
+  │ │ └── package.json │ ├── api/ # NestJS API Server │ │ ├── src/ # Source Code
+  │ │ ├── test/ # Tests │ │ └── package.json │ └── zzyra-worker/ # NestJS Worker
+  Service │ ├── src/ # Source Code │ ├── test/ # Tests │ └── package.json ├──
+  packages/ │ ├── database/ # Prisma Client & Repositories │ │ ├── prisma/ #
+  Database Schema │ │ ├── src/ # Database Services │ │ └── package.json │ ├──
+  types/ # Shared TypeScript Types │ │ ├── src/ # Type Definitions │ │ └──
+  package.json │ └── blocks/ # Block Library │ ├── src/ # Block Definitions │
+  └── package.json ├── docker-compose.yml # Development Infrastructure ├──
+  turbo.json # Turbo Configuration ├── package.json # Root Package └──
+  pnpm-workspace.yaml # Workspace Configuration ```
+</div>
+
+## Environment Configuration
+
+<div className="environment-setup">
+  <h3>🔧 Environment Variables</h3>
+  <p>Configure environment variables for each application</p>
+  
+  <Tabs>
+    <Tab title="Frontend (.env.local)">
+```bash
+# Database
+NEXT_PUBLIC_API_URL=http://localhost:3001
+
+# Authentication
+
+NEXT*PUBLIC_MAGIC_PUBLISHABLE_KEY=pk_live*...
+NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=...
+
+# Web3
+
+NEXT_PUBLIC_ALCHEMY_API_KEY=...
+NEXT_PUBLIC_INFURA_API_KEY=...
+
+# AI Services
+
+NEXT_PUBLIC_OPENROUTER_API_KEY=...
+
+````
+
+  <Tabs>
+    <Tab title="API Server (.env)">
+```bash
+# Database
+DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zzyra?schema=public"
+
+# JWT
+JWT_SECRET="your-super-secret-jwt-key-here"
+JWT_EXPIRES_IN="7d"
+
+# Magic SDK
+MAGIC_SECRET_KEY="sk_live_..."
+
+# AI Services
+OPENROUTER_API_KEY="sk-or-v1-..."
+
+# RabbitMQ
+RABBIT_MQ_URL="amqp://guest:guest@localhost:5672"
+````
+
+    </Tab>
+
+    <Tab title="Worker Service (.env)">
+
+```bash
+# Database
+DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zzyra?schema=public"
+
+# RabbitMQ
+RABBIT_MQ_URL="amqp://guest:guest@localhost:5672"
+
+# AI Services
+OPENROUTER_API_KEY="sk-or-v1-..."
+OLLAMA_BASE_URL="http://localhost:11434"
+
+# Blockchain
+ALCHEMY_API_KEY="..."
+INFURA_API_KEY="..."
+```
+
+    </Tab>
+
+  </Tabs>
+</div>
+
+## Infrastructure Setup
+
+<div className="infrastructure-setup">
+  <h3>🐳 Docker Infrastructure</h3>
+  <p>Local development infrastructure using Docker Compose</p>
+  
+  <CardGroup cols={2}>
+    <Card title="PostgreSQL" icon="database">
+      <div className="service-details">
+        <div className="detail-item">
+          <span className="label">Port:</span>
+          <span className="value">5433</span>
+        </div>
+        <div className="detail-item">
+          <span className="label">Database:</span>
+          <span className="value">zzyra</span>
+        </div>
+        <div className="detail-item">
+          <span className="label">User:</span>
+          <span className="value">zzyra</span>
+        </div>
+      </div>
+    </Card>
+    
+    <Card title="RabbitMQ" icon="rabbit">
+      <div className="service-details">
+        <div className="detail-item">
+          <span className="label">Port:</span>
+          <span className="value">5672</span>
+        </div>
+        <div className="detail-item">
+          <span className="label">Management:</span>
+          <span className="value">15672</span>
+        </div>
+        <div className="detail-item">
+          <span className="label">User:</span>
+          <span className="value">guest</span>
+        </div>
+      </div>
+    </Card>
+    
+    <Card title="Redis" icon="redis">
+      <div className="service-details">
+        <div className="detail-item">
+          <span className="label">Port:</span>
+          <span className="value">6379</span>
+        </div>
+        <div className="detail-item">
+          <span className="label">Purpose:</span>
+          <span className="value">Caching</span>
+        </div>
+      </div>
+    </Card>
+    
+    <Card title="Ollama" icon="ai">
+      <div className="service-details">
+        <div className="detail-item">
+          <span className="label">Port:</span>
+          <span className="value">11434</span>
+        </div>
+        <div className="detail-item">
+          <span className="label">Purpose:</span>
+          <span className="value">Local AI Models</span>
+        </div>
+      </div>
+    </Card>
+  </CardGroup>
+  
+  <Tabs>
+    <Tab title="Start Infrastructure">
+```bash
+# Start all services
+docker-compose -f setup-compose.yml up -d
+
+# Check status
+
+docker-compose -f setup-compose.yml ps
+
+# View logs
+
+docker-compose -f setup-compose.yml logs -f
+
+````
+    </Tab>
+
+    <Tab title="Stop Infrastructure">
+```bash
+# Stop all services
+docker-compose -f setup-compose.yml down
+
+# Stop and remove volumes
+docker-compose -f setup-compose.yml down -v
+````
+
+    </Tab>
+
+    <Tab title="Database Management">
+
+```bash
+# Access PostgreSQL
+docker exec -it zzyra-postgres psql -U zzyra -d zzyra
+
+# Reset database
+docker-compose -f setup-compose.yml down -v
+docker-compose -f setup-compose.yml up -d postgres
+```
+
+    </Tab>
+
+  </Tabs>
+</div>
+
+## Database Setup
+
+<div className="database-setup">
+  <h3>🗄️ Database Configuration</h3>
+  <p>PostgreSQL with Prisma ORM setup and management</p>
+  
+  <Steps>
+    <Step title="Generate Prisma Client">
+```bash
+cd packages/database
+pnpm prisma generate
+```
+    </Step>
+    
+    <Step title="Run Migrations">
+```bash
+# Create initial migration
+pnpm prisma migrate dev --name init
+
+# Apply migrations
+
+pnpm prisma migrate deploy
+
+````
+    </Step>
+
+    <Step title="Seed Database">
+```bash
+# Run seed script
+pnpm prisma db seed
+
+# Or manually seed
+pnpm tsx prisma/seed.ts
+````
+
+    </Step>
+
+    <Step title="Verify Setup">
+
+```bash
+# Open Prisma Studio
+pnpm prisma studio
+
+# Check database connection
+pnpm prisma db pull
+```
+
+    </Step>
+
+  </Steps>
+  
+  <CardGroup cols={2}>
+    <Card title="Prisma Studio" icon="database">
+      - Visual database browser
+      - Data inspection and editing
+      - Relationship visualization
+      - Query building
+    </Card>
+    
+    <Card title="Database Migrations" icon="migration">
+      - Version control for schema
+      - Automatic migration generation
+      - Rollback capabilities
+      - Environment-specific migrations
+    </Card>
+  </CardGroup>
+</div>
+
+## Development Commands
+
+<div className="dev-commands">
+  <h3>🚀 Development Scripts</h3>
+  <p>Essential commands for development workflow</p>
+  
+  <Tabs>
+    <Tab title="Development">
+```bash
+# Start all services
+pnpm dev
+
+# Start individual services
+
+pnpm dev:ui # Frontend (port 3000)
+pnpm dev:api # API Server (port 3001)
+pnpm dev:worker # Worker Service (port 3002)
+
+# Start with specific environment
+
+NODE_ENV=development pnpm dev
+
+````
+    </Tab>
+
+    <Tab title="Building">
+```bash
+# Build all packages
+pnpm build
+
+# Build specific package
+pnpm build:ui
+pnpm build:api
+pnpm build:worker
+
+# Build for production
+pnpm build:prod
+````
+
+    </Tab>
+
+    <Tab title="Testing">
+
+```bash
+# Run all tests
+pnpm test
+
+# Run specific test suites
+pnpm test:ui
+pnpm test:api
+pnpm test:worker
+
+# Run tests with coverage
+pnpm test:coverage
+
+# Run E2E tests
+pnpm test:e2e
+```
+
+    </Tab>
+
+    <Tab title="Linting & Formatting">
+
+```bash
+# Lint all packages
+pnpm lint
+
+# Fix linting issues
+pnpm lint:fix
+
+# Format code
+pnpm format
+
+# Type checking
+pnpm type-check
+```
+
+    </Tab>
+
+  </Tabs>
+</div>
+
+## IDE Configuration
+
+<div className="ide-setup">
+  <h3>💻 IDE Setup</h3>
+  <p>Recommended IDE configuration for optimal development experience</p>
+  
+  <CardGroup cols={2}>
+    <Card title="VS Code" icon="vscode">
+      <div className="extensions">
+        <h5>Recommended Extensions:</h5>
+        <ul>
+          <li>TypeScript and JavaScript</li>
+          <li>Prisma</li>
+          <li>Tailwind CSS IntelliSense</li>
+          <li>ESLint</li>
+          <li>Prettier</li>
+          <li>Docker</li>
+          <li>GitLens</li>
+        </ul>
+      </div>
+    </Card>
+    
+    <Card title="WebStorm" icon="webstorm">
+      <div className="extensions">
+        <h5>Built-in Features:</h5>
+        <ul>
+          <li>TypeScript support</li>
+          <li>Database tools</li>
+          <li>Docker integration</li>
+          <li>Git integration</li>
+          <li>Code completion</li>
+          <li>Refactoring tools</li>
+        </ul>
+      </div>
+    </Card>
+  </CardGroup>
+  
+  <h4>VS Code Settings</h4>
+```json
+{
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.suggest.autoImports": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "tailwindCSS.includeLanguages": {
+    "typescript": "javascript",
+    "typescriptreact": "javascript"
+  },
+  "prisma.format.enable": true,
+  "files.associations": {
+    "*.prisma": "prisma"
+  }
+}
+```
+</div>
+
+## Troubleshooting
+
+<div className="troubleshooting">
+  <h3>🔧 Common Issues</h3>
+  <p>Solutions to common development environment issues</p>
+  
+  <AccordionGroup>
+    <Accordion title="Port Already in Use" icon="warning">
+      <div className="solution">
+        <h5>Problem:</h5>
+        <p>Port 3000, 3001, or 5433 is already in use</p>
+        
+        <h5>Solution:</h5>
+```bash
+# Find process using port
+lsof -i :3000
+
+# Kill process
+
+kill -9 <PID>
+
+# Or use different ports
+
+PORT=3001 pnpm dev:ui
+
+````
+      </div>
+    </Accordion>
+
+    <Accordion title="Database Connection Failed" icon="database">
+      <div className="solution">
+        <h5>Problem:</h5>
+        <p>Cannot connect to PostgreSQL database</p>
+
+        <h5>Solution:</h5>
+```bash
+# Check if Docker containers are running
+docker-compose -f setup-compose.yml ps
+
+# Restart database
+docker-compose -f setup-compose.yml restart postgres
+
+# Check database logs
+docker-compose -f setup-compose.yml logs postgres
+````
+
+      </div>
+    </Accordion>
+
+    <Accordion title="Prisma Client Not Generated" icon="prisma">
+      <div className="solution">
+        <h5>Problem:</h5>
+        <p>Prisma client not found or outdated</p>
+
+        <h5>Solution:</h5>
+
+```bash
+# Regenerate Prisma client
+cd packages/database
+pnpm prisma generate
+
+# Clear node_modules and reinstall
+rm -rf node_modules
+pnpm install
+```
+
+      </div>
+    </Accordion>
+
+    <Accordion title="Dependencies Not Found" icon="package">
+      <div className="solution">
+        <h5>Problem:</h5>
+        <p>Module not found errors in monorepo</p>
+
+        <h5>Solution:</h5>
+
+```bash
+# Clean install
+rm -rf node_modules
+rm -rf packages/*/node_modules
+pnpm install
+
+# Rebuild packages
+pnpm build:packages
+```
+
+      </div>
+    </Accordion>
+
+  </AccordionGroup>
+</div>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title='API Development' icon='api' href='/developers/api/overview'>
+    Learn about API development and endpoints
+  </Card>
+  <Card
+    title='Custom Blocks'
+    icon='puzzle-piece'
+    href='/developers/advanced/custom-blocks'>
+    Create custom automation blocks
+  </Card>
+  <Card
+    title='Database Schema'
+    icon='database'
+    href='/developers/database/schema'>
+    Understand the database structure
+  </Card>
+</CardGroup>
+
+<Note>
+  The development environment is designed to be consistent across all team
+  members. If you encounter issues not covered here, please check the
+  troubleshooting guide or reach out to the development team.
+</Note>{" "}
