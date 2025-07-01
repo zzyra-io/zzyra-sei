@@ -1,0 +1,877 @@
+<!doctype html>
+<html class="no-js" lang="">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <title>@zyra/api documentation</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+	   <link rel="stylesheet" href="../styles/style.css">
+        <link rel="stylesheet" href="../styles/dark.css">
+    </head>
+    <body>
+          <script>
+               // Blocking script to avoid flickering dark mode
+               // Dark mode toggle button
+               var useDark = window.matchMedia('(prefers-color-scheme: dark)');
+               var darkModeState = useDark.matches;
+               var $darkModeToggleSwitchers = document.querySelectorAll('.dark-mode-switch input');
+               var $darkModeToggles = document.querySelectorAll('.dark-mode-switch');
+               var darkModeStateLocal = localStorage.getItem('compodoc_darkmode-state');
+
+               function checkToggle(check) {
+                    for (var i = 0; i < $darkModeToggleSwitchers.length; i++) {
+                         $darkModeToggleSwitchers[i].checked = check;
+                    }
+               }
+
+               function toggleDarkMode(state) {
+                    if (window.localStorage) {
+                         localStorage.setItem('compodoc_darkmode-state', state);
+                    }
+
+                    checkToggle(state);
+
+                    const hasClass = document.body.classList.contains('dark');
+
+                    if (state) {
+                         for (var i = 0; i < $darkModeToggles.length; i++) {
+                              $darkModeToggles[i].classList.add('dark');
+                         }
+                         if (!hasClass) {
+                              document.body.classList.add('dark');
+                         }
+                    } else {
+                         for (var i = 0; i < $darkModeToggles.length; i++) {
+                              $darkModeToggles[i].classList.remove('dark');
+                         }
+                         if (hasClass) {
+                              document.body.classList.remove('dark');
+                         }
+                    }
+               }
+
+               useDark.addEventListener('change', function (evt) {
+                    toggleDarkMode(evt.matches);
+               });
+               if (darkModeStateLocal) {
+                    darkModeState = darkModeStateLocal === 'true';
+               }
+               toggleDarkMode(darkModeState);
+          </script>
+
+        <div class="navbar navbar-default navbar-fixed-top d-md-none p-0">
+               <div class="d-flex">
+                    <a href="../" class="navbar-brand">@zyra/api documentation</a>
+                    <button type="button" class="btn btn-default btn-menu ion-ios-menu" id="btn-menu"></button>
+               </div>
+        </div>
+
+        <div class="xs-menu menu" id="mobile-menu">
+                <div id="book-search-input" role="search"><input type="text" placeholder="Type to search"></div>            <compodoc-menu></compodoc-menu>
+        </div>
+
+        <div class="container-fluid main">
+           <div class="row main">
+               <div class="d-none d-md-block menu">
+                   <compodoc-menu mode="normal"></compodoc-menu>
+               </div>
+               <!-- START CONTENT -->
+               <div class="content interface">
+                   <div class="content-data">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<ol class="breadcrumb">
+  <li class="breadcrumb-item">Interfaces</li>
+  <li class="breadcrumb-item"
+  >
+  WorkflowNode</li>
+</ol>
+
+<ul class="nav nav-tabs" role="tablist">
+        <li class="nav-item">
+            <a href="#info" 
+                class="nav-link"
+                class="nav-link active"
+                role="tab" id="info-tab" data-bs-toggle="tab" data-link="info">Info</a>
+        </li>
+        <li class="nav-item">
+            <a href="#source" 
+                class="nav-link"
+                
+                role="tab" id="source-tab" data-bs-toggle="tab" data-link="source">Source</a>
+        </li>
+</ul>
+
+<div class="tab-content">
+    <div class="tab-pane fade active in" id="info">
+        <p class="comment">
+            <h3>File</h3>
+        </p>
+        <p class="comment">
+            <code>src/ai/ai.service.ts</code>
+        </p>
+
+
+
+
+        <section data-compodoc="block-index">
+            <h3 id="index">Index</h3>
+            <table class="table table-sm table-bordered index-table">
+                <tbody>
+                    <tr>
+                        <td class="col-md-4">
+                            <h6><b>Properties</b></h6>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="col-md-4">
+                            <ul class="index-list">
+                                <li>
+                                        <a href="#data" 
+>
+                                            data
+                                        </a>
+                                </li>
+                                <li>
+                                        <a href="#id" 
+>
+                                            id
+                                        </a>
+                                </li>
+                                <li>
+                                        <a href="#position" 
+>
+                                            position
+                                        </a>
+                                </li>
+                                <li>
+                                        <a href="#type" 
+>
+                                            type
+                                        </a>
+                                </li>
+                            </ul>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+
+
+            <section data-compodoc="block-properties">
+                <h3 id="inputs">Properties</h3>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="data"></a>
+                                        <span class="name "><b>data</b>
+                                            <a href="#data">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>data:     <code>Record&lt;string | &gt;</code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>    <code>Record&lt;string | &gt;</code>
+
+                                        </td>
+                                    </tr>
+
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="id"></a>
+                                        <span class="name "><b>id</b>
+                                            <a href="#id">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>id:         <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+
+                                        </td>
+                                    </tr>
+
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="position"></a>
+                                        <span class="name "><b>position</b>
+                                            <a href="#position">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>position:     <code>literal type</code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>    <code>literal type</code>
+
+                                        </td>
+                                    </tr>
+
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="type"></a>
+                                        <span class="name "><b>type</b>
+                                            <a href="#type">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>type:         <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+
+                                        </td>
+                                    </tr>
+
+
+
+
+
+                        </tbody>
+                    </table>
+            </section>
+    </div>
+
+
+    <div class="tab-pane fade  tab-source-code" id="source">
+        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { Injectable } from &quot;@nestjs/common&quot;;
+import { createOpenRouter } from &quot;@openrouter/ai-sdk-provider&quot;;
+import { generateText } from &quot;ai&quot;;
+import { z } from &quot;zod&quot;;
+import { v4 as uuidv4 } from &quot;uuid&quot;;
+
+// Import types from the types package
+import { BlockType, DataType, NodeCategory } from &quot;@zyra/types&quot;;
+
+const MODEL_TO_USE &#x3D; &quot;gpt-4o-mini&quot;;
+
+interface WorkflowNode {
+  id: string;
+  type: string;
+  position: { x: number; y: number };
+  data: Record&lt;string, unknown&gt;;
+}
+
+interface WorkflowEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+}
+
+interface GenerationOptions {
+  detailedMode: boolean;
+  prefillConfig: boolean;
+  domainHint?: string;
+}
+
+const WorkflowResponseSchema &#x3D; z.object({
+  nodes: z.array(
+    z.object({
+      id: z.string(),
+      type: z.string().default(&quot;custom&quot;),
+      position: z.object({ x: z.number(), y: z.number() }),
+      data: z.object({
+        blockType: z.nativeEnum(BlockType),
+        label: z.string(),
+        description: z.string().optional(),
+        nodeType: z.enum([&quot;TRIGGER&quot;, &quot;ACTION&quot;, &quot;LOGIC&quot;]),
+        iconName: z.string(),
+        isEnabled: z.boolean().default(true),
+        config: z.record(z.unknown()).optional(),
+        inputs: z.array(z.unknown()).default([]),
+        outputs: z.array(z.unknown()).default([]),
+      }),
+    })
+  ),
+  edges: z.array(
+    z.object({
+      id: z.string(),
+      source: z.string(),
+      target: z.string(),
+      sourceHandle: z.string().optional(),
+      targetHandle: z.string().optional(),
+      type: z.string().default(&quot;custom&quot;),
+      animated: z.boolean().default(false),
+    })
+  ),
+});
+
+@Injectable()
+export class AiService {
+  private readonly openrouter;
+
+  constructor() {
+    this.openrouter &#x3D; createOpenRouter({
+      apiKey: process.env.OPENROUTER_API_KEY ?? &quot;&quot;,
+      baseURL: &quot;https://openrouter.ai/api/v1&quot;,
+    });
+  }
+
+  async generateBlock(prompt: string): Promise&lt;{
+    success: boolean;
+    block: {
+      name: string;
+      description: string;
+      category: string;
+      code: string;
+      inputs: Array&lt;{
+        name: string;
+        dataType: string;
+        required?: boolean;
+        description?: string;
+        defaultValue?: unknown;
+      }&gt;;
+      outputs: Array&lt;{
+        name: string;
+        dataType: string;
+        required?: boolean;
+        description?: string;
+      }&gt;;
+      configFields: Array&lt;{
+        name: string;
+        label: string;
+        type: string;
+        required?: boolean;
+        description?: string;
+        defaultValue?: unknown;
+      }&gt;;
+    };
+  }&gt; {
+    try {
+      const systemPrompt &#x3D; &#x60;You are an AI that creates custom workflow blocks for Zzyra platform.
+
+Available Data Types: ${JSON.stringify(Object.values(DataType), null, 2)}
+
+Generate a complete custom block definition based on user requirements.
+
+REQUIRED OUTPUT STRUCTURE:
+{
+  &quot;name&quot;: &quot;Block Name&quot;,
+  &quot;description&quot;: &quot;What this block does&quot;,
+  &quot;category&quot;: &quot;Utility|Integration|AI|Data|Analytics|Communication&quot;,
+  &quot;code&quot;: &quot;async function execute(inputs, context) { /* Complete implementation */ return { outputName: result }; }&quot;,
+  &quot;inputs&quot;: [{&quot;name&quot;: &quot;input&quot;, &quot;dataType&quot;: &quot;string&quot;, &quot;required&quot;: true, &quot;description&quot;: &quot;Input description&quot;}],
+  &quot;outputs&quot;: [{&quot;name&quot;: &quot;output&quot;, &quot;dataType&quot;: &quot;string&quot;, &quot;required&quot;: true, &quot;description&quot;: &quot;Output description&quot;}],
+  &quot;configFields&quot;: [{&quot;name&quot;: &quot;config&quot;, &quot;label&quot;: &quot;Config Label&quot;, &quot;type&quot;: &quot;string&quot;, &quot;required&quot;: false, &quot;description&quot;: &quot;Config help&quot;}]
+}
+
+Requirements:
+1. Analyze user request to understand functionality
+2. Design appropriate inputs, outputs, and config fields
+3. Implement complete, working JavaScript code
+4. Handle errors gracefully
+5. Use async/await for any asynchronous operations
+6. Access config via context.config.fieldName
+7. Return object with named outputs matching the outputs array
+
+Return ONLY the JSON object.&#x60;;
+
+      const { text } &#x3D; await generateText({
+        model: this.openrouter(MODEL_TO_USE),
+        messages: [
+          { role: &quot;system&quot;, content: systemPrompt },
+          { role: &quot;user&quot;, content: prompt },
+        ],
+        temperature: 0.3,
+        maxTokens: 4000,
+      });
+
+      const cleanedText &#x3D; text.replace(/&#x60;&#x60;&#x60;json|&#x60;&#x60;&#x60;/g, &quot;&quot;).trim();
+      const parsedResponse &#x3D; JSON.parse(cleanedText);
+
+      return {
+        success: true,
+        block: parsedResponse,
+      };
+    } catch (error) {
+      console.error(&quot;AI Custom Block Generation Error:&quot;, error);
+      throw new Error(&quot;Failed to generate custom block&quot;);
+    }
+  }
+
+  async generateWorkflow(
+    description: string,
+    options: GenerationOptions &#x3D; { detailedMode: true, prefillConfig: true },
+    existingNodes: WorkflowNode[] &#x3D; [],
+    existingEdges: WorkflowEdge[] &#x3D; []
+  ): Promise&lt;{ nodes: WorkflowNode[]; edges: WorkflowEdge[] }&gt; {
+    try {
+      const systemPrompt &#x3D; this.generateSystemPrompt();
+
+      const userContext &#x3D;
+        existingNodes.length &gt; 0
+          ? this.generateExistingContext(
+              description,
+              existingNodes,
+              existingEdges
+            )
+          : this.generateNewContext(description);
+
+      const { text } &#x3D; await generateText({
+        model: this.openrouter(MODEL_TO_USE),
+        messages: [
+          { role: &quot;system&quot;, content: systemPrompt },
+          { role: &quot;user&quot;, content: userContext },
+        ],
+        temperature: 0.1,
+        maxTokens: 12000,
+      });
+
+      const parsedResponse &#x3D; await this.parseAndValidateResponse(text);
+      const enhancedNodes &#x3D; this.enhanceNodes(parsedResponse.nodes);
+      const enhancedEdges &#x3D; this.enhanceEdges(parsedResponse.edges);
+
+      const finalWorkflow &#x3D; this.mergeWorkflows(
+        existingNodes,
+        existingEdges,
+        enhancedNodes,
+        enhancedEdges
+      );
+
+      return this.deduplicateWorkflow(finalWorkflow);
+    } catch (error) {
+      console.error(&quot;AI Workflow Generation Error:&quot;, error);
+      throw error;
+    }
+  }
+
+  async refineWorkflow(
+    prompt: string,
+    options: {
+      preserveConnections?: boolean;
+      focusArea?: string;
+      intensity?: &quot;light&quot; | &quot;medium&quot; | &quot;heavy&quot;;
+    } &#x3D; {},
+    nodes: WorkflowNode[],
+    edges: WorkflowEdge[]
+  ): Promise&lt;{ nodes: WorkflowNode[]; edges: WorkflowEdge[] }&gt; {
+    try {
+      const systemPrompt &#x3D; this.generateRefinementSystemPrompt();
+
+      const userContext &#x3D; &#x60;
+WORKFLOW REFINEMENT REQUEST:
+
+**CURRENT WORKFLOW**:
+Nodes: ${JSON.stringify(nodes, null, 2)}
+Edges: ${JSON.stringify(edges, null, 2)}
+
+**REFINEMENT REQUEST**: &quot;${prompt}&quot;
+**OPTIONS**: ${JSON.stringify(options, null, 2)}
+
+**TASK**: Refine the existing workflow based on the user&#x27;s request while maintaining the core functionality.
+&#x60;;
+
+      const { text } &#x3D; await generateText({
+        model: this.openrouter(MODEL_TO_USE),
+        messages: [
+          { role: &quot;system&quot;, content: systemPrompt },
+          { role: &quot;user&quot;, content: userContext },
+        ],
+        temperature: 0.1,
+        maxTokens: 12000,
+      });
+
+      const parsedResponse &#x3D; await this.parseAndValidateResponse(text);
+      return {
+        nodes: this.enhanceNodes(parsedResponse.nodes),
+        edges: this.enhanceEdges(parsedResponse.edges),
+      };
+    } catch (error) {
+      console.error(&quot;AI Workflow Refinement Error:&quot;, error);
+      throw error;
+    }
+  }
+
+  private generateSystemPrompt(): string {
+    return &#x60;You are an EXPERT WORKFLOW AI for Zzyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
+
+🎯 **CORE MISSION**: Transform ANY natural language into sophisticated, executable workflows using our comprehensive block system.
+
+🔥 **AVAILABLE BLOCK TYPES**:
+${JSON.stringify(Object.values(BlockType), null, 2)}
+
+📊 **AVAILABLE DATA TYPES**: 
+${JSON.stringify(Object.values(DataType), null, 2)}
+
+🔥 **BLOCK SYSTEM OVERVIEW**:
+- **PRICE_MONITOR**: Monitor cryptocurrency prices with conditions
+- **EMAIL**: Send email notifications
+- **NOTIFICATION**: Send various types of notifications
+- **CONDITION**: Add conditional logic and branching
+- **DELAY**: Add time delays between actions
+- **SCHEDULE**: Schedule recurring tasks
+- **WEBHOOK**: Handle webhook integrations
+- **HTTP_REQUEST**: Make HTTP calls to external APIs
+- **CALCULATOR**: Perform arithmetic calculations
+- **COMPARATOR**: Compare values with logical conditions
+- **BLOCKCHAIN_READ**: Read blockchain data (balances, transactions)
+- **DATABASE_QUERY/WRITE**: Database operations
+- **FILE_READ/WRITE**: File system operations
+- **TRANSFORMER**: Transform and manipulate data
+- **AGGREGATOR**: Aggregate and analyze data
+- **LOOP**: Repeat operations with iteration logic
+- **HTTP_CALL**: Call external services
+- **MESSAGE_SEND**: Send messages via various channels
+
+🎯 **OUTPUT SPECIFICATION**:
+
+**Node Structure** (STRICT FORMAT):
+{
+  &quot;id&quot;: &quot;node-{{uuid}}&quot;,
+  &quot;type&quot;: &quot;custom&quot;,
+  &quot;position&quot;: {&quot;x&quot;: intelligent_x, &quot;y&quot;: intelligent_y},
+  &quot;data&quot;: {
+    &quot;blockType&quot;: &quot;EXACT_UPPERCASE_ENUM_VALUE&quot;,
+    &quot;label&quot;: &quot;User-friendly descriptive name&quot;,
+    &quot;description&quot;: &quot;Clear description of functionality&quot;,
+    &quot;nodeType&quot;: &quot;TRIGGER|ACTION|LOGIC&quot;,
+    &quot;iconName&quot;: &quot;appropriate-icon-name&quot;,
+    &quot;isEnabled&quot;: true,
+    &quot;config&quot;: {
+      /* Intelligent configuration based on user request */
+    },
+    &quot;inputs&quot;: [],
+    &quot;outputs&quot;: []
+  }
+}
+
+**Edge Structure**:
+{
+  &quot;id&quot;: &quot;edge-{{uuid}}&quot;,
+  &quot;source&quot;: &quot;source-node-id&quot;,
+  &quot;target&quot;: &quot;target-node-id&quot;,
+  &quot;type&quot;: &quot;custom&quot;,
+  &quot;animated&quot;: false
+}
+
+**CRITICAL REQUIREMENTS**:
+- Return ONLY valid JSON: {&quot;nodes&quot;: [...], &quot;edges&quot;: [...]}
+- Use exact BlockType enum values (UPPERCASE format)
+- Generate unique UUIDs for all IDs
+- Create intelligent positioning based on flow order
+- Generate proper configurations for each block type
+- Ensure logical execution flow (TRIGGER → LOGIC → ACTION)
+
+Generate workflows that users can execute immediately.&#x60;;
+  }
+
+  private generateRefinementSystemPrompt(): string {
+    return &#x60;You are an EXPERT WORKFLOW REFINEMENT AI for Zzyra automation platform.
+
+Your task is to intelligently refine existing workflows based on user requests while preserving core functionality.
+
+**REFINEMENT CAPABILITIES**:
+- Add new nodes and connections
+- Modify existing configurations
+- Optimize workflow structure
+- Enhance error handling
+- Improve efficiency
+
+**OUTPUT**: Return the complete refined workflow as JSON with &quot;nodes&quot; and &quot;edges&quot; arrays.&#x60;;
+  }
+
+  private generateExistingContext(
+    prompt: string,
+    existingNodes: WorkflowNode[],
+    existingEdges: WorkflowEdge[]
+  ): string {
+    return &#x60;WORKFLOW ENHANCEMENT REQUEST:
+
+**CURRENT WORKFLOW**:
+Nodes: ${JSON.stringify(existingNodes, null, 2)}
+Edges: ${JSON.stringify(existingEdges, null, 2)}
+
+**USER ENHANCEMENT REQUEST**: &quot;${prompt}&quot;
+
+**TASK**: Enhance the existing workflow by adding new functionality while maintaining existing capabilities.&#x60;;
+  }
+
+  private generateNewContext(prompt: string): string {
+    return &#x60;NEW WORKFLOW CREATION REQUEST:
+
+**USER REQUEST**: &quot;${prompt}&quot;
+
+**TASK**: Create a complete workflow from scratch that accomplishes the user&#x27;s automation goal.&#x60;;
+  }
+
+  private async parseAndValidateResponse(
+    text: string
+  ): Promise&lt;z.infer&lt;typeof WorkflowResponseSchema&gt;&gt; {
+    const cleanedText &#x3D; text.replace(/&#x60;&#x60;&#x60;json|&#x60;&#x60;&#x60;/g, &quot;&quot;).trim();
+
+    let parsedResponse: unknown;
+    try {
+      parsedResponse &#x3D; JSON.parse(cleanedText);
+    } catch (parseError) {
+      throw new Error(&quot;AI generated invalid JSON format&quot;);
+    }
+
+    const validationResult &#x3D; WorkflowResponseSchema.safeParse(parsedResponse);
+    if (!validationResult.success) {
+      throw new Error(
+        &#x60;AI workflow validation failed: ${validationResult.error.message}&#x60;
+      );
+    }
+
+    return validationResult.data;
+  }
+
+  private enhanceNodes(nodes: Record&lt;string, unknown&gt;[]): WorkflowNode[] {
+    return nodes.map((nodeData) &#x3D;&gt; {
+      const nodeId &#x3D; (nodeData.id as string) || &#x60;node-${uuidv4()}&#x60;;
+
+      return {
+        id: nodeId,
+        type: &quot;custom&quot;,
+        position: nodeData.position as { x: number; y: number },
+        data: {
+          blockType: (nodeData.data as any)?.blockType,
+          label: (nodeData.data as any)?.label,
+          description: (nodeData.data as any)?.description || &quot;&quot;,
+          nodeType: (nodeData.data as any)?.nodeType || &quot;ACTION&quot;,
+          iconName: (nodeData.data as any)?.iconName || &quot;block&quot;,
+          isEnabled: true,
+          config: (nodeData.data as any)?.config || {},
+          inputs: [],
+          outputs: [],
+          inputCount: 1,
+          outputCount: 1,
+          status: &quot;idle&quot;,
+          nodeStatus: &quot;idle&quot;,
+          isCompleted: false,
+          isFailed: false,
+          isExecuting: false,
+          isActive: false,
+        },
+      };
+    });
+  }
+
+  private enhanceEdges(edges: Record&lt;string, unknown&gt;[]): WorkflowEdge[] {
+    return edges.map((edge) &#x3D;&gt; ({
+      id: (edge.id as string) || &#x60;edge-${uuidv4()}&#x60;,
+      source: edge.source as string,
+      target: edge.target as string,
+      sourceHandle: edge.sourceHandle as string,
+      targetHandle: edge.targetHandle as string,
+      type: (edge.type as string) || &quot;custom&quot;,
+      animated: (edge.animated as boolean) || false,
+    }));
+  }
+
+  private mergeWorkflows(
+    existingNodes: WorkflowNode[],
+    existingEdges: WorkflowEdge[],
+    newNodes: WorkflowNode[],
+    newEdges: WorkflowEdge[]
+  ): { nodes: WorkflowNode[]; edges: WorkflowEdge[] } {
+    if (existingNodes.length &#x3D;&#x3D;&#x3D; 0) {
+      return { nodes: newNodes, edges: newEdges };
+    }
+
+    // Adjust positions to avoid overlap
+    const maxX &#x3D; Math.max(...existingNodes.map((n) &#x3D;&gt; n.position.x), 0);
+    const adjustedNewNodes &#x3D; newNodes.map((node, index) &#x3D;&gt; ({
+      ...node,
+      position: {
+        x: node.position.x + maxX + 200,
+        y: node.position.y + index * 50,
+      },
+    }));
+
+    return {
+      nodes: [...existingNodes, ...adjustedNewNodes],
+      edges: [...existingEdges, ...newEdges],
+    };
+  }
+
+  private deduplicateWorkflow(workflow: {
+    nodes: WorkflowNode[];
+    edges: WorkflowEdge[];
+  }): {
+    nodes: WorkflowNode[];
+    edges: WorkflowEdge[];
+  } {
+    const usedIds &#x3D; new Set&lt;string&gt;();
+    const deduplicatedNodes: WorkflowNode[] &#x3D; [];
+    const deduplicatedEdges: WorkflowEdge[] &#x3D; [];
+
+    workflow.nodes.forEach((node) &#x3D;&gt; {
+      if (!usedIds.has(node.id)) {
+        usedIds.add(node.id);
+        deduplicatedNodes.push(node);
+      }
+    });
+
+    workflow.edges.forEach((edge) &#x3D;&gt; {
+      if (!usedIds.has(edge.id)) {
+        usedIds.add(edge.id);
+        deduplicatedEdges.push(edge);
+      }
+    });
+
+    return { nodes: deduplicatedNodes, edges: deduplicatedEdges };
+  }
+}
+</code></pre>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+                   </div><div class="search-results">
+    <div class="has-results">
+        <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+        <ul class="search-results-list"></ul>
+    </div>
+    <div class="no-results">
+        <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+    </div>
+</div>
+</div>
+               <!-- END CONTENT -->
+           </div>
+       </div>
+
+          <label class="dark-mode-switch">
+               <input type="checkbox">
+               <span class="slider">
+                    <svg class="slider-icon" viewBox="0 0 24 24" fill="none" height="20" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" width="20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+                    </svg>
+               </span>
+          </label>
+
+       <script>
+            var COMPODOC_CURRENT_PAGE_DEPTH = 1;
+            var COMPODOC_CURRENT_PAGE_CONTEXT = 'interface';
+            var COMPODOC_CURRENT_PAGE_URL = 'WorkflowNode.html';
+            var MAX_SEARCH_RESULTS = 15;
+       </script>
+
+       <script>
+               $darkModeToggleSwitchers = document.querySelectorAll('.dark-mode-switch input');
+               checkToggle(darkModeState);
+               if ($darkModeToggleSwitchers.length > 0) {
+                    for (var i = 0; i < $darkModeToggleSwitchers.length; i++) {
+                         $darkModeToggleSwitchers[i].addEventListener('change', function (event) {
+                              darkModeState = !darkModeState;
+                              toggleDarkMode(darkModeState);
+                         });
+                    }
+               }
+          </script>
+
+       <script src="../js/libs/custom-elements.min.js"></script>
+       <script src="../js/libs/lit-html.js"></script>
+
+       <script src="../js/menu-wc.js" defer></script>
+       <script nomodule src="../js/menu-wc_es5.js" defer></script>
+
+       <script src="../js/libs/bootstrap-native.js"></script>
+
+       <script src="../js/libs/es6-shim.min.js"></script>
+       <script src="../js/libs/EventDispatcher.js"></script>
+       <script src="../js/libs/promise.min.js"></script>
+
+       <script src="../js/compodoc.js"></script>
+
+       <script src="../js/tabs.js"></script>
+       <script src="../js/menu.js"></script>
+       <script src="../js/libs/clipboard.min.js"></script>
+       <script src="../js/libs/prism.js"></script>
+       <script src="../js/sourceCode.js"></script>
+          <script src="../js/search/search.js"></script>
+          <script src="../js/search/lunr.min.js"></script>
+          <script src="../js/search/search-lunr.js"></script>
+          <script src="../js/search/search_index.js"></script>
+       <script src="../js/lazy-load-graphs.js"></script>
+
+
+    </body>
+</html>

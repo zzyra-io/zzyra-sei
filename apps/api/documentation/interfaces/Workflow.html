@@ -1,0 +1,1140 @@
+<!doctype html>
+<html class="no-js" lang="">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <title>@zyra/api documentation</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+	   <link rel="stylesheet" href="../styles/style.css">
+        <link rel="stylesheet" href="../styles/dark.css">
+    </head>
+    <body>
+          <script>
+               // Blocking script to avoid flickering dark mode
+               // Dark mode toggle button
+               var useDark = window.matchMedia('(prefers-color-scheme: dark)');
+               var darkModeState = useDark.matches;
+               var $darkModeToggleSwitchers = document.querySelectorAll('.dark-mode-switch input');
+               var $darkModeToggles = document.querySelectorAll('.dark-mode-switch');
+               var darkModeStateLocal = localStorage.getItem('compodoc_darkmode-state');
+
+               function checkToggle(check) {
+                    for (var i = 0; i < $darkModeToggleSwitchers.length; i++) {
+                         $darkModeToggleSwitchers[i].checked = check;
+                    }
+               }
+
+               function toggleDarkMode(state) {
+                    if (window.localStorage) {
+                         localStorage.setItem('compodoc_darkmode-state', state);
+                    }
+
+                    checkToggle(state);
+
+                    const hasClass = document.body.classList.contains('dark');
+
+                    if (state) {
+                         for (var i = 0; i < $darkModeToggles.length; i++) {
+                              $darkModeToggles[i].classList.add('dark');
+                         }
+                         if (!hasClass) {
+                              document.body.classList.add('dark');
+                         }
+                    } else {
+                         for (var i = 0; i < $darkModeToggles.length; i++) {
+                              $darkModeToggles[i].classList.remove('dark');
+                         }
+                         if (hasClass) {
+                              document.body.classList.remove('dark');
+                         }
+                    }
+               }
+
+               useDark.addEventListener('change', function (evt) {
+                    toggleDarkMode(evt.matches);
+               });
+               if (darkModeStateLocal) {
+                    darkModeState = darkModeStateLocal === 'true';
+               }
+               toggleDarkMode(darkModeState);
+          </script>
+
+        <div class="navbar navbar-default navbar-fixed-top d-md-none p-0">
+               <div class="d-flex">
+                    <a href="../" class="navbar-brand">@zyra/api documentation</a>
+                    <button type="button" class="btn btn-default btn-menu ion-ios-menu" id="btn-menu"></button>
+               </div>
+        </div>
+
+        <div class="xs-menu menu" id="mobile-menu">
+                <div id="book-search-input" role="search"><input type="text" placeholder="Type to search"></div>            <compodoc-menu></compodoc-menu>
+        </div>
+
+        <div class="container-fluid main">
+           <div class="row main">
+               <div class="d-none d-md-block menu">
+                   <compodoc-menu mode="normal"></compodoc-menu>
+               </div>
+               <!-- START CONTENT -->
+               <div class="content interface">
+                   <div class="content-data">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<ol class="breadcrumb">
+  <li class="breadcrumb-item">Interfaces</li>
+  <li class="breadcrumb-item"
+  >
+  Workflow</li>
+</ol>
+
+<ul class="nav nav-tabs" role="tablist">
+        <li class="nav-item">
+            <a href="#info" 
+                class="nav-link"
+                class="nav-link active"
+                role="tab" id="info-tab" data-bs-toggle="tab" data-link="info">Info</a>
+        </li>
+        <li class="nav-item">
+            <a href="#source" 
+                class="nav-link"
+                
+                role="tab" id="source-tab" data-bs-toggle="tab" data-link="source">Source</a>
+        </li>
+</ul>
+
+<div class="tab-content">
+    <div class="tab-pane fade active in" id="info">
+        <p class="comment">
+            <h3>File</h3>
+        </p>
+        <p class="comment">
+            <code>/Users/argahv/Projects/personal/zyra/packages/database/src/repositories/workflow.repository.ts</code>
+        </p>
+
+
+
+
+        <section data-compodoc="block-index">
+            <h3 id="index">Index</h3>
+            <table class="table table-sm table-bordered index-table">
+                <tbody>
+                    <tr>
+                        <td class="col-md-4">
+                            <h6><b>Properties</b></h6>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="col-md-4">
+                            <ul class="index-list">
+                                <li>
+                                            <span class="modifier">Optional</span>
+                                        <a href="#createdAt" 
+>
+                                            createdAt
+                                        </a>
+                                </li>
+                                <li>
+                                            <span class="modifier">Optional</span>
+                                        <a href="#createdBy" 
+>
+                                            createdBy
+                                        </a>
+                                </li>
+                                <li>
+                                            <span class="modifier">Optional</span>
+                                        <a href="#definition" 
+>
+                                            definition
+                                        </a>
+                                </li>
+                                <li>
+                                            <span class="modifier">Optional</span>
+                                        <a href="#description" 
+>
+                                            description
+                                        </a>
+                                </li>
+                                <li>
+                                            <span class="modifier">Optional</span>
+                                        <a href="#edges" 
+>
+                                            edges
+                                        </a>
+                                </li>
+                                <li>
+                                        <a href="#id" 
+>
+                                            id
+                                        </a>
+                                </li>
+                                <li>
+                                            <span class="modifier">Optional</span>
+                                        <a href="#isPublic" 
+>
+                                            isPublic
+                                        </a>
+                                </li>
+                                <li>
+                                        <a href="#name" 
+>
+                                            name
+                                        </a>
+                                </li>
+                                <li>
+                                            <span class="modifier">Optional</span>
+                                        <a href="#nodes" 
+>
+                                            nodes
+                                        </a>
+                                </li>
+                                <li>
+                                            <span class="modifier">Optional</span>
+                                        <a href="#tags" 
+>
+                                            tags
+                                        </a>
+                                </li>
+                                <li>
+                                            <span class="modifier">Optional</span>
+                                        <a href="#updatedAt" 
+>
+                                            updatedAt
+                                        </a>
+                                </li>
+                                <li>
+                                        <a href="#userId" 
+>
+                                            userId
+                                        </a>
+                                </li>
+                                <li>
+                                            <span class="modifier">Optional</span>
+                                        <a href="#version" 
+>
+                                            version
+                                        </a>
+                                </li>
+                            </ul>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+
+
+            <section data-compodoc="block-properties">
+                <h3 id="inputs">Properties</h3>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="createdAt"></a>
+                                        <span class="name "><b>createdAt</b>
+                                            <a href="#createdAt">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>createdAt:     <code>Date | null</code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>    <code>Date | null</code>
+
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Optional</i>
+                                        </td>
+                                    </tr>
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="createdBy"></a>
+                                        <span class="name "><b>createdBy</b>
+                                            <a href="#createdBy">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>createdBy:     <code>string | null</code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>    <code>string | null</code>
+
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Optional</i>
+                                        </td>
+                                    </tr>
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="definition"></a>
+                                        <span class="name "><b>definition</b>
+                                            <a href="#definition">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>definition:         <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
+
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Optional</i>
+                                        </td>
+                                    </tr>
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="description"></a>
+                                        <span class="name "><b>description</b>
+                                            <a href="#description">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>description:     <code>string | null</code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>    <code>string | null</code>
+
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Optional</i>
+                                        </td>
+                                    </tr>
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="edges"></a>
+                                        <span class="name "><b>edges</b>
+                                            <a href="#edges">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>edges:         <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
+
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Optional</i>
+                                        </td>
+                                    </tr>
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="id"></a>
+                                        <span class="name "><b>id</b>
+                                            <a href="#id">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>id:         <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+
+                                        </td>
+                                    </tr>
+
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="isPublic"></a>
+                                        <span class="name "><b>isPublic</b>
+                                            <a href="#isPublic">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>isPublic:     <code>boolean | null</code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>    <code>boolean | null</code>
+
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Optional</i>
+                                        </td>
+                                    </tr>
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="name"></a>
+                                        <span class="name "><b>name</b>
+                                            <a href="#name">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>name:         <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+
+                                        </td>
+                                    </tr>
+
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="nodes"></a>
+                                        <span class="name "><b>nodes</b>
+                                            <a href="#nodes">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>nodes:         <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
+
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Optional</i>
+                                        </td>
+                                    </tr>
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="tags"></a>
+                                        <span class="name "><b>tags</b>
+                                            <a href="#tags">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>tags:     <code>string[]</code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>    <code>string[]</code>
+
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Optional</i>
+                                        </td>
+                                    </tr>
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="updatedAt"></a>
+                                        <span class="name "><b>updatedAt</b>
+                                            <a href="#updatedAt">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>updatedAt:     <code>Date | null</code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>    <code>Date | null</code>
+
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Optional</i>
+                                        </td>
+                                    </tr>
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="userId"></a>
+                                        <span class="name "><b>userId</b>
+                                            <a href="#userId">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>userId:         <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+
+                                        </td>
+                                    </tr>
+
+
+
+
+
+                        </tbody>
+                    </table>
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <a name="version"></a>
+                                        <span class="name "><b>version</b>
+                                            <a href="#version">
+                                                <span class="icon ion-ios-link"></span>
+                                            </a>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="col-md-4">
+                                        <code>version:         <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/number" target="_blank" >number</a></code>
+</code>
+                                    </td>
+                                </tr>
+
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Type : </i>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/number" target="_blank" >number</a></code>
+
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="col-md-4">
+                                            <i>Optional</i>
+                                        </td>
+                                    </tr>
+
+
+
+
+                        </tbody>
+                    </table>
+            </section>
+    </div>
+
+
+    <div class="tab-pane fade  tab-source-code" id="source">
+        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { Prisma, WorkflowExecution } from &quot;@prisma/client&quot;;
+import type { Prisma as PrismaNamespace } from &quot;@prisma/client&quot;;
+import { AccessDeniedError, BaseRepository } from &quot;./base.repository&quot;;
+import prisma from &quot;../client&quot;;
+import {
+  createAccessWhereClause,
+  enforcePolicy,
+  createPolicyContext,
+} from &quot;../policies/policy-utils&quot;;
+import { PolicyContext } from &quot;../policies/policy.service&quot;;
+
+// Define the Workflow interface based on the Prisma schema
+interface Workflow {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string | null;
+  nodes?: any;
+  edges?: any;
+  isPublic?: boolean | null; // Updated to match Prisma&#x27;s schema where isPublic is nullable
+  tags?: string[];
+  version?: number;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  definition?: any;
+  createdBy?: string | null;
+}
+
+// Type definitions for workflow operations
+export type WorkflowCreateInput &#x3D; Prisma.WorkflowCreateInput;
+export type WorkflowUpdateInput &#x3D; Prisma.WorkflowUpdateInput;
+export type WorkflowWithExecutions &#x3D; Workflow &amp; {
+  executions: WorkflowExecution[];
+};
+
+export class WorkflowRepository extends BaseRepository&lt;
+  Workflow,
+  WorkflowCreateInput,
+  WorkflowUpdateInput
+&gt; {
+  protected tableName &#x3D; &quot;workflows&quot;;
+  protected model &#x3D; this.prisma.workflow;
+  
+  /**
+   * Map a Prisma workflow to our Workflow interface
+   * This ensures type safety when converting between Prisma types and our interface
+   */
+  private mapToWorkflow(workflow: any): Workflow {
+    return {
+      id: workflow.id,
+      userId: workflow.userId,
+      name: workflow.name,
+      description: workflow.description,
+      nodes: workflow.nodes ?? Prisma.JsonNull,
+      edges: workflow.edges ?? Prisma.JsonNull,
+      isPublic: workflow.isPublic,
+      tags: workflow.tags,
+      version: workflow.version,
+      createdAt: workflow.createdAt,
+      updatedAt: workflow.updatedAt,
+      definition: workflow.definition ?? Prisma.JsonNull,
+      createdBy: workflow.createdBy,
+    };
+  }
+
+  /**
+   * Find workflows by user ID with policy enforcement
+   * @param userId The user ID to filter by
+   * @param includeShared Whether to include workflows shared with the user
+   * @returns An array of workflows
+   */
+  async findByUserId(
+    userId: string,
+    includeShared: boolean &#x3D; true
+  ): Promise&lt;Workflow[]&gt; {
+    const context &#x3D; await createPolicyContext(userId);
+
+    // Create where clause based on user access
+    let whereClause: any &#x3D; { userId };
+
+    // Include shared workflows if requested
+    if (includeShared) {
+      whereClause &#x3D; createAccessWhereClause(userId, context.isAdmin);
+    }
+
+    const workflows &#x3D; await this.prisma.workflow.findMany({
+      where: whereClause,
+      orderBy: {
+        createdAt: &quot;desc&quot;,
+      },
+      // No additional includes needed
+      // Previously included team, but that relation no longer exists
+    });
+
+    return workflows.map(workflow &#x3D;&gt; this.mapToWorkflow(workflow));
+  }
+
+  /**
+   * Find a workflow by ID with policy enforcement
+   * @param id The workflow ID
+   * @param userId The user ID for policy enforcement
+   * @returns The workflow or null
+   */
+  async findById(id: string, userId?: string): Promise&lt;Workflow | null&gt; {
+    // If no userId provided, use the base implementation
+    if (!userId) {
+      return super.findById(id);
+    }
+
+    // Create policy context
+    const context &#x3D; await createPolicyContext(userId);
+
+    // If admin, return the workflow without restrictions
+    if (context.isAdmin) {
+      const workflow &#x3D; await this.prisma.workflow.findUnique({
+        where: { id },
+        // No additional includes needed
+        // Previously included team, but that relation no longer exists
+      });
+      
+      return workflow ? this.mapToWorkflow(workflow) : null;
+    }
+
+    // Otherwise, check if the user has access to the workflow
+    const workflow &#x3D; await this.prisma.workflow.findFirst({
+      where: {
+        id,
+        OR: [
+          { userId },
+          { isPublic: true },
+          // Team-related access has been removed as team relation no longer exists
+        ],
+      },
+      // No additional includes needed
+      // Previously included team, but that relation no longer exists
+    });
+    
+    return workflow ? this.mapToWorkflow(workflow) : null;
+  }
+
+  /**
+   * Find a workflow with its executions
+   * @param id The workflow ID
+   * @returns The workflow with executions or null
+   */
+  async findWithExecutions(id: string): Promise&lt;WorkflowWithExecutions | null&gt; {
+    const result &#x3D; await this.prisma.workflow.findUnique({
+      where: { id },
+      include: {
+        executions: {
+          orderBy: {
+            createdAt: &quot;desc&quot;,
+          },
+        },
+      },
+    });
+    
+    if (!result) return null;
+    
+    // Map to our interface with executions included
+    const workflow &#x3D; this.mapToWorkflow(result);
+    return {
+      ...workflow,
+      executions: result.executions,
+    };
+  }
+
+  /**
+   * Create a new workflow with policy enforcement
+   * @param data The workflow data
+   * @param userId The user ID for policy enforcement
+   * @returns The created workflow
+   */
+  async create(data: WorkflowCreateInput, userId?: string): Promise&lt;Workflow&gt; {
+    // If no userId provided, use the base implementation
+    if (!userId) {
+      return super.create(data);
+    }
+
+    // Ensure the workflow belongs to the user using relation connection
+    const workflowData: any &#x3D; { ...data };
+    // Use relation connection instead of direct userId field
+    workflowData.user &#x3D; { connect: { id: userId } };
+    
+    // Remove userId if it exists to avoid conflict
+    delete workflowData.userId;
+
+    // Create the workflow with audit logging
+    return this.executeWithTransaction(
+      async (tx: PrismaNamespace.TransactionClient) &#x3D;&gt; {
+        const result &#x3D; await tx.workflow.create({
+          data: workflowData,
+        });
+        return this.mapToWorkflow(result);
+      },
+      &quot;CREATE&quot;,
+      &quot;new&quot;, // Will be replaced with the actual ID
+      userId
+    );
+  }
+
+  /**
+   * Create a workflow with nodes and edges
+   * @param data The workflow data
+   * @returns The created workflow
+   */
+  async createWithNodesAndEdges(
+    data: WorkflowCreateInput &amp; {
+      nodes?: any[];
+      edges?: any[];
+    }
+  ): Promise&lt;Workflow&gt; {
+    const { nodes, edges, ...workflowData } &#x3D; data;
+
+    // Convert nodes and edges to JSON if provided
+    const result &#x3D; await this.prisma.workflow.create({
+      data: {
+        ...workflowData,
+        nodes: nodes ? JSON.stringify(nodes) : &quot;[]&quot;,
+        edges: edges ? JSON.stringify(edges) : &quot;[]&quot;,
+      },
+    });
+
+    return this.mapToWorkflow(result);
+  }
+
+  /**
+   * Update a workflow&#x27;s definition
+   * @param id The workflow ID
+   * @param definition The new definition
+   * @returns The updated workflow
+   */
+  async updateDefinition(id: string, definition: any): Promise&lt;Workflow&gt; {
+    const result &#x3D; await this.prisma.workflow.update({
+      where: { id },
+      data: {
+        definition,
+        updatedAt: new Date(),
+      },
+    });
+    
+    return this.mapToWorkflow(result);
+  }
+
+  /**
+   * Find public workflows
+   * @param limit The maximum number of workflows to return
+   * @returns An array of public workflows
+   */
+  async findPublic(limit: number &#x3D; 10): Promise&lt;Workflow[]&gt; {
+    const workflows &#x3D; await this.prisma.workflow.findMany({
+      where: { isPublic: true },
+      orderBy: {
+        createdAt: &quot;desc&quot;,
+      },
+      take: limit,
+    });
+    
+    return workflows.map(workflow &#x3D;&gt; this.mapToWorkflow(workflow));
+  }
+
+  /**
+   * Find workflows by organization (replaces team-based filtering)
+   * @param organizationId The organization ID
+   * @param userId The user ID for policy enforcement
+   * @returns An array of workflows
+   */
+  async findByOrganization(organizationId: string, userId: string): Promise&lt;Workflow[]&gt; {
+    // Check policy context for authorization
+    const context &#x3D; await createPolicyContext(userId);
+    
+    // This would normally check organization membership, but for now
+    // we&#x27;ll just check if the user has access based on the context
+    if (!context.isAdmin) {
+      // In a real implementation, there would be a check for organization membership
+      // For now, we&#x27;ll just enforce that the user ID matches
+      if (!userId) {
+        throw new AccessDeniedError(&quot;Access denied&quot;);
+      }
+    }
+
+    // Find workflows for the user in this organization
+    // Note: organization filtering would be implemented differently
+    // once that relationship is established in the schema
+    const workflows &#x3D; await this.prisma.workflow.findMany({
+      where: {
+        userId,
+        // In the future: organizationId field would be used here
+      },
+      orderBy: {
+        createdAt: &quot;desc&quot;,
+      },
+    });
+    
+    return workflows.map(workflow &#x3D;&gt; this.mapToWorkflow(workflow));
+  }
+
+  /**
+   * Duplicate a workflow
+   * @param id The workflow ID to duplicate
+   * @param userId The user ID who will own the duplicate
+   * @param newName The name for the duplicate
+   * @returns The duplicated workflow
+   */
+  async duplicate(
+    id: string,
+    userId: string,
+    newName?: string
+  ): Promise&lt;Workflow&gt; {
+    const workflow &#x3D; await this.prisma.workflow.findUnique({
+      where: { id },
+    });
+
+    if (!workflow) {
+      throw new Error(&#x60;Workflow with ID ${id} not found&#x60;);
+    }
+
+    const result &#x3D; await this.prisma.workflow.create({
+      data: {
+        name: newName || &#x60;${workflow.name} (Copy)&#x60;,
+        description: workflow.description,
+        nodes: workflow.nodes ?? Prisma.JsonNull,
+        edges: workflow.edges ?? Prisma.JsonNull,
+        definition: workflow.definition ?? Prisma.JsonNull,
+        isPublic: false,
+        userId,
+        version: 1,
+      },
+    });
+    
+    return this.mapToWorkflow(result);
+  }
+}
+</code></pre>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+                   </div><div class="search-results">
+    <div class="has-results">
+        <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+        <ul class="search-results-list"></ul>
+    </div>
+    <div class="no-results">
+        <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+    </div>
+</div>
+</div>
+               <!-- END CONTENT -->
+           </div>
+       </div>
+
+          <label class="dark-mode-switch">
+               <input type="checkbox">
+               <span class="slider">
+                    <svg class="slider-icon" viewBox="0 0 24 24" fill="none" height="20" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" width="20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+                    </svg>
+               </span>
+          </label>
+
+       <script>
+            var COMPODOC_CURRENT_PAGE_DEPTH = 1;
+            var COMPODOC_CURRENT_PAGE_CONTEXT = 'interface';
+            var COMPODOC_CURRENT_PAGE_URL = 'Workflow.html';
+            var MAX_SEARCH_RESULTS = 15;
+       </script>
+
+       <script>
+               $darkModeToggleSwitchers = document.querySelectorAll('.dark-mode-switch input');
+               checkToggle(darkModeState);
+               if ($darkModeToggleSwitchers.length > 0) {
+                    for (var i = 0; i < $darkModeToggleSwitchers.length; i++) {
+                         $darkModeToggleSwitchers[i].addEventListener('change', function (event) {
+                              darkModeState = !darkModeState;
+                              toggleDarkMode(darkModeState);
+                         });
+                    }
+               }
+          </script>
+
+       <script src="../js/libs/custom-elements.min.js"></script>
+       <script src="../js/libs/lit-html.js"></script>
+
+       <script src="../js/menu-wc.js" defer></script>
+       <script nomodule src="../js/menu-wc_es5.js" defer></script>
+
+       <script src="../js/libs/bootstrap-native.js"></script>
+
+       <script src="../js/libs/es6-shim.min.js"></script>
+       <script src="../js/libs/EventDispatcher.js"></script>
+       <script src="../js/libs/promise.min.js"></script>
+
+       <script src="../js/compodoc.js"></script>
+
+       <script src="../js/tabs.js"></script>
+       <script src="../js/menu.js"></script>
+       <script src="../js/libs/clipboard.min.js"></script>
+       <script src="../js/libs/prism.js"></script>
+       <script src="../js/sourceCode.js"></script>
+          <script src="../js/search/search.js"></script>
+          <script src="../js/search/lunr.min.js"></script>
+          <script src="../js/search/search-lunr.js"></script>
+          <script src="../js/search/search_index.js"></script>
+       <script src="../js/lazy-load-graphs.js"></script>
+
+
+    </body>
+</html>

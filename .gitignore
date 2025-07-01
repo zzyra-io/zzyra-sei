@@ -18,6 +18,7 @@ play/
 dist/
 build/
 
+
 # Environment variables
 .env
 .env.local

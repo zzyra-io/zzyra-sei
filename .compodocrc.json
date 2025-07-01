@@ -1,0 +1,22 @@
+{
+  "name": "Zyra API Documentation",
+  "port": 8080,
+  "output": "documentation",
+  "theme": "gitbook",
+  "tsconfig": "./tsconfig.doc.json",
+  "includes": "./apps/api/README.md",
+  "includesName": "Getting Started",
+  "hideGenerator": true,
+  "disablePrivateClassMembers": true,
+  "disableProtectedClassMembers": true,
+  "disableInternal": true,
+  "disableLifeCycleHooks": true,
+  "disableRoutesGraph": false,
+  "disableDependencies": false,
+  "disableCoverage": false,
+  "serve": true,
+  "customFavicon": "",
+  "customLogo": "",
+  "language": "en-US",
+  "silent": false
+}
