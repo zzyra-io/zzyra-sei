@@ -308,6 +308,7 @@ export default function HomePage() {
           ref={heroRef}
           className='w-full py-20 md:py-28 lg:py-32 relative overflow-hidden'>
           <div className='absolute inset-0 bg-gradient-to-b from-primary/5 to-background/0 pointer-events-none' />
+          {/* Temp alert saying zzyra is in development and these are not real results */}
 
           <div className='container px-4 md:px-6 relative'>
             <div className='grid gap-6 lg:grid-cols-2 lg:gap-12 xl:grid-cols-2'>
@@ -330,10 +331,10 @@ export default function HomePage() {
                       <span className='relative inline-flex rounded-full h-2 w-2 bg-primary'></span>
                     </span>
                     <span className='mr-2'>
-                      12,000+ Users Making $10K+ Monthly
+                      12,000+ Users Making $10K+ Monthly *
                     </span>
                     <span className='rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-semibold text-green-600'>
-                      PROVEN
+                      PROVEN*
                     </span>
                   </MotionDiv>
 
@@ -1099,6 +1100,13 @@ export default function HomePage() {
         </section>
       </main>
 
+      <div className='w-full h-16 bg-red-500/10 flex items-center justify-center z-50'>
+        <p className='text-sm text-red-500'>
+          * Zzyra is in still DEVELOPMENT stage and NONE of these are real
+          results.
+        </p>
+      </div>
+
       {/* Footer with subtle animation */}
       <MotionFooter
         className='border-t py-8 md:py-12 bg-background/80 backdrop-blur-sm'
@@ -1203,21 +1211,21 @@ export default function HomePage() {
               <ul className='space-y-2 text-sm'>
                 <li>
                   <Link
-                    href='#'
+                    href='https://docs.zzyra.com'
                     className='text-muted-foreground hover:text-foreground transition-colors'>
                     Documentation
                   </Link>
                 </li>
                 <li>
                   <Link
-                    href='#'
+                    href='https://docs.zzyra.com/api-reference'
                     className='text-muted-foreground hover:text-foreground transition-colors'>
                     API Reference
                   </Link>
                 </li>
                 <li>
                   <Link
-                    href='#'
+                    href='https://zzyra.com/blog'
                     className='text-muted-foreground hover:text-foreground transition-colors'>
                     Blog
                   </Link>

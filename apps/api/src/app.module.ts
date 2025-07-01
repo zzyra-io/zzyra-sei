@@ -16,6 +16,8 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { BillingModule } from "./billing/billing.module";
 import { AiModule } from "./ai/ai.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
+import { TemplateController, TemplateService } from "./templates";
+import { AppController } from "./app.controller";
 
 // Guards
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
@@ -41,11 +43,13 @@ import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
     AiModule,
     DashboardModule,
   ],
+  controllers: [AppController, TemplateController],
   providers: [
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
+    TemplateService,
   ],
 })
 export class AppModule {}
