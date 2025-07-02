@@ -45,7 +45,17 @@
             "pages": [
               "platform/use-cases/overview",
               "platform/use-cases/web3-automation",
-              "platform/use-cases/enterprise-integration"
+              "platform/use-cases/enterprise-integration",
+              "platform/use-cases/personal-automation",
+              "platform/use-cases/template-showcase"
+            ]
+          },
+          {
+            "group": "Template Marketplace",
+            "pages": [
+              "platform/marketplace/overview",
+              "platform/marketplace/getting-started",
+              "platform/marketplace/success-stories"
             ]
           }
         ]
@@ -84,12 +94,16 @@
             "pages": [
               "business/overview",
               "business/market-opportunity",
-              "business/pricing"
+              "business/pricing",
+              "business/template-marketplace"
             ]
           },
           {
             "group": "Case Studies",
-            "pages": ["business/case-studies"]
+            "pages": [
+              "business/case-studies",
+              "business/marketplace-success-stories"
+            ]
           }
         ]
       }
