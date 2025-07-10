@@ -35,7 +35,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle("Zyra API")
     .setDescription("API for Zyra workflow automation platform")
-    .setVersion("1.0")
+    // .setVersion("1.0")
     .addBearerAuth()
     .setVersion("1.0.0")
     .build();

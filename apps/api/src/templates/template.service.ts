@@ -10,7 +10,7 @@ import {
   TemplateQueryDto,
   TemplateResponseDto,
 } from "./dto/template.dto";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@zyra/database";
 
 @Injectable()
 export class TemplateService {
@@ -26,7 +26,7 @@ export class TemplateService {
         { description: { contains: search, mode: "insensitive" } },
       ];
     }
-    const templates = await this.prisma.workflowTemplate.findMany({
+    const templates = await this.prisma.client.workflowTemplate.findMany({
       where,
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
@@ -36,7 +36,7 @@ export class TemplateService {
   }
 
   async getTemplate(id: string): Promise<TemplateResponseDto> {
-    const template = await this.prisma.workflowTemplate.findUnique({
+    const template = await this.prisma.client.workflowTemplate.findUnique({
       where: { id },
     });
     if (!template) throw new NotFoundException("Template not found");
@@ -48,7 +48,7 @@ export class TemplateService {
     user: any
   ): Promise<TemplateResponseDto> {
     // Optionally associate with user/creator
-    const template = await this.prisma.workflowTemplate.create({
+    const template = await this.prisma.client.workflowTemplate.create({
       data: {
         name: data.name,
         description: data.description,
@@ -66,12 +66,12 @@ export class TemplateService {
     data: UpdateTemplateDto,
     user: any
   ): Promise<TemplateResponseDto> {
-    const template = await this.prisma.workflowTemplate.findUnique({
+    const template = await this.prisma.client.workflowTemplate.findUnique({
       where: { id },
     });
     if (!template) throw new NotFoundException("Template not found");
     // Optionally check user/creator permissions here
-    const updated = await this.prisma.workflowTemplate.update({
+    const updated = await this.prisma.client.workflowTemplate.update({
       where: { id },
       data: {
         ...data,
@@ -81,12 +81,12 @@ export class TemplateService {
   }
 
   async deleteTemplate(id: string, user: any): Promise<{ success: boolean }> {
-    const template = await this.prisma.workflowTemplate.findUnique({
+    const template = await this.prisma.client.workflowTemplate.findUnique({
       where: { id },
     });
     if (!template) throw new NotFoundException("Template not found");
     // Optionally check user/creator permissions here
-    await this.prisma.workflowTemplate.delete({ where: { id } });
+    await this.prisma.client.workflowTemplate.delete({ where: { id } });
     return { success: true };
   }
 
