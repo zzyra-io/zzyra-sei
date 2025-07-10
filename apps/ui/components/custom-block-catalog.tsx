@@ -102,12 +102,13 @@ export function CustomBlockCatalog({
 
   const handleDrag = (e: React.DragEvent, b: CustomBlockDefinition) => {
     const data = JSON.stringify({
-      blockType: BlockType.CUSTOM,
+      type: "custom", // Ensure node type is always 'custom'
+      blockType: b.category,
       customBlockId: b.id,
       customBlockDefinition: b,
     });
-    e.dataTransfer.setData("application/reactflow/data", data);
-    e.dataTransfer.setData("application/reactflow/type", BlockType.CUSTOM);
+    e.dataTransfer.setData("application/reactflow/metadata", data);
+    e.dataTransfer.setData("application/reactflow/type", b.category);
     e.dataTransfer.effectAllowed = "move";
     onDragStart?.(e, b);
   };
@@ -155,21 +156,24 @@ export function CustomBlockCatalog({
     })[t] || "?";
 
   return (
-    <div className='space-y-4'>
-      <div className='flex items-center space-x-2'>
+    <div className='space-y-2'>
+      <div className='flex items-center space-x-2 pb-1 border-b border-muted-foreground/10'>
         <Tabs value={category} onValueChange={setCategory}>
-          <TabsList>
+          <TabsList className='bg-muted/30 rounded-md'>
             {categories.map((cat) => (
-              <TabsTrigger key={cat} value={cat}>
+              <TabsTrigger
+                key={cat}
+                value={cat}
+                className='text-xs py-1 rounded-md data-[state=active]:bg-primary/10 data-[state=active]:text-primary'>
                 {cat}
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
         <div className='flex-1 relative'>
-          <SearchIcon className='absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground' />
+          <SearchIcon className='absolute left-2 top-2 h-4 w-4 text-muted-foreground' />
           <Input
-            className='pl-10'
+            className='pl-7 h-8 rounded-md border border-muted-foreground/10 text-sm bg-muted/40 focus:ring-1 focus:ring-primary'
             placeholder='Search blocks'
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -179,9 +183,10 @@ export function CustomBlockCatalog({
           onClick={() => {
             setEditBlock(undefined);
             setBuilderOpen(true);
-          }}>
-          <Plus className='mr-2' />
-          New Block
+          }}
+          className='h-8 px-3 text-xs'>
+          <Plus className='mr-1 w-4 h-4' />
+          New
         </Button>
         <CustomBlockBuilderDialog
           open={builderOpen}
@@ -191,9 +196,9 @@ export function CustomBlockCatalog({
         />
         <Dialog open={aiOpen} onOpenChange={setAiOpen}>
           <DialogTrigger asChild>
-            <Button variant='secondary'>
-              <Sparkles className='mr-2' />
-              Generate with AI
+            <Button variant='secondary' className='h-8 px-3 text-xs'>
+              <Sparkles className='mr-1 w-4 h-4' />
+              AI
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -215,19 +220,27 @@ export function CustomBlockCatalog({
         </Dialog>
       </div>
 
-      <ScrollArea>
-        <div className='grid grid-cols-3 gap-4 p-2'>
+      <ScrollArea className='h-[calc(100vh-200px)]'>
+        <div className='grid grid-cols-2 gap-2 p-1'>
           {filtered.map((b) => (
-            <Card key={b.id} draggable onDragStart={(e) => handleDrag(e, b)}>
-              <CardHeader className='flex justify-between items-center'>
-                <div className='flex items-center space-x-2'>
-                  <Badge variant='outline'>{badgeText(b.logicType)}</Badge>
-                  <CardTitle>{b.name}</CardTitle>
+            <Card
+              key={b.id}
+              draggable
+              onDragStart={(e) => handleDrag(e, b)}
+              className='cursor-grab hover:shadow-md transition-shadow border border-muted-foreground/10 p-2'>
+              <CardHeader className='flex justify-between items-center p-2 pb-1'>
+                <div className='flex items-center space-x-1'>
+                  <Badge variant='outline' className='text-xs px-1'>
+                    {badgeText(b.logicType)}
+                  </Badge>
+                  <CardTitle className='text-sm font-medium'>
+                    {b.name}
+                  </CardTitle>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant='ghost' size='sm'>
-                      <MoreHorizontal />
+                    <Button variant='ghost' size='sm' className='h-6 w-6 p-0'>
+                      <MoreHorizontal className='w-4 h-4' />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
@@ -254,16 +267,20 @@ export function CustomBlockCatalog({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </CardHeader>
-              <CardContent>
-                <CardDescription>{b.description}</CardDescription>
+              <CardContent className='p-2 pt-0'>
+                <CardDescription className='text-xs'>
+                  {b.description}
+                </CardDescription>
               </CardContent>
-              <CardFooter>
-                <Badge variant='secondary'>{b.category}</Badge>
+              <CardFooter className='p-2 pt-0'>
+                <Badge variant='secondary' className='text-xs px-1'>
+                  {b.category}
+                </Badge>
               </CardFooter>
             </Card>
           ))}
           {filtered.length === 0 && (
-            <div className='col-span-3 text-center text-muted-foreground'>
+            <div className='col-span-2 text-center text-muted-foreground text-xs py-4'>
               No blocks found.
             </div>
           )}

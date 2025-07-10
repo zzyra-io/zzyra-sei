@@ -73,13 +73,6 @@ export const useWorkflowStore = create<WorkflowStore>()(
           }),
         }),
         // Handle errors during storage operations
-        onRehydrateStorage: () => (state) => {
-          if (state) {
-            console.log("Workflow store hydrated successfully");
-          } else {
-            console.error("Failed to hydrate workflow store");
-          }
-        },
       }
     )
   )

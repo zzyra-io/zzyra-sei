@@ -114,8 +114,8 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
     );
     // Create a serializable version of the block data
     const blockData = {
-      blockType: block.type, // Use the enum value
-      label: block.label,
+      type: block.type,
+      blockType: block.type,
       description: block.description,
       nodeType: block.category,
       iconName: block.icon,
@@ -131,9 +131,9 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
     };
 
     // Set the data directly on the dataTransfer object
-    event.dataTransfer.setData("application/reactflow/type", block.type);
+    event.dataTransfer.setData("application/reactflow/metadata", block.type);
     event.dataTransfer.setData(
-      "application/reactflow/data",
+      "application/reactflow/metadata",
       JSON.stringify(blockData)
     );
     event.dataTransfer.effectAllowed = "move";
@@ -157,11 +157,13 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
   return (
     <div className='flex flex-col h-full'>
       {/* Favorites & Recent */}
-      <div className='py-2 space-y-2'>
+      <div className='py-1 space-y-1'>
         {favorites.length > 0 && (
           <div>
-            <div className='text-xs font-medium mb-1'>Favorites</div>
-            <div className='flex gap-2 overflow-x-auto'>
+            <div className='text-xs font-semibold mb-0.5 text-muted-foreground tracking-wide'>
+              Favorites
+            </div>
+            <div className='flex gap-1 overflow-x-auto pb-1 border-b border-muted-foreground/10'>
               {favorites.map((ft) => {
                 const blk = blocks.find((b) => b.type === ft);
                 if (!blk) return null;
@@ -171,9 +173,9 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
                     draggable
                     onDragStart={(e) => handleDragStart(e, blk)}
                     onClick={() => handleBlockClick(blk)}
-                    className='flex items-center gap-1 p-2 bg-card rounded shadow'>
+                    className='flex items-center gap-1 px-2 py-1 bg-card rounded-md shadow-sm border border-muted-foreground/10 hover:bg-muted cursor-pointer transition-colors text-xs'>
                     {getBlockIcon(blk.icon)}
-                    <span className='text-xs'>{blk.label}</span>
+                    <span>{blk.label}</span>
                   </div>
                 );
               })}
@@ -182,8 +184,10 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
         )}
         {recents.length > 0 && (
           <div>
-            <div className='text-xs font-medium mb-1'>Recent</div>
-            <div className='flex gap-2 overflow-x-auto'>
+            <div className='text-xs font-semibold mb-0.5 text-muted-foreground tracking-wide'>
+              Recent
+            </div>
+            <div className='flex gap-1 overflow-x-auto pb-1 border-b border-muted-foreground/10'>
               {recents.map((rt) => {
                 const blk = blocks.find((b) => b.type === rt);
                 if (!blk) return null;
@@ -193,9 +197,9 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
                     draggable
                     onDragStart={(e) => handleDragStart(e, blk)}
                     onClick={() => handleBlockClick(blk)}
-                    className='flex items-center gap-1 p-2 bg-card rounded shadow'>
+                    className='flex items-center gap-1 px-2 py-1 bg-card rounded-md shadow-sm border border-muted-foreground/10 hover:bg-muted cursor-pointer transition-colors text-xs'>
                     {getBlockIcon(blk.icon)}
-                    <span className='text-xs'>{blk.label}</span>
+                    <span>{blk.label}</span>
                   </div>
                 );
               })}
@@ -204,13 +208,13 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
         )}
       </div>
 
-      <div className='px-4 pt-4 pb-3'>
+      <div className='px-3 pt-2 pb-2'>
         <div className='relative'>
-          <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
+          <Search className='absolute left-2 top-2 h-4 w-4 text-muted-foreground' />
           <Input
             type='search'
             placeholder='Search blocks...'
-            className='pl-8 h-9'
+            className='pl-7 h-8 rounded-md border border-muted-foreground/10 text-sm bg-muted/40 focus:ring-1 focus:ring-primary'
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -221,23 +225,24 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
         value={activeCategory}
         onValueChange={setActiveCategory}
         className='flex-1 flex flex-col'>
-        <div className='px-4 pb-3'>
-          <TabsList className='grid grid-cols-5 w-full'>
+        <div className='px-3 pb-2'>
+          {/* should be equal to the width of the parent */}
+          <TabsList className='grid grid-cols-5 w-full bg-muted/30 rounded-md max-w-full'>
             {categories.map((category) => (
               <TabsTrigger
                 key={category.id}
                 value={category.id}
-                className='text-xs py-1.5'>
+                className='text-xs py-1 rounded-md data-[state=active]:bg-primary/10 data-[state=active]:text-primary'>
                 {category.label}
               </TabsTrigger>
             ))}
           </TabsList>
         </div>
 
-        <ScrollArea className='flex-1 px-4 pb-4'>
+        <ScrollArea className='flex-1 px-2 pb-2'>
           <TabsContent
             value={activeCategory}
-            className='m-0 space-y-2.5'
+            className='m-0 space-y-1.5'
             forceMount>
             {filteredBlocks.map((block) => (
               <div
@@ -246,60 +251,23 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
                 onDragStart={(e) => handleDragStart(e, block)}
                 onClick={() => handleBlockClick(block)}
                 className={cn(
-                  "group relative flex",
-                  "items-center gap-3 rounded-lg border bg-card p-3",
-                  "shadow-sm hover:shadow-md transition-all duration-200 cursor-grab",
-                  "hover:border-muted-foreground/20 hover:bg-accent/40",
-                  block.category === NodeCategory.TRIGGER &&
-                    "border-l-[5px] border-l-blue-500",
-                  block.category === NodeCategory.ACTION &&
-                    "border-l-[5px] border-l-green-500",
-                  block.category === NodeCategory.LOGIC &&
-                    "border-l-[5px] border-l-purple-500"
+                  "group relative flex items-center gap-2 rounded-md border bg-card px-2 py-2 cursor-pointer hover:shadow-sm hover:border-primary/40 transition-all text-sm",
+                  "border-muted-foreground/10"
                 )}>
-                <div
-                  className={cn(
-                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-md",
-                    "shadow-sm transition-colors duration-200",
-                    block.category === NodeCategory.TRIGGER &&
-                      "bg-blue-50 text-blue-700 group-hover:bg-blue-100",
-                    block.category === NodeCategory.ACTION &&
-                      "bg-green-50 text-green-700 group-hover:bg-green-100",
-                    block.category === NodeCategory.LOGIC &&
-                      "bg-purple-50 text-purple-700 group-hover:bg-purple-100"
-                  )}>
+                <div className='flex items-center justify-center w-7 h-7 rounded-md bg-muted/50 mr-1'>
                   {getBlockIcon(block.icon)}
                 </div>
-                <div className='min-w-0 flex-1'>
-                  <div className='font-medium text-sm leading-tight mb-0.5'>
-                    {block.label}
-                  </div>
-                  <div className='text-xs text-muted-foreground line-clamp-2'>
+                <div className='flex-1 min-w-0'>
+                  <div className='font-medium truncate'>{block.label}</div>
+                  <div className='text-xs text-muted-foreground truncate'>
                     {block.description}
                   </div>
                 </div>
-                <div className='absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity'>
-                  <Star
-                    className={`h-4 w-4 cursor-pointer ${
-                      favorites.includes(block.type)
-                        ? "text-yellow-400"
-                        : "text-muted-foreground"
-                    }`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(block.type);
-                    }}
-                  />
-                </div>
-                <div className='absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-70 transition-opacity'>
-                  <GripHorizontal className='h-4 w-4 text-muted-foreground' />
-                </div>
               </div>
             ))}
-
             {filteredBlocks.length === 0 && (
-              <div className='text-center py-8 text-muted-foreground'>
-                <p>No blocks found matching your search.</p>
+              <div className='text-xs text-muted-foreground text-center py-4'>
+                No blocks found.
               </div>
             )}
           </TabsContent>
