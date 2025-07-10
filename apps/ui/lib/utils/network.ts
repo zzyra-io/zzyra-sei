@@ -7,6 +7,7 @@ import {
   sei,
 } from "wagmi/chains";
 import type { Chain } from "wagmi/chains";
+import { config } from "../config";
 
 // import { sonic_blaze_rpc } from "@/constants/sonic";
 
@@ -87,9 +88,9 @@ export const getActiveNetworkConfigs = () => {
 
 // Get current network from environment or default
 export const getCurrentNetwork = (): Chain => {
-  const envChainId = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK;
+  const envChainId = config.blockchainNetwork;
   if (envChainId) {
-    const chainId = parseInt(envChainId);
+    const chainId = parseInt(envChainId) as number;
     const network = supportedNetworks.find((chain) => chain.id === chainId);
     if (network) return network;
   }
