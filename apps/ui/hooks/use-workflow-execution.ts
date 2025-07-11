@@ -40,6 +40,9 @@ export function useWorkflowExecution() {
 
   // State for tracking execution
   const [executionId, setExecutionId] = useState<string | null>(null);
+  const [executionStartTime, setExecutionStartTime] = useState<number | null>(
+    null
+  );
 
   // Use React Query to fetch execution status
   const { data: executionStatus, isLoading: isLoadingStatus } = useQuery({
@@ -47,13 +50,11 @@ export function useWorkflowExecution() {
     queryFn: async () => {
       if (!executionId) return null;
 
-      const response = await fetch(`/api/execute-workflow/${executionId}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to fetch execution status");
-      }
-
-      const data = await response.json();
+      // Use the workflow service instead of direct API calls
+      const { workflowService } = await import(
+        "@/lib/services/workflow-service"
+      );
+      const data = await workflowService.getExecutionStatus(executionId);
       return data as ExecutionStatus;
     },
     enabled: !!executionId,
@@ -63,9 +64,35 @@ export function useWorkflowExecution() {
       if (data && (data.status === "completed" || data.status === "failed")) {
         return false;
       }
+      // Stop polling after 10 minutes to prevent infinite loading
+      if (
+        executionStartTime &&
+        Date.now() - executionStartTime > 10 * 60 * 1000
+      ) {
+        console.warn("Execution status polling timed out after 10 minutes");
+        toast({
+          title: "Execution Status Timeout",
+          description:
+            "Unable to get execution status. Please check the executions page.",
+          variant: "destructive",
+        });
+        return false;
+      }
       // Poll every 2 seconds while execution is in progress
       return 2000;
     },
+    retry: (failureCount, error) => {
+      // Only retry up to 3 times for network errors
+      if (failureCount < 3) {
+        console.log(
+          `Retrying execution status query (${failureCount + 1}/3):`,
+          error
+        );
+        return true;
+      }
+      return false;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
   // Use React Query for mutation to execute workflow
@@ -95,20 +122,23 @@ export function useWorkflowExecution() {
       // Call the execution API using workflow service
       try {
         console.log("Executing workflow:", workflowId || "(unsaved)");
-        
+
         // Import workflow service dynamically to avoid circular dependencies
-        const { workflowService } = await import("@/lib/services/workflow-service");
-        
+        const { workflowService } = await import(
+          "@/lib/services/workflow-service"
+        );
+
         const data = await workflowService.executeWorkflow({
           id: workflowId,
           nodes: nodes || [],
           edges: edges || [],
         });
-        
+
         console.log("Execution response:", data);
 
         if (data?.id) {
           setExecutionId(data.id);
+          setExecutionStartTime(Date.now());
 
           // Immediately trigger a query for the execution status
           queryClient.invalidateQueries({
@@ -117,7 +147,9 @@ export function useWorkflowExecution() {
 
           return { executionId: data.id };
         } else {
-          throw new Error("Failed to start workflow execution");
+          throw new Error(
+            "Failed to start workflow execution - no execution ID returned"
+          );
         }
       } catch (error) {
         console.error("Error executing workflow:", error);
@@ -180,6 +212,10 @@ export function useWorkflowExecution() {
   // Execute workflow wrapper function
   const executeWorkflow = async () => {
     try {
+      // Reset execution state before starting a new execution
+      setExecutionId(null);
+      setExecutionStartTime(null);
+
       // Reset node statuses before starting a new execution
       nodes.forEach((node) => {
         updateNode(node.id, {
