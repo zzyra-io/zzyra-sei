@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@9.15.2",
   "prisma": {
-    "schema": "packages/db/schema.prisma"
+    "schema": "packages/database/prisma/schema.prisma"
   },
   "pnpm": {
     "overrides": {

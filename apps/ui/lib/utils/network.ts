@@ -4,8 +4,10 @@ import {
   baseSepolia,
   sepolia,
   polygon,
+  sei,
 } from "wagmi/chains";
 import type { Chain } from "wagmi/chains";
+import { config } from "../config";
 
 // import { sonic_blaze_rpc } from "@/constants/sonic";
 
@@ -16,6 +18,7 @@ export const supportedNetworks = [
   mainnet,
   sepolia,
   polygon,
+  sei,
 ] as const;
 
 // Type for supported networks
@@ -47,10 +50,19 @@ export const NETWORK_CONFIG: Record<number, { chain: Chain; rpcUrl: string }> =
       chain: polygon,
       rpcUrl: "https://polygon-rpc.com/",
     },
+    [sei.id]: {
+      chain: sei,
+      rpcUrl: sei.rpcUrls.default.http[0],
+    },
   };
 
 // Active networks - change order to control priority (first is default)
-export const ACTIVE_NETWORKS = [baseSepolia, polygonAmoy, mainnet] as const;
+export const ACTIVE_NETWORKS = [
+  baseSepolia,
+  polygonAmoy,
+  mainnet,
+  sei,
+] as const;
 
 // Get the default network (first in ACTIVE_NETWORKS)
 export const getDefaultNetwork = (): Chain => {
@@ -76,9 +88,9 @@ export const getActiveNetworkConfigs = () => {
 
 // Get current network from environment or default
 export const getCurrentNetwork = (): Chain => {
-  const envChainId = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK;
+  const envChainId = config.blockchainNetwork;
   if (envChainId) {
-    const chainId = parseInt(envChainId);
+    const chainId = parseInt(envChainId) as number;
     const network = supportedNetworks.find((chain) => chain.id === chainId);
     if (network) return network;
   }

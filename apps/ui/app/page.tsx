@@ -1,6 +1,7 @@
 "use client";
 
 import { CountdownTimer } from "@/components/countdown-timer";
+import DevelopmentWarning from "@/components/development-warning";
 import { FeatureCard } from "@/components/feature-card";
 import { FloatingParticles } from "@/components/floating-particles";
 import { GradientButton } from "@/components/gradient-button";
@@ -243,6 +244,7 @@ export default function HomePage() {
 
   return (
     <div className='flex min-h-screen flex-col overflow-hidden'>
+      <DevelopmentWarning />
       {/* Floating particles background */}
       <div className='fixed inset-0 pointer-events-none z-0'>
         <FloatingParticles />

@@ -6,13 +6,12 @@
 
 // Define required environment variables
 interface EnvVars {
-  // Supabase
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-
   // Magic Link
   magicPublishableKey: string;
-  
+
+  // Blockchain Network
+  blockchainNetwork: string;
+
   // Concurrency settings
   concurrency: {
     prefetch: number;
@@ -21,30 +20,21 @@ interface EnvVars {
 
 // Get environment variables with validation
 export const config: EnvVars = {
-  // Supabase
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-
   // Magic Link
   magicPublishableKey: process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY || "",
-  
+
+  // Blockchain Network
+  blockchainNetwork: process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || "84532",
+
   // Concurrency settings
   concurrency: {
-    prefetch: parseInt(process.env.QUEUE_PREFETCH || '1'),
+    prefetch: parseInt(process.env.QUEUE_PREFETCH || "1"),
   },
 };
 
 // Validate required environment variables
 export function validateEnvVars(): string[] {
   const missingVars: string[] = [];
-
-  if (!config.supabaseUrl) {
-    missingVars.push("NEXT_PUBLIC_SUPABASE_URL");
-  }
-
-  if (!config.supabaseAnonKey) {
-    missingVars.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  }
 
   if (!config.magicPublishableKey) {
     missingVars.push("NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY");

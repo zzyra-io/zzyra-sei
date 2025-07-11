@@ -1,16 +1,14 @@
+import { dedicatedWalletConnector } from "@magiclabs/wagmi-connector";
+import { QueryClient } from "@tanstack/react-query";
+import { getDefaultConfig } from "connectkit";
 import { http } from "viem";
 import { type Config, createConfig } from "wagmi";
-import { QueryClient } from "@tanstack/react-query";
-import { dedicatedWalletConnector } from "@magiclabs/wagmi-connector";
-import { injected } from "wagmi/connectors";
 import {
-  getActiveChains,
   getActiveNetworkConfigs,
-  getNetworkUrl,
   getChainId,
+  getNetworkUrl,
   supportedNetworks,
 } from "./network";
-import { getDefaultConfig } from "connectkit";
 
 // Create a new query client for React Query
 export const queryClient = new QueryClient({

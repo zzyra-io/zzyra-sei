@@ -4,7 +4,16 @@ import { BuilderSidebar } from "@/components/builder-sidebar";
 import { ExecutionStatusPanel } from "@/components/execution-status-panel";
 import { FlowCanvas } from "@/components/flow-canvas";
 import { SaveNewWorkflowDialog } from "@/components/save-workflow-dialog";
-import { UpdateWorkflowDialog } from "@/components/update-workflow-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -14,31 +23,22 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { useToast } from "@/components/ui/use-toast";
+import { UpdateWorkflowDialog } from "@/components/update-workflow-dialog";
 import { WorkflowRefinement } from "@/components/workflow-refinement";
 import { WorkflowToolbar } from "@/components/workflow-toolbar";
 import NlWorkflowGenerator from "@/components/workflow/nl-workflow-generator";
+import { useSaveAndExecute } from "@/hooks/use-save-and-execute";
 import { useWorkflowExecution } from "@/hooks/use-workflow-execution";
 import { generateFlow } from "@/lib/api";
 import { refineWorkflow } from "@/lib/api/workflow-generation";
+import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
 import { workflowService } from "@/lib/services/workflow-service";
 import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
+import { BlockType } from "@zyra/types";
 import { ArrowLeft, Loader2, Play, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
-import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
-import { useSaveAndExecute } from "@/hooks/use-save-and-execute";
-import { BlockType } from "@zyra/types";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
 
 // Add new save state interface and state
 interface SaveState {
@@ -192,7 +192,7 @@ export default function BuilderPage() {
     (blockType: BlockType) => {
       const newNode = {
         id: `${Date.now()}`,
-        type: "custom",
+        type: blockType,
         position: { x: 100, y: 100 },
         data: {
           label: `${blockType} Node`,
@@ -661,23 +661,23 @@ export default function BuilderPage() {
     { enableOnFormTags: true }
   );
 
-  useHotkeys(
-    "mod+plus",
-    (e) => {
-      e.preventDefault();
-      toolbar.zoomIn();
-    },
-    { enableOnFormTags: true }
-  );
+  // useHotkeys(
+  //   "mod+plus",
+  //   (e) => {
+  //     e.preventDefault();
+  //     toolbar.zoomIn();
+  //   },
+  //   { enableOnFormTags: true }
+  // );
 
-  useHotkeys(
-    "mod+minus",
-    (e) => {
-      e.preventDefault();
-      toolbar.zoomOut();
-    },
-    { enableOnFormTags: true }
-  );
+  // useHotkeys(
+  //   "mod+minus",
+  //   (e) => {
+  //     e.preventDefault();
+  //     toolbar.zoomOut();
+  //   },
+  //   { enableOnFormTags: true }
+  // );
 
   useHotkeys(
     "mod+g",
@@ -742,7 +742,7 @@ export default function BuilderPage() {
         </div>
 
         {/* Main content */}
-        <div className='relative flex-1 overflow-hidden'>
+        <div className='flex h-screen bg-background'>
           <div className='absolute top-4 left-1/2 transform -translate-x-1/2 z-10'>
             <WorkflowToolbar
               onUndo={toolbar.undo}
@@ -772,8 +772,12 @@ export default function BuilderPage() {
             />
           </div>
 
-          <ResizablePanelGroup direction='horizontal'>
-            <ResizablePanel defaultSize={25} minSize={15} maxSize={30}>
+          <ResizablePanelGroup direction='horizontal' className='h-full w-full'>
+            <ResizablePanel
+              defaultSize={25}
+              minSize={25}
+              maxSize={30}
+              className='h-full'>
               <BuilderSidebar
                 onAddNode={handleAddBlock}
                 onAddCustomBlock={handleAddCustomBlock}
@@ -789,47 +793,45 @@ export default function BuilderPage() {
               />
             </ResizablePanel>
             <ResizableHandle />
-            <ResizablePanel defaultSize={75}>
-              <div className='relative h-full'>
-                <FlowCanvas executionId={executionId} />
+            <ResizablePanel defaultSize={80} className='h-full relative'>
+              <FlowCanvas executionId={executionId} />
 
-                {/* Execution Status Panel - displays when a workflow is being executed */}
-                {showExecutionPanel && (
-                  <div className='absolute bottom-4 right-4 z-50 w-96'>
-                    <ExecutionStatusPanel
-                      executionStatus={executionStatus || undefined}
-                      isLoadingStatus={isLoadingStatus}
-                      onClose={() => setShowExecutionPanel(false)}
-                    />
-                  </div>
-                )}
-              </div>
+              {/* Execution Status Panel - displays when a workflow is being executed */}
+              {showExecutionPanel && (
+                <div className='absolute bottom-4 right-4 z-50 w-96'>
+                  <ExecutionStatusPanel
+                    executionStatus={executionStatus || undefined}
+                    isLoadingStatus={isLoadingStatus}
+                    onClose={() => setShowExecutionPanel(false)}
+                  />
+                </div>
+              )}
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
 
         {/* AI Workflow Generation Component */}
         <div className='absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-full max-w-2xl px-4'>
-          <Card className='bg-background/80 backdrop-blur-sm border shadow-lg p-4'>
-            <NlWorkflowGenerator
-              onNodesGenerated={(newNodes, newEdges) => {
-                const updatedNodes = [...nodes, ...newNodes];
-                const updatedEdges = [...edges, ...newEdges];
-                setNodes(updatedNodes);
-                setEdges(updatedEdges);
-                addToHistory(updatedNodes, updatedEdges);
-                setHasUnsavedChanges(true);
-                toast({
-                  title: "Workflow generated",
-                  description: `Created ${newNodes.length} components based on your description.`,
-                });
-              }}
-              existingNodes={nodes}
-              existingEdges={edges}
-              isGenerating={isGenerating}
-              setIsGenerating={setGenerating}
-            />
-          </Card>
+          {/* <Card className='bg-background/80 backdrop-blur-sm border shadow-lg p-4'> */}
+          <NlWorkflowGenerator
+            onNodesGenerated={(newNodes, newEdges) => {
+              const updatedNodes = [...nodes, ...newNodes];
+              const updatedEdges = [...edges, ...newEdges];
+              setNodes(updatedNodes);
+              setEdges(updatedEdges);
+              addToHistory(updatedNodes, updatedEdges);
+              setHasUnsavedChanges(true);
+              toast({
+                title: "Workflow generated",
+                description: `Created ${newNodes.length} components based on your description.`,
+              });
+            }}
+            existingNodes={nodes}
+            existingEdges={edges}
+            isGenerating={isGenerating}
+            setIsGenerating={setGenerating}
+          />
+          {/* </Card> */}
         </div>
 
         {/* Workflow Refinement Dialog */}

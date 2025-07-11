@@ -15,24 +15,17 @@ import {
   applyNodeChanges,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { NodeCategory, BlockType } from "@zyra/types";
+import { BlockType, NodeCategory } from "@zyra/types";
 // Removed debounce import since we're using direct node updates
+import { useNodeConfigurations } from "@/app/builder/node-configurations";
 import { useWorkflowStore } from "@/lib/store/workflow-store";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { BlockConfigPanel } from "./block-config-panel";
 import { ContextMenu } from "./context-menu";
-import { CustomEdge } from "./custom-edge";
-import { ImprovedCustomNode } from "./custom-node_improved";
 import { EdgeConfigPanel } from "./edge-config-panel";
+import "@xyflow/react/dist/style.css";
+import CustomConnectionLine from "./custom-connection-line";
 
-const MemoizedCustomNode = React.memo(ImprovedCustomNode);
-const MemoizedCustomEdge = React.memo(CustomEdge);
 interface FlowCanvasProps {
   executionId?: string | null;
   toolbarRef?: React.RefObject<{
@@ -106,12 +99,13 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
     showEdgeConfigPanel,
   } = useWorkflowStore();
 
+  console.log("nodes", nodes);
+
   const { toast } = useToast();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  // Memoize node and edge types for performance
-  const nodeTypes = useMemo(() => ({ custom: MemoizedCustomNode }), []);
-  const edgeTypes = useMemo(() => ({ custom: MemoizedCustomEdge }), []);
+  const { nodeTypes, edgeTypes, defaultEdgeOptions, connectionLineTypes } =
+    useNodeConfigurations();
 
   // Local state for context menu (component-specific, not moved to store)
   const [contextMenu, setContextMenu] = useState<{
@@ -157,6 +151,7 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+      console.log("onDrop", event);
       if (!reactFlowWrapper.current || !reactFlowInstance) return;
 
       const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
@@ -185,22 +180,13 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
       });
 
       // Create a well-formed node with proper data structure for the ImprovedCustomNode
-      
+
       // Add default configuration values based on block type
-      let defaultConfig = {};
-      
-      // Add specific default values for different block types
-      if (blockType === BlockType.WEBHOOK) {
-        defaultConfig = {
-          url: "http://localhost:3000/health", // Default URL
-          method: "GET",
-          headers: {}
-        };
-      }
-      
+      const defaultConfig = {};
+
       const newNode = {
         id: `${blockType}-${Date.now()}`,
-        type: "custom",
+        type: blockType,
         position,
         data: {
           blockType,
@@ -291,6 +277,7 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
         });
         return;
       }
+      console.log("params", params);
       const newEdge = {
         ...params,
         id: `${params.source}-${params.target}-${Date.now()}`,
@@ -363,12 +350,12 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
           onNodesChange={(changes) => {
             try {
               // Create a deep copy of nodes to avoid modifying read-only properties
-              const nodesCopy = nodes.map(node => ({
+              const nodesCopy = nodes.map((node) => ({
                 ...JSON.parse(JSON.stringify(node)),
                 // Preserve any non-serializable properties if needed
                 // For example, if there are functions or complex objects
               }));
-              
+
               // Apply changes to our copied nodes
               const updatedNodes = applyNodeChanges(changes, nodesCopy);
               setNodes(updatedNodes);
@@ -432,6 +419,9 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onInit={setReactFlowInstance}
+          connectionLineStyle={{ stroke: "#b1b1b7" }}
+          defaultEdgeOptions={defaultEdgeOptions}
+          connectionLineComponent={CustomConnectionLine}
           fitView>
           {isGridVisible && (
             <Background variant='dots' gap={16} size={0.6} color='#f8fafc' />

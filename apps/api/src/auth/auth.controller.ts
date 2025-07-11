@@ -103,11 +103,11 @@ export class AuthController {
         refreshToken: session.refreshToken,
         expiresAt: session.expiresAt,
       };
-      
+
       console.log("Creating JWT token with payload:", {
         ...tokenPayload,
-        accessToken: '[REDACTED]',
-        refreshToken: '[REDACTED]'
+        accessToken: "[REDACTED]",
+        refreshToken: "[REDACTED]",
       });
 
       // Create session token using NestJS JWT service
@@ -115,7 +115,10 @@ export class AuthController {
         expiresIn: "30d", // Match Next.js behavior
       });
 
-      console.log("Created Session Token:", sessionToken.substring(0, 20) + '...');
+      console.log(
+        "Created Session Token:",
+        sessionToken.substring(0, 20) + "..."
+      );
 
       // Set cookies matching Next.js behavior
       const cookieName =
@@ -186,20 +189,20 @@ export class AuthController {
         success: true,
         callbackUrl: finalCallbackUrl,
       };
-      
+
       // Log the response we're sending (with sensitive data redacted)
       console.log("Sending login response:", {
-        token: responseData.token.substring(0, 20) + '...',
+        token: responseData.token.substring(0, 20) + "...",
         session: {
           ...responseData.session,
-          token: responseData.session.token.substring(0, 20) + '...',
-          accessToken: '[REDACTED]',
-          refreshToken: '[REDACTED]'
+          token: responseData.session.token.substring(0, 20) + "...",
+          accessToken: "[REDACTED]",
+          refreshToken: "[REDACTED]",
         },
         success: responseData.success,
-        callbackUrl: responseData.callbackUrl
+        callbackUrl: responseData.callbackUrl,
       });
-      
+
       // Return response matching Next.js format with token included
       return res.status(200).json(responseData);
     } catch (error) {

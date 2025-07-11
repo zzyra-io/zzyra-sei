@@ -73,8 +73,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 
 // Define scrollbar styles for consistency
-const scrollbarStyles =
-  "scrollbar-thin scrollbar-thumb-rounded-md scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/30";
+
 // import { AIBlockForm } from "./builders/ai-block-form";
 import { CustomBlockConfigModal } from "./custom-block-config-modal";
 
@@ -315,7 +314,7 @@ export function BuilderSidebar({
     <div className='relative'>
       <div
         className={cn(
-          "flex h-full w-[320px] flex-col overflow-hidden bg-muted/5 border-r",
+          "flex h-full flex-col overflow-hidden bg-muted/5 border-r w-full",
           isMobile ? (isMobileCollapsed ? "hidden" : "block") : "block"
         )}>
         {/* Custom Block Configuration Modal */}
@@ -707,7 +706,7 @@ export function BuilderSidebar({
 
               <div className='flex-1 overflow-hidden'>
                 {blockCatalogTab === "blocks" && (
-                  <ScrollArea className='h-full'>
+                  <ScrollArea className='h-[calc(100vh-200px)]'>
                     <div className='p-4 pt-2'>
                       <div className='text-xs text-muted-foreground mb-3 flex items-center'>
                         <ChevronRight className='h-3 w-3 mr-1' />
@@ -722,59 +721,58 @@ export function BuilderSidebar({
                 )}
 
                 {blockCatalogTab === "custom" && (
-                  <ScrollArea className='h-full'>
-                    <div className='p-4 pt-2'>
-                      <div className='flex items-center mb-3'>
-                        <ChevronRight className='h-3 w-3 mr-1' />
-                        <span className='text-xs text-muted-foreground'>
-                          Custom blocks for your workflow
-                        </span>
-                      </div>
+                  <div className='p-4 pt-2'>
+                    <div className='flex items-center mb-3'>
+                      <ChevronRight className='h-3 w-3 mr-1' />
+                      <span className='text-xs text-muted-foreground'>
+                        Custom blocks for your workflow
+                      </span>
+                    </div>
 
-                      <div className='flex flex-col gap-2 mb-3'>
-                        <div className='flex space-x-2'>
-                          <Button
-                            variant='outline'
-                            size='sm'
-                            onClick={() => {
-                              if (selectedNode?.data?.customBlock) {
-                                setSelectedCustomBlock(
-                                  selectedNode.data.customBlock
-                                );
-                                setSaveDialogOpen(true);
-                              } else {
-                                toast({
-                                  title: "No custom block selected",
-                                  description:
-                                    "Please select a custom block to save to the library.",
-                                });
-                              }
-                            }}
-                            disabled={!selectedNode?.data?.customBlock}>
-                            <Save className='h-3.5 w-3.5 mr-1' />
-                            Save to Library
-                          </Button>
-                          <Button
-                            variant='secondary'
-                            size='sm'
-                            onClick={() => setCreateModalOpen(true)}>
-                            <PlusCircle className='h-3.5 w-3.5 mr-1' />
-                            New Block
-                          </Button>
-                          <Button
-                            variant='secondary'
-                            size='sm'
-                            onClick={() => handleOpenCustomBlockModal()}>
-                            <Box className='h-3.5 w-3.5 mr-1' />
-                            Configure Block
-                          </Button>
-                        </div>
-                        <p className='text-xs text-muted-foreground'>
-                          Select a custom block on the canvas to save it to your
-                          personal library
-                        </p>
+                    <div className='flex flex-col gap-2 mb-3'>
+                      <div className='flex space-x-2'>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          onClick={() => {
+                            if (selectedNode?.data?.customBlock) {
+                              setSelectedCustomBlock(
+                                selectedNode.data.customBlock
+                              );
+                              setSaveDialogOpen(true);
+                            } else {
+                              toast({
+                                title: "No custom block selected",
+                                description:
+                                  "Please select a custom block to save to the library.",
+                              });
+                            }
+                          }}
+                          disabled={!selectedNode?.data?.customBlock}>
+                          <Save className='h-3.5 w-3.5 mr-1' />
+                          Save to Library
+                        </Button>
+                        <Button
+                          variant='secondary'
+                          size='sm'
+                          onClick={() => setCreateModalOpen(true)}>
+                          <PlusCircle className='h-3.5 w-3.5 mr-1' />
+                          New Block
+                        </Button>
+                        <Button
+                          variant='secondary'
+                          size='sm'
+                          onClick={() => handleOpenCustomBlockModal()}>
+                          <Box className='h-3.5 w-3.5 mr-1' />
+                          Configure Block
+                        </Button>
                       </div>
-
+                      <p className='text-xs text-muted-foreground'>
+                        Select a custom block on the canvas to save it to your
+                        personal library
+                      </p>
+                    </div>
+                    <ScrollArea className='h-[calc(100vh-200px)]'>
                       <CustomBlockCatalog
                         onAddBlock={(block, position) => {
                           if (onAddCustomBlock) {
@@ -794,8 +792,8 @@ export function BuilderSidebar({
                         onDragStart={handleCustomBlockDragStart}
                         onSelect={(block) => setSelectedCustomBlock(block)}
                       />
-                    </div>
-                  </ScrollArea>
+                    </ScrollArea>
+                  </div>
                 )}
               </div>
             </div>
