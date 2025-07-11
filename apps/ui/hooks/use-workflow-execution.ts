@@ -177,15 +177,44 @@ export function useWorkflowExecution() {
       // Get node status map from execution status
       const nodeStatusMap = executionStatus.node_statuses || {};
 
-      // Update each node with its execution status
+      // Update each node with its execution status and enhanced data
       nodes.forEach((node) => {
         const nodeStatus = nodeStatusMap[node.id];
 
         // Only update if status has changed
-        if (nodeStatus && node.data?.executionStatus !== nodeStatus) {
+        if (nodeStatus && node.data?.status !== nodeStatus) {
           console.log(`Updating node ${node.id} status to ${nodeStatus}`);
+
+          // Create enhanced logs for the node
+          const enhancedLogs = [
+            {
+              level: nodeStatus === "failed" ? "error" : ("info" as const),
+              message: `Node ${
+                nodeStatus === "running"
+                  ? "started execution"
+                  : nodeStatus === "completed"
+                    ? "completed successfully"
+                    : nodeStatus === "failed"
+                      ? "execution failed"
+                      : `status changed to ${nodeStatus}`
+              }`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+            // Add existing logs if available
+            ...(executionStatus.logs || []).map((log) => ({
+              level: "info" as const,
+              message: log,
+              timestamp: new Date().toLocaleTimeString(),
+            })),
+          ];
+
           updateNode(node.id, {
-            data: { ...node.data, executionStatus: nodeStatus },
+            data: {
+              ...node.data,
+              status: nodeStatus,
+              executionStatus: nodeStatus,
+              logs: enhancedLogs,
+            },
           });
         }
       });

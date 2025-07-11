@@ -1,8 +1,8 @@
 import { Handle, Position, useConnection } from "@xyflow/react";
-import { Database, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Database, Loader2, CheckCircle2, XCircle, Eye, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
-import React from "react";
+import React, { useState } from "react";
 
 interface NodeData {
   blockType: string;
@@ -23,6 +23,11 @@ interface NodeData {
     backgroundColor?: string;
     [key: string]: unknown;
   };
+  logs?: Array<{
+    level: "info" | "warn" | "error";
+    message: string;
+    timestamp?: string;
+  }>;
 }
 
 export default function CustomNode({
@@ -36,6 +41,7 @@ export default function CustomNode({
   const connection = useConnection();
   const isConnecting = connection.inProgress;
   const isTarget = isConnecting && connection.fromNode?.id !== id;
+  const [showLogs, setShowLogs] = useState(false);
 
   const {
     label = data.blockType || "Node",
@@ -54,31 +60,64 @@ export default function CustomNode({
   const accentColor = style.accentColor || "primary";
   const backgroundColor = style.backgroundColor || "bg-card";
 
-  // Status Indicator
+  // Enhanced Status Indicator with animations and log access
   const statusIndicator = React.useMemo(() => {
     switch (status) {
       case "started":
       case "running":
         return (
-          <div className='flex items-center gap-1.5 text-blue-500'>
-            <Loader2 className='w-3.5 h-3.5 animate-spin' />
+          <div className='flex items-center gap-1.5 text-blue-500 animate-pulse'>
+            <div className='relative'>
+              <Loader2 className='w-3.5 h-3.5 animate-spin' />
+              <div className='absolute -inset-1 bg-blue-500/20 rounded-full animate-ping' />
+            </div>
             <span className='text-xs font-medium'>Running...</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLogs(true);
+              }}
+              className='ml-1 text-xs px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors'>
+              Logs
+            </button>
           </div>
         );
       case "success":
       case "completed":
         return (
           <div className='flex items-center gap-1.5 text-green-500'>
-            <CheckCircle2 className='w-3.5 h-3.5' />
+            <div className='relative'>
+              <CheckCircle2 className='w-3.5 h-3.5' />
+              <div className='absolute -inset-1 bg-green-500/20 rounded-full animate-pulse' />
+            </div>
             <span className='text-xs font-medium'>Completed</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLogs(true);
+              }}
+              className='ml-1 text-xs px-1.5 py-0.5 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors'>
+              Logs
+            </button>
           </div>
         );
       case "error":
       case "failed":
         return (
           <div className='flex items-center gap-1.5 text-red-500'>
-            <XCircle className='w-3.5 h-3.5' />
+            <div className='relative'>
+              <XCircle className='w-3.5 h-3.5' />
+              <div className='absolute -inset-1 bg-red-500/20 rounded-full animate-pulse' />
+            </div>
             <span className='text-xs font-medium'>Failed</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLogs(true);
+              }}
+              className='ml-1 text-xs px-1.5 py-0.5 bg-red-100 hover:bg-red-200 rounded text-red-700 transition-colors'>
+              Logs
+            </button>
           </div>
         );
       default:
@@ -129,7 +168,13 @@ export default function CustomNode({
         isTarget
           ? "border-2 border-primary shadow-lg shadow-primary/20"
           : "border-border/30",
-        theme === "dark" && !isTarget && "shadow-black/20"
+        theme === "dark" && !isTarget && "shadow-black/20",
+        // Enhanced status-based styling
+        status === "running" &&
+          "animate-pulse border-blue-500 shadow-lg shadow-blue-500/30",
+        status === "completed" &&
+          "border-green-500 shadow-lg shadow-green-500/20",
+        status === "failed" && "border-red-500 shadow-lg shadow-red-500/20"
       )}
       style={{
         width: nodeWidth,
@@ -208,6 +253,52 @@ export default function CustomNode({
           pointerEvents: "all",
         }}
       />
+
+      {/* Log Viewer Modal */}
+      {showLogs && (
+        <div className='absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-50 max-w-md'>
+          <div className='flex items-center justify-between p-3 border-b border-border'>
+            <div className='flex items-center gap-2'>
+              <Eye className='w-4 h-4 text-muted-foreground' />
+              <span className='text-sm font-medium'>Execution Logs</span>
+            </div>
+            <button
+              onClick={() => setShowLogs(false)}
+              className='text-muted-foreground hover:text-foreground transition-colors'
+              title='Close logs'>
+              <X className='w-4 h-4' />
+            </button>
+          </div>
+          <div className='p-3 max-h-64 overflow-y-auto'>
+            {data.logs && data.logs.length > 0 ? (
+              <div className='space-y-2'>
+                {data.logs.map((log, index) => (
+                  <div
+                    key={index}
+                    className={cn(
+                      "text-xs p-2 rounded",
+                      log.level === "error"
+                        ? "bg-red-50 text-red-700 border-l-2 border-red-500"
+                        : log.level === "warn"
+                          ? "bg-yellow-50 text-yellow-700 border-l-2 border-yellow-500"
+                          : "bg-gray-50 text-gray-700 border-l-2 border-gray-400"
+                    )}>
+                    <div className='font-mono'>{log.message}</div>
+                    <div className='text-xs text-muted-foreground mt-1'>
+                      {log.timestamp || "Just now"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className='text-center py-4 text-muted-foreground'>
+                <Database className='w-8 h-8 mx-auto mb-2 opacity-50' />
+                <p className='text-sm'>No logs available</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
