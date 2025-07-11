@@ -39,11 +39,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
-// Add new save state interface and state
+// Simplified save state interface
 interface SaveState {
   isOpen: boolean;
   mode: "new" | "update" | "save-as";
-  shouldExecuteAfterSave: boolean;
 }
 
 export default function BuilderPage() {
@@ -95,7 +94,6 @@ export default function BuilderPage() {
   const [saveState, setSaveState] = useState<SaveState>({
     isOpen: false,
     mode: "new",
-    shouldExecuteAfterSave: false,
   });
 
   // Add back exit dialog state
@@ -186,6 +184,61 @@ export default function BuilderPage() {
     }
   }, [workflowId]);
 
+  // Utility to normalize blockType to lowercase string
+  const normalizeNodesBlockType = useCallback((nodes: any[]) => {
+    return nodes.map((node: any) => ({
+      ...node,
+      data: {
+        ...node.data,
+        blockType:
+          typeof node.data.blockType === "string"
+            ? node.data.blockType.toLowerCase()
+            : node.data.blockType,
+      },
+    }));
+  }, []);
+
+  // Background auto-save for existing workflows
+  useEffect(() => {
+    if (workflowId && hasUnsavedChanges && workflowName) {
+      const autoSaveTimeoutId = setTimeout(async () => {
+        try {
+          // Silently auto-save in background
+          const normalizedNodes = normalizeNodesBlockType(nodes);
+          await workflowService.updateWorkflow(workflowId, {
+            name: workflowName,
+            description: workflowDescription,
+            nodes: normalizedNodes,
+            edges,
+            is_public: false,
+          });
+          setHasUnsavedChanges(false);
+
+          // Subtle feedback
+          toast({
+            title: "Auto-saved",
+            description: "Your workflow has been automatically saved.",
+            duration: 2000,
+          });
+        } catch (error) {
+          console.error("Auto-save failed:", error);
+          // Don't show error toast for auto-save failures to avoid spam
+        }
+      }, 30000); // Auto-save after 30 seconds of inactivity
+
+      return () => clearTimeout(autoSaveTimeoutId);
+    }
+  }, [
+    workflowId,
+    hasUnsavedChanges,
+    nodes,
+    edges,
+    workflowName,
+    workflowDescription,
+    toast,
+    normalizeNodesBlockType,
+  ]);
+
   // Handlers using store actions
   const handleAddBlock = useCallback(
     (blockType: BlockType) => {
@@ -251,36 +304,19 @@ export default function BuilderPage() {
     [setWorkflowName, setWorkflowDescription, setHasUnsavedChanges]
   );
 
-  // Utility to normalize blockType to lowercase string
-  function normalizeNodesBlockType(nodes: any[]) {
-    return nodes.map((node) => ({
-      ...node,
-      data: {
-        ...node.data,
-        blockType:
-          typeof node.data.blockType === "string"
-            ? node.data.blockType.toLowerCase()
-            : node.data.blockType,
-      },
-    }));
-  }
-
-  // Update handleSmartSave
+  // Update handleSmartSave - immediate save for existing workflows
   const handleSmartSave = useCallback(async () => {
     if (workflowId) {
-      setSaveState({
-        isOpen: true,
-        mode: "update",
-        shouldExecuteAfterSave: false,
-      });
+      // ✅ Save immediately for existing workflows without dialog
+      await handleUpdateWorkflow(workflowName, workflowDescription);
     } else {
+      // ✅ Only open dialog for new workflows
       setSaveState({
         isOpen: true,
         mode: "new",
-        shouldExecuteAfterSave: false,
       });
     }
-  }, [workflowId]);
+  }, [workflowId, workflowName, workflowDescription]);
 
   // Update handleSaveNewWorkflow
   const handleSaveNewWorkflow = useCallback(
@@ -315,17 +351,6 @@ export default function BuilderPage() {
             title: "Workflow saved",
             description: "Your workflow has been saved successfully.",
           });
-
-          // Execute if requested
-          if (saveState.shouldExecuteAfterSave) {
-            setSaveState((prev) => ({
-              ...prev,
-              shouldExecuteAfterSave: false,
-            }));
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            executeWorkflow();
-            setShowExecutionPanel(true);
-          }
         }
       } catch (error: unknown) {
         const err = error as Error;
@@ -346,14 +371,12 @@ export default function BuilderPage() {
       toast,
       setWorkflowId,
       setHasUnsavedChanges,
-      saveState,
-      executeWorkflow,
-      setShowExecutionPanel,
       setLoading,
+      normalizeNodesBlockType,
     ]
   );
 
-  // Update handleUpdateWorkflow
+  // Update handleUpdateWorkflow - simplified without execution logic
   const handleUpdateWorkflow = useCallback(
     async (name: string, description: string, tags: string[] = []) => {
       try {
@@ -377,17 +400,6 @@ export default function BuilderPage() {
             title: "Workflow updated",
             description: "Your workflow has been updated successfully.",
           });
-
-          // Execute if requested
-          if (saveState.shouldExecuteAfterSave) {
-            setSaveState((prev) => ({
-              ...prev,
-              shouldExecuteAfterSave: false,
-            }));
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            executeWorkflow();
-            setShowExecutionPanel(true);
-          }
         }
       } catch (error: unknown) {
         const err = error as Error;
@@ -407,10 +419,8 @@ export default function BuilderPage() {
       edges,
       toast,
       setHasUnsavedChanges,
-      saveState,
-      executeWorkflow,
-      setShowExecutionPanel,
       setLoading,
+      normalizeNodesBlockType,
     ]
   );
 
@@ -444,14 +454,6 @@ export default function BuilderPage() {
 
         setHasUnsavedChanges(false);
         setSaveState((prev) => ({ ...prev, isOpen: false }));
-
-        // Execute the workflow if it was requested before saving
-        if (saveState.shouldExecuteAfterSave) {
-          setSaveState((prev) => ({ ...prev, shouldExecuteAfterSave: false }));
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          executeWorkflow();
-          setShowExecutionPanel(true);
-        }
       } catch (error: unknown) {
         const err = error as Error;
         console.error("Error saving as new workflow:", err);
@@ -471,14 +473,12 @@ export default function BuilderPage() {
       toast,
       setWorkflowId,
       setHasUnsavedChanges,
-      saveState,
-      executeWorkflow,
-      setShowExecutionPanel,
       setLoading,
+      normalizeNodesBlockType,
     ]
   );
 
-  // Update handleExecuteWorkflow
+  // Update handleExecuteWorkflow - non-blocking execution
   const handleExecuteWorkflow = useCallback(async () => {
     try {
       // 1. Validate workflow
@@ -494,27 +494,18 @@ export default function BuilderPage() {
         return;
       }
 
-      // 2. Handle unsaved workflow
-      if (!workflowId) {
-        setSaveState({
-          isOpen: true,
-          mode: "new",
-          shouldExecuteAfterSave: true,
+      // 2. Optional save prompt for unsaved workflows (non-blocking)
+      if (!workflowId || hasUnsavedChanges) {
+        // Show subtle toast suggestion but don't block execution
+        toast({
+          title: "Executing unsaved workflow",
+          description:
+            "Consider saving your workflow first. Use Cmd+S to save quickly.",
+          duration: 3000,
         });
-        return;
       }
 
-      // 3. Handle workflow with unsaved changes
-      if (hasUnsavedChanges) {
-        setSaveState({
-          isOpen: true,
-          mode: "update",
-          shouldExecuteAfterSave: true,
-        });
-        return;
-      }
-
-      // 4. Execute workflow
+      // 3. Execute workflow immediately regardless of save state
       setShowExecutionPanel(true);
       await executeWorkflow();
     } catch (error: unknown) {
