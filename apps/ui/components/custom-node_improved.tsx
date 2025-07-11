@@ -1,6 +1,8 @@
 import { Handle, Position, useConnection } from "@xyflow/react";
 import { Database, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "next-themes";
+import React from "react";
 
 interface NodeData {
   blockType: string;
@@ -12,9 +14,9 @@ interface NodeData {
   inputCount?: number;
   outputCount?: number;
   status?: string;
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
   iconName?: string;
-  style?: Record<string, any>;
+  style?: React.CSSProperties;
 }
 
 export default function CustomNode({
@@ -24,87 +26,147 @@ export default function CustomNode({
   id: string;
   data: NodeData;
 }) {
+  const { theme } = useTheme();
   const connection = useConnection();
-  const isTarget = connection.inProgress && connection.fromNode.id !== id;
-  const label = data.label || data.blockType || "Node";
-  const description = data.description || "";
-  const status = data.status || "idle";
-  const isEnabled = data.isEnabled !== false;
-  const icon = <Database className='w-5 h-5' />; // You can map iconName to actual icons if needed
-  // Status indicator
-  let statusColor = "bg-gray-300";
-  let statusIcon = null;
-  if (status === "started" || status === "running") {
-    statusColor = "bg-blue-500 animate-pulse";
-    statusIcon = <Loader2 className='w-3 h-3 animate-spin text-blue-500' />;
-  } else if (status === "success" || status === "completed") {
-    statusColor = "bg-green-500";
-    statusIcon = <CheckCircle2 className='w-3 h-3 text-green-500' />;
-  } else if (status === "error" || status === "failed") {
-    statusColor = "bg-red-500";
-    statusIcon = <XCircle className='w-3 h-3 text-red-500' />;
-  }
+  const isConnecting = connection.inProgress;
+  const isTarget = isConnecting && connection.fromNode?.id !== id;
 
-  // Config summary (show a few key config values)
-  const configSummary = data.config
-    ? Object.entries(data.config)
-        .filter(([k]) => k !== "")
-        .slice(0, 3)
-        .map(([k, v]) => (
-          <div key={k} className='text-xs text-muted-foreground truncate'>
-            <span className='font-medium text-foreground/80'>{k}:</span>{" "}
-            {String(v)}
+  const {
+    label = data.blockType || "Node",
+    description = "",
+    status = "idle",
+    isEnabled = true,
+    config = {},
+  } = data;
+
+  const icon = <Database className='w-5 h-5' />; // TODO: Map iconName to actual icons
+
+  // Status Indicator
+  const statusIndicator = React.useMemo(() => {
+    switch (status) {
+      case "started":
+      case "running":
+        return (
+          <div className='flex items-center gap-1.5 text-blue-500'>
+            <Loader2 className='w-3.5 h-3.5 animate-spin' />
+            <span className='text-xs font-medium'>Running...</span>
           </div>
-        ))
-    : null;
+        );
+      case "success":
+      case "completed":
+        return (
+          <div className='flex items-center gap-1.5 text-green-500'>
+            <CheckCircle2 className='w-3.5 h-3.5' />
+            <span className='text-xs font-medium'>Completed</span>
+          </div>
+        );
+      case "error":
+      case "failed":
+        return (
+          <div className='flex items-center gap-1.5 text-red-500'>
+            <XCircle className='w-3.5 h-3.5' />
+            <span className='text-xs font-medium'>Failed</span>
+          </div>
+        );
+      default:
+        return null;
+    }
+  }, [status]);
+
+  const configSummary = Object.entries(config)
+    .filter(([key]) => key && key !== "blockType" && key !== "label")
+    .slice(0, 3)
+    .map(([key, value]) => (
+      <div key={key} className='flex justify-between items-center text-xs'>
+        <span className='text-muted-foreground font-mono'>{key}:</span>
+        <span className='font-semibold text-foreground/90 truncate'>
+          {String(value) || "Not set"}
+        </span>
+      </div>
+    ));
 
   return (
     <div
       className={cn(
-        "rounded-lg border shadow-md bg-white dark:bg-slate-900 min-w-[200px] max-w-[260px] w-full relative flex flex-col transition-all duration-200",
-        !isEnabled && "opacity-60 grayscale",
-        isTarget && "ring-2 ring-primary animate-pulse"
+        "custom-node rounded-xl border bg-card w-[280px] shadow-sm transition-all duration-200 relative",
+        !isEnabled && "opacity-50 grayscale",
+        isTarget
+          ? "border-2 border-primary shadow-lg shadow-primary/20"
+          : "border-border/30",
+        theme === "dark" && !isTarget && "shadow-black/20"
       )}
-      style={{ width: data.style?.width || 220 }}>
+      style={data.style}>
       {/* Header */}
-      <div className='flex items-center gap-2 px-3 py-2 rounded-t-lg bg-gradient-to-r from-primary/10 to-primary/5 border-b border-muted-foreground/10'>
-        <div className='flex items-center justify-center w-7 h-7 rounded-md bg-primary/10 text-primary'>
+      <div
+        className={cn(
+          "custom-drag-handle flex items-center gap-3 p-3 rounded-t-lg border-b cursor-grab relative z-10",
+          isTarget ? "border-primary/20" : "border-border/80"
+        )}>
+        <div
+          className={cn(
+            "flex items-center justify-center w-8 h-8 rounded-lg",
+            isTarget
+              ? "bg-primary/20 text-primary"
+              : "bg-primary/10 text-primary"
+          )}>
           {icon}
         </div>
         <div className='flex-1 min-w-0'>
-          <div className='font-semibold text-sm truncate'>{label}</div>
-        </div>
-        {/* Status indicator */}
-        <div
-          className={cn(
-            "w-4 h-4 rounded-full flex items-center justify-center",
-            statusColor
-          )}>
-          {statusIcon}
+          <div className='font-bold text-sm truncate text-foreground'>
+            {label}
+          </div>
         </div>
       </div>
-      {/* Description */}
-      {description && (
-        <div className='px-3 pt-1 pb-0.5 text-xs text-muted-foreground truncate'>
-          {description}
-        </div>
-      )}
-      {/* Config summary */}
-      {configSummary && configSummary.length > 0 && (
-        <div className='px-3 pt-1 pb-2 space-y-0.5'>{configSummary}</div>
-      )}
-      {/* Handles */}
+
+      {/* Body */}
+      <div className='p-3 space-y-2 relative z-10'>
+        {description && (
+          <p className='text-xs text-muted-foreground pb-1 border-b border-dashed border-border/80'>
+            {description}
+          </p>
+        )}
+        <div className='space-y-1.5'>{configSummary}</div>
+        {statusIndicator && (
+          <div className='pt-2 mt-2 border-t border-dashed border-border/80'>
+            {statusIndicator}
+          </div>
+        )}
+      </div>
+
+      {/* Handles - styled to cover the entire node */}
       <Handle
-        className='customHandle'
-        position={Position.Right}
-        type='source'
-      />
-      {/* We want to disable the target handle, if the connection was started from this node */}
-      <Handle
-        className='customHandle'
-        position={Position.Left}
         type='target'
-        isConnectableStart={false}
+        position={Position.Left}
+        className='react-flow__handle-target'
+        style={{
+          width: "100%",
+          height: "100%",
+          top: 0,
+          left: 0,
+          transform: "none",
+          borderRadius: "12px",
+          background: "transparent",
+          border: "none",
+          opacity: 0,
+          pointerEvents: "all",
+        }}
+      />
+      <Handle
+        type='source'
+        position={Position.Right}
+        className='react-flow__handle-source'
+        style={{
+          width: "100%",
+          height: "100%",
+          top: 0,
+          right: 0,
+          transform: "none",
+          borderRadius: "12px",
+          background: "transparent",
+          border: "none",
+          opacity: 0,
+          pointerEvents: "all",
+        }}
       />
     </div>
   );

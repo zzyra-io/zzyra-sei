@@ -198,3 +198,84 @@
     border-color 0.2s ease,
     color 0.2s ease;
 }
+
+/* Easy Connect Handles */
+.react-flow__handle-target {
+  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+  top: 0 !important;
+  left: 0 !important;
+  transform: none !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  border: none !important;
+  opacity: 0 !important;
+  pointer-events: all !important;
+  z-index: 1;
+}
+
+.react-flow__handle-source {
+  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+  top: 0 !important;
+  right: 0 !important;
+  transform: none !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  border: none !important;
+  opacity: 0 !important;
+  pointer-events: all !important;
+  z-index: 1;
+}
+
+/* Drag handle should be above the connection handles */
+.custom-drag-handle {
+  position: relative !important;
+  z-index: 10 !important;
+  pointer-events: all !important;
+}
+
+/* Node content should be above connection handles */
+.custom-node > div {
+  position: relative;
+  z-index: 10;
+}
+
+.custom-handle {
+  @apply w-4 h-4 rounded-full bg-card border-2 border-muted-foreground/30 shadow-sm;
+  @apply transition-all duration-200;
+}
+
+.custom-handle:hover {
+  @apply border-primary/80 scale-125 bg-primary/20 shadow-md;
+}
+
+.custom-handle.connecting {
+  @apply cursor-grabbing scale-125 bg-primary/20 border-primary shadow-lg;
+}
+
+.custom-handle.source {
+  /* You can add specific styles for source handles if needed */
+}
+
+.custom-handle.target {
+  /* You can add specific styles for target handles if needed */
+}
+
+.react-flow__handle-left {
+  left: -9px;
+}
+
+.react-flow__handle-right {
+  right: -9px;
+}
+
+.react-flow__handle-top {
+  top: -9px;
+}
+
+.react-flow__handle-bottom {
+  bottom: -9px;
+}

@@ -198,6 +198,8 @@ export default function BuilderPage() {
           blockType: blockType, // Store the actual block type enum value (e.g., "webhook")
           config: {},
         },
+        dragHandle: ".custom-drag-handle",
+        isConnectable: true,
       };
       console.log("newNode", newNode);
       addNode(newNode);
@@ -213,6 +215,8 @@ export default function BuilderPage() {
         type: "custom",
         position: { x: 150, y: 150 },
         data: customData,
+        dragHandle: ".custom-drag-handle",
+        isConnectable: true,
       };
       addNode(newNode);
       setHasUnsavedChanges(true);

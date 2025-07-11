@@ -14,6 +14,7 @@ import {
   ReactFlowProvider,
   applyEdgeChanges,
   applyNodeChanges,
+  ConnectionMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { NodeCategory } from "@zyra/types";
@@ -453,6 +454,7 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onInit={setReactFlowInstance}
+          connectionMode={ConnectionMode.Loose}
           connectionLineStyle={{ stroke: themeColors.connectionLine }}
           defaultEdgeOptions={defaultEdgeOptions}
           connectionLineComponent={CustomConnectionLine}
