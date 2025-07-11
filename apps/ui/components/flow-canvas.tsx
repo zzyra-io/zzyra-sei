@@ -4,6 +4,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { wouldCreateCycle } from "@/lib/workflow/cycle-detection";
 import {
   Background,
+  BackgroundVariant,
   Connection,
   Controls,
   Edge,
@@ -15,7 +16,7 @@ import {
   applyNodeChanges,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { BlockType, NodeCategory } from "@zyra/types";
+import { NodeCategory } from "@zyra/types";
 // Removed debounce import since we're using direct node updates
 import { useNodeConfigurations } from "@/app/builder/node-configurations";
 import { useWorkflowStore } from "@/lib/store/workflow-store";
@@ -25,6 +26,7 @@ import { ContextMenu } from "./context-menu";
 import { EdgeConfigPanel } from "./edge-config-panel";
 import "@xyflow/react/dist/style.css";
 import CustomConnectionLine from "./custom-connection-line";
+import { useTheme } from "next-themes";
 
 interface FlowCanvasProps {
   executionId?: string | null;
@@ -100,6 +102,7 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
   } = useWorkflowStore();
 
   const { toast } = useToast();
+  const { theme } = useTheme();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -113,6 +116,15 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
     type: "node" | "edge" | "canvas";
     id?: string;
   } | null>(null);
+
+  // Theme-aware colors
+  const isDark = theme === "dark";
+  const themeColors = {
+    background: isDark ? "#0f172a" : "#ffffff",
+    grid: isDark ? "#1e293b" : "#f1f5f9",
+    connectionLine: isDark ? "#64748b" : "#94a3b8",
+    edge: isDark ? "#475569" : "#64748b",
+  };
 
   // Initialize canvas state
   useEffect(() => {
@@ -291,11 +303,11 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
         id: `${params.source}-${params.target}-${Date.now()}`,
         type: "custom",
         animated: true,
-        style: { stroke: "#64748b" },
+        style: { stroke: themeColors.edge },
       };
       addEdge(newEdge);
     },
-    [nodes, edges, addEdge, toast]
+    [nodes, edges, addEdge, toast, themeColors.edge]
   );
 
   // Update toolbar actions using store state and actions
@@ -359,11 +371,11 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
   }
 
   return (
-    <div className='flex h-full'>
+    <div className='flex h-full bg-background'>
       {/* Canvas Area */}
       <div
         ref={reactFlowWrapper}
-        className='flex-1 h-full'
+        className={`flex-1 h-full ${isDark ? "dark" : ""}`}
         onDragOver={handleDragOverCanvas}
         onDrop={onDrop}>
         <ReactFlow
@@ -441,15 +453,55 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onInit={setReactFlowInstance}
-          connectionLineStyle={{ stroke: "#b1b1b7" }}
+          connectionLineStyle={{ stroke: themeColors.connectionLine }}
           defaultEdgeOptions={defaultEdgeOptions}
           connectionLineComponent={CustomConnectionLine}
-          fitView>
+          fitView
+          className={isDark ? "dark" : "light"}
+          style={{ backgroundColor: themeColors.background }}>
+          {/* Theme-aware Background */}
           {isGridVisible && (
-            <Background variant='dots' gap={16} size={0.6} color='#f8fafc' />
+            <Background
+              variant='dots'
+              gap={16}
+              size={0.6}
+              color={themeColors.grid}
+            />
           )}
-          <Controls />
-          {nodes.length > 10 && <MiniMap pannable zoomable />}
+
+          {/* Theme-aware Controls */}
+          <Controls
+            className={
+              isDark
+                ? "react-flow__controls-dark"
+                : "react-flow__controls-light"
+            }
+          />
+
+          {/* Theme-aware MiniMap */}
+          {nodes.length > 10 && (
+            <MiniMap
+              pannable
+              zoomable
+              className={
+                isDark
+                  ? "react-flow__minimap-dark"
+                  : "react-flow__minimap-light"
+              }
+              maskColor={
+                isDark ? "rgba(15, 23, 42, 0.8)" : "rgba(255, 255, 255, 0.8)"
+              }
+              nodeColor={(node) => {
+                return node.selected
+                  ? isDark
+                    ? "#3b82f6"
+                    : "#2563eb"
+                  : isDark
+                    ? "#374151"
+                    : "#e5e7eb";
+              }}
+            />
+          )}
         </ReactFlow>
       </div>
 

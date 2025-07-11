@@ -37,6 +37,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useTheme } from "next-themes";
 
 interface WorkflowToolbarProps {
   onUndo: () => void;
@@ -59,27 +60,6 @@ interface WorkflowToolbarProps {
   isExecuting: boolean;
 }
 
-// Wrapper to add inline help icon linking to user manual anchors
-function Helpable({
-  anchor,
-  children,
-}: {
-  anchor: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className='relative inline-block group'>
-      {children}
-      <button
-        onClick={() => window.open(`/user-manual.md#${anchor}`, "_blank")}
-        className='opacity-0 group-hover:opacity-100 absolute top-0 right-0 p-1 text-muted-foreground hover:text-primary'
-        aria-label='Help'>
-        <Info className='h-3 w-3' />
-      </button>
-    </div>
-  );
-}
-
 export function WorkflowToolbar({
   onUndo,
   onRedo,
@@ -100,6 +80,8 @@ export function WorkflowToolbar({
   isGridVisible,
   isExecuting,
 }: WorkflowToolbarProps) {
+  const { theme } = useTheme();
+
   // Determine modifier key based on platform
   const [modKey, setModKey] = useState("Ctrl");
   useEffect(() => {
@@ -113,57 +95,85 @@ export function WorkflowToolbar({
 
   return (
     <TooltipProvider>
-      <div className='bg-background/80 backdrop-blur-sm border rounded-lg shadow-md p-1 flex items-center space-x-1'>
+      <div
+        className={cn(
+          "bg-card/95 backdrop-blur-md border border-border/60 rounded-xl shadow-lg",
+          "p-2 flex items-center gap-1",
+          "transition-all duration-200 hover:shadow-xl hover:border-border/80",
+          theme === "dark" ? "shadow-black/20" : "shadow-gray-200/50"
+        )}>
         {/* History Controls */}
-        <div className='flex items-center'>
+        <div className='flex items-center gap-0.5'>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Helpable anchor='undo'>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  onClick={onUndo}
-                  disabled={!canUndo}
-                  className='h-8 w-8'>
-                  <Undo2 className='h-4 w-4' />
-                </Button>
-              </Helpable>
+              <Button
+                variant='ghost'
+                size='icon'
+                onClick={onUndo}
+                disabled={!canUndo}
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-muted/80 hover:scale-105 active:scale-95",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "focus-visible:ring-2 focus-visible:ring-primary/20"
+                )}>
+                <Undo2 className='h-4 w-4' />
+              </Button>
             </TooltipTrigger>
-            <TooltipContent>Undo ({modKey}+Z)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Undo ({modKey}+Z)</p>
+            </TooltipContent>
           </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Helpable anchor='redo'>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  onClick={onRedo}
-                  disabled={!canRedo}
-                  className='h-8 w-8'>
-                  <Redo2 className='h-4 w-4' />
-                </Button>
-              </Helpable>
+              <Button
+                variant='ghost'
+                size='icon'
+                onClick={onRedo}
+                disabled={!canRedo}
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-muted/80 hover:scale-105 active:scale-95",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "focus-visible:ring-2 focus-visible:ring-primary/20"
+                )}>
+                <Redo2 className='h-4 w-4' />
+              </Button>
             </TooltipTrigger>
-            <TooltipContent>Redo ({modKey}+Y)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Redo ({modKey}+Y)</p>
+            </TooltipContent>
           </Tooltip>
         </div>
 
-        <Separator orientation='vertical' className='h-6' />
+        <Separator orientation='vertical' className='h-6 mx-1 bg-border/60' />
 
         {/* Zoom Controls */}
-        <div className='flex items-center'>
+        <div className='flex items-center gap-0.5'>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant='ghost'
                 size='icon'
                 onClick={onZoomIn}
-                className='h-8 w-8'>
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-muted/80 hover:scale-105 active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-primary/20"
+                )}>
                 <ZoomIn className='h-4 w-4' />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Zoom In ({modKey}++)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Zoom In ({modKey}++)</p>
+            </TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -172,11 +182,19 @@ export function WorkflowToolbar({
                 variant='ghost'
                 size='icon'
                 onClick={onZoomOut}
-                className='h-8 w-8'>
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-muted/80 hover:scale-105 active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-primary/20"
+                )}>
                 <ZoomOut className='h-4 w-4' />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Zoom Out ({modKey}+-)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Zoom Out ({modKey}+-)</p>
+            </TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -185,11 +203,19 @@ export function WorkflowToolbar({
                 variant='ghost'
                 size='icon'
                 onClick={onFitView}
-                className='h-8 w-8'>
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-muted/80 hover:scale-105 active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-primary/20"
+                )}>
                 <Maximize className='h-4 w-4' />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Fit to View ({modKey}+0)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Fit to View ({modKey}+0)</p>
+            </TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -199,31 +225,47 @@ export function WorkflowToolbar({
                 size='icon'
                 onClick={onToggleGrid}
                 className={cn(
-                  "h-8 w-8",
-                  isGridVisible ? "text-primary" : "text-muted-foreground"
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-muted/80 hover:scale-105 active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-primary/20",
+                  isGridVisible
+                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                    : "text-muted-foreground"
                 )}>
                 <Grid className='h-4 w-4' />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Toggle Grid ({modKey}+G)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Toggle Grid ({modKey}+G)</p>
+            </TooltipContent>
           </Tooltip>
         </div>
 
-        <Separator orientation='vertical' className='h-6' />
+        <Separator orientation='vertical' className='h-6 mx-1 bg-border/60' />
 
         {/* Node Operations */}
-        <div className='flex items-center'>
+        <div className='flex items-center gap-0.5'>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant='ghost'
                 size='icon'
                 onClick={onDelete}
-                className='h-8 w-8'>
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-destructive/10 hover:text-destructive hover:scale-105 active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-destructive/20"
+                )}>
                 <Trash2 className='h-4 w-4' />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Delete Selected (Del)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Delete Selected (Del)</p>
+            </TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -232,11 +274,19 @@ export function WorkflowToolbar({
                 variant='ghost'
                 size='icon'
                 onClick={onCopy}
-                className='h-8 w-8'>
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-muted/80 hover:scale-105 active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-primary/20"
+                )}>
                 <Copy className='h-4 w-4' />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Duplicate Selected ({modKey}+D)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Duplicate Selected ({modKey}+D)</p>
+            </TooltipContent>
           </Tooltip>
 
           {/* Horizontal Alignment Dropdown */}
@@ -244,23 +294,40 @@ export function WorkflowToolbar({
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button variant='ghost' size='icon' className='h-8 w-8'>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    className={cn(
+                      "h-9 w-9 rounded-lg transition-all duration-200",
+                      "hover:bg-muted/80 hover:scale-105 active:scale-95",
+                      "focus-visible:ring-2 focus-visible:ring-primary/20"
+                    )}>
                     <AlignHorizontalJustifyCenter className='h-4 w-4' />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
-              <TooltipContent>Horizontal Alignment</TooltipContent>
+              <TooltipContent
+                side='bottom'
+                className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+                <p className='font-medium'>Horizontal Alignment</p>
+              </TooltipContent>
             </Tooltip>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => onAlignHorizontal("left")}>
+            <DropdownMenuContent className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <DropdownMenuItem
+                onClick={() => onAlignHorizontal("left")}
+                className='hover:bg-muted/80'>
                 <AlignLeft className='h-4 w-4 mr-2' />
                 Align Left
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onAlignHorizontal("center")}>
+              <DropdownMenuItem
+                onClick={() => onAlignHorizontal("center")}
+                className='hover:bg-muted/80'>
                 <AlignCenter className='h-4 w-4 mr-2' />
                 Align Center
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onAlignHorizontal("right")}>
+              <DropdownMenuItem
+                onClick={() => onAlignHorizontal("right")}
+                className='hover:bg-muted/80'>
                 <AlignRight className='h-4 w-4 mr-2' />
                 Align Right
               </DropdownMenuItem>
@@ -272,23 +339,40 @@ export function WorkflowToolbar({
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button variant='ghost' size='icon' className='h-8 w-8'>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    className={cn(
+                      "h-9 w-9 rounded-lg transition-all duration-200",
+                      "hover:bg-muted/80 hover:scale-105 active:scale-95",
+                      "focus-visible:ring-2 focus-visible:ring-primary/20"
+                    )}>
                     <AlignVerticalJustifyCenter className='h-4 w-4' />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
-              <TooltipContent>Vertical Alignment</TooltipContent>
+              <TooltipContent
+                side='bottom'
+                className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+                <p className='font-medium'>Vertical Alignment</p>
+              </TooltipContent>
             </Tooltip>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => onAlignVertical("top")}>
+            <DropdownMenuContent className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <DropdownMenuItem
+                onClick={() => onAlignVertical("top")}
+                className='hover:bg-muted/80'>
                 <AlignStartVertical className='h-4 w-4 mr-2' />
                 Align Top
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onAlignVertical("center")}>
+              <DropdownMenuItem
+                onClick={() => onAlignVertical("center")}
+                className='hover:bg-muted/80'>
                 <AlignCenterVertical className='h-4 w-4 mr-2' />
                 Align Middle
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onAlignVertical("bottom")}>
+              <DropdownMenuItem
+                onClick={() => onAlignVertical("bottom")}
+                className='hover:bg-muted/80'>
                 <AlignEndVertical className='h-4 w-4 mr-2' />
                 Align Bottom
               </DropdownMenuItem>
@@ -296,22 +380,30 @@ export function WorkflowToolbar({
           </DropdownMenu>
         </div>
 
-        <Separator orientation='vertical' className='h-6' />
+        <Separator orientation='vertical' className='h-6 mx-1 bg-border/60' />
 
         {/* Workflow Operations */}
-        <div className='flex items-center'>
+        <div className='flex items-center gap-0.5'>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant='ghost'
                 size='icon'
                 onClick={onSave}
-                className='h-8 w-8'
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-green-500/10 hover:text-green-600 hover:scale-105 active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-green-500/20"
+                )}
                 aria-label='Save Workflow'>
                 <Save className='h-4 w-4' />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Save Workflow ({modKey}+S)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Save Workflow ({modKey}+S)</p>
+            </TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -321,12 +413,21 @@ export function WorkflowToolbar({
                 size='icon'
                 onClick={onExecute}
                 disabled={isExecuting}
-                className='h-8 w-8'
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-primary/10 hover:text-primary hover:scale-105 active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-primary/20",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                )}
                 aria-label='Execute Workflow'>
                 <Play className='h-4 w-4' />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Execute Workflow ({modKey}+E)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Execute Workflow ({modKey}+E)</p>
+            </TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -335,33 +436,42 @@ export function WorkflowToolbar({
                 variant='ghost'
                 size='icon'
                 onClick={onReset}
-                className='h-8 w-8 text-destructive'>
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-destructive/10 hover:text-destructive hover:scale-105 active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-destructive/20"
+                )}>
                 <RefreshCw className='h-4 w-4' />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Reset Canvas ({modKey}+Shift+R)</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Reset Canvas ({modKey}+Shift+R)</p>
+            </TooltipContent>
           </Tooltip>
 
-          {/* Help/Tour */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant='ghost'
                 size='icon'
                 onClick={onHelp}
-                className='h-8 w-8'>
+                className={cn(
+                  "h-9 w-9 rounded-lg transition-all duration-200",
+                  "hover:bg-blue-500/10 hover:text-blue-600 hover:scale-105 active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-blue-500/20"
+                )}>
                 <Info className='h-4 w-4' />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Show Tour</TooltipContent>
+            <TooltipContent
+              side='bottom'
+              className='bg-popover/95 backdrop-blur-sm border border-border/60'>
+              <p className='font-medium'>Show Help & Shortcuts</p>
+            </TooltipContent>
           </Tooltip>
         </div>
-      </div>
-      {/* Keyboard shortcuts legend */}
-      <div className='mt-1 text-xs text-muted-foreground text-center'>
-        Shortcuts: Save ({modKey}+S) | Execute ({modKey}+E) | Undo ({modKey}+Z)
-        | Redo ({modKey}+Y) | Delete (Del) | Copy ({modKey}+D) | Grid ({modKey}
-        +G) | Fit ({modKey}+0)
       </div>
     </TooltipProvider>
   );

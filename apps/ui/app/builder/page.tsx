@@ -754,8 +754,8 @@ export default function BuilderPage() {
         {/* Main content */}
         <div className='flex flex-1 bg-background relative overflow-hidden'>
           {/* Workflow Toolbar - positioned relative to main content */}
-          <div className='absolute top-4 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none'>
-            <div className='pointer-events-auto'>
+          <div className='absolute top-6 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none'>
+            <div className='pointer-events-auto animate-in fade-in-0 slide-in-from-top-2 duration-300'>
               <WorkflowToolbar
                 onUndo={toolbar.undo}
                 onRedo={toolbar.redo}
