@@ -99,10 +99,9 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
     showEdgeConfigPanel,
   } = useWorkflowStore();
 
-  console.log("nodes", nodes);
-
   const { toast } = useToast();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const { nodeTypes, edgeTypes, defaultEdgeOptions, connectionLineTypes } =
     useNodeConfigurations();
@@ -114,6 +113,15 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
     type: "node" | "edge" | "canvas";
     id?: string;
   } | null>(null);
+
+  // Initialize canvas state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialized(true);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // **Event Handlers**
 
@@ -335,6 +343,20 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
     addNode,
     toolbarRef,
   ]);
+
+  // Show loading state while initializing
+  if (!isInitialized) {
+    return (
+      <div className='flex items-center justify-center h-full bg-muted/5'>
+        <div className='flex flex-col items-center gap-4'>
+          <div className='w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin' />
+          <p className='text-sm text-muted-foreground'>
+            Loading workflow canvas...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className='flex h-full'>

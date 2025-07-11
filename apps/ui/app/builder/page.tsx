@@ -15,7 +15,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   ResizableHandle,
@@ -702,39 +701,50 @@ export default function BuilderPage() {
     <>
       <div className='flex flex-col h-screen'>
         {/* Header */}
-        <div className='flex justify-between items-center p-4 border-b'>
-          <div className='flex items-center gap-2'>
-            <Button variant='ghost' size='sm' onClick={handleExit}>
-              <ArrowLeft className='h-4 w-4 mr-1' />
-              Back
+        <div className='flex justify-between items-center p-4 border-b flex-shrink-0 bg-background/95 backdrop-blur-sm'>
+          <div className='flex items-center gap-3'>
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={handleExit}
+              className='hover:bg-muted/80'>
+              <ArrowLeft className='h-4 w-4 mr-2' />
+              <span className='font-medium'>Back</span>
             </Button>
-            <span className='text-lg font-semibold'>
-              {workflowName || "Untitled Workflow"}
-            </span>
-            {hasUnsavedChanges && (
-              <span className='text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full'>
-                Unsaved
+            <div className='h-6 w-px bg-border' />
+            <div className='flex items-center gap-2'>
+              <span className='text-lg font-semibold text-foreground'>
+                {workflowName || "Untitled Workflow"}
               </span>
-            )}
+              {hasUnsavedChanges && (
+                <span className='text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 px-2 py-1 rounded-full font-medium border border-amber-200 dark:border-amber-800'>
+                  Unsaved Changes
+                </span>
+              )}
+            </div>
           </div>
           <div className='flex items-center gap-2'>
-            <Button variant='outline' size='sm' onClick={handleSmartSave}>
-              <Save className='h-4 w-4 mr-1' />
-              {workflowId ? "Save" : "Save As..."}
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={handleSmartSave}
+              className='font-medium hover:bg-muted/80 border-border/60'>
+              <Save className='h-4 w-4 mr-2' />
+              <span>{workflowId ? "Save" : "Save As..."}</span>
             </Button>
             <Button
               onClick={handleExecuteWorkflow}
               disabled={isExecutionPending || hasInvalidConfig}
-              className='bg-blue-500 hover:bg-blue-600 text-white'>
+              className='bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm hover:shadow-md transition-all'>
               {isExecutionPending ? (
                 <>
-                  <Loader2 className='h-4 w-4 mr-1 animate-spin' />
-                  Executing...
+                  <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                  <span>Executing...</span>
                 </>
               ) : (
                 <>
-                  <Play className='h-4 w-4 mr-1' />
-                  Execute
+                  <Play className='h-4 w-4 mr-2' />
+                  <span>Execute</span>
                 </>
               )}
             </Button>
@@ -742,41 +752,44 @@ export default function BuilderPage() {
         </div>
 
         {/* Main content */}
-        <div className='flex h-screen bg-background'>
-          <div className='absolute top-4 left-1/2 transform -translate-x-1/2 z-10'>
-            <WorkflowToolbar
-              onUndo={toolbar.undo}
-              onRedo={toolbar.redo}
-              onZoomIn={toolbar.zoomIn}
-              onZoomOut={toolbar.zoomOut}
-              onFitView={toolbar.fitView}
-              onToggleGrid={toolbar.toggleGrid}
-              onSave={handleSmartSave}
-              onExecute={handleExecuteWorkflow}
-              onDelete={toolbar.delete}
-              onCopy={toolbar.copy}
-              onAlignHorizontal={toolbar.alignHorizontal}
-              onAlignVertical={toolbar.alignVertical}
-              onReset={toolbar.reset}
-              onHelp={() => {
-                toast({
-                  title: "Workflow Builder Help",
-                  description:
-                    "Use the toolbar to manage your workflow. You can undo/redo changes, zoom in/out, fit the view, toggle grid, save, execute, delete, copy, align, and reset your workflow.",
-                });
-              }}
-              canUndo={toolbar.canUndo}
-              canRedo={toolbar.canRedo}
-              isGridVisible={toolbar.isGridVisible}
-              isExecuting={isExecutionPending || false}
-            />
+        <div className='flex flex-1 bg-background relative overflow-hidden'>
+          {/* Workflow Toolbar - positioned relative to main content */}
+          <div className='absolute top-4 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none'>
+            <div className='pointer-events-auto'>
+              <WorkflowToolbar
+                onUndo={toolbar.undo}
+                onRedo={toolbar.redo}
+                onZoomIn={toolbar.zoomIn}
+                onZoomOut={toolbar.zoomOut}
+                onFitView={toolbar.fitView}
+                onToggleGrid={toolbar.toggleGrid}
+                onSave={handleSmartSave}
+                onExecute={handleExecuteWorkflow}
+                onDelete={toolbar.delete}
+                onCopy={toolbar.copy}
+                onAlignHorizontal={toolbar.alignHorizontal}
+                onAlignVertical={toolbar.alignVertical}
+                onReset={toolbar.reset}
+                onHelp={() => {
+                  toast({
+                    title: "Workflow Builder Help",
+                    description:
+                      "Use the toolbar to manage your workflow. You can undo/redo changes, zoom in/out, fit the view, toggle grid, save, execute, delete, copy, align, and reset your workflow.",
+                  });
+                }}
+                canUndo={toolbar.canUndo}
+                canRedo={toolbar.canRedo}
+                isGridVisible={toolbar.isGridVisible}
+                isExecuting={isExecutionPending || false}
+              />
+            </div>
           </div>
 
           <ResizablePanelGroup direction='horizontal' className='h-full w-full'>
             <ResizablePanel
               defaultSize={25}
-              minSize={25}
-              maxSize={30}
+              minSize={20}
+              maxSize={35}
               className='h-full'>
               <BuilderSidebar
                 onAddNode={handleAddBlock}
@@ -793,12 +806,116 @@ export default function BuilderPage() {
               />
             </ResizablePanel>
             <ResizableHandle />
-            <ResizablePanel defaultSize={80} className='h-full relative'>
+            <ResizablePanel defaultSize={75} className='h-full relative'>
               <FlowCanvas executionId={executionId} />
+
+              {/* Empty State Overlay */}
+              {nodes.length === 0 && (
+                <div className='absolute inset-0 flex items-center justify-center pointer-events-none z-10 bg-background/50 backdrop-blur-sm'>
+                  <div className='text-center max-w-lg mx-auto p-8 bg-card/80 backdrop-blur-sm rounded-2xl border border-border/50 shadow-lg'>
+                    <div className='mb-8'>
+                      <div className='w-24 h-24 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent flex items-center justify-center border border-primary/20'>
+                        <div className='w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center'>
+                          <svg
+                            className='w-6 h-6 text-primary'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'>
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={1.5}
+                              d='M13.5 16.875h3.375m0 0h3.375m-3.375 0V13.5m0 3.375v3.375M6 10.5h2.25a2.25 2.25 0 002.25-2.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v2.25A2.25 2.25 0 006 10.5zm0 9.75h2.25A2.25 2.25 0 0010.5 18v-2.25a2.25 2.25 0 00-2.25-2.25H6a2.25 2.25 0 00-2.25 2.25V18A2.25 2.25 0 006 20.25zm9.75-9.75H18a2.25 2.25 0 002.25-2.25V6A2.25 2.25 0 0018 3.75h-2.25A2.25 2.25 0 0013.5 6v2.25a2.25 2.25 0 002.25 2.25z'
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                      <h3 className='text-2xl font-bold text-foreground mb-3'>
+                        Start Building Your Workflow
+                      </h3>
+                      <p className='text-muted-foreground text-base leading-relaxed mb-8 max-w-md mx-auto'>
+                        Create powerful automation workflows by connecting
+                        blocks together. Drag from the sidebar or use AI to get
+                        started.
+                      </p>
+                    </div>
+
+                    <div className='space-y-4'>
+                      <div className='grid grid-cols-1 gap-3 text-sm'>
+                        <div className='flex items-center gap-3 p-3 bg-muted/30 rounded-xl border border-muted'>
+                          <div className='w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0'>
+                            <span className='text-primary font-bold text-sm'>
+                              1
+                            </span>
+                          </div>
+                          <div className='text-left'>
+                            <div className='font-medium text-foreground'>
+                              Browse the Block Library
+                            </div>
+                            <div className='text-xs text-muted-foreground'>
+                              Find triggers, actions, and logic blocks in the
+                              sidebar
+                            </div>
+                          </div>
+                        </div>
+                        <div className='flex items-center gap-3 p-3 bg-muted/30 rounded-xl border border-muted'>
+                          <div className='w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0'>
+                            <span className='text-primary font-bold text-sm'>
+                              2
+                            </span>
+                          </div>
+                          <div className='text-left'>
+                            <div className='font-medium text-foreground'>
+                              Add Blocks to Canvas
+                            </div>
+                            <div className='text-xs text-muted-foreground'>
+                              Drag blocks here or click to add them
+                            </div>
+                          </div>
+                        </div>
+                        <div className='flex items-center gap-3 p-3 bg-muted/30 rounded-xl border border-muted'>
+                          <div className='w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0'>
+                            <span className='text-primary font-bold text-sm'>
+                              3
+                            </span>
+                          </div>
+                          <div className='text-left'>
+                            <div className='font-medium text-foreground'>
+                              Connect & Configure
+                            </div>
+                            <div className='text-xs text-muted-foreground'>
+                              Link blocks together and set up your automation
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className='pt-4 border-t border-border/50'>
+                        <p className='text-xs text-muted-foreground/80 flex items-center justify-center gap-2'>
+                          <svg
+                            className='w-4 h-4'
+                            fill='none'
+                            stroke='currentColor'
+                            viewBox='0 0 24 24'>
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              strokeWidth={1.5}
+                              d='M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z'
+                            />
+                          </svg>
+                          Try the AI workflow generator below to get started
+                          instantly
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Execution Status Panel - displays when a workflow is being executed */}
               {showExecutionPanel && (
-                <div className='absolute bottom-4 right-4 z-50 w-96'>
+                <div className='absolute bottom-4 right-4 z-30 w-96'>
                   <ExecutionStatusPanel
                     executionStatus={executionStatus || undefined}
                     isLoadingStatus={isLoadingStatus}
@@ -808,30 +925,30 @@ export default function BuilderPage() {
               )}
             </ResizablePanel>
           </ResizablePanelGroup>
-        </div>
 
-        {/* AI Workflow Generation Component */}
-        <div className='absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-full max-w-2xl px-4'>
-          {/* <Card className='bg-background/80 backdrop-blur-sm border shadow-lg p-4'> */}
-          <NlWorkflowGenerator
-            onNodesGenerated={(newNodes, newEdges) => {
-              const updatedNodes = [...nodes, ...newNodes];
-              const updatedEdges = [...edges, ...newEdges];
-              setNodes(updatedNodes);
-              setEdges(updatedEdges);
-              addToHistory(updatedNodes, updatedEdges);
-              setHasUnsavedChanges(true);
-              toast({
-                title: "Workflow generated",
-                description: `Created ${newNodes.length} components based on your description.`,
-              });
-            }}
-            existingNodes={nodes}
-            existingEdges={edges}
-            isGenerating={isGenerating}
-            setIsGenerating={setGenerating}
-          />
-          {/* </Card> */}
+          {/* AI Workflow Generation Component */}
+          <div className='absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-full max-w-2xl px-4 pointer-events-none'>
+            <div className='pointer-events-auto'>
+              <NlWorkflowGenerator
+                onNodesGenerated={(newNodes, newEdges) => {
+                  const updatedNodes = [...nodes, ...newNodes];
+                  const updatedEdges = [...edges, ...newEdges];
+                  setNodes(updatedNodes);
+                  setEdges(updatedEdges);
+                  addToHistory(updatedNodes, updatedEdges);
+                  setHasUnsavedChanges(true);
+                  toast({
+                    title: "Workflow generated",
+                    description: `Created ${newNodes.length} components based on your description.`,
+                  });
+                }}
+                existingNodes={nodes}
+                existingEdges={edges}
+                isGenerating={isGenerating}
+                setIsGenerating={setGenerating}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Workflow Refinement Dialog */}
