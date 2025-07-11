@@ -586,7 +586,7 @@ export default function BuilderPage() {
     if (hasUnsavedChanges) {
       setIsExitDialogOpen(true);
     } else {
-      router.push("/workflows");
+      router.push("/dashboard");
     }
   };
 
