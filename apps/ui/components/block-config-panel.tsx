@@ -543,25 +543,28 @@ export function BlockConfigPanel({
                 <Label htmlFor='accentColor'>Accent Color</Label>
                 <div className='grid grid-cols-4 gap-2'>
                   {[
-                    "primary",
-                    "secondary",
-                    "blue",
-                    "green",
-                    "red",
-                    "yellow",
-                    "purple",
-                    "orange",
-                  ].map((color) => (
+                    { name: "primary", color: "hsl(var(--primary))" },
+                    { name: "blue", color: "#3b82f6" },
+                    { name: "green", color: "#10b981" },
+                    { name: "red", color: "#ef4444" },
+                    { name: "yellow", color: "#f59e0b" },
+                    { name: "purple", color: "#8b5cf6" },
+                    { name: "orange", color: "#f97316" },
+                    { name: "secondary", color: "hsl(var(--secondary))" },
+                  ].map((colorOption) => (
                     <div
-                      key={color}
-                      className={`h-8 rounded-md cursor-pointer border-2 ${
+                      key={colorOption.name}
+                      className={`h-10 rounded-lg cursor-pointer border-2 transition-all duration-200 hover:scale-105 ${
                         (localNode.data.style?.accentColor || "primary") ===
-                        color
-                          ? "border-ring"
-                          : "border-transparent"
+                        colorOption.name
+                          ? "border-ring shadow-md"
+                          : "border-border hover:border-border/60"
                       }`}
-                      style={{ backgroundColor: `var(--${color})` }}
-                      onClick={() => handleStyleChange({ accentColor: color })}
+                      style={{ backgroundColor: colorOption.color }}
+                      onClick={() =>
+                        handleStyleChange({ accentColor: colorOption.name })
+                      }
+                      title={`${colorOption.name.charAt(0).toUpperCase() + colorOption.name.slice(1)} color`}
                     />
                   ))}
                 </div>
@@ -572,15 +575,19 @@ export function BlockConfigPanel({
                 <Input
                   id='width'
                   type='number'
-                  value={String((localNode.data.style?.width as number) || 220)}
+                  value={String((localNode.data.style?.width as number) || 280)}
                   onChange={(e) =>
                     handleStyleChange({
                       width: Number.parseInt(e.target.value),
                     })
                   }
-                  min={150}
-                  max={400}
+                  min={200}
+                  max={500}
+                  step={10}
                 />
+                <p className='text-xs text-muted-foreground'>
+                  Recommended: 280-350px
+                </p>
               </div>
 
               <div className='space-y-2'>
@@ -588,42 +595,69 @@ export function BlockConfigPanel({
                 <Input
                   id='height'
                   type='number'
-                  value={String(
-                    (localNode.data.style?.height as number) || 150
-                  )}
+                  value={String((localNode.data.style?.height as number) || "")}
                   onChange={(e) =>
                     handleStyleChange({
-                      height: Number.parseInt(e.target.value),
+                      height: e.target.value
+                        ? Number.parseInt(e.target.value)
+                        : undefined,
                     })
                   }
-                  min={100}
-                  max={400}
+                  min={120}
+                  max={500}
+                  step={10}
+                  placeholder='Auto'
                 />
+                <p className='text-xs text-muted-foreground'>
+                  Leave empty for automatic height
+                </p>
               </div>
 
               <div className='space-y-2'>
                 <Label htmlFor='backgroundColor'>Background Style</Label>
                 <div className='grid grid-cols-3 gap-2'>
                   {[
-                    { label: "Default", value: "bg-card" },
-                    { label: "Muted", value: "bg-muted" },
-                    { label: "Accent", value: "bg-accent" },
+                    {
+                      label: "Default",
+                      value: "bg-card",
+                      preview: "hsl(var(--card))",
+                    },
+                    {
+                      label: "Muted",
+                      value: "bg-muted",
+                      preview: "hsl(var(--muted))",
+                    },
+                    {
+                      label: "Accent",
+                      value: "bg-accent",
+                      preview: "hsl(var(--accent))",
+                    },
                   ].map((bg) => (
                     <div
                       key={bg.value}
-                      className={`p-2 rounded-md cursor-pointer text-center text-xs ${bg.value} ${
+                      className={`p-3 rounded-lg cursor-pointer text-center text-xs font-medium transition-all duration-200 hover:scale-105 ${
                         (localNode.data.style?.backgroundColor || "bg-card") ===
                         bg.value
-                          ? "ring-2 ring-ring"
-                          : "border border-border"
+                          ? "ring-2 ring-primary shadow-md"
+                          : "border border-border hover:border-border/60"
                       }`}
+                      style={{ backgroundColor: bg.preview }}
                       onClick={() =>
                         handleStyleChange({ backgroundColor: bg.value })
                       }>
+                      <div
+                        className='w-full h-6 rounded mb-1'
+                        style={{ backgroundColor: bg.preview }}></div>
                       {bg.label}
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className='pt-2 border-t border-border/50'>
+                <p className='text-xs text-muted-foreground'>
+                  Changes are applied immediately to the node
+                </p>
               </div>
             </div>
           </TabsContent>

@@ -16,7 +16,13 @@ interface NodeData {
   status?: string;
   config?: Record<string, unknown>;
   iconName?: string;
-  style?: React.CSSProperties;
+  style?: {
+    width?: number;
+    height?: number;
+    accentColor?: string;
+    backgroundColor?: string;
+    [key: string]: unknown;
+  };
 }
 
 export default function CustomNode({
@@ -37,9 +43,16 @@ export default function CustomNode({
     status = "idle",
     isEnabled = true,
     config = {},
+    style = {},
   } = data;
 
   const icon = <Database className='w-5 h-5' />; // TODO: Map iconName to actual icons
+
+  // Apply style configurations
+  const nodeWidth = style.width || 280;
+  const nodeHeight = style.height;
+  const accentColor = style.accentColor || "primary";
+  const backgroundColor = style.backgroundColor || "bg-card";
 
   // Status Indicator
   const statusIndicator = React.useMemo(() => {
@@ -85,17 +98,44 @@ export default function CustomNode({
       </div>
     ));
 
+  // Get accent color classes
+  const getAccentColorClasses = (color: string) => {
+    switch (color) {
+      case "blue":
+        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+      case "green":
+        return "bg-green-500/10 text-green-600 border-green-500/20";
+      case "red":
+        return "bg-red-500/10 text-red-600 border-red-500/20";
+      case "yellow":
+        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+      case "purple":
+        return "bg-purple-500/10 text-purple-600 border-purple-500/20";
+      case "orange":
+        return "bg-orange-500/10 text-orange-600 border-orange-500/20";
+      case "secondary":
+        return "bg-secondary/10 text-secondary-foreground border-secondary/20";
+      default:
+        return "bg-primary/10 text-primary border-primary/20";
+    }
+  };
+
   return (
     <div
       className={cn(
-        "custom-node rounded-xl border bg-card w-[280px] shadow-sm transition-all duration-200 relative",
+        "custom-node rounded-xl border shadow-sm transition-all duration-200 relative",
+        backgroundColor,
         !isEnabled && "opacity-50 grayscale",
         isTarget
           ? "border-2 border-primary shadow-lg shadow-primary/20"
           : "border-border/30",
         theme === "dark" && !isTarget && "shadow-black/20"
       )}
-      style={data.style}>
+      style={{
+        width: nodeWidth,
+        height: nodeHeight ? `${nodeHeight}px` : "auto",
+        minHeight: nodeHeight ? `${nodeHeight}px` : undefined,
+      }}>
       {/* Header */}
       <div
         className={cn(
@@ -106,8 +146,8 @@ export default function CustomNode({
           className={cn(
             "flex items-center justify-center w-8 h-8 rounded-lg",
             isTarget
-              ? "bg-primary/20 text-primary"
-              : "bg-primary/10 text-primary"
+              ? getAccentColorClasses(accentColor)
+              : getAccentColorClasses(accentColor)
           )}>
           {icon}
         </div>
@@ -119,7 +159,7 @@ export default function CustomNode({
       </div>
 
       {/* Body */}
-      <div className='p-3 space-y-2 relative z-10'>
+      <div className='p-3 space-y-2 relative z-10 flex-1'>
         {description && (
           <p className='text-xs text-muted-foreground pb-1 border-b border-dashed border-border/80'>
             {description}
