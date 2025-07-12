@@ -2,20 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../services/database.service';
 import { MagicAdminService } from '../../services/magic-admin.service';
 
-import { BlockHandler, BlockType } from '@zyra/types';
+import { BlockExecutionContext, BlockHandler, BlockType } from '@zyra/types';
 import * as vm from 'vm';
-import { CircuitBreaker } from '../../lib/blockchain/CircuitBreaker';
-import { CircuitBreakerDbService } from '../../lib/blockchain/CircuitBreakerDbService';
-import { WalletService } from './blockchain/WalletService';
 import { EmailBlockHandler } from './EmailBlockHandler';
-import { MetricsBlockHandler } from './MetricsBlockHandler';
-import { NotificationBlockHandler } from './NotificationBlockHandler';
 import { HttpRequestHandler } from './HttpRequestHandler';
-import { CalculatorHandler } from './CalculatorHandler';
-import { ComparatorHandler } from './ComparatorHandler';
-import { BlockchainReadHandler } from './BlockchainReadHandler';
+import { MetricsBlockHandler } from './MetricsBlockHandler';
 import { ScheduleBlockHandler } from './ScheduleBlockHandler';
-import { MagicWalletHandler } from './MagicWalletHandler';
 
 /**
  * Central registry for all block handlers.
@@ -31,26 +23,14 @@ export class BlockHandlerRegistry {
   constructor(
     private readonly logger: Logger,
     private readonly databaseService: DatabaseService,
-    private readonly magicAdminService: MagicAdminService,
   ) {
     // Initialize services
-    const walletService = new WalletService(this.databaseService);
-
-    // Create circuit breaker for blockchain operations
-    const circuitBreaker = new CircuitBreaker();
-    const circuitBreakerDbService = new CircuitBreakerDbService(
-      this.databaseService,
-    );
 
     this.handlers = {
       // Action blocks
       [BlockType.EMAIL]: new MetricsBlockHandler(
         BlockType.EMAIL,
         new EmailBlockHandler(this.databaseService),
-      ),
-      [BlockType.NOTIFICATION]: new MetricsBlockHandler(
-        BlockType.NOTIFICATION,
-        new NotificationBlockHandler(this.databaseService, {} as any),
       ),
 
       // Trigger blocks
@@ -64,105 +44,30 @@ export class BlockHandlerRegistry {
         BlockType.HTTP_REQUEST,
         new HttpRequestHandler(),
       ),
-      [BlockType.CALCULATOR]: new MetricsBlockHandler(
-        BlockType.CALCULATOR,
-        new CalculatorHandler(),
-      ),
-      [BlockType.COMPARATOR]: new MetricsBlockHandler(
-        BlockType.COMPARATOR,
-        new ComparatorHandler(),
-      ),
-      [BlockType.BLOCKCHAIN_READ]: new MetricsBlockHandler(
-        BlockType.BLOCKCHAIN_READ,
-        new BlockchainReadHandler(),
-      ),
 
       // Legacy block types mapped to new handlers
-      [BlockType.CONDITION]: new MetricsBlockHandler(
-        BlockType.CONDITION,
-        new ComparatorHandler(),
-      ),
+      [BlockType.CONDITION]: new MetricsBlockHandler(BlockType.CONDITION, {
+        execute: (node: any, context: BlockExecutionContext) => {
+          return Promise.resolve({
+            result: 'condition',
+          });
+        },
+      }),
 
       // Logic blocks with dedicated handlers
       [BlockType.SCHEDULE]: new MetricsBlockHandler(
         BlockType.SCHEDULE,
         new ScheduleBlockHandler(),
       ),
-      [BlockType.DELAY]: new MetricsBlockHandler(
-        BlockType.DELAY,
-        new ScheduleBlockHandler(),
-      ),
 
       // Additional block types mapped to existing handlers
-      [BlockType.HTTP_CALL]: new MetricsBlockHandler(
-        BlockType.HTTP_CALL,
-        new HttpRequestHandler(),
-      ),
+
       [BlockType.WEBHOOK]: new MetricsBlockHandler(
         BlockType.WEBHOOK,
         new HttpRequestHandler(),
       ),
-      [BlockType.MESSAGE_SEND]: new MetricsBlockHandler(
-        BlockType.MESSAGE_SEND,
-        new NotificationBlockHandler(this.databaseService, {} as any),
-      ),
 
       // Placeholder handlers for unimplemented block types
-      [BlockType.DATABASE_QUERY]: new MetricsBlockHandler(
-        BlockType.DATABASE_QUERY,
-        {
-          execute: () => {
-            throw new Error('DATABASE_QUERY block type not yet implemented');
-          },
-        },
-      ),
-      [BlockType.FILE_READ]: new MetricsBlockHandler(BlockType.FILE_READ, {
-        execute: () => {
-          throw new Error('FILE_READ block type not yet implemented');
-        },
-      }),
-      [BlockType.TRANSFORMER]: new MetricsBlockHandler(BlockType.TRANSFORMER, {
-        execute: () => {
-          throw new Error('TRANSFORMER block type not yet implemented');
-        },
-      }),
-      [BlockType.AGGREGATOR]: new MetricsBlockHandler(BlockType.AGGREGATOR, {
-        execute: () => {
-          throw new Error('AGGREGATOR block type not yet implemented');
-        },
-      }),
-      [BlockType.LOOP]: new MetricsBlockHandler(BlockType.LOOP, {
-        execute: () => {
-          throw new Error('LOOP block type not yet implemented');
-        },
-      }),
-      [BlockType.DATABASE_WRITE]: new MetricsBlockHandler(
-        BlockType.DATABASE_WRITE,
-        {
-          execute: () => {
-            throw new Error('DATABASE_WRITE block type not yet implemented');
-          },
-        },
-      ),
-      [BlockType.BLOCKCHAIN_WRITE]: new MetricsBlockHandler(
-        BlockType.BLOCKCHAIN_WRITE,
-        {
-          execute: () => {
-            throw new Error('BLOCKCHAIN_WRITE block type not yet implemented');
-          },
-        },
-      ),
-      [BlockType.FILE_WRITE]: new MetricsBlockHandler(BlockType.FILE_WRITE, {
-        execute: () => {
-          throw new Error('FILE_WRITE block type not yet implemented');
-        },
-      }),
-
-      // Magic Wallet handler for blockchain operations via Magic Link
-      [BlockType.MAGIC_WALLET]: new MetricsBlockHandler(
-        BlockType.MAGIC_WALLET,
-        new MagicWalletHandler(this.magicAdminService, this.databaseService),
-      ),
 
       [BlockType.UNKNOWN]: new MetricsBlockHandler(BlockType.UNKNOWN, {
         execute: (inputs: any, context: any) => {

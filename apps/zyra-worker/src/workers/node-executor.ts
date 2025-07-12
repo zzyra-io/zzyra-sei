@@ -82,7 +82,6 @@ export class NodeExecutor {
     this.blockHandlerRegistry = new BlockHandlerRegistry(
       this.logger,
       this.databaseService,
-      this.magicAdminService,
     );
     this.handlers = this.blockHandlerRegistry.getAllHandlers();
   }
