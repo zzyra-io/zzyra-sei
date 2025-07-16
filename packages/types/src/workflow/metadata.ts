@@ -12,6 +12,12 @@ export interface BlockMetadata {
   category: NodeCategory;
   icon: string;
   defaultConfig: Record<string, any>;
+  metadata?: {
+    customBlockId?: string;
+    isOwned?: boolean;
+    isPublic?: boolean;
+    [key: string]: any;
+  };
 }
 
 /**

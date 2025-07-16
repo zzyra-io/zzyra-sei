@@ -15,8 +15,10 @@ export enum BlockType {
   // Default/unknown
   UNKNOWN = "UNKNOWN",
   HTTP_REQUEST = "HTTP_REQUEST",
-
+  CUSTOM = "CUSTOM",
   CONDITION = "CONDITION",
+
+  // AGENT = "AGENT", //TODO: Future block type
 }
 
 /**

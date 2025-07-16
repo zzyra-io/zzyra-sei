@@ -720,3 +720,5 @@ model WalletTransaction {
   @@index([walletAddress])
   @@index([txHash])
 }
+
+

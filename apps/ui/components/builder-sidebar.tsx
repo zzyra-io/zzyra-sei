@@ -35,9 +35,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import type { CustomBlockDefinition } from "@zyra/types";
-import { BlockType } from "@zyra/types";
 import { zodResolver } from "@hookform/resolvers/zod";
+import type {
+  CustomBlockDefinition,
+  CustomBlockInput,
+  CustomBlockOutput,
+} from "@zyra/types";
+import { BlockType, NodeCategory } from "@zyra/types";
 import {
   BarChart3,
   Blocks,
@@ -51,17 +55,27 @@ import {
   Sparkles,
   Terminal,
   Workflow,
+  ChevronRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { DragEvent, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 // Define scrollbar styles for consistency
 
 // import { AIBlockForm } from "./builders/ai-block-form";
-import { CustomBlockConfigModal } from "./custom-block-config-modal";
 import { Card, CardContent } from "./ui/card";
+import api from "@/lib/services/api";
+import CustomBlocksModal from "./custom-blocks-modal";
 
 interface BuilderSidebarProps {
   onAddNode: (
@@ -70,7 +84,8 @@ interface BuilderSidebarProps {
   ) => void;
   onAddCustomBlock?: (
     customBlock: CustomBlockDefinition,
-    position?: { x: number; y: number }
+    position?: { x: number; y: number },
+    method: "manual" | "ai"
   ) => void;
   onGenerateCustomBlock?: (prompt: string) => Promise<void>;
   workflowName: string;
@@ -81,30 +96,28 @@ interface BuilderSidebarProps {
   }) => void;
   nodes: Node[];
   selectedNode?: Node | null;
-  onNodeSelect?: (node: Node | null) => void;
-  onNodeUpdate?: (nodeId: string, updates: any) => void;
+}
+
+function isCustomBlockDefinition(obj: any): obj is CustomBlockDefinition {
+  return (
+    obj &&
+    typeof obj === "object" &&
+    "name" in obj &&
+    "inputs" in obj &&
+    "outputs" in obj
+  );
+}
+
+function hasData(node: any): node is { data: any } {
+  return node && typeof node === "object" && "data" in node;
 }
 
 // Form schema for saving a block to the library
 const saveBlockSchema = z.object({
-  name: z
-    .string()
-    .min(3, {
-      message: "Block name must be at least 3 characters.",
-    })
-    .max(50, {
-      message: "Block name must not exceed 50 characters.",
-    }),
-  description: z
-    .string()
-    .min(10, {
-      message: "Description must be at least 10 characters.",
-    })
-    .max(200, {
-      message: "Description must not exceed 200 characters.",
-    }),
-  isPublic: z.boolean().default(false),
-  tags: z.array(z.string()).default([]),
+  name: z.string().min(3).max(50),
+  description: z.string().min(10).max(200),
+  isPublic: z.boolean(),
+  tags: z.array(z.string()),
 });
 
 export function BuilderSidebar({
@@ -116,42 +129,17 @@ export function BuilderSidebar({
   onWorkflowDetailsChange,
   nodes,
   selectedNode,
-  onNodeSelect,
-  onNodeUpdate,
 }: BuilderSidebarProps) {
   const [mainTab, setMainTab] = useState("blocks");
   const [blockCatalogTab, setBlockCatalogTab] = useState("blocks");
   const isMobile = useIsMobile();
   const [isMobileCollapsed, setIsMobileCollapsed] = useState(isMobile);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Custom block config modal state
-  const [isCustomBlockModalOpen, setIsCustomBlockModalOpen] = useState(false);
-  const [selectedNodeForEdit, setSelectedNodeForEdit] = useState<
-    string | undefined
-  >(undefined);
-
-  // Handler for opening custom block config modal
-  const handleOpenCustomBlockModal = (nodeId?: string) => {
-    if (nodeId) {
-      setSelectedNodeForEdit(nodeId);
-    } else {
-      setSelectedNodeForEdit(undefined);
-    }
-    setIsCustomBlockModalOpen(true);
-  };
-
-  // Handler for closing custom block config modal
-  const handleCloseCustomBlockModal = () => {
-    setIsCustomBlockModalOpen(false);
-    setSelectedNodeForEdit(undefined);
-  };
   const router = useRouter();
   const { toast } = useToast();
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [currentTag, setCurrentTag] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [selectedCustomBlock, setSelectedCustomBlock] =
-    useState<CustomBlockDefinition | null>(null);
+
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [creationMethod, setCreationMethod] = useState<
     "ai" | "manual" | "simulation" | null
@@ -283,18 +271,10 @@ export function BuilderSidebar({
     event.dataTransfer.effectAllowed = "move";
   };
 
-  // Handle drag start for custom blocks
-  const handleCustomBlockDragStart = (
-    event: DragEvent<Element>,
-    customBlock: CustomBlockDefinition
-  ) => {
-    console.log("Custom block drag started:", customBlock);
-  };
-
   // Calculate some example stats
-  const executionTime =
-    nodes.length > 0 ? `${(nodes.length * 0.5).toFixed(1)}s` : "N/A";
-  const lastUpdated = new Date().toLocaleDateString();
+  // const executionTime =
+  //   nodes.length > 0 ? `${(nodes.length * 0.5).toFixed(1)}s` : "N/A";
+  // const lastUpdated = new Date().toLocaleDateString();
 
   return (
     <div className='relative h-full'>
@@ -323,13 +303,6 @@ export function BuilderSidebar({
             />
           </button>
         )}
-
-        {/* Custom Block Configuration Modal */}
-        <CustomBlockConfigModal
-          isOpen={isCustomBlockModalOpen}
-          onClose={handleCloseCustomBlockModal}
-          nodeId={selectedNodeForEdit}
-        />
 
         {/* Sidebar Header */}
         <div className='p-4 border-b bg-muted/30 flex-shrink-0'>
@@ -372,306 +345,17 @@ export function BuilderSidebar({
             <Library className='h-3.5 w-3.5' />
             <span className='text-xs'>Block Library</span>
           </Button>
-
-          <Button
-            variant='outline'
-            size='sm'
-            className='flex items-center gap-1'
-            onClick={() => setCreateModalOpen(true)}>
-            <PlusCircle className='h-3.5 w-3.5' />
-            <span className='text-xs'>Create Block</span>
-          </Button>
+          <CustomBlocksModal
+            onAddCustomBlock={
+              onAddCustomBlock ||
+              ((block, position, method) => {
+                console.log("Add custom block:", block, position, method);
+              })
+            }
+            onGenerateCustomBlock={onGenerateCustomBlock || (async () => {})}
+            setBlockCatalogTab={setBlockCatalogTab}
+          />
         </div>
-
-        {/* Create Custom Block Modal */}
-        <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-          <DialogContent className='sm:max-w-[600px]'>
-            <DialogHeader>
-              <DialogTitle>Create Custom Block</DialogTitle>
-              <DialogDescription>
-                Design your own custom block with inputs, outputs, and logic.
-              </DialogDescription>
-            </DialogHeader>
-
-            {creationMethod === null ? (
-              <div className='grid grid-cols-2 gap-4 py-4'>
-                <Card
-                  className='cursor-pointer hover:border-primary transition-colors'
-                  onClick={() => setCreationMethod("ai")}>
-                  <CardContent className='p-6 flex flex-col items-center justify-center text-center'>
-                    <Sparkles className='h-8 w-8 text-primary mb-3' />
-                    <h3 className='font-semibold mb-1'>Use AI</h3>
-                    <p className='text-sm text-muted-foreground'>
-                      Let AI help you create a complete custom block based on
-                      your description.
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card
-                  className='cursor-pointer hover:border-primary transition-colors'
-                  onClick={() => setCreationMethod("manual")}>
-                  <CardContent className='p-6 flex flex-col items-center justify-center text-center'>
-                    <Terminal className='h-8 w-8 text-primary mb-3' />
-                    <h3 className='font-semibold mb-1'>Create Manually</h3>
-                    <p className='text-sm text-muted-foreground'>
-                      Define your block inputs, outputs, and logic yourself.
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : creationMethod === "manual" ? (
-              <div className='border rounded-md overflow-hidden'>
-                <CustomBlockBuilderDialog
-                  open={true}
-                  onOpenChange={() => {
-                    setCreateModalOpen(false);
-                    setCreationMethod(null);
-                  }}
-                  initialBlock={undefined}
-                  inline={true}
-                  onSave={(block) => {
-                    // Add the new block to custom blocks
-                    if (onAddCustomBlock) {
-                      // Create position slightly offset from center of viewport
-                      const viewportWidth =
-                        window.innerWidth ||
-                        document.documentElement.clientWidth;
-                      const viewportHeight =
-                        window.innerHeight ||
-                        document.documentElement.clientHeight;
-                      const position = {
-                        x: Math.round(viewportWidth / 2) + 100,
-                        y: Math.round(viewportHeight / 2) + 100,
-                      };
-                      onAddCustomBlock(block, position);
-
-                      toast({
-                        title: "Block Created",
-                        description: `${block.name} has been created and added to your custom blocks.`,
-                      });
-
-                      setCreateModalOpen(false);
-                      setCreationMethod(null);
-                      // Switch to custom tab to see the new block
-                      setBlockCatalogTab("custom");
-                    }
-                  }}
-                  onGenerateWithAI={onGenerateCustomBlock}
-                />
-              </div>
-            ) : creationMethod === "simulation" && simulatedBlock ? (
-              <div className='py-4'>
-                <BlockSimulator
-                  block={simulatedBlock}
-                  onClose={() => {
-                    setCreationMethod("manual");
-                  }}
-                  onFinalize={(finalizedBlock) => {
-                    // Handle the finalized block
-                    if (onAddCustomBlock) {
-                      // Create position slightly offset from center of viewport
-                      const viewportWidth =
-                        window.innerWidth ||
-                        document.documentElement.clientWidth;
-                      const viewportHeight =
-                        window.innerHeight ||
-                        document.documentElement.clientHeight;
-                      const position = {
-                        x: Math.round(viewportWidth / 2) + 100,
-                        y: Math.round(viewportHeight / 2) + 100,
-                      };
-
-                      // Add the custom block to the workflow
-                      onAddCustomBlock(finalizedBlock, position);
-
-                      // Save the block to the library
-                      saveBlock({
-                        blockData: {
-                          name: finalizedBlock.name,
-                          description: finalizedBlock.description,
-                          category: finalizedBlock.category,
-                          inputs: finalizedBlock.inputs.map((input) => ({
-                            name: input.name,
-                            description: input.description || "",
-                            dataType: input.dataType,
-                            required: input.required,
-                          })),
-                          outputs: finalizedBlock.outputs.map((output) => ({
-                            name: output.name,
-                            description: output.description || "",
-                            dataType: output.dataType,
-                            required: output.required,
-                          })),
-                          configFields: finalizedBlock.configFields || [],
-                          code: finalizedBlock.logic,
-                        },
-                        blockType: "CUSTOM" as BlockType,
-                        isPublic: false,
-                        tags: [],
-                      })
-                        .then(() => {
-                          console.log("Block saved to library");
-                          // Reset UI state after successful save
-                          setSimulatedBlock(null);
-                          setCreationMethod(null);
-                          // Switch to custom tab to see the new block
-                          setBlockCatalogTab("custom");
-                        })
-                        .catch((error) => {
-                          console.error(
-                            "Error saving block to library:",
-                            error
-                          );
-                          toast({
-                            title: "Error Saving Block",
-                            description:
-                              "The block was added to your workflow but could not be saved to your library.",
-                            variant: "destructive",
-                          });
-                          // Still reset UI state even on error
-                          setSimulatedBlock(null);
-                          setCreationMethod(null);
-                        });
-
-                      toast({
-                        title: "Block Created",
-                        description: `${finalizedBlock.name} has been created and added to your custom blocks.`,
-                      });
-
-                      setCreateModalOpen(false);
-                      setCreationMethod(null);
-                      setSimulatedBlock(null);
-                      // Switch to custom tab to see the new block
-                      setBlockCatalogTab("custom");
-                    }
-                  }}
-                />
-              </div>
-            ) : (
-              <div className='py-4'>
-                <h3 className='text-sm font-medium mb-3'>
-                  Describe Your Block
-                </h3>
-                <p className='text-xs text-muted-foreground mb-4'>
-                  Describe the purpose of your custom block, what it should do,
-                  and any specific inputs or outputs it should have. Our AI will
-                  generate a complete block for you to review and modify.
-                </p>
-
-                {/* AI Block Generation Form */}
-                <div className='space-y-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='block-name'>Block Name</Label>
-                    <Input
-                      id='block-name'
-                      placeholder='E.g., Twitter Sentiment Analysis'
-                      value={aiBlockForm.blockName}
-                      onChange={(e) =>
-                        handleAiFormChange("blockName", e.target.value)
-                      }
-                    />
-                    <p className='text-xs text-muted-foreground'>
-                      Give your block a clear, descriptive name
-                    </p>
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='block-description'>Description</Label>
-                    <Textarea
-                      id='block-description'
-                      placeholder='Describe what this block should do. Example: This block should analyze the sentiment of tweets mentioning a specific keyword.'
-                      rows={4}
-                      value={aiBlockForm.blockDescription}
-                      onChange={(e) =>
-                        handleAiFormChange("blockDescription", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='block-inputs'>Inputs (optional)</Label>
-                    <Textarea
-                      id='block-inputs'
-                      placeholder='Describe the inputs your block needs. Example: Keyword to search, Number of tweets to analyze'
-                      rows={3}
-                      value={aiBlockForm.blockInputs}
-                      onChange={(e) =>
-                        handleAiFormChange("blockInputs", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='block-outputs'>Outputs (optional)</Label>
-                    <Textarea
-                      id='block-outputs'
-                      placeholder='Describe the outputs your block should produce. Example: Sentiment score, Top positive/negative words'
-                      rows={3}
-                      value={aiBlockForm.blockOutputs}
-                      onChange={(e) =>
-                        handleAiFormChange("blockOutputs", e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className='space-y-2'>
-                    <Label htmlFor='block-category'>Category (optional)</Label>
-                    <Select
-                      value={aiBlockForm.blockCategory}
-                      onValueChange={(value) =>
-                        handleAiFormChange("blockCategory", value)
-                      }>
-                      <SelectTrigger id='block-category'>
-                        <SelectValue placeholder='Select a category' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='ACTION'>Action</SelectItem>
-                        <SelectItem value='TRIGGER'>Trigger</SelectItem>
-                        <SelectItem value='CONDITION'>Condition</SelectItem>
-                        <SelectItem value='TRANSFORMER'>Transformer</SelectItem>
-                        <SelectItem value='FINANCE'>Finance</SelectItem>
-                        <SelectItem value='AI'>AI</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className='flex justify-end space-x-2 mt-6'>
-                  <Button
-                    variant='outline'
-                    onClick={() => setCreationMethod(null)}
-                    disabled={isGeneratingBlock}>
-                    Back
-                  </Button>
-                  <Button
-                    onClick={handleAiBlockSubmit}
-                    disabled={isGeneratingBlock}>
-                    {isGeneratingBlock ? (
-                      <>
-                        <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className='h-4 w-4 mr-2' />
-                        Generate Block
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {creationMethod === null && (
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant='outline'>Cancel</Button>
-                </DialogClose>
-              </DialogFooter>
-            )}
-          </DialogContent>
-        </Dialog>
 
         {/* Tab Content */}
         <div className='flex-1 overflow-hidden'>
@@ -684,14 +368,6 @@ export function BuilderSidebar({
                     <Library className='h-4 w-4 text-primary' />
                     <h3 className='font-medium text-sm'>Block Library</h3>
                   </div>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    onClick={() => handleOpenCustomBlockModal()}
-                    className='h-7 px-2 text-xs'>
-                    <PlusCircle className='h-3 w-3 mr-1' />
-                    Create
-                  </Button>
                 </div>
                 <p className='text-xs text-muted-foreground'>
                   Drag blocks to the canvas or click to add
@@ -724,6 +400,7 @@ export function BuilderSidebar({
                     <BlockCatalog
                       onDragStart={handleDragStart}
                       onAddBlock={onAddNode}
+                      // Remove onAddCustomBlock prop if not supported
                     />
                   </div>
                 )}
@@ -737,7 +414,7 @@ export function BuilderSidebar({
                     </div>
                     <CustomBlockCatalog
                       onAddBlock={(b) => {
-                        if (onAddCustomBlock) {
+                        if (isCustomBlockDefinition(b) && onAddCustomBlock) {
                           const position = {
                             x: Math.round(Math.random() * 300),
                             y: Math.round(Math.random() * 300),
@@ -745,30 +422,6 @@ export function BuilderSidebar({
                           onAddCustomBlock(b, position);
                         }
                       }}
-                      onEdit={(editBlock) => {
-                        // setBuilderOpen(true); // This state was not defined in the original file
-                        // setEditBlock(editBlock); // This state was not defined in the original file
-                      }}
-                      onDuplicate={(block) => {
-                        // Handle duplication
-                        toast({
-                          title: "Block duplicated",
-                          description: `Duplicated ${block.name}`,
-                        });
-                      }}
-                      onDelete={(block) => {
-                        // Handle deletion
-                        toast({
-                          title: "Block deleted",
-                          description: `Deleted ${block.name}`,
-                        });
-                      }}
-                      onDragStart={(event, block) => {
-                        handleCustomBlockDragStart(event, block);
-                      }}
-                      onGenerateCustomBlock={
-                        onGenerateCustomBlock || (async () => {})
-                      }
                     />
                   </div>
                 )}
@@ -884,67 +537,60 @@ export function BuilderSidebar({
           </DialogHeader>
 
           <SaveBlockForm
-            block={selectedCustomBlock}
+            block={
+              hasData(selectedNode)
+                ? (selectedNode.data.blockData as CustomBlockDefinition | null)
+                : null
+            }
             onSave={async (data) => {
               try {
                 setSaving(true);
 
-                if (!selectedCustomBlock) {
+                if (!hasData(selectedNode) || !selectedNode.data.blockData) {
                   throw new Error("No block selected");
                 }
 
                 // Determine the category from the block definition or use a default
-                let category =
-                  selectedCustomBlock.category || NodeCategory.ACTION;
+                const category =
+                  selectedNode.data.blockData.category || NodeCategory.ACTION;
                 let blockType = BlockType.CUSTOM;
 
                 // If the node has a blockType property, use it
-                if (selectedNode?.data?.blockType) {
+                if (selectedNode.data.blockType) {
                   blockType = selectedNode.data.blockType as BlockType;
 
-                  // For DeFi blocks, set category to FINANCE if not already set
-                  if (
-                    blockType.toString().startsWith("defi-") &&
-                    category === NodeCategory.ACTION
-                  ) {
-                    category = NodeCategory.FINANCE;
-                  }
-                }
-
-                // Save with additional metadata
-                await saveBlock({
-                  name: data.name,
-                  description: data.description,
-                  blockType: blockType,
-                  blockData: selectedCustomBlock,
-                  isPublic: data.isPublic,
-                  tags: data.tags,
-                  category: category,
-                });
-
-                toast({
-                  title: "Block saved",
-                  description:
-                    "Your block has been saved to the library. View it in the Block Library.",
-                });
-
-                setSaveDialogOpen(false);
-
-                // Optional: Navigate to the library
-                if (data.isPublic) {
-                  toast({
-                    title: "Block shared",
-                    description:
-                      "Your block is now available to the community.",
-                    action: (
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        onClick={() => router.push("/blocks/shared")}>
-                        View Shared Blocks
-                      </Button>
-                    ),
+                  // Save with additional metadata
+                  await api.post("/blocks/custom", {
+                    name: data.name,
+                    description: data.description,
+                    blockType: blockType,
+                    blockData: selectedNode.data.blockData,
+                    isPublic: data.isPublic,
+                    tags: data.tags,
+                    category: category,
                   });
+                  toast({
+                    title: "Block saved",
+                    description:
+                      "Your block has been saved to the library. View it in the Block Library.",
+                  });
+
+                  // Optional: Navigate to the library
+                  if (data.isPublic) {
+                    toast({
+                      title: "Block shared",
+                      description:
+                        "Your block is now available to the community.",
+                      action: (
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          onClick={() => router.push("/blocks/shared")}>
+                          View Shared Blocks
+                        </Button>
+                      ),
+                    });
+                  }
                 }
               } catch (error) {
                 console.error("Error saving block:", error);
@@ -953,8 +599,6 @@ export function BuilderSidebar({
                   description: "Failed to save block to library.",
                   variant: "destructive",
                 });
-              } finally {
-                setSaving(false);
               }
             }}
             saving={saving}
@@ -977,7 +621,7 @@ function SaveBlockForm({
   const [currentTag, setCurrentTag] = useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  // Initialize form with block data if available
+  // Ensure all default values are always present
   const form = useForm<z.infer<typeof saveBlockSchema>>({
     resolver: zodResolver(saveBlockSchema),
     defaultValues: {
@@ -986,6 +630,7 @@ function SaveBlockForm({
       isPublic: false,
       tags: [],
     },
+    mode: "onChange",
   });
 
   const tags = form.watch("tags");
@@ -994,7 +639,6 @@ function SaveBlockForm({
     if (currentTag.trim() && !tags.includes(currentTag.trim())) {
       form.setValue("tags", [...tags, currentTag.trim()]);
       setCurrentTag("");
-
       if (inputRef.current) {
         inputRef.current.focus();
       }
@@ -1004,7 +648,7 @@ function SaveBlockForm({
   const removeTag = (tag: string) => {
     form.setValue(
       "tags",
-      tags.filter((t) => t !== tag)
+      tags.filter((t: string) => t !== tag)
     );
   };
 
@@ -1050,7 +694,7 @@ function SaveBlockForm({
             <FormItem>
               <FormLabel>Tags</FormLabel>
               <div className='flex flex-wrap gap-2 mb-2'>
-                {tags.map((tag) => (
+                {tags.map((tag: string) => (
                   <Badge key={tag} variant='secondary' className='text-xs py-1'>
                     {tag}
                     <button

@@ -23,7 +23,8 @@ export interface CreateCustomBlockRequest {
   name: string;
   description?: string;
   category: NodeCategory;
-  code: string;
+  code?: string;
+  logic?: string; // Legacy support - will be mapped to code
   logicType: LogicType;
   inputs?: Array<{
     name: string;
@@ -46,11 +47,15 @@ export interface CreateCustomBlockRequest {
 export class BlocksService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getBlockTypes(): Promise<BlockMetadata[]> {
+  async getBlockTypes(
+    type?: BlockType,
+    userId?: string
+  ): Promise<BlockMetadata[]> {
     try {
-      // Get all block types from the zyra types catalog
-      const blockTypes: BlockMetadata[] = Object.values(ZyraBlockType).map(
-        (blockTypeKey) => {
+      // Get all predefined block types from the zyra types catalog
+      const predefinedBlockTypes: BlockMetadata[] = Object.values(ZyraBlockType)
+        .filter((blockType) => blockType !== ZyraBlockType.CUSTOM) // Exclude generic CUSTOM
+        .map((blockTypeKey) => {
           const metadata = BLOCK_CATALOG[blockTypeKey];
 
           if (metadata) {
@@ -73,10 +78,120 @@ export class BlocksService {
             icon: "help-circle",
             defaultConfig: {},
           };
-        }
-      );
+        });
 
-      return blockTypes.sort((a, b) => a.label.localeCompare(b.label));
+      // Get custom blocks based on context
+      let customBlocksQuery: any = {};
+
+      if (type && type.toString().toUpperCase() === "CUSTOM") {
+        // For /blocks/types?type=CUSTOM - show user's blocks + public blocks
+        if (userId) {
+          customBlocksQuery = {
+            OR: [
+              { userId: userId }, // User's own blocks
+              { isPublic: true }, // Public blocks
+            ],
+          };
+        } else {
+          // No user context - only public blocks
+          customBlocksQuery = { isPublic: true };
+        }
+      } else {
+        // For general /blocks/types - only public blocks in main catalog
+        customBlocksQuery = { isPublic: true };
+      }
+
+      const customBlocks = await this.prisma.client.customBlock.findMany({
+        where: customBlocksQuery,
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          category: true,
+          userId: true,
+          isPublic: true,
+          blockData: true,
+        },
+      });
+
+      // Convert custom blocks to BlockMetadata format
+      const customBlockTypes: BlockMetadata[] = customBlocks.map((block) => {
+        // Parse blockData to get inputs for default config
+        let inputs: any[] = [];
+        try {
+          const blockData =
+            typeof block.blockData === "string"
+              ? JSON.parse(block.blockData)
+              : block.blockData || {};
+          inputs = blockData.inputs || [];
+        } catch {
+          inputs = [];
+        }
+
+        // Generate default config from inputs
+        const defaultConfig: Record<string, any> = {
+          customBlockId: block.id,
+        };
+
+        // Add default values from inputs
+        inputs.forEach((input) => {
+          if (input.defaultValue !== undefined) {
+            defaultConfig[input.name] = input.defaultValue;
+          } else {
+            // Set sensible defaults based on type
+            switch (input.type) {
+              case "string":
+                defaultConfig[input.name] = "";
+                break;
+              case "number":
+                defaultConfig[input.name] = 0;
+                break;
+              case "boolean":
+                defaultConfig[input.name] = false;
+                break;
+              case "array":
+                defaultConfig[input.name] = [];
+                break;
+              case "object":
+                defaultConfig[input.name] = {};
+                break;
+              default:
+                defaultConfig[input.name] = null;
+            }
+          }
+        });
+
+        return {
+          type: ZyraBlockType.CUSTOM,
+          label: block.name,
+          description: block.description || `${block.name} custom block`,
+          category: this.validateCategory(block.category),
+          icon: "puzzle",
+          defaultConfig,
+          // Additional metadata for custom blocks
+          metadata: {
+            customBlockId: block.id,
+            isOwned: userId ? block.userId === userId : false,
+            isPublic: block.isPublic || false,
+          },
+        };
+      });
+
+      // Combine all block types
+      const allBlockTypes = [...predefinedBlockTypes, ...customBlockTypes];
+
+      // Apply filtering
+      if (type) {
+        const upperType = String(type).toUpperCase();
+
+        if (upperType === "CUSTOM") {
+          return customBlockTypes;
+        }
+
+        return allBlockTypes.filter((block) => block.type === upperType);
+      }
+
+      return allBlockTypes;
     } catch (error) {
       console.error("Error in block-types service:", error);
       throw new Error("Internal server error");
@@ -121,7 +236,9 @@ export class BlocksService {
       });
 
       return {
-        blocks: blocks.map(this.mapDatabaseToCustomBlockDefinition),
+        blocks: blocks.map((block) =>
+          this.mapDatabaseToCustomBlockDefinition(block)
+        ),
       };
     } catch (error) {
       console.error("Error fetching custom blocks:", error);
@@ -159,6 +276,15 @@ export class BlocksService {
     data: CreateCustomBlockRequest
   ): Promise<{ block: CustomBlockDefinition }> {
     try {
+      console.log("Creating custom block:", data);
+
+      // Handle both 'code' and 'logic' fields - prefer 'code' if provided, fallback to 'logic'
+      const codeContent = data.code || data.logic;
+
+      if (!codeContent) {
+        throw new Error("Either 'code' or 'logic' field is required");
+      }
+
       const blockData = {
         inputs: data.inputs || [],
         outputs: data.outputs || [],
@@ -171,8 +297,8 @@ export class BlocksService {
           name: data.name,
           description: data.description || "",
           category: data.category,
-          code: data.code,
-          logic: data.code,
+          code: codeContent,
+          logic: codeContent,
           logicType: data.logicType,
           blockData: JSON.stringify(blockData),
           tags: JSON.stringify(data.tags || []),
@@ -211,10 +337,14 @@ export class BlocksService {
       if (data.description !== undefined)
         updateData.description = data.description;
       if (data.category) updateData.category = data.category;
-      if (data.code) {
-        updateData.code = data.code;
-        updateData.logic = data.code;
+
+      // Handle both 'code' and 'logic' fields - prefer 'code' if provided, fallback to 'logic'
+      const codeContent = data.code || data.logic;
+      if (codeContent) {
+        updateData.code = codeContent;
+        updateData.logic = codeContent;
       }
+
       if (data.logicType) updateData.logicType = data.logicType;
       if (data.isPublic !== undefined) updateData.isPublic = data.isPublic;
       if (data.tags) updateData.tags = JSON.stringify(data.tags);
@@ -278,42 +408,68 @@ export class BlocksService {
     }
 
     try {
-      tags =
-        typeof dbBlock.tags === "string"
-          ? JSON.parse(dbBlock.tags)
-          : Array.isArray(dbBlock.tags)
-            ? dbBlock.tags
-            : [];
+      // Handle both JSON string and direct array for tags
+      if (typeof dbBlock.tags === "string") {
+        tags = JSON.parse(dbBlock.tags);
+      } else if (Array.isArray(dbBlock.tags)) {
+        tags = dbBlock.tags;
+      } else {
+        tags = [];
+      }
     } catch {
       tags = [];
     }
+
+    // Validate and convert category
+    const validCategory = this.validateCategory(dbBlock.category);
+
+    // Validate and convert logicType
+    const validLogicType = this.validateLogicType(dbBlock.logicType);
 
     return {
       id: dbBlock.id,
       name: dbBlock.name,
       description: dbBlock.description || "",
-      category: dbBlock.category as NodeCategory,
+      category: validCategory,
       inputs: (blockData.inputs || []).map((input: any) => ({
         name: input.name,
-        type: input.type,
+        type: input.type || input.dataType, // Handle both 'type' and 'dataType' fields
         description: input.description || "",
         required: input.required || false,
         defaultValue: input.defaultValue,
       })),
       outputs: (blockData.outputs || []).map((output: any) => ({
         name: output.name,
-        type: output.type,
+        type: output.type || output.dataType, // Handle both 'type' and 'dataType' fields
         description: output.description || "",
         required: output.required || false,
       })),
       code: dbBlock.code,
-      logicType: dbBlock.logicType as LogicType,
+      logicType: validLogicType,
       isPublic: dbBlock.isPublic || false,
       createdAt: dbBlock.createdAt?.toISOString(),
       updatedAt: dbBlock.updatedAt?.toISOString(),
       createdBy: dbBlock.userId,
       tags,
     };
+  }
+
+  private validateCategory(category: string): NodeCategory {
+    const validCategories = Object.values(NodeCategory);
+    if (validCategories.includes(category as NodeCategory)) {
+      return category as NodeCategory;
+    }
+    console.warn(`Invalid category "${category}", defaulting to ACTION`);
+    return NodeCategory.ACTION;
+  }
+
+  private validateLogicType(logicType: string): LogicType {
+    const validLogicTypes = Object.values(LogicType);
+    if (validLogicTypes.includes(logicType as LogicType)) {
+      return logicType as LogicType;
+    }
+    console.warn(`Invalid logicType "${logicType}", defaulting to JAVASCRIPT`);
+    return LogicType.JAVASCRIPT;
   }
 
   private formatBlockTypeName(blockType: string): string {

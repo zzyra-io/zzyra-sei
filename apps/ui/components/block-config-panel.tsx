@@ -77,8 +77,7 @@ export function BlockConfigPanel({
   const blockMetadata = getBlockMetadata(blockType);
 
   // Check if this is a custom block
-  // it should not exist in the blocktypes
-  const isCustomBlock = !Object.values(BlockType).includes(blockType);
+  const isCustomBlock = blockType === BlockType.CUSTOM;
 
   // Dynamic Zod schema for block config
   const schema = blockSchemas[blockType] as ZodType | undefined;
@@ -100,7 +99,11 @@ export function BlockConfigPanel({
 
   // Load custom block definition if needed
   useEffect(() => {
-    if (isCustomBlock && node.data?.customBlockId) {
+    // Check for customBlockId in both locations for backward compatibility
+    const customBlockId =
+      node.data?.customBlockId || node.data?.config?.customBlockId;
+
+    if (isCustomBlock && customBlockId) {
       const loadCustomBlock = async () => {
         setIsLoadingCustomBlock(true);
         try {
@@ -111,15 +114,14 @@ export function BlockConfigPanel({
           }
 
           // Otherwise try to load from the database
-          const blockDef = await customBlockService.getCustomBlockById(
-            node.data.customBlockId!
-          );
+          const blockDef =
+            await customBlockService.getCustomBlockById(customBlockId);
 
           // If not found in database, try example blocks
           if (!blockDef) {
             const exampleBlocks = customBlockService.getExampleBlocks();
             const exampleBlockDef = exampleBlocks.find(
-              (b) => b.id === node.data.customBlockId
+              (b) => b.id === customBlockId
             );
 
             if (exampleBlockDef) {
@@ -155,7 +157,12 @@ export function BlockConfigPanel({
 
       loadCustomBlock();
     }
-  }, [isCustomBlock, node.data?.customBlockId, toast]);
+  }, [
+    isCustomBlock,
+    node.data?.customBlockId,
+    node.data?.config?.customBlockId,
+    toast,
+  ]);
 
   // Initialize localNode when switching to a new node
   const prevNodeId = useRef(node.id);
@@ -285,10 +292,10 @@ export function BlockConfigPanel({
         );
       case BlockType.EMAIL:
         return <EmailConfig config={config} onChange={handleConfigChange} />;
-      case BlockType.NOTIFICATION:
-        return (
-          <NotificationConfig config={config} onChange={handleConfigChange} />
-        );
+      // case BlockType.NOTIFICATION:
+      //   return (
+      //     <NotificationConfig config={config} onChange={handleConfigChange} />
+      //   );
       case "discord" as BlockType:
         return (
           <div className='w-80 h-full flex flex-col bg-background border-l'>
@@ -348,32 +355,32 @@ export function BlockConfigPanel({
         return (
           <ConditionConfig config={config} onChange={handleConfigChange} />
         );
-      case BlockType.DELAY:
-        return <DelayConfig config={config} onChange={handleConfigChange} />;
+      // case BlockType.DELAY:
+      //   return <DelayConfig config={config} onChange={handleConfigChange} />;
       case BlockType.WEBHOOK:
         return <WebhookConfig config={config} onChange={handleConfigChange} />;
-      case BlockType.TRANSFORMER:
-        return (
-          <TransformConfig config={config} onChange={handleConfigChange} />
-        );
+      // case BlockType.TRANSFORMER:
+      //   return (
+      //     <TransformConfig config={config} onChange={handleConfigChange} />
+      //   );
       case BlockType.SCHEDULE:
         return <ScheduleConfig config={config} onChange={handleConfigChange} />;
       case BlockType.HTTP_REQUEST:
         return (
           <HttpRequestConfig config={config} onChange={handleConfigChange} />
         );
-      case BlockType.CALCULATOR:
-        return (
-          <CalculatorConfig config={config} onChange={handleConfigChange} />
-        );
-      case BlockType.COMPARATOR:
-        return (
-          <ComparatorConfig config={config} onChange={handleConfigChange} />
-        );
-      case BlockType.BLOCKCHAIN_READ:
-        return (
-          <BlockchainReadConfig config={config} onChange={handleConfigChange} />
-        );
+      // case BlockType.CALCULATOR:
+      //   return (
+      //     <CalculatorConfig config={config} onChange={handleConfigChange} />
+      //   );
+      // case BlockType.COMPARATOR:
+      //   return (
+      //     <ComparatorConfig config={config} onChange={handleConfigChange} />
+      //   );
+      // case BlockType.BLOCKCHAIN_READ:
+      //   return (
+      //     <BlockchainReadConfig config={config} onChange={handleConfigChange} />
+      //   );
       default:
         // For unknown types, check if we have any config data to display
         if (Object.keys(config).length > 0) {

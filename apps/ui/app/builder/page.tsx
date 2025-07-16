@@ -27,13 +27,14 @@ import { WorkflowRefinement } from "@/components/workflow-refinement";
 import { WorkflowToolbar } from "@/components/workflow-toolbar";
 import NlWorkflowGenerator from "@/components/workflow/nl-workflow-generator";
 import { useSaveAndExecute } from "@/hooks/use-save-and-execute";
+import { useCreateCustomBlock } from "@/hooks/use-custom-blocks";
 import { useWorkflowExecution } from "@/hooks/use-workflow-execution";
 import { generateFlow } from "@/lib/api";
 import { refineWorkflow } from "@/lib/api/workflow-generation";
 import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
 import { workflowService } from "@/lib/services/workflow-service";
 import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
-import { BlockType } from "@zyra/types";
+import { BlockType, CustomBlockDefinition } from "@zyra/types";
 import { ArrowLeft, Loader2, Play, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -81,7 +82,7 @@ export default function BuilderPage() {
   const toolbar = useFlowToolbar();
   const { validateWorkflow } = useWorkflowValidation();
   const { mutateAsync: saveAndExecute } = useSaveAndExecute();
-
+  const { mutateAsync: createCustomBlock } = useCreateCustomBlock();
   // Other hooks
   const { toast } = useToast();
   const router = useRouter();
@@ -262,19 +263,25 @@ export default function BuilderPage() {
   );
 
   const handleAddCustomBlock = useCallback(
-    (customData: any) => {
+    (
+      customData: CustomBlockDefinition,
+      position: { x: number; y: number },
+      method: "manual" | "ai"
+    ) => {
       const newNode = {
         id: `${Date.now()}`,
         type: "custom",
-        position: { x: 150, y: 150 },
+        position,
         data: customData,
         dragHandle: ".custom-drag-handle",
         isConnectable: true,
       };
-      addNode(newNode);
+      createCustomBlock({ customBlock: customData, method });
+      addNode(newNode as unknown as Node);
+
       setHasUnsavedChanges(true);
     },
-    [addNode, setHasUnsavedChanges]
+    [addNode, setHasUnsavedChanges, createCustomBlock]
   );
 
   // Use our custom hook for workflow execution with WebSocket-based real-time updates

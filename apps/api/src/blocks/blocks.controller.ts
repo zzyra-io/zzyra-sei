@@ -1,28 +1,23 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
   Body,
-  Param,
-  Query,
-  Request,
+  Controller,
+  Delete,
+  Get,
   HttpException,
   HttpStatus,
+  Param,
+  Post,
+  Put,
+  Query,
+  Request,
 } from "@nestjs/common";
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Public } from "../auth/decorators/public.decorator";
 import {
   BlocksService,
   BlockType,
   CreateCustomBlockRequest,
 } from "./blocks.service";
-import { Public } from "../auth/decorators/public.decorator";
 
 @ApiTags("blocks")
 @Controller("blocks")
@@ -33,9 +28,11 @@ export class BlocksController {
   @Public()
   @Get("types")
   @ApiOperation({ summary: "Get all available block types" })
-  async getBlockTypes() {
+  async getBlockTypes(@Query("type") type?: BlockType, @Request() req?: any) {
     try {
-      return this.blocksService.getBlockTypes();
+      // Extract userId if authenticated, but allow public access
+      const userId = req?.user?.id;
+      return this.blocksService.getBlockTypes(type, userId);
     } catch (error) {
       console.error("Error in block-types API:", error);
       throw new HttpException(

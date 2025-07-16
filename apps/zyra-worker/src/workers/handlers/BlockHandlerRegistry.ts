@@ -8,6 +8,7 @@ import { EmailBlockHandler } from './EmailBlockHandler';
 import { HttpRequestHandler } from './HttpRequestHandler';
 import { MetricsBlockHandler } from './MetricsBlockHandler';
 import { ScheduleBlockHandler } from './ScheduleBlockHandler';
+import { CustomBlockHandler } from './CustomBlockHandler';
 
 /**
  * Central registry for all block handlers.
@@ -43,6 +44,12 @@ export class BlockHandlerRegistry {
       [BlockType.HTTP_REQUEST]: new MetricsBlockHandler(
         BlockType.HTTP_REQUEST,
         new HttpRequestHandler(),
+      ),
+
+      // Custom blocks
+      [BlockType.CUSTOM]: new MetricsBlockHandler(
+        BlockType.CUSTOM,
+        new CustomBlockHandler(this.databaseService),
       ),
 
       // Legacy block types mapped to new handlers
@@ -88,6 +95,11 @@ export class BlockHandlerRegistry {
     // Direct match first
     if (this.handlers[type]) {
       return this.handlers[type];
+    }
+
+    // All custom blocks now use the unified CUSTOM type
+    if (typeof type === 'string' && type.toUpperCase() === 'CUSTOM') {
+      return this.handlers[BlockType.CUSTOM];
     }
 
     // Try case-insensitive match if the type is a string
@@ -156,7 +168,7 @@ export class BlockHandlerRegistry {
     const context = vm.createContext(sandbox);
     const script = new vm.Script(`
       (async () => {
-        ${blockDefinition.logic}
+        ${blockDefinition.code}
       })();
     `);
 
@@ -256,7 +268,7 @@ export class BlockHandlerRegistry {
   ): Promise<any> {
     const validatedInputs = this.validateInputs(blockDefinition.inputs, inputs);
 
-    switch (blockDefinition.logic_type?.toLowerCase()) {
+    switch (blockDefinition.logicType?.toLowerCase()) {
       case 'javascript':
         return this.executeJavaScript(
           blockDefinition,
@@ -265,9 +277,7 @@ export class BlockHandlerRegistry {
           executionId,
         );
       default:
-        throw new Error(
-          `Unsupported logic type: ${blockDefinition.logic_type}`,
-        );
+        throw new Error(`Unsupported logic type: ${blockDefinition.logicType}`);
     }
   }
 

@@ -63,6 +63,24 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
     timeout: z.number().default(10000),
   }),
 
+  [BlockType.CUSTOM]: z.object({
+    code: z.string().min(1),
+    inputs: z.record(z.any()).optional(),
+    outputs: z.record(z.any()).optional(),
+    logicType: z.enum(["javascript", "python"]).default("javascript"),
+    tags: z.array(z.string()).optional(),
+    isPublic: z.boolean().default(false),
+    createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
+    createdBy: z.string().optional(),
+    version: z.number().default(1),
+    description: z.string().optional(),
+    category: z.string().optional(),
+    name: z.string().optional(),
+    icon: z.string().optional(),
+    defaultConfig: z.record(z.any()).optional(),
+  }),
+
   // [BlockType.CALCULATOR]: z.object({
   //   operation: z
   //     .enum([

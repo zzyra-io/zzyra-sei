@@ -5,7 +5,6 @@ import { wouldCreateCycle } from "@/lib/workflow/cycle-detection";
 import {
   Background,
   BackgroundVariant,
-  Connection,
   Controls,
   Edge,
   MiniMap,
@@ -15,6 +14,7 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
   ConnectionMode,
+  Connection,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { NodeCategory } from "@zyra/types";
@@ -30,7 +30,6 @@ import CustomConnectionLine from "./custom-connection-line";
 import { useTheme } from "next-themes";
 
 interface FlowCanvasProps {
-  executionId?: string | null;
   toolbarRef?: React.RefObject<{
     canUndo: boolean;
     canRedo: boolean;
@@ -71,7 +70,7 @@ interface FlowCanvasProps {
   isExecuting?: boolean;
 }
 
-function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
+function FlowContent({ toolbarRef }: FlowCanvasProps) {
   // Access state and actions from Zustand store
   const {
     nodes,
@@ -107,8 +106,7 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  const { nodeTypes, edgeTypes, defaultEdgeOptions, connectionLineTypes } =
-    useNodeConfigurations();
+  const { nodeTypes, edgeTypes, defaultEdgeOptions } = useNodeConfigurations();
 
   // Local state for context menu (component-specific, not moved to store)
   const [contextMenu, setContextMenu] = useState<{
@@ -183,7 +181,15 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
       if (!blockType) return;
 
       // Get the additional metadata for creating a fully configured node
-      let nodeMetadata = {};
+      interface NodeMetadata {
+        label?: string;
+        nodeType?: NodeCategory;
+        description?: string;
+        config?: Record<string, unknown>;
+        [key: string]: unknown;
+      }
+
+      let nodeMetadata: NodeMetadata = {};
       try {
         const metadataStr = event.dataTransfer.getData(
           "application/reactflow/metadata"
@@ -202,8 +208,13 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
 
       // Create a well-formed node with proper data structure for the ImprovedCustomNode
 
-      // Add default configuration values based on block type
-      const defaultConfig = {};
+      // Preserve the config from nodeMetadata, especially for custom blocks
+      const preservedConfig = nodeMetadata?.config || {};
+
+      // Add default configuration values based on block type if they don't exist
+      const defaultConfig = {
+        ...preservedConfig, // Preserve existing config (like customBlockId)
+      };
 
       const newNode = {
         id: `${blockType}-${Date.now()}`,
@@ -211,19 +222,21 @@ function FlowContent({ executionId, toolbarRef }: FlowCanvasProps) {
         position,
         data: {
           blockType,
-          label: nodeMetadata.label || `${blockType} Node`,
-          nodeType: nodeMetadata.nodeType || NodeCategory.ACTION,
-          description: nodeMetadata.description || "",
+          label: nodeMetadata?.label || `${blockType} Node`,
+          nodeType: nodeMetadata?.nodeType || NodeCategory.ACTION,
+          description: nodeMetadata?.description || "",
           isValid: true,
           isEnabled: true,
           inputCount: 1,
           outputCount: 1,
           status: "idle",
-          config: defaultConfig, // Add default config
           ...nodeMetadata,
+          // Override to ensure config is properly set (must come after spread)
+          config: defaultConfig,
         },
       };
 
+      console.log("Created node with config:", newNode.data.config);
       addNode(newNode);
     },
     [addNode, reactFlowInstance]

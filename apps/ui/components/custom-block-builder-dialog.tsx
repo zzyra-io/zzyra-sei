@@ -96,11 +96,11 @@ export function CustomBlockBuilderDialog({
         setName(initialBlock.name);
         setDescription(initialBlock.description);
         setCategory(initialBlock.category);
-        setIsPublic(initialBlock.isPublic);
+        setIsPublic(initialBlock.isPublic || false);
         setInputs(initialBlock.inputs);
         setOutputs(initialBlock.outputs);
         setLogicType(initialBlock.logicType);
-        setLogic(initialBlock.logic);
+        setLogic(initialBlock.code);
         setTags(initialBlock.tags || []);
       } else {
         // Default values for new block
@@ -121,10 +121,9 @@ export function CustomBlockBuilderDialog({
   // Add a new input parameter
   const addInput = () => {
     const newInput: BlockParameter = {
-      id: `input_${Date.now()}`,
       name: `input${inputs.length + 1}`,
       description: "",
-      dataType: DataType.STRING,
+      type: DataType.STRING,
       required: true,
     };
     setInputs([...inputs, newInput]);
@@ -167,10 +166,9 @@ export function CustomBlockBuilderDialog({
   // Add a new output parameter
   const addOutput = () => {
     const newOutput: BlockParameter = {
-      id: `output_${Date.now()}`,
       name: `output${outputs.length + 1}`,
       description: "",
-      dataType: DataType.STRING,
+      type: DataType.STRING,
       required: true,
     };
     setOutputs([...outputs, newOutput]);
@@ -336,12 +334,12 @@ export function CustomBlockBuilderDialog({
       inputs,
       outputs,
       logicType,
-      logic,
+      code: logic,
       isPublic,
       createdAt: initialBlock?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       createdBy: initialBlock?.createdBy,
-      version: initialBlock?.version,
+      // version: initialBlock?.version,
       tags,
     };
 
@@ -415,9 +413,6 @@ export function CustomBlockBuilderDialog({
                         Action
                       </SelectItem>
                       <SelectItem value={NodeCategory.LOGIC}>Logic</SelectItem>
-                      <SelectItem value={NodeCategory.FINANCE}>
-                        Finance
-                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -481,13 +476,14 @@ export function CustomBlockBuilderDialog({
                   <div className='text-center py-8 text-muted-foreground'>
                     <p>No input parameters defined</p>
                     <p className='text-xs mt-1'>
-                      Click 'Add Input' to define parameters for your block
+                      Click &apos;Add Input&apos; to define parameters for your
+                      block
                     </p>
                   </div>
                 ) : (
                   <div className='space-y-4'>
                     {inputs.map((input, index) => (
-                      <Card key={input.id}>
+                      <Card key={input.name}>
                         <CardHeader className='py-3 px-4'>
                           <CardTitle className='text-sm font-medium flex justify-between'>
                             <span>Input Parameter {index + 1}</span>
@@ -538,10 +534,10 @@ export function CustomBlockBuilderDialog({
                                 Data Type
                               </Label>
                               <Select
-                                value={input.dataType}
+                                value={input.type}
                                 onValueChange={(value) =>
                                   updateInput(index, {
-                                    dataType: value as DataType,
+                                    type: value as DataType,
                                   })
                                 }>
                                 <SelectTrigger id={`input-type-${index}`}>
@@ -639,13 +635,14 @@ export function CustomBlockBuilderDialog({
                   <div className='text-center py-8 text-muted-foreground'>
                     <p>No output parameters defined</p>
                     <p className='text-xs mt-1'>
-                      Click 'Add Output' to define what your block will return
+                      Click &apos;Add Output&apos; to define what your block
+                      will return
                     </p>
                   </div>
                 ) : (
                   <div className='space-y-4'>
                     {outputs.map((output, index) => (
-                      <Card key={output.id}>
+                      <Card key={output.name}>
                         <CardHeader className='py-3 px-4'>
                           <CardTitle className='text-sm font-medium flex justify-between'>
                             <span>Output Parameter {index + 1}</span>
@@ -696,10 +693,10 @@ export function CustomBlockBuilderDialog({
                                 Data Type
                               </Label>
                               <Select
-                                value={output.dataType}
+                                value={output.type}
                                 onValueChange={(value) =>
                                   updateOutput(index, {
-                                    dataType: value as DataType,
+                                    type: value as DataType,
                                   })
                                 }>
                                 <SelectTrigger id={`output-type-${index}`}>
@@ -902,8 +899,8 @@ export function CustomBlockBuilderDialog({
                                 onGenerateWithAI?.(
                                   aiPrompt,
                                   (generatedBlock) => {
-                                    if (generatedBlock.logic) {
-                                      setLogic(generatedBlock.logic);
+                                    if (generatedBlock.code) {
+                                      setLogic(generatedBlock.code);
 
                                       // If logic type is provided, update it
                                       if (generatedBlock.logicType) {
