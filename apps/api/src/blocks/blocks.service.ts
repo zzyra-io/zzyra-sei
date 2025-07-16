@@ -433,14 +433,14 @@ export class BlocksService {
       category: validCategory,
       inputs: (blockData.inputs || []).map((input: any) => ({
         name: input.name,
-        type: input.type || input.dataType, // Handle both 'type' and 'dataType' fields
+        type: this.validateDataType(input.type || input.dataType), // Convert to DataType enum
         description: input.description || "",
         required: input.required || false,
         defaultValue: input.defaultValue,
       })),
       outputs: (blockData.outputs || []).map((output: any) => ({
         name: output.name,
-        type: output.type || output.dataType, // Handle both 'type' and 'dataType' fields
+        type: this.validateDataType(output.type || output.dataType), // Convert to DataType enum
         description: output.description || "",
         required: output.required || false,
       })),
@@ -470,6 +470,15 @@ export class BlocksService {
     }
     console.warn(`Invalid logicType "${logicType}", defaulting to JAVASCRIPT`);
     return LogicType.JAVASCRIPT;
+  }
+
+  private validateDataType(dataType: string): DataType {
+    const validDataTypes = Object.values(DataType);
+    if (validDataTypes.includes(dataType as DataType)) {
+      return dataType as DataType;
+    }
+    console.warn(`Invalid dataType "${dataType}", defaulting to STRING`);
+    return DataType.STRING;
   }
 
   private formatBlockTypeName(blockType: string): string {

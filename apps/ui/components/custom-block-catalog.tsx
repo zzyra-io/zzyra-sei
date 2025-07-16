@@ -241,7 +241,7 @@ export function CustomBlockCatalog({
                         if (!blk) return null;
                         return (
                           <div
-                            key={ft}
+                            key={blk.metadata?.customBlockId || `fav-${ft}`}
                             draggable
                             onDragStart={(e) => handleDragStart(e, blk)}
                             onClick={() => handleBlockClick(blk)}
@@ -271,7 +271,7 @@ export function CustomBlockCatalog({
                         if (!blk) return null;
                         return (
                           <div
-                            key={rt}
+                            key={blk.metadata?.customBlockId || `recent-${rt}`}
                             draggable
                             onDragStart={(e) => handleDragStart(e, blk)}
                             onClick={() => handleBlockClick(blk)}
@@ -320,7 +320,10 @@ export function CustomBlockCatalog({
                 <div className='grid grid-cols-1 gap-3'>
                   {filteredBlocks.map((block, index) => (
                     <div
-                      key={block.type}
+                      key={
+                        block.metadata?.customBlockId ||
+                        `${block.type}-${index}`
+                      }
                       draggable
                       onDragStart={(e) => handleDragStart(e, block)}
                       onClick={() => handleBlockClick(block)}

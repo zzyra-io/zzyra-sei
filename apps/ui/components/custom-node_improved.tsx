@@ -128,14 +128,26 @@ export default function CustomNode({
   const configSummary = Object.entries(config)
     .filter(([key]) => key && key !== "blockType" && key !== "label")
     .slice(0, 3)
-    .map(([key, value]) => (
-      <div key={key} className='flex justify-between items-center text-xs'>
-        <span className='text-muted-foreground font-mono'>{key}:</span>
-        <span className='font-semibold text-foreground/90 truncate'>
-          {String(value) || "Not set"}
-        </span>
-      </div>
-    ));
+    .map(([key, value]) => {
+      // Special handling for customBlockId to show shortened version but preserve full value
+      const displayValue =
+        key === "customBlockId" &&
+        typeof value === "string" &&
+        value.length > 20
+          ? `${value.substring(0, 8)}...${value.substring(value.length - 4)}`
+          : String(value) || "Not set";
+
+      return (
+        <div key={key} className='flex justify-between items-center text-xs'>
+          <span className='text-muted-foreground font-mono'>{key}:</span>
+          <span
+            className='font-semibold text-foreground/90'
+            title={String(value)}>
+            {displayValue}
+          </span>
+        </div>
+      );
+    });
 
   // Get accent color classes
   const getAccentColorClasses = (color: string) => {
