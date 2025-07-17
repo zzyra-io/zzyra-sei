@@ -2,13 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../services/database.service';
 import { MagicAdminService } from '../../services/magic-admin.service';
 
-import { BlockExecutionContext, BlockHandler, BlockType } from '@zyra/types';
+import { BlockExecutionContext, BlockHandler, BlockType, GenericBlockType } from '@zyra/types';
 import * as vm from 'vm';
 import { EmailBlockHandler } from './EmailBlockHandler';
 import { HttpRequestHandler } from './HttpRequestHandler';
 import { MetricsBlockHandler } from './MetricsBlockHandler';
 import { ScheduleBlockHandler } from './ScheduleBlockHandler';
 import { CustomBlockHandler } from './CustomBlockHandler';
+
+// Import enhanced block system
+import { EnhancedBlockRegistry } from './enhanced/EnhancedBlockRegistry';
+import { ZyraTemplateProcessor } from '../../utils/template-processor';
 
 /**
  * Central registry for all block handlers.
@@ -17,6 +21,7 @@ import { CustomBlockHandler } from './CustomBlockHandler';
 export class BlockHandlerRegistry {
   // Using string keys to avoid type issues with BlockType enum
   private handlers: Record<string, BlockHandler>;
+  private enhancedRegistry: EnhancedBlockRegistry;
 
   // Maximum execution time for JavaScript blocks in milliseconds
   private readonly MAX_EXECUTION_TIME = 30000; // 30 seconds
@@ -25,7 +30,9 @@ export class BlockHandlerRegistry {
     private readonly logger: Logger,
     private readonly databaseService: DatabaseService,
   ) {
-    // Initialize services
+    // Initialize enhanced block system
+    const templateProcessor = new ZyraTemplateProcessor();
+    this.enhancedRegistry = new EnhancedBlockRegistry(templateProcessor);
 
     this.handlers = {
       // Action blocks
@@ -40,7 +47,17 @@ export class BlockHandlerRegistry {
         new HttpRequestHandler(),
       ),
 
-      // Generic blocks
+      // Generic blocks - Enhanced versions take priority
+      [GenericBlockType.HTTP_REQUEST]: new MetricsBlockHandler(
+        GenericBlockType.HTTP_REQUEST,
+        new HttpRequestHandler(),
+      ),
+      [GenericBlockType.COMPARATOR]: new MetricsBlockHandler(
+        GenericBlockType.COMPARATOR,
+        new HttpRequestHandler(), // Placeholder - enhanced version will override
+      ),
+      
+      // Legacy HTTP handler for backward compatibility
       [BlockType.HTTP_REQUEST]: new MetricsBlockHandler(
         BlockType.HTTP_REQUEST,
         new HttpRequestHandler(),
@@ -89,11 +106,19 @@ export class BlockHandlerRegistry {
 
   /**
    * Retrieve a handler for the given block type.
-   * Performs case-insensitive lookup to match handlers.
+   * Tries enhanced registry first, then falls back to legacy handlers.
    */
   getHandler(type: BlockType | string): BlockHandler {
-    // Direct match first
+    // First, try enhanced registry for generic blocks
+    const enhancedHandler = this.enhancedRegistry.getHandler(type);
+    if (enhancedHandler) {
+      this.logger.debug(`Using enhanced handler for block type: ${type}`);
+      return this.createEnhancedBlockWrapper(enhancedHandler, type);
+    }
+
+    // Fall back to legacy handlers
     if (this.handlers[type]) {
+      this.logger.debug(`Using legacy handler for block type: ${type}`);
       return this.handlers[type];
     }
 
@@ -123,6 +148,47 @@ export class BlockHandlerRegistry {
 
     // Fall back to unknown handler
     return this.handlers[BlockType.UNKNOWN];
+  }
+
+  /**
+   * Create a wrapper to bridge enhanced blocks with the legacy BlockHandler interface
+   */
+  private createEnhancedBlockWrapper(enhancedHandler: any, blockType: string): BlockHandler {
+    return {
+      execute: async (node: any, context: BlockExecutionContext) => {
+        try {
+          this.logger.debug(`Executing enhanced block: ${blockType}`, {
+            nodeId: node.id,
+            executionId: context.executionId
+          });
+
+          // Use the enhanced registry's execution method
+          const result = await this.enhancedRegistry.executeBlock(
+            node,
+            context,
+            context.previousOutputs || {}
+          );
+
+          this.logger.debug(`Enhanced block execution completed: ${blockType}`, {
+            nodeId: node.id,
+            executionId: context.executionId,
+            hasResult: !!result
+          });
+
+          return result;
+        } catch (error) {
+          this.logger.error(`Enhanced block execution failed: ${blockType}`, {
+            nodeId: node.id,
+            executionId: context.executionId,
+            error: error.message
+          });
+          throw error;
+        }
+      },
+      
+      validate: enhancedHandler.validate?.bind(enhancedHandler),
+      getDefaultConfig: enhancedHandler.getDefaultConfig?.bind(enhancedHandler)
+    };
   }
 
   /**

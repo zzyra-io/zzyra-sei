@@ -12,7 +12,7 @@ export { BLOCK_CATALOG } from "./workflow/metadata";
 
 // Explicitly re-export critical types at the top level for backward compatibility
 // This ensures all import paths continue to work for both UI and worker components
-export { BlockType } from "./workflow/block-types";
+export { BlockType, GenericBlockType } from "./workflow/block-types";
 export { NodeCategory } from "./workflow/categories";
 
 // Re-export custom block types
@@ -30,7 +30,33 @@ export {
 } from "./workflow/custom-block";
 
 // Re-export execution related types
-export type { BlockExecutionContext, BlockHandler } from "./workflow/execution";
+export type { 
+  BlockExecutionContext, 
+  BlockHandler,
+  EnhancedBlockExecutionContext,
+  EnhancedBlockHandler,
+  EnhancedBlockDefinition,
+  ZyraNodeData,
+  BinaryData,
+  ZyraNodeError,
+  ValidationResult,
+  TemplateProcessor,
+  DataMapping,
+  FieldMapping,
+  DataTransformation,
+  HttpRequestOptions,
+  BlockGroup,
+  ConnectionType,
+  BlockProperty,
+  PropertyType,
+  PropertyOption,
+  PropertyTypeOptions,
+  DisplayOptions,
+  CredentialDefinition,
+  WebhookDefinition,
+  BlockExample,
+  DocumentationResource
+} from "./workflow/execution";
 
 // Re-export metadata helper functions
 export { getBlockMetadata, getBlockType } from "./workflow/metadata";

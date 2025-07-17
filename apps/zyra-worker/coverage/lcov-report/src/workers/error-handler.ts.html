@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/22</span>
+                <span class='fraction'>0/23</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>0/6</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/16</span>
+                <span class='fraction'>0/17</span>
             </div>
         
             
@@ -116,7 +116,19 @@
 <a name='L51'></a><a href='#L51'>51</a>
 <a name='L52'></a><a href='#L52'>52</a>
 <a name='L53'></a><a href='#L53'>53</a>
-<a name='L54'></a><a href='#L54'>54</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -124,6 +136,8 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -132,7 +146,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -143,7 +156,18 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -170,12 +194,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import { Injectable, Logger } from '@nestjs/common';</span>
-<span class="cstat-no" title="statement not covered" >import { createServiceClient } from '../lib/supabase/serviceClient';</span>
+<span class="cstat-no" title="statement not covered" >import { DatabaseService } from '../services/database.service';</span>
 <span class="cstat-no" title="statement not covered" >import { ExecutionEventsService } from '../lib/services/execution-events.service';</span>
 &nbsp;
 @Injectable()
-export <span class="fstat-no" title="function not covered" >class <span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" >E</span>rrorHandler<span class="cstat-no" title="statement not covered" > </span>{</span></span>
+export class <span class="cstat-no" title="statement not covered" ><span class="cstat-no" title="statement not covered" >ErrorHandler<span class="cstat-no" title="statement not covered" > </span>{</span></span>
   private readonly <span class="cstat-no" title="statement not covered" >logger = new Logger(ErrorHandler.name);</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  constructor(private readonly <span class="cstat-no" title="statement not covered" >d</span>atabaseService: D</span>atabaseService) {}
 &nbsp;
 <span class="fstat-no" title="function not covered" >  async </span>handleJobFailure(
     error: Error,
@@ -183,7 +209,6 @@ export <span class="fstat-no" title="function not covered" >class <span class="c
     userId: string,
     nodeId?: string,
   ): Promise&lt;void&gt; {
-    const supabase = <span class="cstat-no" title="statement not covered" >createServiceClient();</span>
     const errorType = <span class="cstat-no" title="statement not covered" >this.categorizeError(error);</span>
     const details = <span class="cstat-no" title="statement not covered" >{</span>
       type: errorType,
@@ -196,15 +221,26 @@ export <span class="fstat-no" title="function not covered" >class <span class="c
       `[executionId=${executionId}] Job failed: ${error.message}`,
       { userId, details },
     );
-<span class="cstat-no" title="statement not covered" >    await supabase</span>
-      .from('workflow_executions')
-      .update({
-        status: 'failed',
-        error: error.message,
+&nbsp;
+    // Update execution status using DatabaseService
+<span class="cstat-no" title="statement not covered" >    await this.databaseService.executions.updateStatus(</span>
+      executionId,
+      'failed',
+      error.message,
+    );
+&nbsp;
+    // Add detailed error log
+<span class="cstat-no" title="statement not covered" >    await this.databaseService.executions.addLog(</span>
+      executionId,
+      'error',
+      `Job failed: ${error.message}`,
+      {
+        error_type: errorType,
         error_details: details,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', executionId);
+        node_id: nodeId || 'system',
+        user_id: userId,
+      },
+    );
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    ExecutionEventsService.emitWorkflowFailed({</span>
       executionId,
@@ -229,7 +265,7 @@ export <span class="fstat-no" title="function not covered" >class <span class="c
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-05-05T15:32:30.053Z
+                at 2025-07-17T19:14:31.786Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
