@@ -34,7 +34,7 @@ const WorkflowResponseSchema = z.object({
   nodes: z.array(
     z.object({
       id: z.string(),
-      type: z.string().default("custom"),
+      type: z.string().default("CUSTOM"),
       position: z.object({ x: z.number(), y: z.number() }),
       data: z.object({
         blockType: z.nativeEnum(BlockType),
@@ -56,7 +56,7 @@ const WorkflowResponseSchema = z.object({
       target: z.string(),
       sourceHandle: z.string().optional(),
       targetHandle: z.string().optional(),
-      type: z.string().default("custom"),
+      type: z.string().default("CUSTOM"),
       animated: z.boolean().default(false),
     })
   ),
@@ -104,11 +104,11 @@ export class AiService {
     };
   }> {
     try {
-      const systemPrompt = `You are an AI that creates custom workflow blocks for Zzyra platform.
+      const systemPrompt = `You are an AI that creates CUSTOM workflow blocks for Zzyra platform.
 
 Available Data Types: ${JSON.stringify(Object.values(DataType), null, 2)}
 
-Generate a complete custom block definition based on user requirements.
+Generate a complete CUSTOM block definition based on user requirements.
 
 REQUIRED OUTPUT STRUCTURE:
 {
@@ -151,7 +151,7 @@ Return ONLY the JSON object.`;
       };
     } catch (error) {
       console.error("AI Custom Block Generation Error:", error);
-      throw new Error("Failed to generate custom block");
+      throw new Error("Failed to generate CUSTOM block");
     }
   }
 
@@ -284,7 +284,7 @@ ${JSON.stringify(Object.values(DataType), null, 2)}
 **Node Structure** (STRICT FORMAT):
 {
   "id": "node-{{uuid}}",
-  "type": "custom",
+  "type": "CUSTOM",
   "position": {"x": intelligent_x, "y": intelligent_y},
   "data": {
     "blockType": "EXACT_UPPERCASE_ENUM_VALUE",
@@ -306,7 +306,7 @@ ${JSON.stringify(Object.values(DataType), null, 2)}
   "id": "edge-{{uuid}}",
   "source": "source-node-id",
   "target": "target-node-id",
-  "type": "custom",
+  "type": "CUSTOM",
   "animated": false
 }
 
@@ -388,7 +388,7 @@ Edges: ${JSON.stringify(existingEdges, null, 2)}
 
       return {
         id: nodeId,
-        type: "custom",
+        type: "CUSTOM",
         position: nodeData.position as { x: number; y: number },
         data: {
           blockType: (nodeData.data as any)?.blockType,
@@ -420,7 +420,7 @@ Edges: ${JSON.stringify(existingEdges, null, 2)}
       target: edge.target as string,
       sourceHandle: edge.sourceHandle as string,
       targetHandle: edge.targetHandle as string,
-      type: (edge.type as string) || "custom",
+      type: (edge.type as string) || "CUSTOM",
       animated: (edge.animated as boolean) || false,
     }));
   }

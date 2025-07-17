@@ -31,8 +31,8 @@ export class WorkerHealthIndicator extends HealthIndicator {
 
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     try {
-      // Check database connectivity
-      await this.databaseService.healthCheck();
+      // Check database connectivity with enhanced monitoring
+      const dbHealthResult = await this.databaseService.healthCheck();
 
       // Calculate health metrics
       const uptime = Date.now() - this.startTime;
@@ -48,8 +48,9 @@ export class WorkerHealthIndicator extends HealthIndicator {
         this.lastSuccessfulExecution > 0 && // Has processed at least one job
         Date.now() - this.lastSuccessfulExecution > 600000; // No successful job in 10 minutes
 
-      // Worker is unhealthy if failure rate is too high or it's been idle too long
-      const isHealthy = failureRate < 50 && !idleTooLong;
+      // Worker is unhealthy if failure rate is too high, idle too long, or database is unhealthy
+      const databaseHealthy = dbHealthResult.isHealthy;
+      const isHealthy = failureRate < 50 && !idleTooLong && databaseHealthy;
 
       return this.getStatus(key, isHealthy, {
         uptime,
@@ -61,6 +62,11 @@ export class WorkerHealthIndicator extends HealthIndicator {
           ? new Date(this.lastSuccessfulExecution).toISOString()
           : 'never',
         idleTooLong,
+        database: {
+          healthy: databaseHealthy,
+          responseTime: dbHealthResult.responseTime,
+          lastError: dbHealthResult.lastError,
+        },
       });
     } catch (error) {
       return this.getStatus(key, false, {
@@ -73,17 +79,27 @@ export class WorkerHealthIndicator extends HealthIndicator {
   async isReady(key: string): Promise<HealthIndicatorResult> {
     // For readiness, we just need to make sure the worker is running and connected to the database
     try {
-      await this.databaseService.healthCheck();
+      const dbHealthResult = await this.databaseService.healthCheck();
+      const isReady = dbHealthResult.isHealthy;
 
-      return this.getStatus(key, true, {
+      return this.getStatus(key, isReady, {
         uptime: Date.now() - this.startTime,
-        databaseConnected: true,
-        message: 'Worker is ready',
+        database: {
+          connected: dbHealthResult.isHealthy,
+          responseTime: dbHealthResult.responseTime,
+          lastError: dbHealthResult.lastError,
+        },
+        message: isReady
+          ? 'Worker is ready'
+          : 'Worker not ready - database issues',
       });
     } catch (error) {
       return this.getStatus(key, false, {
         uptime: Date.now() - this.startTime,
-        databaseConnected: false,
+        database: {
+          connected: false,
+          error: (error as ErrorWithMessage).message,
+        },
         message: `Readiness check failed: ${(error as ErrorWithMessage).message}`,
       });
     }

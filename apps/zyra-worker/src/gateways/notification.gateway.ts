@@ -29,6 +29,9 @@ export class NotificationGateway
   @WebSocketServer() server: Server;
   private logger: Logger;
   private userSockets: Map<string, Set<string>>;
+  // Map to track polling intervals and last notification timestamp per user
+  private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private lastNotificationTimestamps: Map<string, string> = new Map();
 
   constructor(
     private readonly configService: ConfigService,
@@ -70,6 +73,39 @@ export class NotificationGateway
 
     // Join user-specific room
     client.join(`user:${userId}`);
+
+    // Start polling for new notifications for this user
+    if (!this.pollingIntervals.has(userId)) {
+      let lastTimestamp = new Date(Date.now() - 1000 * 60 * 60).toISOString(); // 1 hour ago
+      this.lastNotificationTimestamps.set(userId, lastTimestamp);
+      const interval = setInterval(async () => {
+        try {
+          // Get notifications newer than lastTimestamp
+          const notifications =
+            await this.databaseService.prisma.notification.findMany({
+              where: {
+                userId,
+                createdAt: { gt: this.lastNotificationTimestamps.get(userId) },
+              },
+              orderBy: { createdAt: 'asc' },
+            });
+          if (notifications.length > 0) {
+            notifications.forEach((notification) => {
+              this.sendNotificationToUser(userId, notification);
+            });
+            // Update lastTimestamp to the latest notification
+            const latest = notifications[notifications.length - 1];
+            this.lastNotificationTimestamps.set(
+              userId,
+              latest.createdAt.toISOString(),
+            );
+          }
+        } catch (err) {
+          this.logger.error(`Polling error for user ${userId}:`, err);
+        }
+      }, 2000); // Poll every 2 seconds
+      this.pollingIntervals.set(userId, interval);
+    }
   }
 
   handleDisconnect(client: Socket) {
@@ -81,6 +117,11 @@ export class NotificationGateway
         sockets.delete(client.id);
         if (sockets.size === 0) {
           this.userSockets.delete(userId);
+          // Clean up polling interval and timestamp
+          const interval = this.pollingIntervals.get(userId);
+          if (interval) clearInterval(interval);
+          this.pollingIntervals.delete(userId);
+          this.lastNotificationTimestamps.delete(userId);
         }
         break;
       }

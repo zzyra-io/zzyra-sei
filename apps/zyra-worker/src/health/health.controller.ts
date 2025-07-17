@@ -1,9 +1,10 @@
-import { Controller, Get, Res, Header } from '@nestjs/common';
+import { Controller, Get, Res, Header, Post } from '@nestjs/common';
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
 import { Counter, Gauge } from 'prom-client';
 import { QueueHealthIndicator } from '../health/queue.health';
 import { WorkerHealthIndicator } from '../health/worker.health';
+import { HealthService } from '../health/health.service';
 import { DatabaseService } from '../services/database.service';
 import { RabbitMQService } from '../services/rabbitmq.service';
 import { Response } from 'express';
@@ -56,6 +57,7 @@ export class HealthController {
     private health: HealthCheckService,
     private queueHealth: QueueHealthIndicator,
     private workerHealth: WorkerHealthIndicator,
+    private readonly healthService: HealthService,
     @InjectMetric('worker_health_check_total')
     private healthCheckCounter: Counter<string>,
     @InjectMetric('worker_uptime_seconds') private uptimeGauge: Gauge<string>,
@@ -82,7 +84,7 @@ export class HealthController {
       const queueStats = await this.rabbitmqService.getQueueStats();
       const performanceMetrics =
         await this.rabbitmqService.getPerformanceMetrics();
-      const dbHealthy = await this.databaseService.healthCheck();
+      const dbHealthy = await this.databaseService.checkWorkerHealth();
 
       const systemMetrics = {
         uptime: process.uptime(),
@@ -124,7 +126,7 @@ export class HealthController {
     const queueStats = await this.rabbitmqService.getQueueStats();
     const performanceMetrics =
       await this.rabbitmqService.getPerformanceMetrics();
-    const dbHealthy = await this.databaseService.healthCheck();
+    const dbHealthy = await this.databaseService.checkWorkerHealth();
     const scalingInfo = await this.getScalingInfo();
 
     const healthData: HealthData = {
@@ -772,12 +774,13 @@ export class HealthController {
   }
 
   @Get('database')
-  async checkDatabase() {
-    const isHealthy = await this.databaseService.healthCheck();
+  async checkDatabase(): Promise<any> {
+    const healthStatus = await this.databaseService.checkWorkerHealth();
 
     return {
-      status: isHealthy ? 'healthy' : 'unhealthy',
+      status: healthStatus.status === 'healthy' ? 'healthy' : 'unhealthy',
       timestamp: new Date().toISOString(),
+      details: healthStatus,
     };
   }
 
@@ -786,7 +789,7 @@ export class HealthController {
     const queueStats = await this.rabbitmqService.getQueueStats();
     const performanceMetrics =
       await this.rabbitmqService.getPerformanceMetrics();
-    const dbHealthy = await this.databaseService.healthCheck();
+    const dbHealthy = await this.databaseService.checkWorkerHealth();
 
     return {
       timestamp: new Date().toISOString(),
@@ -864,5 +867,43 @@ export class HealthController {
       return 'SCALE_DOWN_POSSIBLE';
     }
     return 'MAINTAIN_CURRENT';
+  }
+
+  // === Enhanced Health Endpoints ===
+
+  @Get('enhanced')
+  async getEnhancedHealth(): Promise<any> {
+    return this.healthService.getHealthStatus();
+  }
+
+  @Get('enhanced/simple')
+  async getSimpleHealth(): Promise<any> {
+    return this.healthService.getSimpleHealth();
+  }
+
+  @Get('enhanced/readiness')
+  async getReadiness(): Promise<any> {
+    return this.healthService.getReadiness();
+  }
+
+  @Get('enhanced/liveness')
+  async getLiveness(): Promise<any> {
+    return this.healthService.getLiveness();
+  }
+
+  @Get('enhanced/worker-metrics')
+  async getWorkerMetrics(): Promise<any> {
+    return this.databaseService.getWorkerMetrics();
+  }
+
+  @Post('enhanced/maintenance')
+  async performMaintenance(): Promise<any> {
+    return this.healthService.performMaintenance();
+  }
+
+  @Post('enhanced/reset-metrics')
+  async resetMetrics(): Promise<any> {
+    this.databaseService.resetMetrics();
+    return { success: true, message: 'Worker metrics reset successfully' };
   }
 }

@@ -1,14 +1,18 @@
 /**
  * Notification Repository
- * 
+ *
  * This repository provides database operations for user notifications.
  * It handles notification creation, retrieval, and management.
  */
 
 import { Notification, NotificationPreference } from "@prisma/client";
 // No need for custom interfaces; use Prisma-generated types for type safety.
-import { BaseRepository } from './base.repository';
-import { PaginationParams, applyPagination, createPaginatedResult } from '../utils/pagination';
+import { BaseRepository } from "./base.repository";
+import {
+  PaginationParams,
+  parsePaginationParams,
+  createPaginatedResult,
+} from "../utils/pagination";
 
 // Type definitions for notification operations
 export interface NotificationCreateInput {
@@ -45,8 +49,12 @@ export interface NotificationPreferenceUpdateInput {
   discordWebhookUrl?: string;
 }
 
-export class NotificationRepository extends BaseRepository<Notification, NotificationCreateInput, NotificationUpdateInput> {
-  protected tableName = 'notifications';
+export class NotificationRepository extends BaseRepository<
+  Notification,
+  NotificationCreateInput,
+  NotificationUpdateInput
+> {
+  protected tableName = "notifications";
   protected model = this.prisma.notification;
 
   /**
@@ -61,16 +69,14 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
       where: { userId },
     });
 
-    // Apply pagination
-    const query = this.prisma.notification.findMany({
-      where: { userId },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    // Build pagination options
+    const paginationOptions = parsePaginationParams(params);
 
-    const paginatedQuery = applyPagination(query, params);
-    const data = await paginatedQuery;
+    // Merge options for findMany
+    const data = await this.prisma.notification.findMany({
+      where: { userId },
+      ...paginationOptions,
+    });
 
     // Return paginated result
     return createPaginatedResult(data, total, params);
@@ -82,14 +88,17 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
    * @param limit The maximum number of notifications to return
    * @returns An array of unread notifications
    */
-  async findUnreadByUserId(userId: string, limit = 10): Promise<Notification[]> {
+  async findUnreadByUserId(
+    userId: string,
+    limit = 10
+  ): Promise<Notification[]> {
     return this.prisma.notification.findMany({
       where: {
         userId,
         read: false,
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
       take: limit,
     });
@@ -119,7 +128,6 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
       where: { id },
       data: {
         read: true,
-        
       },
     });
   }
@@ -137,7 +145,6 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
       },
       data: {
         read: true,
-        
       },
     });
 
@@ -174,7 +181,10 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
    * @param data The notification data
    * @returns The created notification
    */
-  async createForUser(userId: string, data: Omit<NotificationCreateInput, 'user'>): Promise<Notification> {
+  async createForUser(
+    userId: string,
+    data: Omit<NotificationCreateInput, "user">
+  ): Promise<Notification> {
     return this.prisma.notification.create({
       data: {
         ...data,
@@ -189,16 +199,19 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
    * @param data The notification data
    * @returns The number of created notifications
    */
-  async createForUsers(userIds: string[], data: Omit<NotificationCreateInput, 'user'>): Promise<number> {
+  async createForUsers(
+    userIds: string[],
+    data: Omit<NotificationCreateInput, "user">
+  ): Promise<number> {
     // Create notifications in batches
     const batchSize = 100;
     let createdCount = 0;
 
     for (let i = 0; i < userIds.length; i += batchSize) {
       const batch = userIds.slice(i, i + batchSize);
-      
+
       // Create notifications for this batch
-      const notifications = batch.map(userId => ({
+      const notifications = batch.map((userId) => ({
         ...data,
         userId,
       }));
@@ -230,12 +243,14 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
    * @param data The notification preference data
    * @returns The created or updated notification preferences
    */
-  async updatePreferences(userId: string, data: Omit<NotificationPreferenceUpdateInput, 'user'>): Promise<NotificationPreference> {
+  async updatePreferences(
+    userId: string,
+    data: Omit<NotificationPreferenceUpdateInput, "user">
+  ): Promise<NotificationPreference> {
     return this.prisma.notificationPreference.upsert({
       where: { userId },
       update: {
         ...data,
-        
       },
       create: {
         ...data,
@@ -252,7 +267,12 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
    * @param type The notification type
    * @returns True if the notification was sent successfully
    */
-  async sendExternalNotification(userId: string, title: string, message: string, type: string): Promise<boolean> {
+  async sendExternalNotification(
+    userId: string,
+    title: string,
+    message: string,
+    type: string
+  ): Promise<boolean> {
     try {
       // Get user with profile
       const user = await this.prisma.user.findUnique({
@@ -295,7 +315,7 @@ export class NotificationRepository extends BaseRepository<Notification, Notific
 
       return true;
     } catch (error) {
-      console.error('Failed to send external notification:', error);
+      console.error("Failed to send external notification:", error);
       return false;
     }
   }

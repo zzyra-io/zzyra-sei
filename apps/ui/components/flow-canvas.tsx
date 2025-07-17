@@ -315,7 +315,7 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
       const newEdge = {
         ...params,
         id: `${params.source}-${params.target}-${Date.now()}`,
-        type: "custom",
+        type: "CUSTOM",
         animated: true,
         style: { stroke: themeColors.edge },
       };

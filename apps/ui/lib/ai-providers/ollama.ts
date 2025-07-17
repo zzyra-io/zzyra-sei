@@ -125,7 +125,7 @@ export class OllamaProvider implements AIProvider {
     if (hasWallet) {
       nodes.push({
         id: `node-${nodeId}`,
-        type: "custom",
+        type: "CUSTOM",
         position: { x: startX, y: startY },
         data: {
           label: "Wallet Trigger",

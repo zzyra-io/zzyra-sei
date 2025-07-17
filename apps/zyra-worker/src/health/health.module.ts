@@ -3,13 +3,16 @@ import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from './health.controller';
 import { QueueHealthIndicator } from './queue.health';
 import { WorkerHealthIndicator } from './worker.health';
+import { HealthService } from './health.service';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { getOrCreateCounter, getOrCreateGauge } from '../lib/prometheus';
 import { RabbitMQService } from '../services/rabbitmq.service';
+import { DatabaseModule } from '../services/database.module';
 
 @Module({
   imports: [
     TerminusModule,
+    DatabaseModule,
     PrometheusModule.register({
       defaultMetrics: {
         enabled: true,
@@ -20,6 +23,7 @@ import { RabbitMQService } from '../services/rabbitmq.service';
   providers: [
     QueueHealthIndicator,
     WorkerHealthIndicator,
+    HealthService,
     RabbitMQService,
     {
       provide: 'PROM_METRIC_WORKER_HEALTH_CHECK_TOTAL',

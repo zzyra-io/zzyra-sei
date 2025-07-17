@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { JwtModule } from "@nestjs/jwt";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_FILTER } from "@nestjs/core";
 
 // Database and core modules
 import { DatabaseModule } from "./database/database.module";
@@ -16,11 +16,16 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { BillingModule } from "./billing/billing.module";
 import { AiModule } from "./ai/ai.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
+import { HealthModule } from "./health/health.module";
 import { TemplateController, TemplateService } from "./templates";
 // import { AppController } from "./app.controller";
 
 // Guards
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
+
+// Exception Filters
+import { DatabaseExceptionFilter } from "./filters/database-exception.filter";
+import { PrismaExceptionFilter } from "./filters/prisma-exception.filter";
 
 @Module({
   imports: [
@@ -42,12 +47,21 @@ import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
     BillingModule,
     AiModule,
     DashboardModule,
+    HealthModule,
   ],
   controllers: [TemplateController],
   providers: [
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: DatabaseExceptionFilter,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: PrismaExceptionFilter,
     },
     TemplateService,
   ],

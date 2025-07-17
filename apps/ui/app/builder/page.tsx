@@ -270,7 +270,8 @@ export default function BuilderPage() {
     ) => {
       const newNode = {
         id: `${Date.now()}`,
-        type: "custom",
+        type: "CUSTOM",
+        blockType: customData.category,
         position,
         data: customData,
         dragHandle: ".custom-drag-handle",

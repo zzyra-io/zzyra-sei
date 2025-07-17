@@ -5,8 +5,15 @@
  * It exports the Prisma client, repositories, authentication services, and utility functions.
  */
 
-// Export Prisma client
-export { default as prisma } from "./client";
+// Export Prisma client and utilities
+export {
+  default as prisma,
+  DatabaseError,
+  checkDatabaseHealth,
+  getDatabaseConnectionState,
+  connectDatabase,
+  disconnectDatabase,
+} from "./client";
 export * from "./client";
 
 // Export all types
@@ -29,3 +36,38 @@ export * from "./auth/middleware";
 // Export utilities
 export * from "./utils/validation";
 export * from "./utils/pagination";
+
+// Export extensions and utilities
+export {
+  ExtensionManager,
+  createDevelopmentExtensionManager,
+  createProductionExtensionManager,
+  createExtendedPrismaClient,
+  type ExtendedPrismaClient,
+  type ExtensionConfig,
+  type RLSContext,
+  type CacheProvider,
+  type CacheConfig,
+  type RateLimitStore,
+  type RateLimitConfig,
+  type WorkflowStateConfig,
+  type StateEventHandler,
+  type AuditConfig,
+  type AuditContext,
+  MemoryCache,
+  RedisCache,
+  DatabaseCacheProvider,
+  MemoryRateLimitStore,
+  RedisRateLimitStore,
+  DatabaseRateLimitStore,
+  RateLimitError,
+  createRLSExtension,
+  createCacheExtension,
+  createRateLimitExtension,
+  createWorkflowStateExtension,
+  createAuditExtension,
+  createCacheUtils,
+  createRateLimitUtils,
+  createWorkflowStateUtils,
+  createAuditUtils,
+} from "./extensions";

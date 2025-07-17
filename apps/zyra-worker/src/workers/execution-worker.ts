@@ -261,8 +261,8 @@ export class ExecutionWorker implements OnModuleInit {
       await this.databaseService.updateExecutionStatusWithLogging(
         executionId,
         result.status,
-        result.outputs,
         result.error,
+        result.outputs,
       );
     } catch (error) {
       await this.errorHandler.handleJobFailure(

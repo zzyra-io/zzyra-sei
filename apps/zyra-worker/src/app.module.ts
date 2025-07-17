@@ -1,4 +1,5 @@
 import { Module, Logger } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { WorkflowModule } from './lib/services/workflow.module';
@@ -12,6 +13,10 @@ import { BlockchainModule } from './lib/blockchain/BlockchainModule';
 import { DatabaseModule } from './services/database.module';
 import { RabbitMQService } from './services/rabbitmq.service';
 import { MagicModule } from './services/magic.module';
+
+// Exception Filters
+import { DatabaseExceptionFilter } from './filters/database-exception.filter';
+import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
 
 // Configuration validation schema
 const configValidationSchema = {
@@ -76,6 +81,15 @@ const configValidationSchema = {
     AppService,
     ExecutionWorker,
     RabbitMQService,
+    // Exception filters
+    {
+      provide: APP_FILTER,
+      useClass: DatabaseExceptionFilter,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: PrismaExceptionFilter,
+    },
     // Add configuration as a provider for dependency injection
     {
       provide: 'CONFIG',

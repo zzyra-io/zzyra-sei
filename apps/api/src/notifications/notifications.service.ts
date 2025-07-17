@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { NotificationRepository } from "@zyra/database";
+import { Notification, PaginatedResult } from "@zyra/database";
 
 @Injectable()
 export class NotificationsService {
@@ -7,7 +8,11 @@ export class NotificationsService {
     private readonly notificationRepository: NotificationRepository
   ) {}
 
-  async getNotifications(userId: string, page = 1, limit = 10) {
+  async getNotifications(
+    userId: string,
+    page = 1,
+    limit = 10
+  ): Promise<PaginatedResult<Notification>> {
     return this.notificationRepository.findByUserId(userId, { page, limit });
   }
 
@@ -64,5 +69,13 @@ export class NotificationsService {
     );
 
     return { success: true, notification };
+  }
+
+  async markAsRead(
+    userId: string,
+    notificationId: string
+  ): Promise<Notification> {
+    // Optionally, check ownership here
+    return this.notificationRepository.markAsRead(notificationId);
   }
 }

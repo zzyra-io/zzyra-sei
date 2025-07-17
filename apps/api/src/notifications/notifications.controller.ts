@@ -1,6 +1,15 @@
-import { Controller, Get, Post, Body, Query, Request } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  Request,
+  Patch,
+} from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { NotificationsService } from "./notifications.service";
+import { Notification, PaginatedResult } from "@zyra/database";
 
 @ApiTags("notifications")
 @Controller("notifications")
@@ -11,17 +20,11 @@ export class NotificationsController {
   @ApiOperation({ summary: "Get user notifications" })
   async getNotifications(
     @Request() req: { user?: { id: string } },
-    @Query("page") page?: string,
-    @Query("limit") limit?: string
-  ) {
+    @Query("page") page = 1,
+    @Query("limit") limit = 10
+  ): Promise<PaginatedResult<Notification>> {
     const userId = req.user?.id || "user1";
-    const pageNum = page ? parseInt(page, 10) : 1;
-    const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.notificationsService.getNotifications(
-      userId,
-      pageNum,
-      limitNum
-    );
+    return this.notificationsService.getNotifications(userId, page, limit);
   }
 
   @Get("unread-count")
@@ -53,5 +56,14 @@ export class NotificationsController {
   ): Promise<{ success: boolean; notification: any }> {
     const userId = req.user?.id || "user1";
     return this.notificationsService.testNotification(userId, data);
+  }
+
+  @Patch()
+  async markAsRead(
+    @Request() req: { user?: { id: string } },
+    @Body() body: { id: string }
+  ): Promise<Notification> {
+    const userId = req.user?.id || "user1";
+    return this.notificationsService.markAsRead(userId, body.id);
   }
 }

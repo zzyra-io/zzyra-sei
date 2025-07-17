@@ -47,6 +47,7 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`🚀 Zyra API is running on: http://localhost:${port}/api`);
   console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
+  console.log(`Health Dashboard: http://localhost:${port}/api/health`);
 }
 
 bootstrap();

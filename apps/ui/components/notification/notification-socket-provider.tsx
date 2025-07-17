@@ -10,6 +10,19 @@ import React, {
 } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { io, Socket } from "socket.io-client";
+import api from "@/lib/services/api";
+
+// Define Notification type if not imported
+interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+  read: boolean;
+  data?: unknown;
+  createdAt?: string;
+}
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -37,257 +50,112 @@ export const NotificationSocketProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
   const { toast } = useToast();
-  const retryCountRef = useRef<number>(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [socketConnected, setSocketConnected] = useState<boolean>(false);
+  const socketRef = useRef<Socket | null>(null);
+  const reconnectAttempts = useRef(0);
 
-  // const fetchNotifications = useCallback(async () => {
-  //   try {
-  //     console.log("Fetching notifications from API");
-  //     const response = await fetch("/api/notifications");
-  //     if (!response.ok) {
-  //       console.error("Failed to fetch notifications:", response.statusText);
-  //       return;
-  //     }
-
-  //     const data = await response.json();
-  //     const notificationData = Array.isArray(data)
-  //       ? data
-  //       : data.data && Array.isArray(data.data)
-  //       ? data.data
-  //       : [];
-  //     console.log(`Received ${notificationData.length} notifications`);
-  //     setNotifications(notificationData as Notification[]);
-  //     setUnreadCount(
-  //       notificationData.filter((n: Notification) => !n.read).length
-  //     );
-  //   } catch (error: unknown) {
-  //     console.error("Error fetching notifications:", error);
-  //   }
-  // }, []);
-
-  // const refetchNotifications = useCallback(async () => {
-  //   await fetchNotifications();
-  // }, [fetchNotifications]);
-
-  const getVariantForType = useCallback((type: string) => {
-    switch (type) {
-      case "error":
-        return "destructive" as const;
-      case "warning":
-        return "default" as const;
-      case "success":
-        return "default" as const;
-      default:
-        return "default" as const;
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const response = await api.get("/notifications");
+      const data = response.data;
+      const notificationData = Array.isArray(data)
+        ? data
+        : data.data && Array.isArray(data.data)
+          ? data.data
+          : [];
+      setNotifications(notificationData as Notification[]);
+      setUnreadCount(
+        notificationData.filter((n: Notification) => !n.read).length
+      );
+    } catch (error: unknown) {
+      // Silent fail
     }
   }, []);
 
+  const refetchNotifications = useCallback(async () => {
+    await fetchNotifications();
+  }, [fetchNotifications]);
+
   const markAsRead = useCallback(async (id: string) => {
     try {
-      console.log(`Marking notification ${id} as read`);
-      const response = await fetch("/api/notifications", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-
-      if (!response.ok) {
-        console.error(
-          "Failed to mark notification as read:",
-          response.statusText
-        );
-        return;
-      }
-
+      await api.patch("/notifications", { id });
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, read: true } : n))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (error: unknown) {
-      console.error("Error marking notification as read:", error);
-    }
+    } catch {}
   }, []);
 
   const markAllAsRead = useCallback(async () => {
     try {
-      console.log("Marking all notifications as read");
-      const response = await fetch("/api/notifications/mark-all-read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!response.ok) {
-        console.error(
-          "Failed to mark all notifications as read:",
-          response.statusText
-        );
-        return;
-      }
-
+      await api.post("/notifications/mark-all-read");
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
-    } catch (error: unknown) {
-      console.error("Error marking all notifications as read:", error);
-    }
+    } catch {}
   }, []);
 
-  // useEffect(() => {
-  //   let socketInstance: Socket | null = null;
-  //   let isMounted = true;
-  //   let connectionAttemptInProgress = false;
-  //   const maxRetries = 5;
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
-  //   const connectSocket = async () => {
-  //     if (connectionAttemptInProgress) return;
-  //     connectionAttemptInProgress = true;
+  useEffect(() => {
+    // Connect to the worker's notification socket
+    const userId =
+      typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+    if (!userId) return;
+    const socket = io(
+      process.env.NEXT_PUBLIC_NOTIFICATION_WS_URL ||
+        "http://localhost:3007/notifications",
+      {
+        auth: { userId },
+        transports: ["websocket"],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+      }
+    );
+    socketRef.current = socket;
 
-  //     try {
-  //       const supabase = createClient();
-  //       const {
-  //         data: { user },
-  //       } = await supabase.auth.getUser();
-  //       if (!user) {
-  //         console.log("No authenticated user found");
-  //         connectionAttemptInProgress = false;
-  //         return;
-  //       }
+    socket.on("connect", () => {
+      reconnectAttempts.current = 0;
+    });
 
-  //       const socketUrl =
-  //         process.env.NEXT_PUBLIC_WS_URL ||
-  //         process.env.NEXT_PUBLIC_API_URL ||
-  //         "ws://localhost:3000";
-  //       console.log(`Connecting to notification socket at ${socketUrl}`);
+    socket.on("disconnect", () => {
+      // Exponential backoff reconnect
+      if (reconnectAttempts.current < 5) {
+        setTimeout(
+          () => {
+            socket.connect();
+          },
+          Math.pow(2, reconnectAttempts.current) * 1000
+        );
+        reconnectAttempts.current += 1;
+      }
+    });
 
-  //       socketInstance = io(socketUrl, {
-  //         auth: { userId: user.id },
-  //         transports: ["websocket", "polling"], // Adding polling as fallback
-  //         reconnection: true, // Enable automatic reconnection
-  //         reconnectionAttempts: 5, // Maximum reconnection attempts
-  //         reconnectionDelay: 1000, // Initial delay between reconnections
-  //         reconnectionDelayMax: 5000, // Maximum delay between reconnections
-  //         timeout: 20000, // Increased timeout
-  //         forceNew: false, // Reuse connections when possible
-  //         autoConnect: false,
-  //       });
+    socket.on("notification", (notification: Notification) => {
+      setNotifications((prev) => [notification, ...prev]);
+      setUnreadCount((prev) => prev + 1);
+      toast({
+        title: notification.title,
+        description: notification.message,
+        variant: notification.type === "error" ? "destructive" : "default",
+      });
+    });
 
-  //       if (!socketInstance) {
-  //         console.error("Failed to create socket instance");
-  //         connectionAttemptInProgress = false;
-  //         return;
-  //       }
-
-  //       const connectWithRetry = () => {
-  //         if (retryCountRef.current >= maxRetries) {
-  //           console.error("Max retries reached, stopping connection attempts");
-  //           connectionAttemptInProgress = false;
-  //           return;
-  //         }
-
-  //         socketInstance?.removeAllListeners();
-
-  //         const backoffTime = Math.min(
-  //           1000 * Math.pow(2, retryCountRef.current),
-  //           30000
-  //         );
-  //         console.log(
-  //           `Attempting to connect to WebSocket... Retry ${
-  //             retryCountRef.current + 1
-  //           }/${maxRetries}, backoff: ${backoffTime}ms`
-  //         );
-
-  //         socketInstance?.connect();
-
-  //         const timeoutId = setTimeout(() => {
-  //           console.log("WebSocket connection timed out");
-  //           socketInstance?.disconnect();
-  //           retryCountRef.current++;
-
-  //           if (isMounted && retryCountRef.current < maxRetries) {
-  //             setTimeout(() => {
-  //               connectWithRetry();
-  //             }, backoffTime);
-  //           } else {
-  //             connectionAttemptInProgress = false;
-  //           }
-  //         }, 10000);
-
-  //         socketInstance?.on("connect", () => {
-  //           clearTimeout(timeoutId);
-  //           console.log("WebSocket connected successfully");
-  //           setSocketConnected(true);
-  //           retryCountRef.current = 0;
-  //           connectionAttemptInProgress = false;
-  //         });
-
-  //         socketInstance?.on("connect_error", (error) => {
-  //           clearTimeout(timeoutId);
-  //           console.error("WebSocket connection error:", error);
-  //           socketInstance?.disconnect();
-
-  //           if (isMounted && retryCountRef.current < maxRetries) {
-  //             retryCountRef.current++;
-  //             setTimeout(() => {
-  //               connectWithRetry();
-  //             }, backoffTime);
-  //           } else {
-  //             connectionAttemptInProgress = false;
-  //           }
-  //         });
-
-  //         socketInstance?.on("disconnect", () => {
-  //           console.log("WebSocket disconnected");
-  //           setSocketConnected(false);
-  //         });
-
-  //         socketInstance?.on(
-  //           "notification",
-  //           (notification: Notification | undefined) => {
-  //             if (!notification || !isMounted) return;
-  //             console.log("New notification received:", notification);
-  //             setNotifications((prev) => [notification, ...prev]);
-  //             if (!notification.read) {
-  //               setUnreadCount((prev) => prev + 1);
-  //             }
-  //             toast({
-  //               title: notification.title,
-  //               description: notification.message,
-  //               variant: getVariantForType(notification.type),
-  //             });
-  //           }
-  //         );
-  //       };
-
-  //       connectWithRetry();
-  //     } catch (error: unknown) {
-  //       console.error("Error in notification socket setup:", error);
-  //       connectionAttemptInProgress = false;
-  //     }
-  //   };
-
-  //   connectSocket();
-  //   // fetchNotifications();
-
-  //   return () => {
-  //     isMounted = false;
-  //     if (socketInstance) {
-  //       console.log("Disconnecting notification socket");
-  //       socketInstance.disconnect();
-  //       socketInstance.off("connect");
-  //       socketInstance.off("disconnect");
-  //       socketInstance.off("connect_error");
-  //       socketInstance.off("notification");
-  //     }
-  //   };
-  // }, [toast, fetchNotifications, getVariantForType]);
+    return () => {
+      socket.disconnect();
+    };
+  }, [toast]);
 
   const value: NotificationContextType = {
     notifications,
     unreadCount,
     markAsRead,
     markAllAsRead,
-    // refetchNotifications,
+    refetchNotifications,
   };
 
   return (

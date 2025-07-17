@@ -37,6 +37,7 @@ import Link from "next/link";
 export function NotificationBell() {
   const { notifications, unreadCount, markAsRead, markAllAsRead } =
     useNotifications();
+  console.log("notifications", notifications);
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
 

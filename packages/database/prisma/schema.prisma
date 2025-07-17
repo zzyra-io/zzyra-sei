@@ -721,4 +721,230 @@ model WalletTransaction {
   @@index([txHash])
 }
 
+// ================ Extension Support Models ================
 
+// Rate Limiting Support
+model RateLimitBucket {
+  id                   String        @id @default(uuid())
+  userId               String?       @map("user_id")
+  identifier           String        // user_id, ip_address, or other identifier
+  operation            String        // operation type (e.g., "workflow_execution", "api_request")
+  windowStart          DateTime      @map("window_start")
+  windowEnd            DateTime      @map("window_end")
+  currentCount         Int           @default(0) @map("current_count")
+  limit                Int
+  resetAt              DateTime      @map("reset_at")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  
+  @@map("rate_limit_buckets")
+  @@unique([identifier, operation, windowStart])
+  @@index([userId])
+  @@index([identifier])
+  @@index([operation])
+  @@index([resetAt])
+}
+
+model RateLimitViolation {
+  id                   String        @id @default(uuid())
+  userId               String?       @map("user_id")
+  identifier           String
+  operation            String
+  limit                Int
+  attemptedCount       Int           @map("attempted_count")
+  windowStart          DateTime      @map("window_start")
+  windowEnd            DateTime      @map("window_end")
+  ipAddress            String?       @map("ip_address")
+  userAgent            String?       @map("user_agent")
+  metadata             Json?
+  createdAt            DateTime      @default(now()) @map("created_at")
+  
+  @@map("rate_limit_violations")
+  @@index([userId])
+  @@index([identifier])
+  @@index([operation])
+  @@index([createdAt])
+}
+
+// Cache Support
+model CacheEntry {
+  id                   String        @id @default(uuid())
+  key                  String        @unique
+  namespace            String?
+  value                Json
+  ttl                  Int?          // TTL in seconds
+  expiresAt            DateTime?     @map("expires_at")
+  hitCount             Int           @default(0) @map("hit_count")
+  lastAccessed         DateTime      @default(now()) @map("last_accessed")
+  compressed           Boolean       @default(false)
+  size                 Int?          // Size in bytes
+  tags                 String[]      @default([])
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  
+  @@map("cache_entries")
+  @@index([namespace])
+  @@index([expiresAt])
+  @@index([tags])
+  @@index([lastAccessed])
+}
+
+model CacheStats {
+  id                   String        @id @default(uuid())
+  namespace            String?
+  operation            String        // hit, miss, set, delete, expire
+  count                Int           @default(1)
+  totalSize            BigInt?       @map("total_size")
+  avgResponseTime      Float?        @map("avg_response_time") // in milliseconds
+  hour                 DateTime      // truncated to hour for aggregation
+  createdAt            DateTime      @default(now()) @map("created_at")
+  
+  @@map("cache_stats")
+  @@unique([namespace, operation, hour])
+  @@index([namespace])
+  @@index([operation])
+  @@index([hour])
+}
+
+// Analytics Support
+model QueryPerformance {
+  id                   String        @id @default(uuid())
+  queryHash            String        @map("query_hash") // hash of the normalized query
+  queryType            String        @map("query_type") // SELECT, INSERT, UPDATE, DELETE
+  tableName            String?       @map("table_name")
+  executionTime        Float         @map("execution_time") // in milliseconds
+  rowsAffected         Int?          @map("rows_affected")
+  queryPlan            Json?         @map("query_plan")
+  stackTrace           String?       @map("stack_trace")
+  userId               String?       @map("user_id")
+  sessionId            String?       @map("session_id")
+  timestamp            DateTime      @default(now())
+  
+  @@map("query_performance")
+  @@index([queryHash])
+  @@index([queryType])
+  @@index([tableName])
+  @@index([executionTime])
+  @@index([timestamp])
+  @@index([userId])
+}
+
+model WorkflowAnalytics {
+  id                   String        @id @default(uuid())
+  workflowId           String        @map("workflow_id")
+  executionId          String?       @map("execution_id")
+  userId               String        @map("user_id")
+  metric               String        // execution_time, success_rate, error_rate, etc.
+  value                Float
+  unit                 String?       // ms, percentage, count, etc.
+  dimensions           Json?         // additional categorization data
+  aggregationPeriod    String        @map("aggregation_period") // hour, day, week, month
+  periodStart          DateTime      @map("period_start")
+  periodEnd            DateTime      @map("period_end")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  
+  @@map("workflow_analytics")
+  @@index([workflowId])
+  @@index([userId])
+  @@index([metric])
+  @@index([aggregationPeriod])
+  @@index([periodStart])
+}
+
+model SystemMetrics {
+  id                   String        @id @default(uuid())
+  component            String        // database, cache, queue, worker, etc.
+  metric               String        // cpu_usage, memory_usage, response_time, etc.
+  value                Float
+  unit                 String?       // percentage, ms, bytes, etc.
+  hostname             String?
+  instanceId           String?       @map("instance_id")
+  metadata             Json?
+  timestamp            DateTime      @default(now())
+  
+  @@map("system_metrics")
+  @@index([component])
+  @@index([metric])
+  @@index([hostname])
+  @@index([timestamp])
+}
+
+// Enhanced Audit Support
+model ComplianceAuditLog {
+  id                   String        @id @default(uuid())
+  userId               String?       @map("user_id")
+  sessionId            String?       @map("session_id")
+  action               String
+  resource             String
+  resourceId           String?       @map("resource_id")
+  complianceFramework  String        @map("compliance_framework") // GDPR, SOX, HIPAA, etc.
+  riskLevel            String        @map("risk_level") // low, medium, high, critical
+  dataClassification   String?       @map("data_classification") // public, internal, confidential, restricted
+  beforeValue          Json?         @map("before_value")
+  afterValue           Json?         @map("after_value")
+  reason               String?       // reason for the action
+  approvedBy           String?       @map("approved_by")
+  ipAddress            String?       @map("ip_address")
+  userAgent            String?       @map("user_agent")
+  location             Json?         // geographical location data
+  metadata             Json?
+  retentionPolicy      String?       @map("retention_policy")
+  archivedAt           DateTime?     @map("archived_at")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  
+  @@map("compliance_audit_logs")
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([complianceFramework])
+  @@index([riskLevel])
+  @@index([createdAt])
+}
+
+model DataChangeLog {
+  id                   String        @id @default(uuid())
+  tableName            String        @map("table_name")
+  recordId             String        @map("record_id")
+  operation            String        // INSERT, UPDATE, DELETE
+  fieldChanges         Json          @map("field_changes") // {field: {old: value, new: value}}
+  userId               String?       @map("user_id")
+  sessionId            String?       @map("session_id")
+  transactionId        String?       @map("transaction_id")
+  changeReason         String?       @map("change_reason")
+  applicationVersion   String?       @map("application_version")
+  timestamp            DateTime      @default(now())
+  
+  @@map("data_change_logs")
+  @@index([tableName])
+  @@index([recordId])
+  @@index([operation])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+// Workflow State Enhancement
+model WorkflowStateSnapshot {
+  id                   String        @id @default(uuid())
+  workflowId           String        @map("workflow_id")
+  executionId          String        @map("execution_id")
+  snapshotType         String        @map("snapshot_type") // checkpoint, failure, pause, resume
+  state                Json          // complete workflow state
+  nodeStates           Json          @map("node_states") // individual node states
+  context              Json?         // additional context data
+  version              Int           @default(1)
+  parentSnapshotId     String?       @map("parent_snapshot_id") // for state history
+  createdBy            String?       @map("created_by") // system, user, or scheduler
+  expiresAt            DateTime?     @map("expires_at")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  
+  // Relations
+  parentSnapshot       WorkflowStateSnapshot? @relation("SnapshotHistory", fields: [parentSnapshotId], references: [id])
+  childSnapshots       WorkflowStateSnapshot[] @relation("SnapshotHistory")
+  
+  @@map("workflow_state_snapshots")
+  @@index([workflowId])
+  @@index([executionId])
+  @@index([snapshotType])
+  @@index([createdAt])
+  @@index([expiresAt])
+}
