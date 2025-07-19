@@ -162,7 +162,16 @@ export class NodeExecutor {
         const handler = this.blockHandlerRegistry.getHandler(
           blockType as BlockType,
         );
+
+        this.logger.debug(
+          `Handler lookup result for ${blockType}: ${handler ? 'found' : 'not found'}`,
+        );
+
         if (!handler) {
+          this.logger.error(`No handler found for block type: ${blockType}`);
+          this.logger.error(
+            `Available block types: ${Object.keys(this.handlers).join(', ')}`,
+          );
           throw new Error(
             `No handler found for block type: ${blockType}. Available: ${Object.keys(this.handlers).join(', ')}`,
           );

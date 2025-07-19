@@ -42,7 +42,27 @@ class BlockConfigRegistry {
   }
 
   get(blockType: BlockType | string): BlockConfigComponent | undefined {
-    return this.configs.get(blockType);
+    console.log("BlockConfigRegistry.get called with:", blockType);
+    console.log("Available registered types:", Array.from(this.configs.keys()));
+
+    // Try exact match first
+    const exactMatch = this.configs.get(blockType);
+    if (exactMatch) {
+      console.log("Found exact match for:", blockType);
+      return exactMatch;
+    }
+
+    // Try case-insensitive match
+    const upperBlockType = blockType.toUpperCase();
+    for (const [key, component] of Array.from(this.configs.entries())) {
+      if (key.toUpperCase() === upperBlockType) {
+        console.log("Found case-insensitive match:", blockType, "->", key);
+        return component;
+      }
+    }
+
+    console.log("No match found for:", blockType);
+    return undefined;
   }
 
   has(blockType: BlockType | string): boolean {

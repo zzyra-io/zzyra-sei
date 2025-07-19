@@ -72,6 +72,21 @@ export function BlockConfigPanel({
   const metadata = getBlockMetadata(blockType);
   const enhancedSchema = getEnhancedBlockSchema(blockType);
 
+  // Debug logging to understand the data structure
+  console.log("BlockConfigPanel debug:", {
+    node,
+    nodeData,
+    data,
+    blockType,
+    hasMetadata: !!metadata,
+    hasEnhancedSchema: !!enhancedSchema,
+    dataKeys: Object.keys(data),
+    dataBlockType: data?.blockType,
+    dataType: data?.type,
+    dataId: data?.id,
+    nodeType: data?.nodeType,
+  });
+
   // Get connected input nodes (nodes that connect TO this node)
   const inputNodes = useMemo(() => {
     if (!workflowData?.edges || !workflowData?.selectedNodeId) return [];
@@ -104,6 +119,45 @@ export function BlockConfigPanel({
 
     return inputNodes;
   }, [workflowData]);
+
+  // Check if we have valid data to work with (after all hooks)
+  if (!node && !nodeData) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Block Configuration</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert>
+            <Info className='h-4 w-4' />
+            <AlertDescription>
+              No block selected. Please select a block to configure it.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Check if we have data but couldn't determine the block type
+  if (blockType === "UNKNOWN" && (node || nodeData)) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Block Configuration</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert>
+            <AlertCircle className='h-4 w-4' />
+            <AlertDescription>
+              Unable to determine block type. Data structure:{" "}
+              {JSON.stringify(data, null, 2)}
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Fetch sample data for connected nodes
   useEffect(() => {
@@ -477,12 +531,16 @@ export function BlockConfigPanel({
               (data as Record<string, unknown>)?.config ||
               ({} as Record<string, unknown>)
             }
-            onChange={(config) =>
-              onChange({
+            onChange={(config) => {
+              console.log("ConfigComponent onChange called with:", config);
+              console.log("Current data:", data);
+              const newData = {
                 ...(data as Record<string, unknown>),
                 config,
-              })
-            }
+              };
+              console.log("New data to be passed to onChange:", newData);
+              onChange(newData);
+            }}
             executionStatus={executionStatus}
             executionData={executionData}
             onTest={onTest}

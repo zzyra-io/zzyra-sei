@@ -80,17 +80,48 @@ export class EnhancedBlockRegistry {
    * Get a block handler by type (enhanced or legacy)
    */
   getHandler(blockType: string): EnhancedBlockHandler | BlockHandler | null {
-    // Try enhanced blocks first
+    this.logger.debug(`Looking for handler for block type: ${blockType}`);
+
+    // Try exact match first
     if (this.enhancedBlocks.has(blockType)) {
+      this.logger.debug(`Found exact match for enhanced block: ${blockType}`);
       return this.enhancedBlocks.get(blockType)!;
     }
 
-    // Fall back to legacy blocks
+    // Try case-insensitive match for enhanced blocks
+    const upperBlockType = blockType.toUpperCase();
+    for (const [key, handler] of this.enhancedBlocks.entries()) {
+      if (key.toUpperCase() === upperBlockType) {
+        this.logger.debug(
+          `Found case-insensitive match for enhanced block: ${blockType} -> ${key}`,
+        );
+        return handler;
+      }
+    }
+
+    // Fall back to legacy blocks with exact match
     if (this.legacyBlocks.has(blockType)) {
+      this.logger.debug(`Found exact match for legacy block: ${blockType}`);
       return this.legacyBlocks.get(blockType)!;
     }
 
+    // Try case-insensitive match for legacy blocks
+    for (const [key, handler] of this.legacyBlocks.entries()) {
+      if (key.toUpperCase() === upperBlockType) {
+        this.logger.debug(
+          `Found case-insensitive match for legacy block: ${blockType} -> ${key}`,
+        );
+        return handler;
+      }
+    }
+
     this.logger.warn(`No handler found for block type: ${blockType}`);
+    this.logger.debug(
+      `Available enhanced blocks: ${Array.from(this.enhancedBlocks.keys()).join(', ')}`,
+    );
+    this.logger.debug(
+      `Available legacy blocks: ${Array.from(this.legacyBlocks.keys()).join(', ')}`,
+    );
     return null;
   }
 
@@ -98,14 +129,40 @@ export class EnhancedBlockRegistry {
    * Check if a block type is enhanced (new system)
    */
   isEnhancedBlock(blockType: string): boolean {
-    return this.enhancedBlocks.has(blockType);
+    // Try exact match first
+    if (this.enhancedBlocks.has(blockType)) {
+      return true;
+    }
+
+    // Try case-insensitive match
+    const upperBlockType = blockType.toUpperCase();
+    for (const key of this.enhancedBlocks.keys()) {
+      if (key.toUpperCase() === upperBlockType) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
    * Check if a block type is legacy (old system)
    */
   isLegacyBlock(blockType: string): boolean {
-    return this.legacyBlocks.has(blockType);
+    // Try exact match first
+    if (this.legacyBlocks.has(blockType)) {
+      return true;
+    }
+
+    // Try case-insensitive match
+    const upperBlockType = blockType.toUpperCase();
+    for (const key of this.legacyBlocks.keys()) {
+      if (key.toUpperCase() === upperBlockType) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**

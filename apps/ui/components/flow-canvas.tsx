@@ -145,6 +145,24 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
     [updateNode, setSelectedNode]
   );
 
+  // Handle config updates from the config panel
+  const handleConfigUpdate = useCallback(
+    (config: Record<string, unknown>) => {
+      if (selectedNode) {
+        const updatedNode = {
+          ...selectedNode,
+          data: {
+            ...selectedNode.data,
+            ...config,
+          },
+        };
+        updateNode(selectedNode.id, updatedNode);
+        setSelectedNode(updatedNode);
+      }
+    },
+    [selectedNode, updateNode, setSelectedNode]
+  );
+
   // Handle edge updates from the config panel
   const handleEdgeUpdate = useCallback(
     (updatedEdge: Edge) => {
@@ -522,21 +540,25 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
 
       {/* Config Panels */}
       {showConfigPanel && selectedNode && (
-        <BlockConfigPanel
-          nodeData={selectedNode.data}
-          onChange={handleNodeUpdate}
-          executionStatus={selectedNode.status}
-          connectedNodes={nodes.map((node) => ({
-            id: node.id,
-            type: node.type || "default",
-            data: node.data || {},
-          }))}
-          workflowData={{
-            nodes: nodes,
-            edges: edges,
-            selectedNodeId: selectedNode.id,
-          }}
-        />
+        <>
+          {console.log("Selected node data:", selectedNode)}
+          <BlockConfigPanel
+            node={selectedNode}
+            nodeData={selectedNode.data}
+            onChange={handleConfigUpdate}
+            executionStatus={(selectedNode as any).status || "idle"}
+            connectedNodes={nodes.map((node) => ({
+              id: node.id,
+              type: node.type || "default",
+              data: node.data || {},
+            }))}
+            workflowData={{
+              nodes: nodes,
+              edges: edges,
+              selectedNodeId: selectedNode.id,
+            }}
+          />
+        </>
       )}
       {showEdgeConfigPanel && selectedEdge && (
         <EdgeConfigPanel

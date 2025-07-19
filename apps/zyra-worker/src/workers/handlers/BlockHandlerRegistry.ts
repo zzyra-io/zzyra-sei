@@ -110,12 +110,20 @@ export class BlockHandlerRegistry {
    * Tries enhanced registry first, then falls back to legacy handlers.
    */
   getHandler(type: BlockType | string): BlockHandler {
+    this.logger.debug(
+      `BlockHandlerRegistry: Looking for handler for block type: ${type}`,
+    );
+
     // First, try enhanced registry for generic blocks
     const enhancedHandler = this.enhancedRegistry.getHandler(type);
     if (enhancedHandler) {
       this.logger.debug(`Using enhanced handler for block type: ${type}`);
       return this.createEnhancedBlockWrapper(enhancedHandler, type);
     }
+
+    this.logger.debug(
+      `No enhanced handler found for ${type}, trying legacy handlers`,
+    );
 
     // Fall back to legacy handlers
     if (this.handlers[type]) {
@@ -125,6 +133,7 @@ export class BlockHandlerRegistry {
 
     // All custom blocks now use the unified CUSTOM type
     if (typeof type === 'string' && type.toUpperCase() === 'CUSTOM') {
+      this.logger.debug(`Using CUSTOM handler for block type: ${type}`);
       return this.handlers[BlockType.CUSTOM];
     }
 
@@ -137,6 +146,9 @@ export class BlockHandlerRegistry {
       );
 
       if (handlerKey) {
+        this.logger.debug(
+          `Found case-insensitive match: ${type} -> ${handlerKey}`,
+        );
         return this.handlers[handlerKey];
       }
     }
