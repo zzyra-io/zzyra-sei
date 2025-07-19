@@ -1,13 +1,15 @@
-import { 
+import {
   EnhancedBlockHandler,
   EnhancedBlockDefinition,
   EnhancedBlockExecutionContext,
   ZyraNodeData,
-  GenericBlockType,
+  BlockType,
   BlockGroup,
   ConnectionType,
   PropertyType,
-  ValidationResult
+  ValidationResult,
+  getBlockType,
+  getBlockMetadata,
 } from '@zyra/types';
 import { Injectable, Logger } from '@nestjs/common';
 
@@ -17,23 +19,25 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
 
   definition: EnhancedBlockDefinition = {
     displayName: 'Comparator',
-    name: GenericBlockType.COMPARATOR,
+    name: BlockType.CONDITION,
     version: 1,
-    description: 'Compare two values and return a boolean result for conditional logic',
+    description:
+      'Compare two values and return a boolean result for conditional logic',
     icon: 'compare-arrows',
     color: '#10B981',
     group: [BlockGroup.CONDITION],
     inputs: [ConnectionType.MAIN],
     outputs: [ConnectionType.MAIN],
-    
+
     properties: [
       {
         displayName: 'Left Value',
         name: 'leftValue',
         type: PropertyType.STRING,
         required: true,
-        description: 'The left operand for comparison. Supports template variables like {{json.field}}',
-        default: ''
+        description:
+          'The left operand for comparison. Supports template variables like {{json.field}}',
+        default: '',
       },
       {
         displayName: 'Operator',
@@ -55,20 +59,21 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
           { name: 'Ends With', value: 'endsWith' },
           { name: 'Is Empty', value: 'isEmpty' },
           { name: 'Is Not Empty', value: 'isNotEmpty' },
-          { name: 'Regex Match', value: 'regex' }
-        ]
+          { name: 'Regex Match', value: 'regex' },
+        ],
       },
       {
         displayName: 'Right Value',
         name: 'rightValue',
         type: PropertyType.STRING,
-        description: 'The right operand for comparison. Supports template variables like {{json.field}}',
+        description:
+          'The right operand for comparison. Supports template variables like {{json.field}}',
         default: '',
         displayOptions: {
           hide: {
-            operator: ['isEmpty', 'isNotEmpty']
-          }
-        }
+            operator: ['isEmpty', 'isNotEmpty'],
+          },
+        },
       },
       {
         displayName: 'Data Type',
@@ -81,8 +86,8 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
           { name: 'Number', value: 'number' },
           { name: 'Boolean', value: 'boolean' },
           { name: 'Date', value: 'date' },
-          { name: 'Auto Detect', value: 'auto' }
-        ]
+          { name: 'Auto Detect', value: 'auto' },
+        ],
       },
       {
         displayName: 'Case Sensitive',
@@ -92,16 +97,25 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
         default: true,
         displayOptions: {
           show: {
-            operator: ['equals', 'notEquals', 'contains', 'notContains', 'startsWith', 'endsWith', 'regex']
-          }
-        }
+            operator: [
+              'equals',
+              'notEquals',
+              'contains',
+              'notContains',
+              'startsWith',
+              'endsWith',
+              'regex',
+            ],
+          },
+        },
       },
       {
         displayName: 'Continue on False',
         name: 'continueOnFalse',
         type: PropertyType.BOOLEAN,
-        description: 'Whether to continue workflow execution when condition is false',
-        default: false
+        description:
+          'Whether to continue workflow execution when condition is false',
+        default: false,
       },
       {
         displayName: 'Output Mode',
@@ -113,11 +127,11 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
           { name: 'Only True Results', value: 'onlyTrue' },
           { name: 'Only False Results', value: 'onlyFalse' },
           { name: 'All Results', value: 'all' },
-          { name: 'Pass Through Original', value: 'passThrough' }
-        ]
-      }
+          { name: 'Pass Through Original', value: 'passThrough' },
+        ],
+      },
     ],
-    
+
     documentation: {
       examples: [
         {
@@ -130,11 +144,11 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
                   leftValue: '{{json.price}}',
                   operator: 'lessThan',
                   rightValue: '2000',
-                  dataType: 'number'
-                }
-              }
-            ]
-          }
+                  dataType: 'number',
+                },
+              },
+            ],
+          },
         },
         {
           name: 'String Contains',
@@ -147,23 +161,25 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
                   operator: 'contains',
                   rightValue: 'error',
                   dataType: 'string',
-                  caseSensitive: false
-                }
-              }
-            ]
-          }
-        }
+                  caseSensitive: false,
+                },
+              },
+            ],
+          },
+        },
       ],
       resources: [
         {
           url: 'https://docs.zyra.com/blocks/comparator',
-          text: 'Comparator Block Documentation'
-        }
-      ]
-    }
+          text: 'Comparator Block Documentation',
+        },
+      ],
+    },
   };
 
-  async execute(context: EnhancedBlockExecutionContext): Promise<ZyraNodeData[]> {
+  async execute(
+    context: EnhancedBlockExecutionContext,
+  ): Promise<ZyraNodeData[]> {
     const inputData = context.getInputData();
     const returnData: ZyraNodeData[] = [];
 
@@ -172,23 +188,53 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
 
     for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
       const item = items[itemIndex];
-      
+
       try {
         // Get node parameters
-        const leftValue = context.getNodeParameter('leftValue', itemIndex) as string;
-        const operator = context.getNodeParameter('operator', itemIndex) as string;
-        const rightValue = context.getNodeParameter('rightValue', itemIndex) as string;
-        const dataType = context.getNodeParameter('dataType', itemIndex) as string;
-        const caseSensitive = context.getNodeParameter('caseSensitive', itemIndex) as boolean;
-        const continueOnFalse = context.getNodeParameter('continueOnFalse', itemIndex) as boolean;
-        const outputMode = context.getNodeParameter('outputMode', itemIndex) as string;
+        const leftValue = context.getNodeParameter(
+          'leftValue',
+          itemIndex,
+        ) as string;
+        const operator = context.getNodeParameter(
+          'operator',
+          itemIndex,
+        ) as string;
+        const rightValue = context.getNodeParameter(
+          'rightValue',
+          itemIndex,
+        ) as string;
+        const dataType = context.getNodeParameter(
+          'dataType',
+          itemIndex,
+        ) as string;
+        const caseSensitive = context.getNodeParameter(
+          'caseSensitive',
+          itemIndex,
+        ) as boolean;
+        const continueOnFalse = context.getNodeParameter(
+          'continueOnFalse',
+          itemIndex,
+        ) as boolean;
+        const outputMode = context.getNodeParameter(
+          'outputMode',
+          itemIndex,
+        ) as string;
 
         // Process template variables
-        const processedLeftValue = context.helpers.processTemplate(leftValue, item.json);
-        const processedRightValue = rightValue ? context.helpers.processTemplate(rightValue, item.json) : '';
+        const processedLeftValue = context.helpers.processTemplate(
+          leftValue,
+          item.json,
+        );
+        const processedRightValue = rightValue
+          ? context.helpers.processTemplate(rightValue, item.json)
+          : '';
 
         // Convert values to appropriate types
-        const [leftVal, rightVal] = this.convertValues(processedLeftValue, processedRightValue, dataType);
+        const [leftVal, rightVal] = this.convertValues(
+          processedLeftValue,
+          processedRightValue,
+          dataType,
+        );
 
         // Perform comparison
         const result = this.compare(leftVal, rightVal, operator, caseSensitive);
@@ -203,8 +249,13 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
             dataType,
             caseSensitive,
             timestamp: new Date().toISOString(),
-            evaluation: this.getEvaluationDescription(leftVal, rightVal, operator, result)
-          }
+            evaluation: this.getEvaluationDescription(
+              leftVal,
+              rightVal,
+              operator,
+              result,
+            ),
+          },
         };
 
         // Add original data for pass-through mode
@@ -214,7 +265,7 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
 
         // Filter output based on mode
         const shouldInclude = this.shouldIncludeOutput(result, outputMode);
-        
+
         if (shouldInclude) {
           returnData.push(outputData);
         } else if (continueOnFalse && !result) {
@@ -222,33 +273,39 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
           returnData.push(outputData);
         }
 
-        this.logger.debug(`Comparison result for item ${itemIndex}: ${result}`, {
-          leftValue: leftVal,
-          rightValue: rightVal,
-          operator,
-          result,
-          executionId: context.executionId
-        });
-
+        this.logger.debug(
+          `Comparison result for item ${itemIndex}: ${result}`,
+          {
+            leftValue: leftVal,
+            rightValue: rightVal,
+            operator,
+            result,
+            executionId: context.executionId,
+          },
+        );
       } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+
         this.logger.error(`Comparison failed for item ${itemIndex}`, {
-          error: error.message,
-          executionId: context.executionId
+          error: errorMessage,
+          executionId: context.executionId,
         });
 
         // Create error output
         const errorOutput: ZyraNodeData = {
           json: {
             result: false,
-            error: error.message,
-            timestamp: new Date().toISOString()
+            error: errorMessage,
+            timestamp: new Date().toISOString(),
           },
           error: {
-            message: error.message,
-            name: error.name,
+            message: errorMessage,
+            name: errorName,
             timestamp: new Date().toISOString(),
-            context: { itemIndex }
-          }
+            context: { itemIndex },
+          },
         };
 
         returnData.push(errorOutput);
@@ -258,7 +315,11 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
     return returnData;
   }
 
-  private convertValues(leftValue: any, rightValue: any, dataType: string): [any, any] {
+  private convertValues(
+    leftValue: any,
+    rightValue: any,
+    dataType: string,
+  ): [any, any] {
     if (dataType === 'auto') {
       // Auto-detect data type
       dataType = this.detectDataType(leftValue);
@@ -267,13 +328,13 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
     switch (dataType) {
       case 'number':
         return [this.toNumber(leftValue), this.toNumber(rightValue)];
-      
+
       case 'boolean':
         return [this.toBoolean(leftValue), this.toBoolean(rightValue)];
-      
+
       case 'date':
         return [this.toDate(leftValue), this.toDate(rightValue)];
-      
+
       case 'string':
       default:
         return [String(leftValue), String(rightValue)];
@@ -281,18 +342,21 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
   }
 
   private detectDataType(value: any): string {
-    if (typeof value === 'number' || (!isNaN(Number(value)) && !isNaN(parseFloat(value)))) {
+    if (
+      typeof value === 'number' ||
+      (!isNaN(Number(value)) && !isNaN(parseFloat(value)))
+    ) {
       return 'number';
     }
-    
+
     if (typeof value === 'boolean' || value === 'true' || value === 'false') {
       return 'boolean';
     }
-    
+
     if (value instanceof Date || !isNaN(Date.parse(value))) {
       return 'date';
     }
-    
+
     return 'string';
   }
 
@@ -314,13 +378,23 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
   private toDate(value: any): Date {
     if (value instanceof Date) return value;
     const date = new Date(value);
-    if (isNaN(date.getTime())) throw new Error(`Cannot convert "${value}" to date`);
+    if (isNaN(date.getTime()))
+      throw new Error(`Cannot convert "${value}" to date`);
     return date;
   }
 
-  private compare(leftValue: any, rightValue: any, operator: string, caseSensitive: boolean): boolean {
+  private compare(
+    leftValue: any,
+    rightValue: any,
+    operator: string,
+    caseSensitive: boolean,
+  ): boolean {
     // Handle string case sensitivity
-    if (typeof leftValue === 'string' && typeof rightValue === 'string' && !caseSensitive) {
+    if (
+      typeof leftValue === 'string' &&
+      typeof rightValue === 'string' &&
+      !caseSensitive
+    ) {
       leftValue = leftValue.toLowerCase();
       rightValue = rightValue.toLowerCase();
     }
@@ -328,48 +402,59 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
     switch (operator) {
       case 'equals':
         return leftValue === rightValue;
-      
+
       case 'notEquals':
         return leftValue !== rightValue;
-      
+
       case 'greaterThan':
         return leftValue > rightValue;
-      
+
       case 'greaterThanOrEqual':
         return leftValue >= rightValue;
-      
+
       case 'lessThan':
         return leftValue < rightValue;
-      
+
       case 'lessThanOrEqual':
         return leftValue <= rightValue;
-      
+
       case 'contains':
         return String(leftValue).includes(String(rightValue));
-      
+
       case 'notContains':
         return !String(leftValue).includes(String(rightValue));
-      
+
       case 'startsWith':
         return String(leftValue).startsWith(String(rightValue));
-      
+
       case 'endsWith':
         return String(leftValue).endsWith(String(rightValue));
-      
+
       case 'isEmpty':
-        return leftValue == null || leftValue === '' || (Array.isArray(leftValue) && leftValue.length === 0);
-      
+        return (
+          leftValue == null ||
+          leftValue === '' ||
+          (Array.isArray(leftValue) && leftValue.length === 0)
+        );
+
       case 'isNotEmpty':
-        return !(leftValue == null || leftValue === '' || (Array.isArray(leftValue) && leftValue.length === 0));
-      
+        return !(
+          leftValue == null ||
+          leftValue === '' ||
+          (Array.isArray(leftValue) && leftValue.length === 0)
+        );
+
       case 'regex':
         try {
-          const regex = new RegExp(String(rightValue), caseSensitive ? 'g' : 'gi');
+          const regex = new RegExp(
+            String(rightValue),
+            caseSensitive ? 'g' : 'gi',
+          );
           return regex.test(String(leftValue));
         } catch (error) {
           throw new Error(`Invalid regex pattern: ${rightValue}`);
         }
-      
+
       default:
         throw new Error(`Unsupported operator: ${operator}`);
     }
@@ -379,42 +464,47 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
     switch (outputMode) {
       case 'onlyTrue':
         return result === true;
-      
+
       case 'onlyFalse':
         return result === false;
-      
+
       case 'all':
       case 'passThrough':
         return true;
-      
+
       default:
         return result === true;
     }
   }
 
-  private getEvaluationDescription(leftValue: any, rightValue: any, operator: string, result: boolean): string {
+  private getEvaluationDescription(
+    leftValue: any,
+    rightValue: any,
+    operator: string,
+    result: boolean,
+  ): string {
     const operatorSymbols = {
-      'equals': '==',
-      'notEquals': '!=',
-      'greaterThan': '>',
-      'greaterThanOrEqual': '>=',
-      'lessThan': '<',
-      'lessThanOrEqual': '<=',
-      'contains': 'contains',
-      'notContains': 'not contains',
-      'startsWith': 'starts with',
-      'endsWith': 'ends with',
-      'isEmpty': 'is empty',
-      'isNotEmpty': 'is not empty',
-      'regex': 'matches regex'
+      equals: '==',
+      notEquals: '!=',
+      greaterThan: '>',
+      greaterThanOrEqual: '>=',
+      lessThan: '<',
+      lessThanOrEqual: '<=',
+      contains: 'contains',
+      notContains: 'not contains',
+      startsWith: 'starts with',
+      endsWith: 'ends with',
+      isEmpty: 'is empty',
+      isNotEmpty: 'is not empty',
+      regex: 'matches regex',
     };
 
     const symbol = operatorSymbols[operator] || operator;
-    
+
     if (operator === 'isEmpty' || operator === 'isNotEmpty') {
       return `"${leftValue}" ${symbol} = ${result}`;
     }
-    
+
     return `"${leftValue}" ${symbol} "${rightValue}" = ${result}`;
   }
 
@@ -433,12 +523,23 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
 
     // Validate right value for operators that need it
     const operatorsRequiringRightValue = [
-      'equals', 'notEquals', 'greaterThan', 'greaterThanOrEqual', 
-      'lessThan', 'lessThanOrEqual', 'contains', 'notContains',
-      'startsWith', 'endsWith', 'regex'
+      'equals',
+      'notEquals',
+      'greaterThan',
+      'greaterThanOrEqual',
+      'lessThan',
+      'lessThanOrEqual',
+      'contains',
+      'notContains',
+      'startsWith',
+      'endsWith',
+      'regex',
     ];
 
-    if (operatorsRequiringRightValue.includes(config.operator) && !config.rightValue) {
+    if (
+      operatorsRequiringRightValue.includes(config.operator) &&
+      !config.rightValue
+    ) {
       errors.push('Right value is required for this operator');
     }
 
@@ -459,7 +560,7 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
     return {
       valid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 }

@@ -14,7 +14,7 @@ import {
   NotificationService,
   NotificationType,
 } from '../services/notification.service';
-import { BlockType } from '@zyra/types';
+import { BlockType, getEnhancedBlockSchema } from '@zyra/types';
 
 @Injectable()
 export class WorkflowExecutor {
@@ -84,6 +84,119 @@ export class WorkflowExecutor {
     });
 
     return relevantOutputs;
+  }
+
+  /**
+   * Check for type compatibility between connected nodes
+   * @param nodes Workflow nodes
+   * @param edges Workflow edges
+   * @returns Array of type mismatch issues
+   */
+  private checkTypeCompatibility(
+    nodes: any[],
+    edges: any[],
+  ): Array<{
+    sourceNode: string;
+    targetNode: string;
+    mismatches: Array<{ field: string; expected: string; received: string }>;
+  }> {
+    const issues: Array<{
+      sourceNode: string;
+      targetNode: string;
+      mismatches: Array<{ field: string; expected: string; received: string }>;
+    }> = [];
+
+    edges.forEach((edge) => {
+      const sourceNode = nodes.find((n) => n.id === edge.source);
+      const targetNode = nodes.find((n) => n.id === edge.target);
+
+      if (!sourceNode || !targetNode) return;
+
+      const sourceBlockType =
+        sourceNode.data?.blockType || sourceNode.data?.type || sourceNode.type;
+      const targetBlockType =
+        targetNode.data?.blockType || targetNode.data?.type || targetNode.type;
+
+      const sourceSchema = getEnhancedBlockSchema(sourceBlockType as BlockType);
+      const targetSchema = getEnhancedBlockSchema(targetBlockType as BlockType);
+
+      if (sourceSchema && targetSchema) {
+        const mismatches: Array<{
+          field: string;
+          expected: string;
+          received: string;
+        }> = [];
+
+        // Check for field type mismatches
+        const sourceOutputFields = Object.keys(
+          sourceSchema.outputSchema.shape || {},
+        );
+        const targetInputFields = Object.keys(
+          targetSchema.inputSchema.shape || {},
+        );
+
+        targetInputFields.forEach((inputField) => {
+          const sourceField = sourceOutputFields.find(
+            (field) => field === inputField,
+          );
+          if (sourceField) {
+            const sourceFieldSchema =
+              sourceSchema.outputSchema.shape[sourceField];
+            const targetFieldSchema =
+              targetSchema.inputSchema.shape[inputField];
+
+            if (sourceFieldSchema && targetFieldSchema) {
+              const sourceType = this.getZodTypeString(
+                sourceFieldSchema._def?.typeName,
+              );
+              const targetType = this.getZodTypeString(
+                targetFieldSchema._def?.typeName,
+              );
+
+              if (sourceType !== targetType) {
+                mismatches.push({
+                  field: inputField,
+                  expected: targetType,
+                  received: sourceType,
+                });
+              }
+            }
+          }
+        });
+
+        if (mismatches.length > 0) {
+          issues.push({
+            sourceNode: sourceNode.id,
+            targetNode: targetNode.id,
+            mismatches,
+          });
+        }
+      }
+    });
+
+    return issues;
+  }
+
+  /**
+   * Get Zod type string for comparison
+   */
+  private getZodTypeString(typeName: string): string {
+    switch (typeName) {
+      case 'ZodString':
+        return 'string';
+      case 'ZodNumber':
+        return 'number';
+      case 'ZodBoolean':
+        return 'boolean';
+      case 'ZodArray':
+        return 'array';
+      case 'ZodObject':
+        return 'object';
+      case 'ZodEnum':
+        return 'string';
+      default:
+        return 'unknown';
+    }
   }
 
   async executeWorkflow(
@@ -172,6 +285,64 @@ export class WorkflowExecutor {
       validateAcyclic(nodes, edges);
       validateOrphans(nodes, edges);
       validateTerminals(nodes, edges);
+
+      // Check for type compatibility issues
+      const typeCompatibilityIssues = this.checkTypeCompatibility(nodes, edges);
+      if (typeCompatibilityIssues.length > 0) {
+        this.logger.warn('Type compatibility issues detected:', {
+          executionId,
+          issues: typeCompatibilityIssues,
+        });
+
+        // Log each compatibility issue
+        typeCompatibilityIssues.forEach((issue) => {
+          this.logger.warn(
+            `Type mismatch between ${issue.sourceNode} and ${issue.targetNode}:`,
+            {
+              executionId,
+              sourceNode: issue.sourceNode,
+              targetNode: issue.targetNode,
+              mismatches: issue.mismatches,
+            },
+          );
+
+          // Log suggestion for data transformation
+          this.logger.log(
+            `Suggestion: Add a DATA_TRANSFORM block between ${issue.sourceNode} and ${issue.targetNode} to handle type conversions`,
+            {
+              executionId,
+              sourceNode: issue.sourceNode,
+              targetNode: issue.targetNode,
+            },
+          );
+
+          // Log detailed transformation suggestions
+          issue.mismatches.forEach((mismatch) => {
+            this.logger.log(
+              `Type mismatch: field '${mismatch.field}' - expected ${mismatch.expected}, received ${mismatch.received}`,
+              {
+                executionId,
+                sourceNode: issue.sourceNode,
+                targetNode: issue.targetNode,
+                field: mismatch.field,
+                expectedType: mismatch.expected,
+                receivedType: mismatch.received,
+              },
+            );
+          });
+        });
+
+        // Log to execution logs for UI visibility
+        await this.executionLogger.logExecutionEvent(executionId, {
+          level: 'warn',
+          message: `Type compatibility issues detected. Consider adding DATA_TRANSFORM blocks.`,
+          node_id: 'system',
+          data: {
+            type_issues: typeCompatibilityIssues.length,
+            issues: typeCompatibilityIssues,
+          },
+        });
+      }
 
       // Sort nodes in execution order
       const sortedNodes = topologicalSort(nodes, edges);

@@ -3,7 +3,12 @@ import { trace } from '@opentelemetry/api';
 import { DatabaseService } from '../services/database.service';
 import { MagicAdminService } from '../services/magic-admin.service';
 import { ExecutionLogger } from './execution-logger';
-import { BlockExecutionContext, BlockHandler, BlockType } from '@zyra/types';
+import {
+  BlockExecutionContext,
+  BlockHandler,
+  BlockType,
+  getEnhancedBlockSchema,
+} from '@zyra/types';
 import { BlockHandlerRegistry } from './handlers/BlockHandlerRegistry';
 
 class CircuitBreaker {
@@ -109,6 +114,40 @@ export class NodeExecutor {
           throw new Error(`Node ${node.id} has no block type specified`);
         }
 
+        // Get enhanced schema for validation
+        const enhancedSchema = getEnhancedBlockSchema(blockType as BlockType);
+
+        // Validate input data against enhanced schema if available
+        if (enhancedSchema && previousOutputs) {
+          try {
+            // Validate input data against the enhanced input schema
+            const validatedInputs = enhancedSchema.inputSchema.parse({
+              data: previousOutputs,
+              context: {
+                workflowId: executionId,
+                executionId,
+                userId,
+                timestamp: new Date().toISOString(),
+              },
+            });
+
+            this.logger.debug(`Input validation passed for ${blockType}`, {
+              nodeId: node.id,
+              executionId,
+            });
+          } catch (validationError) {
+            this.logger.warn(`Input validation failed for ${blockType}`, {
+              nodeId: node.id,
+              executionId,
+              error:
+                validationError instanceof Error
+                  ? validationError.message
+                  : String(validationError),
+            });
+            // Continue execution but log the validation issue
+          }
+        }
+
         // Debug logging
         this.logger.debug(`Block type resolution for node ${node.id}:`);
         this.logger.debug(`  node.data?.blockType: ${node.data?.blockType}`);
@@ -190,6 +229,32 @@ export class NodeExecutor {
           this.circuitBreaker.execute(() => handler.execute(node, ctx)),
           timeoutPromise,
         ]);
+
+        // Validate output data against enhanced schema if available
+        if (enhancedSchema && result) {
+          try {
+            // Validate output data against the enhanced output schema
+            const validatedOutput = enhancedSchema.outputSchema.parse(result);
+
+            this.logger.debug(`Output validation passed for ${blockType}`, {
+              nodeId: node.id,
+              executionId,
+            });
+
+            // Use validated output
+            result = validatedOutput;
+          } catch (validationError) {
+            this.logger.warn(`Output validation failed for ${blockType}`, {
+              nodeId: node.id,
+              executionId,
+              error:
+                validationError instanceof Error
+                  ? validationError.message
+                  : String(validationError),
+            });
+            // Continue with original result but log the validation issue
+          }
+        }
 
         // Log node output
         await this.executionLogger.logNodeEvent(

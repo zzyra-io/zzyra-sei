@@ -3,23 +3,23 @@ import {
   EnhancedBlockDefinition,
   EnhancedBlockExecutionContext,
   ZyraNodeData,
-  GenericBlockType,
   BlockGroup,
   ConnectionType,
   PropertyType,
   ValidationResult,
   HttpRequestOptions,
+  BlockType,
 } from '@zyra/types';
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 
 @Injectable()
-export class EnhancedHttpBlock implements EnhancedBlockHandler {
-  private readonly logger = new Logger(EnhancedHttpBlock.name);
+export class HttpBlockHandler implements EnhancedBlockHandler {
+  private readonly logger = new Logger(HttpBlockHandler.name);
 
   definition: EnhancedBlockDefinition = {
     displayName: 'HTTP Request',
-    name: GenericBlockType.HTTP_REQUEST,
+    name: BlockType.HTTP_REQUEST,
     version: 1,
     description:
       'Make HTTP requests to any API endpoint with comprehensive configuration options',
@@ -87,7 +87,6 @@ export class EnhancedHttpBlock implements EnhancedBlockHandler {
           },
         },
         typeOptions: {
-          alwaysOpenEditWindow: true,
           rows: 10,
         },
       },
@@ -420,21 +419,25 @@ export class EnhancedHttpBlock implements EnhancedBlockHandler {
           executionId: context.executionId,
         });
       } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const errorName = error instanceof Error ? error.name : 'UnknownError';
+
         this.logger.error(`HTTP request failed for item ${itemIndex}`, {
-          error: error.message,
+          error: errorMessage,
           executionId: context.executionId,
         });
 
         // Create error output
         const errorOutput: ZyraNodeData = {
           json: {
-            error: error.message,
+            error: errorMessage,
             success: false,
             timestamp: new Date().toISOString(),
           },
           error: {
-            message: error.message,
-            name: error.name,
+            message: errorMessage,
+            name: errorName,
             timestamp: new Date().toISOString(),
             context: { itemIndex },
           },
@@ -509,7 +512,7 @@ export class EnhancedHttpBlock implements EnhancedBlockHandler {
         });
 
         if (attempt > 0) {
-          this.logger.info(`HTTP request succeeded on attempt ${attempt + 1}`, {
+          this.logger.log(`HTTP request succeeded on attempt ${attempt + 1}`, {
             url: options.url,
             statusCode: response.status,
             executionId: context.executionId,
@@ -518,15 +521,17 @@ export class EnhancedHttpBlock implements EnhancedBlockHandler {
 
         return response;
       } catch (error) {
-        lastError = error;
+        lastError = error as Error | AxiosError<unknown, any>;
 
         if (attempt < maxRetries) {
           const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           this.logger.warn(
             `HTTP request failed (attempt ${attempt + 1}), retrying in ${delay}ms`,
             {
               url: options.url,
-              error: error.message,
+              error: errorMessage,
               executionId: context.executionId,
             },
           );

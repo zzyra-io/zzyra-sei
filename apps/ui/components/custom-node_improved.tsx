@@ -3,6 +3,7 @@ import { Database, Loader2, CheckCircle2, XCircle, Eye, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 import React, { useState } from "react";
+import { useBlockExecution } from "@/hooks/useBlockExecution";
 
 interface NodeData {
   blockType: string;
@@ -43,14 +44,23 @@ export default function CustomNode({
   const isTarget = isConnecting && connection.fromNode?.id !== id;
   const [showLogs, setShowLogs] = useState(false);
 
+  // Initialize block execution monitoring
+  const blockExecution = useBlockExecution({
+    blockId: id,
+    blockType: data.blockType,
+    blockName: data.label,
+  });
+
   const {
     label = data.blockType || "Node",
     description = "",
-    status = "idle",
     isEnabled = true,
     config = {},
     style = {},
   } = data;
+
+  // Use the monitoring system status instead of basic data.status
+  const status = blockExecution.currentState || "idle";
 
   const icon = <Database className='w-5 h-5' />; // TODO: Map iconName to actual icons
 
@@ -62,8 +72,17 @@ export default function CustomNode({
 
   // Enhanced Status Indicator with animations and log access
   const statusIndicator = React.useMemo(() => {
+    const logs = blockExecution.currentBlock?.logs || [];
+    const duration = blockExecution.currentBlock?.duration;
+
     switch (status) {
-      case "started":
+      case "queued":
+        return (
+          <div className='flex items-center gap-1.5 text-gray-500'>
+            <div className='w-3.5 h-3.5 rounded-full bg-gray-300 animate-pulse' />
+            <span className='text-xs font-medium'>Queued</span>
+          </div>
+        );
       case "running":
         return (
           <div className='flex items-center gap-1.5 text-blue-500 animate-pulse'>
@@ -72,37 +91,41 @@ export default function CustomNode({
               <div className='absolute -inset-1 bg-blue-500/20 rounded-full animate-ping' />
             </div>
             <span className='text-xs font-medium'>Running...</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowLogs(true);
-              }}
-              className='ml-1 text-xs px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors'>
-              Logs
-            </button>
+            {logs.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLogs(true);
+                }}
+                className='ml-1 text-xs px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors'>
+                Logs ({logs.length})
+              </button>
+            )}
           </div>
         );
       case "success":
-      case "completed":
         return (
           <div className='flex items-center gap-1.5 text-green-500'>
             <div className='relative'>
               <CheckCircle2 className='w-3.5 h-3.5' />
               <div className='absolute -inset-1 bg-green-500/20 rounded-full animate-pulse' />
             </div>
-            <span className='text-xs font-medium'>Completed</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowLogs(true);
-              }}
-              className='ml-1 text-xs px-1.5 py-0.5 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors'>
-              Logs
-            </button>
+            <span className='text-xs font-medium'>
+              Completed {duration && `(${duration}ms)`}
+            </span>
+            {logs.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLogs(true);
+                }}
+                className='ml-1 text-xs px-1.5 py-0.5 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors'>
+                Logs
+              </button>
+            )}
           </div>
         );
       case "error":
-      case "failed":
         return (
           <div className='flex items-center gap-1.5 text-red-500'>
             <div className='relative'>
@@ -110,20 +133,61 @@ export default function CustomNode({
               <div className='absolute -inset-1 bg-red-500/20 rounded-full animate-pulse' />
             </div>
             <span className='text-xs font-medium'>Failed</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowLogs(true);
-              }}
-              className='ml-1 text-xs px-1.5 py-0.5 bg-red-100 hover:bg-red-200 rounded text-red-700 transition-colors'>
-              Logs
-            </button>
+            {logs.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLogs(true);
+                }}
+                className='ml-1 text-xs px-1.5 py-0.5 bg-red-100 hover:bg-red-200 rounded text-red-700 transition-colors'>
+                Logs ({logs.length})
+              </button>
+            )}
+          </div>
+        );
+      case "warning":
+        return (
+          <div className='flex items-center gap-1.5 text-yellow-500'>
+            <div className='relative'>
+              <XCircle className='w-3.5 h-3.5' />
+              <div className='absolute -inset-1 bg-yellow-500/20 rounded-full animate-pulse' />
+            </div>
+            <span className='text-xs font-medium'>Warning</span>
+            {logs.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLogs(true);
+                }}
+                className='ml-1 text-xs px-1.5 py-0.5 bg-yellow-100 hover:bg-yellow-200 rounded text-yellow-700 transition-colors'>
+                Logs ({logs.length})
+              </button>
+            )}
+          </div>
+        );
+      case "cancelled":
+        return (
+          <div className='flex items-center gap-1.5 text-gray-500'>
+            <X className='w-3.5 h-3.5' />
+            <span className='text-xs font-medium'>Cancelled</span>
+          </div>
+        );
+      case "skipped":
+        return (
+          <div className='flex items-center gap-1.5 text-gray-400'>
+            <div className='w-3.5 h-3.5 rounded-full bg-gray-300' />
+            <span className='text-xs font-medium'>Skipped</span>
           </div>
         );
       default:
-        return null;
+        return (
+          <div className='flex items-center gap-1.5 text-gray-400'>
+            <div className='w-3.5 h-3.5 rounded-full bg-gray-300' />
+            <span className='text-xs font-medium'>Idle</span>
+          </div>
+        );
     }
-  }, [status]);
+  }, [status, blockExecution.currentBlock]);
 
   const configSummary = Object.entries(config)
     .filter(([key]) => key && key !== "blockType" && key !== "label")
@@ -184,9 +248,9 @@ export default function CustomNode({
         // Enhanced status-based styling
         status === "running" &&
           "animate-pulse border-blue-500 shadow-lg shadow-blue-500/30",
-        status === "completed" &&
+        status === "success" &&
           "border-green-500 shadow-lg shadow-green-500/20",
-        status === "failed" && "border-red-500 shadow-lg shadow-red-500/20"
+        status === "error" && "border-red-500 shadow-lg shadow-red-500/20"
       )}
       style={{
         width: nodeWidth,

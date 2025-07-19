@@ -10,6 +10,7 @@ export enum NodeCategory {
   TRIGGER = "trigger",
   ACTION = "action",
   LOGIC = "logic",
+  DATA_PROCESSING = "data_processing", // New category for data transformation
 }
 
 /**
@@ -23,6 +24,8 @@ export function getCategoryColor(category: NodeCategory): string {
       return "green";
     case NodeCategory.LOGIC:
       return "purple";
+    case NodeCategory.DATA_PROCESSING:
+      return "purple"; // Purple for data processing
     default:
       return "gray";
   }

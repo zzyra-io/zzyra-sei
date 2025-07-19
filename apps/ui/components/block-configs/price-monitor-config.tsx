@@ -24,6 +24,10 @@ import {
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+// Remove the circular dependency - don't self-register
+// import blockConfigRegistry from "@/lib/block-config-registry";
+// blockConfigRegistry.register("PRICE_MONITOR", PriceMonitorConfig);
+
 interface PriceMonitorConfigProps {
   config: any;
   onChange: (config: any) => void;

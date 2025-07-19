@@ -45,14 +45,35 @@ export class BlocksController {
   @Public()
   @Get("schema")
   @ApiOperation({ summary: "Get block schema for a specific type" })
-  async getBlockSchema(@Query("type") type?: string) {
+  async getBlockSchema(
+    @Query("type") type?: string,
+    @Query("schema") schemaType?: 'config' | 'input' | 'output'
+  ) {
     try {
-      return this.blocksService.getBlockSchema(type);
+      return this.blocksService.getBlockSchema(type, schemaType);
     } catch (error) {
       console.error("Error in block-schema API:", error);
       throw new HttpException(
         "Internal server error",
         HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Public()
+  @Post("validate/:blockType")
+  @ApiOperation({ summary: "Validate block configuration" })
+  async validateBlockConfig(
+    @Param("blockType") blockType: string,
+    @Body() config: any
+  ) {
+    try {
+      return this.blocksService.validateBlockConfig(blockType, config);
+    } catch (error) {
+      console.error("Error validating block config:", error);
+      throw new HttpException(
+        "Validation failed",
+        HttpStatus.BAD_REQUEST
       );
     }
   }

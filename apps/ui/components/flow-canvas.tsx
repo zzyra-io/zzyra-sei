@@ -523,9 +523,19 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
       {/* Config Panels */}
       {showConfigPanel && selectedNode && (
         <BlockConfigPanel
-          node={selectedNode}
-          onUpdate={handleNodeUpdate}
-          onClose={handleCloseConfigPanel}
+          nodeData={selectedNode.data}
+          onChange={handleNodeUpdate}
+          executionStatus={selectedNode.status}
+          connectedNodes={nodes.map((node) => ({
+            id: node.id,
+            type: node.type || "default",
+            data: node.data || {},
+          }))}
+          workflowData={{
+            nodes: nodes,
+            edges: edges,
+            selectedNodeId: selectedNode.id,
+          }}
         />
       )}
       {showEdgeConfigPanel && selectedEdge && (

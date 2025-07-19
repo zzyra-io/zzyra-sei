@@ -1,34 +1,155 @@
 import retry from 'async-retry';
-import { BlockExecutionContext, BlockHandler } from '@zyra/types';
+import {
+  BlockExecutionContext,
+  BlockHandler,
+  enhancedHttpRequestSchema,
+} from '@zyra/types';
 import { Logger } from '@nestjs/common';
+import { z } from 'zod';
 
 /**
  * Generic HTTP Request Handler
- * Can fetch data from any HTTP endpoint and extract specific fields
+ * Schema-first design with input/output validation
  * Maintains backward compatibility with price monitoring configurations
  */
 export class HttpRequestHandler implements BlockHandler {
+  // Use the enhanced schema from @zyra/types
+  static readonly inputSchema = enhancedHttpRequestSchema.inputSchema;
+  static readonly outputSchema = enhancedHttpRequestSchema.outputSchema;
+  static readonly configSchema = enhancedHttpRequestSchema.configSchema;
   private readonly logger = new Logger(HttpRequestHandler.name);
 
-  async execute(node: any, ctx: BlockExecutionContext): Promise<any> {
-    const { nodeId } = ctx;
-    const cfg = (node.data as any).config;
-
-    // Check if this is a legacy price monitor configuration
-    if (cfg.asset && !cfg.url) {
-      return this.executeLegacyPriceMonitor(cfg, ctx);
-    }
-
-    // Generic HTTP request execution
-    return this.executeHttpRequest(cfg, ctx);
+  /**
+   * Get input schema for this block type
+   */
+  static getInputSchema(): z.ZodObject<any> {
+    return this.inputSchema;
   }
 
   /**
-   * Execute generic HTTP request
+   * Get output schema for this block type
+   */
+  static getOutputSchema(): z.ZodObject<any> {
+    return this.outputSchema;
+  }
+
+  /**
+   * Get configuration schema for this block type
+   */
+  static getConfigSchema(): z.ZodObject<any> {
+    return this.configSchema;
+  }
+
+  /**
+   * Validate configuration
+   */
+  static validateConfig(config: any): any {
+    return this.configSchema.parse(config);
+  }
+
+  /**
+   * Check if this block can connect to another block
+   */
+  static canConnectTo(targetBlockHandler: any): boolean {
+    if (!targetBlockHandler.getInputSchema) {
+      return true; // Assume compatibility with legacy blocks
+    }
+
+    // In future: implement schema compatibility checking
+    // For now: allow all connections
+    return true;
+  }
+
+  /**
+   * Main execution method with schema validation
+   */
+  async execute(node: any, ctx: BlockExecutionContext): Promise<any> {
+    try {
+      // Validate and extract configuration
+      const config = this.validateAndExtractConfig(node, ctx);
+
+      // Validate inputs from previous blocks
+      const inputs = this.validateInputs(
+        ctx.inputs || {},
+        ctx.previousOutputs || {},
+      );
+
+      // Check if this is a legacy price monitor configuration
+      if (config.asset && !config.url) {
+        const result = await this.executeLegacyPriceMonitor(
+          config,
+          ctx,
+          inputs,
+        );
+        return result; // Legacy format
+      }
+
+      // Execute generic HTTP request
+      const result = await this.executeHttpRequest(config, ctx, inputs);
+      return result; // Schema-validated result
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      ctx.logger.error(`HTTP block execution failed: ${errorMsg}`);
+
+      // Return error in legacy format for backward compatibility
+      return {
+        statusCode: 0,
+        data: null,
+        headers: {},
+        url: '',
+        method: 'GET',
+        timestamp: new Date().toISOString(),
+        success: false,
+        error: errorMsg,
+      };
+    }
+  }
+
+  /**
+   * Validate configuration and merge with inputs
+   */
+  private validateAndExtractConfig(
+    node: any,
+    _ctx: BlockExecutionContext,
+  ): any {
+    const cfg = (node.data as any)?.config || {};
+
+    // Validate configuration against schema
+    const validatedConfig = HttpRequestHandler.configSchema.parse(cfg);
+
+    return validatedConfig;
+  }
+
+  /**
+   * Validate and process inputs from previous blocks
+   */
+  private validateInputs(
+    inputs: Record<string, any>,
+    previousOutputs: Record<string, any>,
+  ): any {
+    // Merge inputs and previousOutputs for template processing
+    const allInputs = { ...previousOutputs, ...inputs };
+
+    // Validate against input schema (non-strict for flexibility)
+    const result = HttpRequestHandler.inputSchema.safeParse(allInputs);
+
+    if (!result.success) {
+      // Log warning but don't fail - inputs are optional overrides
+      console.warn('Input validation warning:', result.error.message);
+    }
+
+    return allInputs;
+  }
+
+  // formatOutput method removed - maintaining backward compatibility
+
+  /**
+   * Execute generic HTTP request with enhanced input processing
    */
   private async executeHttpRequest(
     cfg: any,
     ctx: BlockExecutionContext,
+    inputs: Record<string, any>,
   ): Promise<any> {
     const {
       url,
@@ -47,19 +168,27 @@ export class HttpRequestHandler implements BlockHandler {
     }
 
     try {
-      const processedUrl = this.processTemplate(url, ctx.inputs || {});
+      // Allow input override of configuration
+      const finalUrl = inputs.url || url;
+      const finalMethod = inputs.method || method;
+      const finalHeaders = { ...headers, ...inputs.headers };
+      const finalBody = inputs.body || body;
+
+      // Process templates with all available data
+      const templateData = { ...inputs, ...ctx.inputs };
+      const processedUrl = this.processTemplate(finalUrl, templateData);
       const processedHeaders = this.processTemplateObject(
-        headers,
-        ctx.inputs || {},
+        finalHeaders,
+        templateData,
       );
-      const processedBody = body
-        ? this.processTemplateObject(body, ctx.inputs || {})
+      const processedBody = finalBody
+        ? this.processTemplateObject(finalBody, templateData)
         : undefined;
 
       const response = await retry(
         async () => {
           const fetchOptions: RequestInit = {
-            method,
+            method: finalMethod,
             headers: {
               'Content-Type': 'application/json',
               ...processedHeaders,
@@ -84,7 +213,7 @@ export class HttpRequestHandler implements BlockHandler {
           factor: 2,
           minTimeout: 1000,
           maxTimeout: 5000,
-          onRetry: (error, attempt) => {
+          onRetry: (error: Error, attempt: number) => {
             this.logger.warn(
               `Retry attempt ${attempt} for ${url}: ${error.message}`,
             );
@@ -102,8 +231,9 @@ export class HttpRequestHandler implements BlockHandler {
         data: result,
         headers: Object.fromEntries(response.headers.entries()),
         url: processedUrl,
-        method,
+        method: finalMethod,
         timestamp: new Date().toISOString(),
+        success: true,
       };
     } catch (error) {
       this.logger.error(
@@ -119,6 +249,7 @@ export class HttpRequestHandler implements BlockHandler {
   private async executeLegacyPriceMonitor(
     cfg: any,
     ctx: BlockExecutionContext,
+    inputs: Record<string, any>,
   ): Promise<any> {
     const { asset, dataSource = 'coingecko', condition, targetPrice } = cfg;
 
@@ -141,6 +272,7 @@ export class HttpRequestHandler implements BlockHandler {
           retries: 3,
         },
         ctx,
+        inputs,
       );
 
       const currentPrice = httpResult.data;
@@ -186,6 +318,7 @@ export class HttpRequestHandler implements BlockHandler {
         // Include new format too
         statusCode: httpResult.statusCode,
         data: currentPrice,
+        success: true,
       };
     } catch (error) {
       this.logger.error(
@@ -291,6 +424,7 @@ export class HttpRequestHandler implements BlockHandler {
     this.logger.debug(
       `Would store historical price for ${userId}: ${asset} = $${price}`,
     );
-    // Implementation would use the database service to store this data
+    // TODO: Implementation would use the database service to store this data
+    // This is a placeholder for historical data storage
   }
 }

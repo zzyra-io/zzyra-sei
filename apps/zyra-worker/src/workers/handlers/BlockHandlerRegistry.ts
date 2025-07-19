@@ -2,13 +2,21 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../services/database.service';
 import { MagicAdminService } from '../../services/magic-admin.service';
 
-import { BlockExecutionContext, BlockHandler, BlockType, GenericBlockType } from '@zyra/types';
+import {
+  BlockExecutionContext,
+  BlockHandler,
+  BlockType,
+  getBlockType,
+  getBlockMetadata,
+} from '@zyra/types';
 import * as vm from 'vm';
 import { EmailBlockHandler } from './EmailBlockHandler';
 import { HttpRequestHandler } from './HttpRequestHandler';
 import { MetricsBlockHandler } from './MetricsBlockHandler';
 import { ScheduleBlockHandler } from './ScheduleBlockHandler';
 import { CustomBlockHandler } from './CustomBlockHandler';
+import { PriceMonitorBlockHandler } from './PriceMonitorBlockHandler';
+import { DataTransformHandler } from './DataTransformHandler';
 
 // Import enhanced block system
 import { EnhancedBlockRegistry } from './enhanced/EnhancedBlockRegistry';
@@ -32,35 +40,28 @@ export class BlockHandlerRegistry {
   ) {
     // Initialize enhanced block system
     const templateProcessor = new ZyraTemplateProcessor();
-    this.enhancedRegistry = new EnhancedBlockRegistry(templateProcessor);
+    this.enhancedRegistry = new EnhancedBlockRegistry(
+      templateProcessor,
+      this.databaseService,
+    );
 
     this.handlers = {
-      // Action blocks
-      [BlockType.EMAIL]: new MetricsBlockHandler(
-        BlockType.EMAIL,
-        new EmailBlockHandler(this.databaseService),
-      ),
+      // Notifications are handled by the enhanced registry
+      // [BlockType.EMAIL]: Handled by enhanced registry
 
       // Trigger blocks
       [BlockType.PRICE_MONITOR]: new MetricsBlockHandler(
         BlockType.PRICE_MONITOR,
-        new HttpRequestHandler(),
+        new PriceMonitorBlockHandler(this.databaseService),
       ),
 
-      // Generic blocks - Enhanced versions take priority
-      [GenericBlockType.HTTP_REQUEST]: new MetricsBlockHandler(
-        GenericBlockType.HTTP_REQUEST,
-        new HttpRequestHandler(),
-      ),
-      [GenericBlockType.COMPARATOR]: new MetricsBlockHandler(
-        GenericBlockType.COMPARATOR,
-        new HttpRequestHandler(), // Placeholder - enhanced version will override
-      ),
-      
-      // Legacy HTTP handler for backward compatibility
-      [BlockType.HTTP_REQUEST]: new MetricsBlockHandler(
-        BlockType.HTTP_REQUEST,
-        new HttpRequestHandler(),
+      // HTTP requests are handled by the enhanced registry
+      // [BlockType.HTTP_REQUEST]: Handled by enhanced registry
+
+      // Data transformation blocks
+      [BlockType.DATA_TRANSFORM]: new MetricsBlockHandler(
+        BlockType.DATA_TRANSFORM,
+        new DataTransformHandler(),
       ),
 
       // Custom blocks
@@ -153,41 +154,47 @@ export class BlockHandlerRegistry {
   /**
    * Create a wrapper to bridge enhanced blocks with the legacy BlockHandler interface
    */
-  private createEnhancedBlockWrapper(enhancedHandler: any, blockType: string): BlockHandler {
+  private createEnhancedBlockWrapper(
+    enhancedHandler: any,
+    blockType: string,
+  ): BlockHandler {
     return {
       execute: async (node: any, context: BlockExecutionContext) => {
         try {
           this.logger.debug(`Executing enhanced block: ${blockType}`, {
             nodeId: node.id,
-            executionId: context.executionId
+            executionId: context.executionId,
           });
 
           // Use the enhanced registry's execution method
           const result = await this.enhancedRegistry.executeBlock(
             node,
             context,
-            context.previousOutputs || {}
+            context.previousOutputs || {},
           );
 
-          this.logger.debug(`Enhanced block execution completed: ${blockType}`, {
-            nodeId: node.id,
-            executionId: context.executionId,
-            hasResult: !!result
-          });
+          this.logger.debug(
+            `Enhanced block execution completed: ${blockType}`,
+            {
+              nodeId: node.id,
+              executionId: context.executionId,
+              hasResult: !!result,
+            },
+          );
 
           return result;
         } catch (error) {
           this.logger.error(`Enhanced block execution failed: ${blockType}`, {
             nodeId: node.id,
             executionId: context.executionId,
-            error: error.message
+            error: error instanceof Error ? error.message : String(error),
           });
           throw error;
         }
       },
-      
+
       validate: enhancedHandler.validate?.bind(enhancedHandler),
-      getDefaultConfig: enhancedHandler.getDefaultConfig?.bind(enhancedHandler)
+      getDefaultConfig: enhancedHandler.getDefaultConfig?.bind(enhancedHandler),
     };
   }
 

@@ -47,6 +47,15 @@ interface BlockCatalogProps {
   ) => void;
 }
 
+// Extend BlockMetadata to include new properties from API
+interface BlockMetadataWithSchemas extends BlockMetadata {
+  configSchema?: Record<string, unknown>;
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  validation?: Record<string, unknown>;
+  compatibility?: Record<string, unknown>;
+}
+
 export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
   const FAVORITES_KEY = "block_favorites";
   const RECENT_KEY = "block_recent";
@@ -66,7 +75,7 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
     }
     return [];
   });
-  const [blocks, setBlocks] = useState<BlockMetadata[]>([]);
+  const [blocks, setBlocks] = useState<BlockMetadataWithSchemas[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -144,7 +153,10 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
   });
 
   // Handle drag start event
-  const handleDragStart = (event: React.DragEvent, block: BlockMetadata) => {
+  const handleDragStart = (
+    event: React.DragEvent,
+    block: BlockMetadataWithSchemas
+  ) => {
     setRecents((r) =>
       [block.type, ...r.filter((t) => t !== block.type)].slice(0, 10)
     );
@@ -157,6 +169,17 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
       iconName: block.icon,
       isEnabled: true,
       config: { ...block.defaultConfig },
+      configSchema: block.configSchema?.properties
+        ? block.configSchema
+        : undefined,
+      inputSchema: block.inputSchema?.properties
+        ? block.inputSchema
+        : undefined,
+      outputSchema: block.outputSchema?.properties
+        ? block.outputSchema
+        : undefined,
+      validation: block.validation ?? undefined,
+      compatibility: block.compatibility ?? undefined,
       style: {
         backgroundColor: "bg-card",
         borderColor: "border-border",
@@ -165,7 +188,6 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
         width: 220,
       },
     };
-
     // Set the data directly on the dataTransfer object
     event.dataTransfer.setData("application/reactflow/type", block.type);
     event.dataTransfer.setData(
@@ -173,8 +195,6 @@ export function BlockCatalog({ onDragStart, onAddBlock }: BlockCatalogProps) {
       JSON.stringify(blockData)
     );
     event.dataTransfer.effectAllowed = "move";
-
-    // Only call onDragStart if it's provided
     if (typeof onDragStart === "function") {
       onDragStart(event, block.type, blockData);
     }

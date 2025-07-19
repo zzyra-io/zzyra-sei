@@ -1,22 +1,27 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { 
-  BlockHandler, 
-  EnhancedBlockHandler, 
-  BlockExecutionContext, 
+import {
+  BlockHandler,
+  EnhancedBlockHandler,
+  BlockExecutionContext,
   EnhancedBlockExecutionContext,
   ZyraNodeData,
-  GenericBlockType
+  BlockType,
+  getBlockType,
+  getBlockMetadata,
 } from '@zyra/types';
 import { ZyraTemplateProcessor } from '../../../utils/template-processor';
+import { DatabaseService } from '../../../services/database.service';
 
 // Import enhanced blocks
-import { EnhancedHttpBlock } from './EnhancedHttpBlock';
+import { HttpBlockHandler } from '../HttpBlockHandler';
 import { EnhancedComparatorBlock } from './EnhancedComparatorBlock';
+import { NotificationBlockHandler } from '../NotificationBlockHandler';
 
 // Import legacy blocks
 import { EmailBlockHandler } from '../EmailBlockHandler';
 import { HttpRequestHandler } from '../HttpRequestHandler';
 import { CustomBlockHandler } from '../CustomBlockHandler';
+import { PriceMonitorBlockHandler } from '../PriceMonitorBlockHandler';
 
 @Injectable()
 export class EnhancedBlockRegistry {
@@ -25,28 +30,45 @@ export class EnhancedBlockRegistry {
   private legacyBlocks: Map<string, BlockHandler> = new Map();
 
   constructor(
-    private templateProcessor: ZyraTemplateProcessor
+    private templateProcessor: ZyraTemplateProcessor,
+    private databaseService: DatabaseService,
   ) {
     this.initializeBlocks();
   }
 
   private initializeBlocks(): void {
     // Register enhanced blocks
-    this.registerEnhancedBlock(new EnhancedHttpBlock());
+    this.registerEnhancedBlock(new HttpBlockHandler());
     this.registerEnhancedBlock(new EnhancedComparatorBlock());
-    
+    this.registerEnhancedBlock(
+      new NotificationBlockHandler(this.databaseService),
+    );
+
     // Register legacy blocks for backward compatibility
-    this.registerLegacyBlock('EMAIL', new EmailBlockHandler());
+    this.registerLegacyBlock(
+      'EMAIL',
+      new EmailBlockHandler(this.databaseService),
+    );
     this.registerLegacyBlock('HTTP_REQUEST', new HttpRequestHandler());
-    this.registerLegacyBlock('PRICE_MONITOR', new HttpRequestHandler());
-    this.registerLegacyBlock('CUSTOM', new CustomBlockHandler());
-    
-    this.logger.log(`Initialized ${this.enhancedBlocks.size} enhanced blocks and ${this.legacyBlocks.size} legacy blocks`);
+    this.registerLegacyBlock(
+      'PRICE_MONITOR',
+      new PriceMonitorBlockHandler(this.databaseService),
+    );
+    this.registerLegacyBlock(
+      'CUSTOM',
+      new CustomBlockHandler(this.databaseService),
+    );
+
+    this.logger.log(
+      `Initialized ${this.enhancedBlocks.size} enhanced blocks and ${this.legacyBlocks.size} legacy blocks`,
+    );
   }
 
   private registerEnhancedBlock(block: EnhancedBlockHandler): void {
     this.enhancedBlocks.set(block.definition.name, block);
-    this.logger.debug(`Registered enhanced block: ${block.definition.displayName}`);
+    this.logger.debug(
+      `Registered enhanced block: ${block.definition.displayName}`,
+    );
   }
 
   private registerLegacyBlock(type: string, handler: BlockHandler): void {
@@ -92,7 +114,7 @@ export class EnhancedBlockRegistry {
   async executeBlock(
     node: any,
     context: BlockExecutionContext,
-    previousOutputs: Record<string, any>
+    previousOutputs: Record<string, any>,
   ): Promise<any> {
     const blockType = node.type || node.data?.type;
     const handler = this.getHandler(blockType);
@@ -102,7 +124,12 @@ export class EnhancedBlockRegistry {
     }
 
     if (this.isEnhancedBlock(blockType)) {
-      return this.executeEnhancedBlock(handler as EnhancedBlockHandler, node, context, previousOutputs);
+      return this.executeEnhancedBlock(
+        handler as EnhancedBlockHandler,
+        node,
+        context,
+        previousOutputs,
+      );
     } else {
       return this.executeLegacyBlock(handler as BlockHandler, node, context);
     }
@@ -112,21 +139,27 @@ export class EnhancedBlockRegistry {
     handler: EnhancedBlockHandler,
     node: any,
     context: BlockExecutionContext,
-    previousOutputs: Record<string, any>
+    previousOutputs: Record<string, any>,
   ): Promise<any> {
     // Convert legacy context to enhanced context
-    const enhancedContext = this.createEnhancedContext(node, context, previousOutputs);
-    
+    const enhancedContext = this.createEnhancedContext(
+      node,
+      context,
+      previousOutputs,
+    );
+
     try {
       const result = await handler.execute(enhancedContext);
-      
+
       // Convert enhanced result back to legacy format
       return this.convertEnhancedResultToLegacy(result);
     } catch (error) {
-      this.logger.error(`Enhanced block execution failed: ${error.message}`, {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(`Enhanced block execution failed: ${errorMessage}`, {
         blockType: node.type,
         nodeId: node.id,
-        executionId: context.executionId
+        executionId: context.executionId,
       });
       throw error;
     }
@@ -135,15 +168,17 @@ export class EnhancedBlockRegistry {
   private async executeLegacyBlock(
     handler: BlockHandler,
     node: any,
-    context: BlockExecutionContext
+    context: BlockExecutionContext,
   ): Promise<any> {
     try {
       return await handler.execute(node, context);
     } catch (error) {
-      this.logger.error(`Legacy block execution failed: ${error.message}`, {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(`Legacy block execution failed: ${errorMessage}`, {
         blockType: node.type,
         nodeId: node.id,
-        executionId: context.executionId
+        executionId: context.executionId,
       });
       throw error;
     }
@@ -152,18 +187,18 @@ export class EnhancedBlockRegistry {
   private createEnhancedContext(
     node: any,
     context: BlockExecutionContext,
-    previousOutputs: Record<string, any>
+    previousOutputs: Record<string, any>,
   ): EnhancedBlockExecutionContext {
     // Convert previous outputs to ZyraNodeData format
     const inputData: ZyraNodeData[] = [];
-    
+
     if (previousOutputs && Object.keys(previousOutputs).length > 0) {
       // Convert each previous output to ZyraNodeData format
       for (const [nodeId, output] of Object.entries(previousOutputs)) {
         if (output && typeof output === 'object') {
           inputData.push({
             json: output,
-            pairedItem: { item: 0 }
+            pairedItem: { item: 0 },
           });
         }
       }
@@ -176,14 +211,16 @@ export class EnhancedBlockRegistry {
 
     return {
       ...context,
-      
+
       getInputData: (inputIndex = 0) => {
         return inputData;
       },
 
       getNodeParameter: (parameterName: string, itemIndex = 0) => {
         const nodeData = node.data || {};
-        return nodeData[parameterName] !== undefined ? nodeData[parameterName] : node[parameterName];
+        return nodeData[parameterName] !== undefined
+          ? nodeData[parameterName]
+          : node[parameterName];
       },
 
       getCredentials: async (type: string) => {
@@ -210,21 +247,24 @@ export class EnhancedBlockRegistry {
           if (format === 'currency') {
             return new Intl.NumberFormat('en-US', {
               style: 'currency',
-              currency: 'USD'
+              currency: 'USD',
             }).format(Number(value));
           }
-          
+
           if (format === 'date') {
             return new Date(value).toISOString();
           }
-          
+
           return String(value);
         },
 
-        constructExecutionMetaData: (inputData: ZyraNodeData[], outputData: any[]) => {
+        constructExecutionMetaData: (
+          inputData: ZyraNodeData[],
+          outputData: any[],
+        ) => {
           return outputData.map((data, index) => ({
             json: data,
-            pairedItem: inputData[index]?.pairedItem || { item: index }
+            pairedItem: inputData[index]?.pairedItem || { item: index },
           }));
         },
 
@@ -232,16 +272,16 @@ export class EnhancedBlockRegistry {
           if (!Array.isArray(items)) {
             return [{ json: items }];
           }
-          
-          return items.map(item => ({
-            json: item
+
+          return items.map((item) => ({
+            json: item,
           }));
         },
 
         returnJsonArray: (jsonData: any[]) => {
-          return jsonData.map(data => ({ json: data }));
-        }
-      }
+          return jsonData.map((data) => ({ json: data }));
+        },
+      },
     };
   }
 
@@ -256,7 +296,7 @@ export class EnhancedBlockRegistry {
     }
 
     // If multiple results, return array of json data
-    return result.map(item => item.json);
+    return result.map((item) => item.json);
   }
 
   /**
@@ -265,7 +305,7 @@ export class EnhancedBlockRegistry {
   getAllBlockTypes(): string[] {
     return [
       ...Array.from(this.enhancedBlocks.keys()),
-      ...Array.from(this.legacyBlocks.keys())
+      ...Array.from(this.legacyBlocks.keys()),
     ];
   }
 
@@ -274,7 +314,7 @@ export class EnhancedBlockRegistry {
    */
   getBlockDefinition(blockType: string): any {
     const handler = this.getHandler(blockType);
-    
+
     if (!handler) {
       return null;
     }
@@ -292,7 +332,7 @@ export class EnhancedBlockRegistry {
       icon: 'legacy',
       color: '#6B7280',
       group: ['action'],
-      properties: []
+      properties: [],
     };
   }
 
@@ -307,9 +347,9 @@ export class EnhancedBlockRegistry {
     issues: string[];
   } {
     const issues: string[] = [];
-    
+
     // Check for essential blocks
-    const essentialBlocks = [GenericBlockType.HTTP_REQUEST, GenericBlockType.COMPARATOR];
+    const essentialBlocks = [BlockType.HTTP_REQUEST, BlockType.CONDITION];
     for (const blockType of essentialBlocks) {
       if (!this.enhancedBlocks.has(blockType)) {
         issues.push(`Missing essential enhanced block: ${blockType}`);
@@ -324,15 +364,19 @@ export class EnhancedBlockRegistry {
       }
     }
 
-    const status = issues.length === 0 ? 'healthy' : 
-                   issues.length <= 2 ? 'degraded' : 'unhealthy';
+    const status =
+      issues.length === 0
+        ? 'healthy'
+        : issues.length <= 2
+          ? 'degraded'
+          : 'unhealthy';
 
     return {
       status,
       enhancedBlocks: this.enhancedBlocks.size,
       legacyBlocks: this.legacyBlocks.size,
       totalBlocks: this.enhancedBlocks.size + this.legacyBlocks.size,
-      issues
+      issues,
     };
   }
 }

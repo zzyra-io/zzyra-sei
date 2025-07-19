@@ -6,6 +6,7 @@ import { NotificationToastContainer } from "@/components/NotificationToast";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
+import { WorkflowExecutionProvider } from "@/components/workflow/BlockExecutionMonitor";
 import "@/styles/flow-components.css";
 import { Montserrat } from "next/font/google";
 import type React from "react";
@@ -41,14 +42,16 @@ export default function RootLayout({
                 defaultTheme='system'
                 enableSystem
                 disableTransitionOnChange>
-                <NotificationSocketProvider>
-                  <div className='fixed inset-0 pointer-events-none z-0'>
-                    <FloatingParticles />
-                  </div>
-                  <main id='main-content'>{children}</main>
-                  <Toaster />
-                  <NotificationToastContainer />
-                </NotificationSocketProvider>
+                <WorkflowExecutionProvider>
+                  <NotificationSocketProvider>
+                    <div className='fixed inset-0 pointer-events-none z-0'>
+                      <FloatingParticles />
+                    </div>
+                    <main id='main-content'>{children}</main>
+                    <Toaster />
+                    <NotificationToastContainer />
+                  </NotificationSocketProvider>
+                </WorkflowExecutionProvider>
               </ThemeProvider>
             </Providers>
           </WagmiProviders>

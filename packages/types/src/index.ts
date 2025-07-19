@@ -5,14 +5,22 @@ export * from "./workflow";
 export * from "./wallet";
 
 // Export schemas
-export { blockSchemas } from "./schemas/blockSchemas";
+export {
+  blockSchemas,
+  enhancedBlockSchemas,
+  getEnhancedBlockSchema,
+  hasEnhancedSchema,
+  enhancedHttpRequestSchema,
+  enhancedNotificationSchema,
+  enhancedDataTransformSchema,
+} from "./schemas/blockSchemas";
 
 // Export metadata catalog
 export { BLOCK_CATALOG } from "./workflow/metadata";
 
 // Explicitly re-export critical types at the top level for backward compatibility
 // This ensures all import paths continue to work for both UI and worker components
-export { BlockType, GenericBlockType } from "./workflow/block-types";
+export { BlockType } from "./workflow/block-types";
 export { NodeCategory } from "./workflow/categories";
 
 // Re-export custom block types
@@ -30,8 +38,8 @@ export {
 } from "./workflow/custom-block";
 
 // Re-export execution related types
-export type { 
-  BlockExecutionContext, 
+export type {
+  BlockExecutionContext,
   BlockHandler,
   EnhancedBlockExecutionContext,
   EnhancedBlockHandler,
@@ -45,18 +53,18 @@ export type {
   FieldMapping,
   DataTransformation,
   HttpRequestOptions,
-  BlockGroup,
-  ConnectionType,
   BlockProperty,
-  PropertyType,
   PropertyOption,
   PropertyTypeOptions,
   DisplayOptions,
   CredentialDefinition,
   WebhookDefinition,
   BlockExample,
-  DocumentationResource
+  DocumentationResource,
 } from "./workflow/execution";
+
+// Export enums as values
+export { BlockGroup, ConnectionType, PropertyType } from "./workflow/execution";
 
 // Re-export metadata helper functions
 export { getBlockMetadata, getBlockType } from "./workflow/metadata";

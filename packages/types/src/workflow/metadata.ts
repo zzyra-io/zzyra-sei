@@ -53,6 +53,22 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
     },
   },
 
+  [BlockType.NOTIFICATION]: {
+    type: BlockType.NOTIFICATION,
+    label: "Notification",
+    description:
+      "Send notifications via email, webhook, Discord, Slack, or Telegram",
+    category: NodeCategory.ACTION,
+    icon: "bell",
+    defaultConfig: {
+      notificationType: "email",
+      to: "",
+      subject: "",
+      body: "",
+      template: "",
+    },
+  },
+
   [BlockType.SCHEDULE]: {
     type: BlockType.SCHEDULE,
     label: "Schedule",
@@ -112,6 +128,18 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
     category: NodeCategory.ACTION,
     icon: "help-circle",
     defaultConfig: {},
+  },
+
+  [BlockType.DATA_TRANSFORM]: {
+    type: BlockType.DATA_TRANSFORM,
+    label: "Data Transform",
+    description: "Transform and manipulate data between blocks",
+    category: NodeCategory.DATA_PROCESSING,
+    icon: "transform",
+    defaultConfig: {
+      transformations: [],
+      outputSchema: {},
+    },
   },
 };
 

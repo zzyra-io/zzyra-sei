@@ -2,11 +2,127 @@ import { z } from "zod";
 import { BlockType } from "../workflow/block-types";
 
 /**
- * Zod schemas for block configurations
- * Shared between UI and worker for consistent validation
+ * Enhanced block schema definition with input/output schemas
  */
-export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
-  [BlockType.PRICE_MONITOR]: z.object({
+export interface EnhancedBlockSchema {
+  configSchema: z.ZodObject<any>;
+  inputSchema: z.ZodObject<any>;
+  outputSchema: z.ZodObject<any>;
+  metadata?: {
+    category: string;
+    icon: string;
+    description: string;
+    tags?: string[];
+  };
+}
+
+/**
+ * Enhanced HTTP Request block schema definition
+ */
+export const enhancedHttpRequestSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
+    url: z.string().url(),
+    method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).default("GET"),
+    headers: z.record(z.string()).optional(),
+    body: z.any().optional(),
+    dataPath: z.string().optional(),
+    retries: z.number().min(0).max(10).default(3),
+    timeout: z.number().min(1000).max(300000).default(10000),
+  }),
+  inputSchema: z.object({
+    data: z.any().optional(), // Generic data from previous blocks
+    context: z
+      .object({
+        workflowId: z.string(),
+        executionId: z.string(),
+        userId: z.string(),
+        timestamp: z.string(),
+      })
+      .optional(),
+    variables: z.record(z.any()).optional(), // Workflow variables
+  }),
+  outputSchema: z.object({
+    statusCode: z.number(),
+    data: z.any(),
+    headers: z.record(z.string()),
+    url: z.string(),
+    method: z.string(),
+    timestamp: z.string(),
+    success: z.boolean(),
+    error: z.string().optional(),
+  }),
+  metadata: {
+    category: "action",
+    icon: "globe",
+    description:
+      "Make HTTP requests to any API endpoint with schema validation",
+    tags: ["http", "api", "request", "web"],
+  },
+};
+
+/**
+ * Enhanced Notification block schema definition
+ */
+export const enhancedNotificationSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
+    notificationType: z
+      .enum(["email", "webhook", "discord", "slack", "telegram"])
+      .default("email"),
+    to: z.string().email().optional(),
+    subject: z.string().min(1).optional(),
+    body: z.string().min(1).optional(),
+    template: z.string().optional(),
+    webhookUrl: z.string().url().optional(),
+    webhookHeaders: z.record(z.string()).optional(),
+    discordWebhookUrl: z.string().url().optional(),
+    slackWebhookUrl: z.string().url().optional(),
+    telegramBotToken: z.string().optional(),
+    telegramChatId: z.string().optional(),
+    cc: z.string().email().optional(),
+    bcc: z.string().email().optional(),
+  }),
+  inputSchema: z.object({
+    data: z.any().optional(), // Generic data from previous blocks
+    context: z
+      .object({
+        workflowId: z.string(),
+        executionId: z.string(),
+        userId: z.string(),
+        timestamp: z.string(),
+      })
+      .optional(),
+    variables: z.record(z.any()).optional(), // Workflow variables
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    messageId: z.string().optional(),
+    timestamp: z.string(),
+    notificationType: z.string(),
+    recipient: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  metadata: {
+    category: "action",
+    icon: "bell",
+    description:
+      "Send notifications via multiple channels with template support",
+    tags: [
+      "notification",
+      "email",
+      "webhook",
+      "discord",
+      "slack",
+      "telegram",
+      "communication",
+    ],
+  },
+};
+
+/**
+ * Enhanced Price Monitor block schema definition
+ */
+export const enhancedPriceMonitorSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
     asset: z.string().min(1),
     condition: z.enum(["above", "below", "equals", "change"]).optional(),
     targetPrice: z.string().optional(),
@@ -15,26 +131,113 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
       .enum(["coingecko", "coinmarketcap", "binance"])
       .default("coingecko"),
   }),
+  inputSchema: z.object({
+    data: z.any().optional(), // Generic data from previous blocks
+    context: z
+      .object({
+        workflowId: z.string(),
+        executionId: z.string(),
+        userId: z.string(),
+        timestamp: z.string(),
+      })
+      .optional(),
+    variables: z.record(z.any()).optional(), // Workflow variables
+  }),
+  outputSchema: z.object({
+    asset: z.string(),
+    currentPrice: z.number(),
+    targetPrice: z.number().optional(),
+    condition: z.string().optional(),
+    triggered: z.boolean(),
+    timestamp: z.string(),
+    dataSource: z.string(),
+  }),
+  metadata: {
+    category: "trigger",
+    icon: "trending-up",
+    description: "Monitor cryptocurrency prices with conditional triggers",
+    tags: ["price", "crypto", "monitor", "trigger", "trading"],
+  },
+};
 
-  [BlockType.EMAIL]: z.object({
+/**
+ * Enhanced Email block schema definition
+ */
+export const enhancedEmailSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
     to: z.string().email(),
     subject: z.string().min(1),
     body: z.string().min(1),
     cc: z.string().email().optional(),
     template: z.string().optional(),
   }),
+  inputSchema: z.object({
+    data: z.any().optional(), // Generic data from previous blocks
+    context: z
+      .object({
+        workflowId: z.string(),
+        executionId: z.string(),
+        userId: z.string(),
+        timestamp: z.string(),
+      })
+      .optional(),
+    variables: z.record(z.any()).optional(), // Workflow variables
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    messageId: z.string().optional(),
+    timestamp: z.string(),
+    recipient: z.string(),
+    subject: z.string(),
+    error: z.string().optional(),
+  }),
+  metadata: {
+    category: "action",
+    icon: "mail",
+    description: "Send email notifications with template support",
+    tags: ["email", "notification", "communication"],
+  },
+};
 
-  [BlockType.CONDITION]: z.object({
+/**
+ * Enhanced Condition block schema definition
+ */
+export const enhancedConditionSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
     condition: z.string().min(1),
     description: z.string().optional(),
   }),
+  inputSchema: z.object({
+    data: z.any().optional(), // Generic data from previous blocks
+    context: z
+      .object({
+        workflowId: z.string(),
+        executionId: z.string(),
+        userId: z.string(),
+        timestamp: z.string(),
+      })
+      .optional(),
+    variables: z.record(z.any()).optional(), // Workflow variables
+  }),
+  outputSchema: z.object({
+    result: z.boolean(),
+    condition: z.string(),
+    evaluatedAt: z.string(),
+    data: z.any().optional(),
+  }),
+  metadata: {
+    category: "logic",
+    icon: "filter",
+    description: "Add conditional logic and branching to workflows",
+    tags: ["condition", "logic", "branching", "control-flow"],
+  },
+};
 
-  // [BlockType.DELAY]: z.object({
-  //   duration: z.number().positive(),
-  //   unit: z.enum(["seconds", "minutes", "hours", "days"]).default("minutes"),
-  // }),
-
-  [BlockType.SCHEDULE]: z.object({
+/**
+ * Enhanced Schedule block schema definition
+ */
+export const enhancedScheduleSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
     interval: z
       .enum(["once", "minutely", "hourly", "daily", "weekly", "monthly"])
       .default("daily"),
@@ -42,28 +245,77 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
     cron: z.string().optional(),
     timezone: z.string().optional(),
   }),
+  inputSchema: z.object({
+    data: z.any().optional(), // Generic data from previous blocks
+    context: z
+      .object({
+        workflowId: z.string(),
+        executionId: z.string(),
+        userId: z.string(),
+        timestamp: z.string(),
+      })
+      .optional(),
+    variables: z.record(z.any()).optional(), // Workflow variables
+  }),
+  outputSchema: z.object({
+    triggered: z.boolean(),
+    nextRun: z.string().optional(),
+    lastRun: z.string().optional(),
+    schedule: z.string(),
+    timestamp: z.string(),
+  }),
+  metadata: {
+    category: "trigger",
+    icon: "calendar",
+    description: "Trigger workflows on a schedule with cron support",
+    tags: ["schedule", "trigger", "cron", "automation"],
+  },
+};
 
-  [BlockType.WEBHOOK]: z.object({
+/**
+ * Enhanced Webhook block schema definition
+ */
+export const enhancedWebhookSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
     url: z.string().url(),
     method: z.enum(["GET", "POST", "PUT", "DELETE"]).default("POST"),
     headers: z.record(z.string()).optional(),
     body: z.string().optional(),
   }),
-
-  [BlockType.UNKNOWN]: z.any(),
-
-  // Generic block schemas
-  [BlockType.HTTP_REQUEST]: z.object({
-    url: z.string().url(),
-    method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).default("GET"),
-    headers: z.record(z.string()).optional(),
-    body: z.any().optional(),
-    dataPath: z.string().optional(),
-    retries: z.number().default(3),
-    timeout: z.number().default(10000),
+  inputSchema: z.object({
+    data: z.any().optional(), // Generic data from previous blocks
+    context: z
+      .object({
+        workflowId: z.string(),
+        executionId: z.string(),
+        userId: z.string(),
+        timestamp: z.string(),
+      })
+      .optional(),
+    variables: z.record(z.any()).optional(), // Workflow variables
   }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    statusCode: z.number(),
+    response: z.any(),
+    timestamp: z.string(),
+    url: z.string(),
+    method: z.string(),
+    error: z.string().optional(),
+  }),
+  metadata: {
+    category: "trigger",
+    icon: "webhook",
+    description: "Trigger workflows via HTTP webhook endpoints",
+    tags: ["webhook", "trigger", "http", "integration"],
+  },
+};
 
-  [BlockType.CUSTOM]: z.object({
+/**
+ * Enhanced Custom block schema definition
+ */
+export const enhancedCustomSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
     code: z.string().min(1),
     inputs: z.record(z.any()).optional(),
     outputs: z.record(z.any()).optional(),
@@ -80,75 +332,148 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
     icon: z.string().optional(),
     defaultConfig: z.record(z.any()).optional(),
   }),
-
-  // [BlockType.CALCULATOR]: z.object({
-  //   operation: z
-  //     .enum([
-  //       "add",
-  //       "subtract",
-  //       "multiply",
-  //       "divide",
-  //       "percentage",
-  //       "percentageOf",
-  //       "average",
-  //       "min",
-  //       "max",
-  //       "sum",
-  //       "round",
-  //       "floor",
-  //       "ceil",
-  //       "abs",
-  //       "sqrt",
-  //       "power",
-  //     ])
-  //     .optional(),
-  //   inputs: z.record(z.any()).optional(),
-  //   formula: z.string().optional(),
-  //   precision: z.number().default(8),
-  // }),
-
-  // [BlockType.COMPARATOR]: z.object({
-  //   operation: z
-  //     .enum([
-  //       "equals",
-  //       "eq",
-  //       "not_equals",
-  //       "neq",
-  //       "greater_than",
-  //       "gt",
-  //       "greater_than_or_equal",
-  //       "gte",
-  //       "less_than",
-  //       "lt",
-  //       "less_than_or_equal",
-  //       "lte",
-  //       "between",
-  //       "not_between",
-  //       "in",
-  //       "not_in",
-  //       "contains",
-  //       "not_contains",
-  //       "starts_with",
-  //       "ends_with",
-  //       "is_null",
-  //       "is_not_null",
-  //       "is_empty",
-  //       "is_not_empty",
-  //       "regex_match",
-  //     ])
-  //     .optional(),
-  //   inputs: z.record(z.any()).optional(),
-  //   conditions: z
-  //     .array(
-  //       z.object({
-  //         operation: z.string(),
-  //         inputs: z.record(z.any()),
-  //         logicalOperator: z.enum(["and", "or", "&&", "||"]).optional(),
-  //       })
-  //     )
-  //     .optional(),
-  // }),
+  inputSchema: z.object({
+    data: z.any().optional(), // Generic data from previous blocks
+    context: z
+      .object({
+        workflowId: z.string(),
+        executionId: z.string(),
+        userId: z.string(),
+        timestamp: z.string(),
+      })
+      .optional(),
+    variables: z.record(z.any()).optional(), // Workflow variables
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    result: z.any(),
+    executionTime: z.number().optional(),
+    timestamp: z.string(),
+    error: z.string().optional(),
+    logs: z.array(z.string()).optional(),
+  }),
+  metadata: {
+    category: "action",
+    icon: "puzzle",
+    description: "Execute custom JavaScript or Python code",
+    tags: ["custom", "code", "javascript", "python", "scripting"],
+  },
 };
+
+/**
+ * Enhanced Data Transform block schema definition
+ */
+export const enhancedDataTransformSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
+    transformations: z.array(
+      z.object({
+        type: z.enum([
+          "map",
+          "filter",
+          "aggregate",
+          "format",
+          "extract",
+          "combine",
+        ]),
+        field: z.string(),
+        operation: z.string(),
+        value: z.any().optional(),
+        outputField: z.string().optional(),
+      })
+    ),
+    outputSchema: z.record(z.any()).optional(),
+    previewMode: z.boolean().default(true),
+  }),
+  inputSchema: z.object({
+    data: z.any().optional(), // Generic data from previous blocks
+    context: z
+      .object({
+        workflowId: z.string(),
+        executionId: z.string(),
+        userId: z.string(),
+        timestamp: z.string(),
+      })
+      .optional(),
+    variables: z.record(z.any()).optional(), // Workflow variables
+  }),
+  outputSchema: z.object({
+    transformedData: z.any(), // Transformed data
+    originalData: z.any().optional(), // Original data for reference
+    transformationLog: z
+      .array(
+        z.object({
+          type: z.string(),
+          field: z.string(),
+          operation: z.string(),
+          success: z.boolean(),
+          error: z.string().optional(),
+        })
+      )
+      .optional(),
+    metadata: z.object({
+      transformationCount: z.number(),
+      executionTime: z.number(),
+      timestamp: z.string(),
+    }),
+  }),
+  metadata: {
+    category: "data_processing",
+    icon: "transform",
+    description: "Transform and manipulate data between blocks",
+  },
+};
+
+/**
+ * Zod schemas for block configurations
+ * Shared between UI and worker for consistent validation
+ * All schemas now use enhanced format with config/input/output validation
+ */
+export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
+  [BlockType.PRICE_MONITOR]: enhancedPriceMonitorSchema.configSchema,
+  [BlockType.EMAIL]: enhancedEmailSchema.configSchema,
+  [BlockType.NOTIFICATION]: enhancedNotificationSchema.configSchema,
+  [BlockType.SCHEDULE]: enhancedScheduleSchema.configSchema,
+  [BlockType.WEBHOOK]: enhancedWebhookSchema.configSchema,
+  [BlockType.CONDITION]: enhancedConditionSchema.configSchema,
+  [BlockType.HTTP_REQUEST]: enhancedHttpRequestSchema.configSchema,
+  [BlockType.CUSTOM]: enhancedCustomSchema.configSchema,
+  [BlockType.DATA_TRANSFORM]: enhancedDataTransformSchema.configSchema,
+  [BlockType.UNKNOWN]: z.any(),
+};
+
+/**
+ * Enhanced block schemas registry
+ * All blocks now use enhanced schemas with config/input/output validation
+ */
+export const enhancedBlockSchemas: Partial<
+  Record<BlockType, EnhancedBlockSchema>
+> = {
+  [BlockType.HTTP_REQUEST]: enhancedHttpRequestSchema,
+  [BlockType.NOTIFICATION]: enhancedNotificationSchema,
+  [BlockType.PRICE_MONITOR]: enhancedPriceMonitorSchema,
+  [BlockType.EMAIL]: enhancedEmailSchema,
+  [BlockType.CONDITION]: enhancedConditionSchema,
+  [BlockType.SCHEDULE]: enhancedScheduleSchema,
+  [BlockType.WEBHOOK]: enhancedWebhookSchema,
+  [BlockType.CUSTOM]: enhancedCustomSchema,
+  [BlockType.DATA_TRANSFORM]: enhancedDataTransformSchema,
+};
+
+/**
+ * Get enhanced schema for a block type
+ */
+export function getEnhancedBlockSchema(
+  blockType: BlockType
+): EnhancedBlockSchema | undefined {
+  return enhancedBlockSchemas[blockType];
+}
+
+/**
+ * Check if a block type has enhanced schema support
+ */
+export function hasEnhancedSchema(blockType: BlockType): boolean {
+  return blockType in enhancedBlockSchemas;
+}
 
 /**
  * Validate block configuration against its schema
@@ -162,6 +487,45 @@ export function validateBlockConfig(blockType: BlockType, config: any): any {
 }
 
 /**
+ * Validate block configuration against enhanced schema
+ */
+export function validateEnhancedBlockConfig(
+  blockType: BlockType,
+  config: any
+): any {
+  const enhancedSchema = enhancedBlockSchemas[blockType];
+  if (enhancedSchema) {
+    return enhancedSchema.configSchema.parse(config);
+  }
+  // Fallback to legacy validation
+  return validateBlockConfig(blockType, config);
+}
+
+/**
+ * Validate block inputs against enhanced schema
+ */
+export function validateBlockInputs(blockType: BlockType, inputs: any): any {
+  const enhancedSchema = enhancedBlockSchemas[blockType];
+  if (enhancedSchema) {
+    return enhancedSchema.inputSchema.parse(inputs);
+  }
+  // Legacy blocks don't validate inputs
+  return inputs;
+}
+
+/**
+ * Validate block outputs against enhanced schema
+ */
+export function validateBlockOutputs(blockType: BlockType, outputs: any): any {
+  const enhancedSchema = enhancedBlockSchemas[blockType];
+  if (enhancedSchema) {
+    return enhancedSchema.outputSchema.parse(outputs);
+  }
+  // Legacy blocks don't validate outputs
+  return outputs;
+}
+
+/**
  * Safely validate block configuration without throwing
  */
 export function safeValidateBlockConfig(
@@ -169,14 +533,7 @@ export function safeValidateBlockConfig(
   config: any
 ): { success: boolean; data?: any; error?: string } {
   try {
-    const schema = blockSchemas[blockType];
-    if (!schema) {
-      return {
-        success: false,
-        error: `No schema found for block type: ${blockType}`,
-      };
-    }
-    const data = schema.parse(config);
+    const data = validateEnhancedBlockConfig(blockType, config);
     return { success: true, data };
   } catch (error) {
     return {
@@ -185,3 +542,42 @@ export function safeValidateBlockConfig(
     };
   }
 }
+
+/**
+ * Safely validate block inputs without throwing
+ */
+export function safeValidateBlockInputs(
+  blockType: BlockType,
+  inputs: any
+): { success: boolean; data?: any; error?: string } {
+  try {
+    const data = validateBlockInputs(blockType, inputs);
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Input validation failed",
+    };
+  }
+}
+
+/**
+ * Safely validate block outputs without throwing
+ */
+export function safeValidateBlockOutputs(
+  blockType: BlockType,
+  outputs: any
+): { success: boolean; data?: any; error?: string } {
+  try {
+    const data = validateBlockOutputs(blockType, outputs);
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Output validation failed",
+    };
+  }
+}
+
+// Enhanced schemas are already exported above

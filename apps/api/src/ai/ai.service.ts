@@ -104,33 +104,49 @@ export class AiService {
     };
   }> {
     try {
-      const systemPrompt = `You are an AI that creates CUSTOM workflow blocks for Zzyra platform.
+      const systemPrompt = `You are an EXPERT CUSTOM BLOCK GENERATOR for Zyra automation platform.
 
-Available Data Types: ${JSON.stringify(Object.values(DataType), null, 2)}
+🎯 **MISSION**: Generate custom blocks based on user requirements.
 
-Generate a complete CUSTOM block definition based on user requirements.
+📊 **AVAILABLE DATA TYPES**: 
+${JSON.stringify(Object.values(DataType), null, 2)}
 
-REQUIRED OUTPUT STRUCTURE:
+🎯 **OUTPUT FORMAT** (STRICT JSON):
 {
-  "name": "Block Name",
-  "description": "What this block does",
-  "category": "Utility|Integration|AI|Data|Analytics|Communication",
-  "code": "async function execute(inputs, context) { /* Complete implementation */ return { outputName: result }; }",
-  "inputs": [{"name": "input", "dataType": "string", "required": true, "description": "Input description"}],
-  "outputs": [{"name": "output", "dataType": "string", "required": true, "description": "Output description"}],
-  "configFields": [{"name": "config", "label": "Config Label", "type": "string", "required": false, "description": "Config help"}]
+  "name": "Descriptive block name",
+  "description": "Clear description of functionality",
+  "category": "utility|integration|ai|data|analytics|communication",
+  "code": "async function execute(inputs) { /* implementation */ }",
+  "inputs": [
+    {
+      "name": "inputName",
+      "dataType": "string|number|boolean|object|array",
+      "required": true,
+      "description": "Input description",
+      "defaultValue": "default value"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "outputName", 
+      "dataType": "string|number|boolean|object|array",
+      "required": true,
+      "description": "Output description"
+    }
+  ],
+  "configFields": [
+    {
+      "name": "configName",
+      "label": "Display Label",
+      "type": "string|number|boolean|select",
+      "required": false,
+      "description": "Configuration description",
+      "defaultValue": "default value"
+    }
+  ]
 }
 
-Requirements:
-1. Analyze user request to understand functionality
-2. Design appropriate inputs, outputs, and config fields
-3. Implement complete, working JavaScript code
-4. Handle errors gracefully
-5. Use async/await for any asynchronous operations
-6. Access config via context.config.fieldName
-7. Return object with named outputs matching the outputs array
-
-Return ONLY the JSON object.`;
+Return ONLY the JSON object with no additional text, explanations, or formatting.`;
 
       const { text } = await generateText({
         model: this.openrouter(MODEL_TO_USE),
@@ -249,7 +265,7 @@ Edges: ${JSON.stringify(edges, null, 2)}
   }
 
   private generateSystemPrompt(): string {
-    return `You are an EXPERT WORKFLOW AI for Zzyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
+    return `You are an EXPERT WORKFLOW AI for Zyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
 
 🎯 **CORE MISSION**: Transform ANY natural language into sophisticated, executable workflows using our comprehensive block system.
 
@@ -258,26 +274,6 @@ ${JSON.stringify(Object.values(BlockType), null, 2)}
 
 📊 **AVAILABLE DATA TYPES**: 
 ${JSON.stringify(Object.values(DataType), null, 2)}
-
-🔥 **BLOCK SYSTEM OVERVIEW**:
-- **PRICE_MONITOR**: Monitor cryptocurrency prices with conditions
-- **EMAIL**: Send email notifications
-- **NOTIFICATION**: Send various types of notifications
-- **CONDITION**: Add conditional logic and branching
-- **DELAY**: Add time delays between actions
-- **SCHEDULE**: Schedule recurring tasks
-- **WEBHOOK**: Handle webhook integrations
-- **HTTP_REQUEST**: Make HTTP calls to external APIs
-- **CALCULATOR**: Perform arithmetic calculations
-- **COMPARATOR**: Compare values with logical conditions
-- **BLOCKCHAIN_READ**: Read blockchain data (balances, transactions)
-- **DATABASE_QUERY/WRITE**: Database operations
-- **FILE_READ/WRITE**: File system operations
-- **TRANSFORMER**: Transform and manipulate data
-- **AGGREGATOR**: Aggregate and analyze data
-- **LOOP**: Repeat operations with iteration logic
-- **HTTP_CALL**: Call external services
-- **MESSAGE_SEND**: Send messages via various channels
 
 🎯 **OUTPUT SPECIFICATION**:
 
@@ -322,7 +318,7 @@ Generate workflows that users can execute immediately.`;
   }
 
   private generateRefinementSystemPrompt(): string {
-    return `You are an EXPERT WORKFLOW REFINEMENT AI for Zzyra automation platform.
+    return `You are an EXPERT WORKFLOW REFINEMENT AI for Zyra automation platform.
 
 Your task is to intelligently refine existing workflows based on user requests while preserving core functionality.
 
@@ -337,7 +333,7 @@ Your task is to intelligently refine existing workflows based on user requests w
   }
 
   private generateExistingContext(
-    prompt: string,
+    description: string,
     existingNodes: WorkflowNode[],
     existingEdges: WorkflowEdge[]
   ): string {
@@ -347,7 +343,7 @@ Your task is to intelligently refine existing workflows based on user requests w
 Nodes: ${JSON.stringify(existingNodes, null, 2)}
 Edges: ${JSON.stringify(existingEdges, null, 2)}
 
-**USER ENHANCEMENT REQUEST**: "${prompt}"
+**USER ENHANCEMENT REQUEST**: "${description}"
 
 **TASK**: Enhance the existing workflow by adding new functionality while maintaining existing capabilities.`;
   }
@@ -362,27 +358,18 @@ Edges: ${JSON.stringify(existingEdges, null, 2)}
 
   private async parseAndValidateResponse(
     text: string
-  ): Promise<z.infer<typeof WorkflowResponseSchema>> {
-    const cleanedText = text.replace(/```json|```/g, "").trim();
-
-    let parsedResponse: unknown;
+  ): Promise<{ nodes: WorkflowNode[]; edges: WorkflowEdge[] }> {
     try {
-      parsedResponse = JSON.parse(cleanedText);
-    } catch (parseError) {
-      throw new Error("AI generated invalid JSON format");
+      const cleanedText = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(cleanedText);
+      return WorkflowResponseSchema.parse(parsed);
+    } catch (error) {
+      console.error("Failed to parse AI response:", error);
+      throw new Error("Invalid workflow format generated by AI");
     }
-
-    const validationResult = WorkflowResponseSchema.safeParse(parsedResponse);
-    if (!validationResult.success) {
-      throw new Error(
-        `AI workflow validation failed: ${validationResult.error.message}`
-      );
-    }
-
-    return validationResult.data;
   }
 
-  private enhanceNodes(nodes: Record<string, unknown>[]): WorkflowNode[] {
+  private enhanceNodes(nodes: any[]): WorkflowNode[] {
     return nodes.map((nodeData) => {
       const nodeId = (nodeData.id as string) || `node-${uuidv4()}`;
 
@@ -413,16 +400,20 @@ Edges: ${JSON.stringify(existingEdges, null, 2)}
     });
   }
 
-  private enhanceEdges(edges: Record<string, unknown>[]): WorkflowEdge[] {
-    return edges.map((edge) => ({
-      id: (edge.id as string) || `edge-${uuidv4()}`,
-      source: edge.source as string,
-      target: edge.target as string,
-      sourceHandle: edge.sourceHandle as string,
-      targetHandle: edge.targetHandle as string,
-      type: (edge.type as string) || "CUSTOM",
-      animated: (edge.animated as boolean) || false,
-    }));
+  private enhanceEdges(edges: any[]): WorkflowEdge[] {
+    return edges.map((edgeData) => {
+      const edgeId = (edgeData.id as string) || `edge-${uuidv4()}`;
+
+      return {
+        id: edgeId,
+        source: edgeData.source as string,
+        target: edgeData.target as string,
+        sourceHandle: edgeData.sourceHandle as string,
+        targetHandle: edgeData.targetHandle as string,
+        type: "CUSTOM",
+        animated: false,
+      };
+    });
   }
 
   private mergeWorkflows(
@@ -431,51 +422,25 @@ Edges: ${JSON.stringify(existingEdges, null, 2)}
     newNodes: WorkflowNode[],
     newEdges: WorkflowEdge[]
   ): { nodes: WorkflowNode[]; edges: WorkflowEdge[] } {
-    if (existingNodes.length === 0) {
-      return { nodes: newNodes, edges: newEdges };
-    }
+    // Simple merge - in a real implementation, you'd want more sophisticated merging logic
+    const mergedNodes = [...existingNodes, ...newNodes];
+    const mergedEdges = [...existingEdges, ...newEdges];
 
-    // Adjust positions to avoid overlap
-    const maxX = Math.max(...existingNodes.map((n) => n.position.x), 0);
-    const adjustedNewNodes = newNodes.map((node, index) => ({
-      ...node,
-      position: {
-        x: node.position.x + maxX + 200,
-        y: node.position.y + index * 50,
-      },
-    }));
-
-    return {
-      nodes: [...existingNodes, ...adjustedNewNodes],
-      edges: [...existingEdges, ...newEdges],
-    };
+    return { nodes: mergedNodes, edges: mergedEdges };
   }
 
   private deduplicateWorkflow(workflow: {
     nodes: WorkflowNode[];
     edges: WorkflowEdge[];
-  }): {
-    nodes: WorkflowNode[];
-    edges: WorkflowEdge[];
-  } {
-    const usedIds = new Set<string>();
-    const deduplicatedNodes: WorkflowNode[] = [];
-    const deduplicatedEdges: WorkflowEdge[] = [];
+  }): { nodes: WorkflowNode[]; edges: WorkflowEdge[] } {
+    // Remove duplicate nodes and edges
+    const uniqueNodes = workflow.nodes.filter(
+      (node, index, self) => index === self.findIndex((n) => n.id === node.id)
+    );
+    const uniqueEdges = workflow.edges.filter(
+      (edge, index, self) => index === self.findIndex((e) => e.id === edge.id)
+    );
 
-    workflow.nodes.forEach((node) => {
-      if (!usedIds.has(node.id)) {
-        usedIds.add(node.id);
-        deduplicatedNodes.push(node);
-      }
-    });
-
-    workflow.edges.forEach((edge) => {
-      if (!usedIds.has(edge.id)) {
-        usedIds.add(edge.id);
-        deduplicatedEdges.push(edge);
-      }
-    });
-
-    return { nodes: deduplicatedNodes, edges: deduplicatedEdges };
+    return { nodes: uniqueNodes, edges: uniqueEdges };
   }
 }

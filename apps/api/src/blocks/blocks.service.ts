@@ -8,6 +8,9 @@ import {
   BlockType as ZyraBlockType,
   BlockMetadata,
   BLOCK_CATALOG,
+  enhancedBlockSchemas,
+  getEnhancedBlockSchema,
+  hasEnhancedSchema,
 } from "@zyra/types";
 
 export interface BlockType {
@@ -54,53 +57,60 @@ export class BlocksService {
     try {
       // Get all predefined block types from the zyra types catalog
       const predefinedBlockTypes: BlockMetadata[] = Object.values(ZyraBlockType)
-        .filter((blockType) => blockType !== ZyraBlockType.CUSTOM) // Exclude generic CUSTOM
+        .filter((blockType) => blockType !== ZyraBlockType.CUSTOM)
         .map((blockTypeKey) => {
           const metadata = BLOCK_CATALOG[blockTypeKey];
-
-          if (metadata) {
-            return {
-              type: blockTypeKey,
-              label: metadata.label,
-              description: metadata.description,
-              category: metadata.category,
-              icon: metadata.icon,
-              defaultConfig: metadata.defaultConfig,
-            };
-          }
-
-          // Fallback for block types not in catalog
+          // Try to get enhanced schema
+          const enhancedSchema = getEnhancedBlockSchema(
+            blockTypeKey as ZyraBlockType
+          );
           return {
             type: blockTypeKey,
-            label: this.formatBlockTypeName(blockTypeKey),
-            description: `${this.formatBlockTypeName(blockTypeKey)} block`,
-            category: this.inferCategoryFromName(blockTypeKey) as NodeCategory,
-            icon: "help-circle",
-            defaultConfig: {},
+            label: metadata?.label || this.formatBlockTypeName(blockTypeKey),
+            description:
+              metadata?.description ||
+              `${this.formatBlockTypeName(blockTypeKey)} block`,
+            category:
+              metadata?.category ||
+              (this.inferCategoryFromName(blockTypeKey) as NodeCategory),
+            icon: metadata?.icon || "help-circle",
+            defaultConfig: metadata?.defaultConfig || {},
+            configSchema: enhancedSchema
+              ? this.zodSchemaToJsonSchema(enhancedSchema.configSchema)
+              : undefined,
+            inputSchema: enhancedSchema
+              ? this.zodSchemaToJsonSchema(enhancedSchema.inputSchema)
+              : undefined,
+            outputSchema: enhancedSchema
+              ? this.zodSchemaToJsonSchema(enhancedSchema.outputSchema)
+              : undefined,
+            validation: enhancedSchema
+              ? { hasEnhancedSchema: true }
+              : { hasEnhancedSchema: false },
+            compatibility: enhancedSchema
+              ? {
+                  input: Object.keys(enhancedSchema.inputSchema.shape),
+                  output: Object.keys(enhancedSchema.outputSchema.shape),
+                }
+              : undefined,
+            // Remove tags property to fix linter error
+            // tags: enhancedSchema?.metadata?.tags || metadata?.tags || [],
           };
         });
 
       // Get custom blocks based on context
       let customBlocksQuery: any = {};
-
       if (type && type.toString().toUpperCase() === "CUSTOM") {
-        // For /blocks/types?type=CUSTOM - show user's blocks + public blocks
         if (userId) {
           customBlocksQuery = {
-            OR: [
-              { userId: userId }, // User's own blocks
-              { isPublic: true }, // Public blocks
-            ],
+            OR: [{ userId: userId }, { isPublic: true }],
           };
         } else {
-          // No user context - only public blocks
           customBlocksQuery = { isPublic: true };
         }
       } else {
-        // For general /blocks/types - only public blocks in main catalog
         customBlocksQuery = { isPublic: true };
       }
-
       const customBlocks = await this.prisma.client.customBlock.findMany({
         where: customBlocksQuery,
         select: {
@@ -113,32 +123,31 @@ export class BlocksService {
           blockData: true,
         },
       });
-
-      // Convert custom blocks to BlockMetadata format
       const customBlockTypes: BlockMetadata[] = customBlocks.map((block) => {
-        // Parse blockData to get inputs for default config
         let inputs: any[] = [];
+        let outputs: any[] = [];
+        let configSchema = {};
+        let inputSchema = {};
+        let outputSchema = {};
         try {
           const blockData =
             typeof block.blockData === "string"
               ? JSON.parse(block.blockData)
               : block.blockData || {};
           inputs = blockData.inputs || [];
+          outputs = blockData.outputs || [];
+          configSchema = blockData.configSchema || {};
+          inputSchema = blockData.inputSchema || {};
+          outputSchema = blockData.outputSchema || {};
         } catch {
           inputs = [];
+          outputs = [];
         }
-
-        // Generate default config from inputs
-        const defaultConfig: Record<string, any> = {
-          customBlockId: block.id,
-        };
-
-        // Add default values from inputs
+        const defaultConfig: Record<string, any> = { customBlockId: block.id };
         inputs.forEach((input) => {
           if (input.defaultValue !== undefined) {
             defaultConfig[input.name] = input.defaultValue;
           } else {
-            // Set sensible defaults based on type
             switch (input.type) {
               case "string":
                 defaultConfig[input.name] = "";
@@ -160,7 +169,6 @@ export class BlocksService {
             }
           }
         });
-
         return {
           type: ZyraBlockType.CUSTOM,
           label: block.name,
@@ -168,7 +176,16 @@ export class BlocksService {
           category: this.validateCategory(block.category),
           icon: "puzzle",
           defaultConfig,
-          // Additional metadata for custom blocks
+          configSchema,
+          inputSchema,
+          outputSchema,
+          validation: { hasEnhancedSchema: false },
+          compatibility: {
+            input: inputs.map((i) => i.name),
+            output: outputs.map((o) => o.name),
+          },
+          // Remove tags property to fix linter error
+          // tags: [],
           metadata: {
             customBlockId: block.id,
             isOwned: userId ? block.userId === userId : false,
@@ -176,21 +193,14 @@ export class BlocksService {
           },
         };
       });
-
-      // Combine all block types
       const allBlockTypes = [...predefinedBlockTypes, ...customBlockTypes];
-
-      // Apply filtering
       if (type) {
         const upperType = String(type).toUpperCase();
-
         if (upperType === "CUSTOM") {
           return customBlockTypes;
         }
-
         return allBlockTypes.filter((block) => block.type === upperType);
       }
-
       return allBlockTypes;
     } catch (error) {
       console.error("Error in block-types service:", error);
@@ -198,20 +208,131 @@ export class BlocksService {
     }
   }
 
-  async getBlockSchema(type?: string) {
+  async getBlockSchema(
+    type?: string,
+    schemaType?: "config" | "input" | "output"
+  ) {
     try {
-      // For now, return a simple mock response
       if (!type) {
-        return {
-          HTTP_REQUEST: { type: "object", properties: {} },
-          EMAIL: { type: "object", properties: {} },
-        };
+        // Return all available enhanced schemas
+        const allSchemas: Record<string, any> = {};
+
+        Object.keys(enhancedBlockSchemas).forEach((blockType) => {
+          const schema = getEnhancedBlockSchema(blockType as ZyraBlockType);
+          if (schema) {
+            allSchemas[blockType] = {
+              config: this.zodSchemaToJsonSchema(schema.configSchema),
+              input: this.zodSchemaToJsonSchema(schema.inputSchema),
+              output: this.zodSchemaToJsonSchema(schema.outputSchema),
+              metadata: schema.metadata,
+              hasEnhancedSchema: true,
+            };
+          }
+        });
+
+        return allSchemas;
       }
 
       // Return schema for specific block type
-      return { type: "object", properties: {} };
+      const enhancedSchema = getEnhancedBlockSchema(type as ZyraBlockType);
+
+      if (enhancedSchema) {
+        const result: any = {
+          hasEnhancedSchema: true,
+          metadata: enhancedSchema.metadata,
+        };
+
+        if (!schemaType || schemaType === "config") {
+          result.config = this.zodSchemaToJsonSchema(
+            enhancedSchema.configSchema
+          );
+        }
+        if (!schemaType || schemaType === "input") {
+          result.input = this.zodSchemaToJsonSchema(enhancedSchema.inputSchema);
+        }
+        if (!schemaType || schemaType === "output") {
+          result.output = this.zodSchemaToJsonSchema(
+            enhancedSchema.outputSchema
+          );
+        }
+
+        return result;
+      }
+
+      // Fallback for legacy blocks
+      return {
+        hasEnhancedSchema: false,
+        config: { type: "object", properties: {} },
+        input: { type: "object", properties: {} },
+        output: { type: "object", properties: {} },
+      };
     } catch (error) {
       console.error("Error in block-schema service:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate block configuration against enhanced schema
+   */
+  async validateBlockConfig(blockType: string, config: any) {
+    try {
+      const enhancedSchema = getEnhancedBlockSchema(blockType as ZyraBlockType);
+
+      if (enhancedSchema) {
+        const result = enhancedSchema.configSchema.safeParse(config);
+        return {
+          valid: result.success,
+          data: result.success ? result.data : null,
+          errors: result.success ? [] : result.error.errors,
+        };
+      }
+
+      // Legacy blocks - assume valid
+      return {
+        valid: true,
+        data: config,
+        errors: [],
+      };
+    } catch (error) {
+      console.error("Error validating block config:", error);
+      return {
+        valid: false,
+        data: null,
+        errors: [{ message: "Validation failed", path: [] }],
+      };
+    }
+  }
+
+  /**
+   * Get enhanced block metadata with schema information
+   */
+  async getEnhancedBlockMetadata(blockType: string) {
+    try {
+      const enhancedSchema = getEnhancedBlockSchema(blockType as ZyraBlockType);
+      const catalogMetadata = BLOCK_CATALOG[blockType as ZyraBlockType];
+
+      if (enhancedSchema && catalogMetadata) {
+        return {
+          ...catalogMetadata,
+          hasEnhancedSchema: true,
+          schemas: {
+            config: this.zodSchemaToJsonSchema(enhancedSchema.configSchema),
+            input: this.zodSchemaToJsonSchema(enhancedSchema.inputSchema),
+            output: this.zodSchemaToJsonSchema(enhancedSchema.outputSchema),
+          },
+          enhanced: enhancedSchema.metadata,
+        };
+      }
+
+      return catalogMetadata
+        ? {
+            ...catalogMetadata,
+            hasEnhancedSchema: false,
+          }
+        : null;
+    } catch (error) {
+      console.error("Error getting enhanced block metadata:", error);
       throw error;
     }
   }
@@ -510,5 +631,76 @@ export class BlocksService {
 
     // Default to action
     return NodeCategory.ACTION;
+  }
+
+  /**
+   * Convert Zod schema to JSON Schema for API responses
+   * This is a simplified conversion - for production, use @zod-to-json-schema
+   */
+  private zodSchemaToJsonSchema(zodSchema: any): any {
+    try {
+      // This is a basic conversion - in production you'd use a proper library
+      // For now, return a simplified representation
+      const shape = zodSchema._def?.shape;
+      if (!shape) {
+        return { type: "object", properties: {} };
+      }
+
+      const properties: any = {};
+      const required: string[] = [];
+
+      Object.keys(shape).forEach((key) => {
+        const field = shape[key];
+        const fieldDef = field._def;
+
+        // Extract basic type information
+        properties[key] = {
+          type: this.getZodTypeString(fieldDef.typeName),
+        };
+
+        // Handle optional vs required
+        if (!fieldDef.hasOwnProperty("isOptional") || !fieldDef.isOptional) {
+          required.push(key);
+        }
+
+        // Add enum values if present
+        if (fieldDef.values) {
+          properties[key].enum = fieldDef.values;
+        }
+
+        // Add default value if present
+        if (fieldDef.defaultValue !== undefined) {
+          properties[key].default = fieldDef.defaultValue();
+        }
+      });
+
+      return {
+        type: "object",
+        properties,
+        required: required.length > 0 ? required : undefined,
+      };
+    } catch (error) {
+      console.warn("Failed to convert Zod schema to JSON schema:", error);
+      return { type: "object", properties: {} };
+    }
+  }
+
+  private getZodTypeString(typeName: string): string {
+    switch (typeName) {
+      case "ZodString":
+        return "string";
+      case "ZodNumber":
+        return "number";
+      case "ZodBoolean":
+        return "boolean";
+      case "ZodArray":
+        return "array";
+      case "ZodObject":
+        return "object";
+      case "ZodEnum":
+        return "string";
+      default:
+        return "string";
+    }
   }
 }
