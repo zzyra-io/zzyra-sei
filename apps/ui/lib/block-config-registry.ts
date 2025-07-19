@@ -17,6 +17,7 @@ import { NotificationConfig } from "@/components/block-configs/notification-conf
 import { ConditionConfig } from "@/components/block-configs/condition-config";
 import { ScheduleConfig } from "@/components/block-configs/schedule-config";
 import { WebhookConfig } from "@/components/block-configs/webhook-config";
+import { CustomConfig } from "@/components/block-configs/custom-config";
 
 export interface BlockConfigComponentProps {
   config: Record<string, unknown>;
@@ -97,6 +98,7 @@ blockConfigRegistry.register("NOTIFICATION", NotificationConfig);
 blockConfigRegistry.register("CONDITION", ConditionConfig);
 blockConfigRegistry.register("SCHEDULE", ScheduleConfig);
 blockConfigRegistry.register("WEBHOOK", WebhookConfig);
+blockConfigRegistry.register("CUSTOM", CustomConfig);
 
 // Export the registry instance
 export default blockConfigRegistry;

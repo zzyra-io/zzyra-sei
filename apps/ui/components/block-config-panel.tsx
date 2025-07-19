@@ -85,6 +85,8 @@ export function BlockConfigPanel({
     dataType: data?.type,
     dataId: data?.id,
     nodeType: data?.nodeType,
+    customBlockId: data?.customBlockId || data?.config?.customBlockId,
+    isCustomBlock: blockType === "CUSTOM",
   });
 
   // Get connected input nodes (nodes that connect TO this node)
@@ -526,25 +528,31 @@ export function BlockConfigPanel({
 
         {/* Configuration Tab */}
         <TabsContent value='config' className='space-y-4'>
-          <ConfigComponent
-            config={
-              (data as Record<string, unknown>)?.config ||
-              ({} as Record<string, unknown>)
-            }
-            onChange={(config) => {
-              console.log("ConfigComponent onChange called with:", config);
-              console.log("Current data:", data);
-              const newData = {
-                ...(data as Record<string, unknown>),
-                config,
-              };
-              console.log("New data to be passed to onChange:", newData);
-              onChange(newData);
-            }}
-            executionStatus={executionStatus}
-            executionData={executionData}
-            onTest={onTest}
-          />
+          {ConfigComponent ? (
+            <ConfigComponent
+              config={
+                (data as Record<string, unknown>)?.config ||
+                ({} as Record<string, unknown>)
+              }
+              onChange={(config: Record<string, unknown>) => {
+                console.log("ConfigComponent onChange called with:", config);
+                console.log("Current data:", data);
+                const newData = {
+                  ...(data as Record<string, unknown>),
+                  config,
+                };
+                console.log("New data to be passed to onChange:", newData);
+                onChange(newData);
+              }}
+              executionStatus={executionStatus}
+              executionData={executionData}
+              onTest={onTest}
+            />
+          ) : (
+            <div className='p-4 text-center text-muted-foreground'>
+              No configuration component available for this block type.
+            </div>
+          )}
         </TabsContent>
 
         {/* Inputs Tab - Show detected input schemas */}

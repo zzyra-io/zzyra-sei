@@ -141,6 +141,19 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
       outputSchema: {},
     },
   },
+
+  [BlockType.CUSTOM]: {
+    type: BlockType.CUSTOM,
+    label: "Custom Block",
+    description: "Execute custom JavaScript or Python code",
+    category: NodeCategory.ACTION,
+    icon: "puzzle",
+    defaultConfig: {
+      customBlockId: "",
+      code: "",
+      inputs: {},
+    },
+  },
 };
 
 /**
@@ -157,6 +170,20 @@ export function getBlockMetadata(
  * Used to handle various ways block types might be stored in data
  */
 export function getBlockType(data: any): BlockType {
+  // Check for custom blocks first
+  if (data?.customBlockId || data?.config?.customBlockId) {
+    return BlockType.CUSTOM;
+  }
+
+  // Check if the block type is explicitly CUSTOM
+  const possibleTypes = [data?.blockType, data?.type, data?.id].filter(Boolean);
+  for (const type of possibleTypes) {
+    const upperType = type.toUpperCase();
+    if (upperType === "CUSTOM") {
+      return BlockType.CUSTOM;
+    }
+  }
+
   // First check if we have a direct nodeType that matches a category
   if (data?.nodeType) {
     const nodeType = data.nodeType.toUpperCase();
@@ -172,8 +199,6 @@ export function getBlockType(data: any): BlockType {
   }
 
   // Then check blockType
-  const possibleTypes = [data?.blockType, data?.type, data?.id].filter(Boolean);
-
   for (const type of possibleTypes) {
     // Convert to uppercase for enum matching since BlockType uses uppercase
     const upperType = type.toUpperCase();
