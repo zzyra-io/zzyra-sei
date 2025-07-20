@@ -20,11 +20,14 @@ import {
   Unlink,
   AlertTriangle,
   ArrowDown,
+  Settings,
+  ArrowUp,
 } from "lucide-react";
 import { blockConfigRegistry } from "@/lib/block-config-registry";
 import { getBlockMetadata, getBlockType } from "@zyra/types";
 import { getEnhancedBlockSchema } from "@zyra/types";
 import { executionsApi } from "@/lib/services/api";
+import { ScrollArea } from "./ui/scroll-area";
 
 interface ConnectedNode {
   id: string;
@@ -479,215 +482,369 @@ export function BlockConfigPanel({
   }
 
   return (
-    <div className='space-y-4'>
-      {/* Connection Status Header */}
-      <Card>
-        <CardHeader className='pb-3'>
+    <div className='w-80 border-l border-border/50 bg-background/95 backdrop-blur-sm flex flex-col h-full max-h-screen'>
+      {/* Header with Status */}
+      <div className='sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50 flex-shrink-0'>
+        <div className='p-6 space-y-4'>
           <div className='flex items-center justify-between'>
-            <div className='flex items-center space-x-2'>
+            <div className='flex items-center space-x-3'>
               {metadata?.icon && (
-                <div className='w-5 h-5 bg-gray-100 rounded flex items-center justify-center'>
-                  <span className='text-xs'>{metadata.icon}</span>
+                <div className='w-10 h-10 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center'>
+                  <span className='text-sm font-medium text-primary'>
+                    {metadata.icon}
+                  </span>
                 </div>
               )}
-              <CardTitle className='text-lg'>
-                {metadata?.label || blockType}
-              </CardTitle>
-            </div>
-            <div className='flex items-center space-x-2'>
-              {/* Connection Status */}
-              <div className='flex items-center space-x-1'>
-                {inputNodes.length > 0 ? (
-                  <Link className='w-4 h-4 text-green-600' />
-                ) : (
-                  <Unlink className='w-4 h-4 text-gray-400' />
-                )}
-                <span className='text-sm text-gray-600'>
-                  {inputNodes.length} input{inputNodes.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-
-              {/* Execution Status */}
-              <div
-                className={`flex items-center space-x-1 ${getExecutionStatusColor(executionStatus)}`}>
-                {getExecutionStatusIcon(executionStatus)}
-                <span className='text-sm capitalize'>{executionStatus}</span>
+              <div>
+                <h3 className='font-semibold text-lg text-foreground'>
+                  {metadata?.label || blockType}
+                </h3>
+                <p className='text-sm text-muted-foreground mt-1'>
+                  {metadata?.description || "Configure block settings"}
+                </p>
               </div>
             </div>
           </div>
-        </CardHeader>
-      </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
-        <TabsList className='grid w-full grid-cols-4'>
-          <TabsTrigger value='config'>Configuration</TabsTrigger>
-          <TabsTrigger value='inputs'>Inputs</TabsTrigger>
-          <TabsTrigger value='outputs'>Outputs</TabsTrigger>
-          <TabsTrigger value='execution'>Execution</TabsTrigger>
-        </TabsList>
-
-        {/* Configuration Tab */}
-        <TabsContent value='config' className='space-y-4'>
-          {ConfigComponent ? (
-            <ConfigComponent
-              config={
-                (data as Record<string, unknown>)?.config ||
-                ({} as Record<string, unknown>)
-              }
-              onChange={(config: Record<string, unknown>) => {
-                console.log("ConfigComponent onChange called with:", config);
-                console.log("Current data:", data);
-                const newData = {
-                  ...(data as Record<string, unknown>),
-                  config,
-                };
-                console.log("New data to be passed to onChange:", newData);
-                onChange(newData);
-              }}
-              executionStatus={executionStatus}
-              executionData={executionData}
-              onTest={onTest}
-            />
-          ) : (
-            <div className='p-4 text-center text-muted-foreground'>
-              No configuration component available for this block type.
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Inputs Tab - Show detected input schemas */}
-        <TabsContent value='inputs' className='space-y-4'>
-          <Card>
-            <CardHeader>
-              <div className='flex items-center justify-between'>
-                <CardTitle className='text-base'>Input Data</CardTitle>
-                <div className='flex items-center space-x-2'>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={() => setShowInputSchema(!showInputSchema)}>
-                    {showInputSchema ? (
-                      <EyeOff className='w-4 h-4' />
-                    ) : (
-                      <Eye className='w-4 h-4' />
-                    )}
-                    {showInputSchema ? "Hide" : "Show"} Details
-                  </Button>
+          {/* Status Indicators */}
+          <div className='flex items-center justify-between'>
+            {/* Connection Status */}
+            <div className='flex items-center space-x-2'>
+              {inputNodes.length > 0 ? (
+                <div className='flex items-center space-x-1'>
+                  <Link className='w-4 h-4 text-green-600' />
+                  <span className='text-sm text-muted-foreground'>
+                    {inputNodes.length} input
+                    {inputNodes.length !== 1 ? "s" : ""}
+                  </span>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {detectedInputSchema && detectedInputSchema.length > 0 ? (
-                <div className='space-y-4'>
-                  {/* Compatibility Status */}
-                  <Alert
-                    variant={
-                      compatibilityStatus.status === "compatible"
-                        ? "default"
-                        : "destructive"
-                    }>
-                    {compatibilityStatus.status === "compatible" ? (
-                      <CheckCircle className='h-4 w-4' />
-                    ) : (
-                      <AlertCircle className='h-4 w-4' />
-                    )}
-                    <AlertDescription>
-                      {compatibilityStatus.message}
-                    </AlertDescription>
-                  </Alert>
+              ) : (
+                <div className='flex items-center space-x-1'>
+                  <Unlink className='w-4 h-4 text-muted-foreground' />
+                  <span className='text-sm text-muted-foreground'>
+                    No inputs
+                  </span>
+                </div>
+              )}
+            </div>
 
-                  {/* Data Transformation Suggestion */}
-                  {compatibilityStatus.status === "incompatible" &&
-                    compatibilityStatus.mismatches && (
-                      <Alert
-                        variant='default'
-                        className='border-orange-200 bg-orange-50'>
-                        <AlertTriangle className='h-4 w-4 text-orange-600' />
-                        <AlertDescription className='text-orange-800'>
-                          <div className='space-y-2'>
-                            <p className='font-medium'>
-                              Type mismatches detected:
-                            </p>
-                            <div className='space-y-1'>
-                              {compatibilityStatus.mismatches.map(
-                                (mismatch, idx) => (
-                                  <div key={idx} className='text-sm'>
-                                    <span className='font-medium'>
-                                      {mismatch.field}:
-                                    </span>
-                                    <span className='text-orange-700'>
-                                      {" "}
-                                      {mismatch.received} → {mismatch.expected}
-                                    </span>
+            {/* Execution Status */}
+            <div
+              className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
+                executionStatus === "running"
+                  ? "bg-blue-50 text-blue-700"
+                  : executionStatus === "success"
+                    ? "bg-green-50 text-green-700"
+                    : executionStatus === "error"
+                      ? "bg-red-50 text-red-700"
+                      : executionStatus === "warning"
+                        ? "bg-yellow-50 text-yellow-700"
+                        : "bg-muted text-muted-foreground"
+              }`}>
+              {getExecutionStatusIcon(executionStatus)}
+              <span className='capitalize'>{executionStatus}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className='px-6 py-4 flex-1 flex flex-col min-h-0'>
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className='w-full h-full flex flex-col'>
+          <TabsList className='grid w-full grid-cols-4 h-12 bg-muted/50 flex-shrink-0 mb-4'>
+            <TabsTrigger
+              value='config'
+              className='flex items-center space-x-2 data-[state=active]:bg-background'>
+              <Settings className='w-4 h-4' />
+              <span className='hidden sm:inline'>Config</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value='inputs'
+              className='flex items-center space-x-2 data-[state=active]:bg-background'>
+              <ArrowDown className='w-4 h-4' />
+              <span className='hidden sm:inline'>Inputs</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value='outputs'
+              className='flex items-center space-x-2 data-[state=active]:bg-background'>
+              <ArrowUp className='w-4 h-4' />
+              <span className='hidden sm:inline'>Outputs</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value='execution'
+              className='flex items-center space-x-2 data-[state=active]:bg-background'>
+              <Play className='w-4 h-4' />
+              <span className='hidden sm:inline'>Exec</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <div className='flex-1 min-h-0 overflow-hidden'>
+            <ScrollArea className='h-full border border-red-200'>
+              {/* Configuration Tab */}
+              <TabsContent value='config' className='space-y-6 pb-6'>
+                {ConfigComponent ? (
+                  <ConfigComponent
+                    config={
+                      (data as Record<string, unknown>)?.config ||
+                      ({} as Record<string, unknown>)
+                    }
+                    onChange={(config: Record<string, unknown>) => {
+                      console.log(
+                        "ConfigComponent onChange called with:",
+                        config
+                      );
+                      console.log("Current data:", data);
+                      const newData = {
+                        ...(data as Record<string, unknown>),
+                        config,
+                      };
+                      console.log(
+                        "New data to be passed to onChange:",
+                        newData
+                      );
+                      onChange(newData);
+                    }}
+                    executionStatus={executionStatus}
+                    executionData={executionData}
+                    onTest={onTest}
+                  />
+                ) : (
+                  <div className='p-6 text-center text-muted-foreground bg-muted/30 rounded-lg'>
+                    <Settings className='w-8 h-8 mx-auto mb-2 text-muted-foreground' />
+                    <p className='text-sm'>
+                      No configuration component available for this block type.
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Inputs Tab - Show detected input schemas */}
+              <TabsContent value='inputs' className='space-y-4 pb-6'>
+                <Card>
+                  <CardHeader>
+                    <div className='flex items-center justify-between'>
+                      <CardTitle className='text-base'>Input Data</CardTitle>
+                      <div className='flex items-center space-x-2'>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          onClick={() => setShowInputSchema(!showInputSchema)}>
+                          {showInputSchema ? (
+                            <EyeOff className='w-4 h-4' />
+                          ) : (
+                            <Eye className='w-4 h-4' />
+                          )}
+                          {showInputSchema ? "Hide" : "Show"} Details
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {detectedInputSchema && detectedInputSchema.length > 0 ? (
+                      <div className='space-y-4'>
+                        {/* Compatibility Status */}
+                        <Alert
+                          variant={
+                            compatibilityStatus.status === "compatible"
+                              ? "default"
+                              : "destructive"
+                          }>
+                          {compatibilityStatus.status === "compatible" ? (
+                            <CheckCircle className='h-4 w-4' />
+                          ) : (
+                            <AlertCircle className='h-4 w-4' />
+                          )}
+                          <AlertDescription>
+                            {compatibilityStatus.message}
+                          </AlertDescription>
+                        </Alert>
+
+                        {/* Data Transformation Suggestion */}
+                        {compatibilityStatus.status === "incompatible" &&
+                          compatibilityStatus.mismatches && (
+                            <Alert
+                              variant='default'
+                              className='border-orange-200 bg-orange-50'>
+                              <AlertTriangle className='h-4 w-4 text-orange-600' />
+                              <AlertDescription className='text-orange-800'>
+                                <div className='space-y-2'>
+                                  <p className='font-medium'>
+                                    Type mismatches detected:
+                                  </p>
+                                  <div className='space-y-1'>
+                                    {compatibilityStatus.mismatches.map(
+                                      (mismatch, idx) => (
+                                        <div key={idx} className='text-sm'>
+                                          <span className='font-medium'>
+                                            {mismatch.field}:
+                                          </span>
+                                          <span className='text-orange-700'>
+                                            {" "}
+                                            {mismatch.received} →{" "}
+                                            {mismatch.expected}
+                                          </span>
+                                        </div>
+                                      )
+                                    )}
                                   </div>
-                                )
-                              )}
-                            </div>
-                            <div className='mt-3 p-2 bg-orange-100 rounded border border-orange-200'>
-                              <p className='text-sm font-medium text-orange-800 mb-1'>
-                                💡 Suggestion:
-                              </p>
-                              <p className='text-xs text-orange-700'>
-                                Add a "Data Transform" block between these
-                                blocks to convert the data types.
-                              </p>
-                              <Button
-                                size='sm'
-                                variant='outline'
-                                className='mt-2 text-xs h-6 px-2 border-orange-300 text-orange-700 hover:bg-orange-200'
-                                onClick={() => {
-                                  // This would trigger adding a data transform block
-                                  console.log("Add data transform block");
-                                }}>
-                                Add Data Transform Block
-                              </Button>
-                            </div>
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    )}
+                                  <div className='mt-3 p-2 bg-orange-100 rounded border border-orange-200'>
+                                    <p className='text-sm font-medium text-orange-800 mb-1'>
+                                      💡 Suggestion:
+                                    </p>
+                                    <p className='text-xs text-orange-700'>
+                                      Add a &quot;Data Transform&quot; block
+                                      between these blocks to convert the data
+                                      types.
+                                    </p>
+                                    <Button
+                                      size='sm'
+                                      variant='outline'
+                                      className='mt-2 text-xs h-6 px-2 border-orange-300 text-orange-700 hover:bg-orange-200'
+                                      onClick={() => {
+                                        // This would trigger adding a data transform block
+                                        console.log("Add data transform block");
+                                      }}>
+                                      Add Data Transform Block
+                                    </Button>
+                                  </div>
+                                </div>
+                              </AlertDescription>
+                            </Alert>
+                          )}
 
-                  {/* Connected Input Nodes */}
-                  {detectedInputSchema.map((schema, index) => {
-                    const nodeSampleData = sampleData[schema.nodeId];
-                    return (
-                      <Card
-                        key={index}
-                        className='p-4 border-l-4 border-l-blue-500'>
-                        <div className='flex items-center justify-between mb-4'>
-                          <div className='flex items-center space-x-2'>
-                            <div className='w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center'>
-                              <ArrowDown className='w-4 h-4 text-blue-600' />
-                            </div>
-                            <div>
-                              <div className='flex items-center space-x-2'>
-                                <Badge
-                                  variant='outline'
-                                  className='bg-blue-50 text-blue-700'>
-                                  {schema.nodeType}
-                                </Badge>
-                                <span className='text-sm font-medium text-gray-900'>
-                                  {schema.nodeType} Block
-                                </span>
+                        {/* Connected Input Nodes */}
+                        {detectedInputSchema.map((schema, index) => {
+                          const nodeSampleData = sampleData[schema.nodeId];
+                          return (
+                            <Card
+                              key={index}
+                              className='p-4 border-l-4 border-l-blue-500'>
+                              <div className='flex items-center justify-between mb-4'>
+                                <div className='flex items-center space-x-2'>
+                                  <div className='w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center'>
+                                    <ArrowDown className='w-4 h-4 text-blue-600' />
+                                  </div>
+                                  <div>
+                                    <div className='flex items-center space-x-2'>
+                                      <Badge
+                                        variant='outline'
+                                        className='bg-blue-50 text-blue-700'>
+                                        {schema.nodeType}
+                                      </Badge>
+                                      <span className='text-sm font-medium text-gray-900'>
+                                        {schema.nodeType} Block
+                                      </span>
+                                    </div>
+                                    <p className='text-xs text-gray-500 mt-1'>
+                                      Providing data to this block
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
-                              <p className='text-xs text-gray-500 mt-1'>
-                                Providing data to this block
-                              </p>
-                            </div>
-                          </div>
-                        </div>
 
-                        {showInputSchema && schema.outputSchema && (
+                              {showInputSchema && schema.outputSchema && (
+                                <div className='space-y-3'>
+                                  <div className='flex items-center space-x-2'>
+                                    <Label className='text-sm font-medium text-gray-700'>
+                                      Available Data Fields:
+                                    </Label>
+                                    <Badge
+                                      variant='secondary'
+                                      className='text-xs'>
+                                      {
+                                        Object.keys(
+                                          extractSchemaDefinition(
+                                            schema.outputSchema
+                                          )?.properties || {}
+                                        ).length
+                                      }{" "}
+                                      fields
+                                    </Badge>
+                                  </div>
+
+                                  <div className='grid gap-2'>
+                                    {Object.entries(
+                                      extractSchemaDefinition(
+                                        schema.outputSchema
+                                      )?.properties || {}
+                                    ).map(
+                                      ([fieldName, fieldSchema]: [
+                                        string,
+                                        any,
+                                      ]) => (
+                                        <div
+                                          key={fieldName}
+                                          className='flex items-center justify-between p-2 bg-gray-50 rounded-md'>
+                                          <div className='flex items-center space-x-2'>
+                                            <div className='w-2 h-2 bg-green-500 rounded-full'></div>
+                                            <span className='text-sm font-medium text-gray-900'>
+                                              {fieldName}
+                                            </span>
+                                            <Badge
+                                              variant='outline'
+                                              className='text-xs'>
+                                              {fieldSchema.type}
+                                            </Badge>
+                                          </div>
+                                          {fieldSchema.description && (
+                                            <span className='text-xs text-gray-500'>
+                                              {fieldSchema.description}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+
+                                  {/* Sample Data Section */}
+                                  {nodeSampleData && (
+                                    <div className='mt-4 p-3 bg-blue-50 rounded-md border border-blue-200'>
+                                      <div className='flex items-center space-x-2 mb-2'>
+                                        <div className='w-4 h-4 bg-blue-500 rounded-full'></div>
+                                        <Label className='text-sm font-medium text-gray-700'>
+                                          Sample Data from Previous Execution:
+                                        </Label>
+                                      </div>
+                                      <pre className='text-xs bg-white p-2 rounded border overflow-auto max-h-32'>
+                                        {JSON.stringify(
+                                          nodeSampleData,
+                                          null,
+                                          2
+                                        )}
+                                      </pre>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    ) : enhancedSchema?.inputSchema ? (
+                      <div className='space-y-4'>
+                        <Alert>
+                          <Info className='h-4 w-4' />
+                          <AlertDescription>
+                            This block expects specific data. Connect it to
+                            another block to provide the required information.
+                          </AlertDescription>
+                        </Alert>
+
+                        {showInputSchema && (
                           <div className='space-y-3'>
                             <div className='flex items-center space-x-2'>
                               <Label className='text-sm font-medium text-gray-700'>
-                                Available Data Fields:
+                                Required Data Fields:
                               </Label>
                               <Badge variant='secondary' className='text-xs'>
                                 {
                                   Object.keys(
-                                    extractSchemaDefinition(schema.outputSchema)
-                                      ?.properties || {}
+                                    extractSchemaDefinition(
+                                      enhancedSchema.inputSchema
+                                    )?.properties || {}
                                   ).length
                                 }{" "}
                                 fields
@@ -696,13 +853,116 @@ export function BlockConfigPanel({
 
                             <div className='grid gap-2'>
                               {Object.entries(
-                                extractSchemaDefinition(schema.outputSchema)
-                                  ?.properties || {}
+                                extractSchemaDefinition(
+                                  enhancedSchema.inputSchema
+                                )?.properties || {}
                               ).map(
                                 ([fieldName, fieldSchema]: [string, any]) => (
                                   <div
                                     key={fieldName}
-                                    className='flex items-center justify-between p-2 bg-gray-50 rounded-md'>
+                                    className='flex items-center justify-between p-2 bg-blue-50 rounded-md border border-blue-200'>
+                                    <div className='flex items-center space-x-2'>
+                                      <div className='w-2 h-2 bg-blue-500 rounded-full'></div>
+                                      <span className='text-sm font-medium text-gray-900'>
+                                        {fieldName}
+                                      </span>
+                                      <Badge
+                                        variant='outline'
+                                        className='text-xs'>
+                                        {fieldSchema.type}
+                                      </Badge>
+                                      {extractSchemaDefinition(
+                                        enhancedSchema.inputSchema
+                                      )?.required?.includes(fieldName) && (
+                                        <Badge
+                                          variant='destructive'
+                                          className='text-xs'>
+                                          Required
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {fieldSchema.description && (
+                                      <span className='text-xs text-gray-500'>
+                                        {fieldSchema.description}
+                                      </span>
+                                    )}
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className='text-center py-8 text-gray-500'>
+                        <Unlink className='w-12 h-12 mx-auto mb-4 text-gray-300' />
+                        <p className='font-medium text-gray-900 mb-2'>
+                          No Input Data
+                        </p>
+                        <p className='text-sm'>
+                          Connect this block to another block to see what data
+                          it will receive
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Outputs Tab - Show this block's output schema */}
+              <TabsContent value='outputs' className='space-y-4 pb-6'>
+                <Card>
+                  <CardHeader>
+                    <div className='flex items-center justify-between'>
+                      <CardTitle className='text-base'>Output Data</CardTitle>
+                      <div className='flex items-center space-x-2'>
+                        <Button
+                          variant='outline'
+                          size='sm'
+                          onClick={() =>
+                            setShowOutputSchema(!showOutputSchema)
+                          }>
+                          {showOutputSchema ? (
+                            <EyeOff className='w-4 h-4' />
+                          ) : (
+                            <Eye className='w-4 h-4' />
+                          )}
+                          {showOutputSchema ? "Hide" : "Show"} Details
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {enhancedSchema?.outputSchema ? (
+                      <div className='space-y-4'>
+                        {showOutputSchema && (
+                          <div className='space-y-3'>
+                            <div className='flex items-center space-x-2'>
+                              <Label className='text-sm font-medium text-gray-700'>
+                                Available Output Fields:
+                              </Label>
+                              <Badge variant='secondary' className='text-xs'>
+                                {
+                                  Object.keys(
+                                    extractSchemaDefinition(
+                                      enhancedSchema.outputSchema
+                                    )?.properties || {}
+                                  ).length
+                                }{" "}
+                                fields
+                              </Badge>
+                            </div>
+
+                            <div className='grid gap-2'>
+                              {Object.entries(
+                                extractSchemaDefinition(
+                                  enhancedSchema.outputSchema
+                                )?.properties || {}
+                              ).map(
+                                ([fieldName, fieldSchema]: [string, any]) => (
+                                  <div
+                                    key={fieldName}
+                                    className='flex items-center justify-between p-2 bg-green-50 rounded-md border border-green-200'>
                                     <div className='flex items-center space-x-2'>
                                       <div className='w-2 h-2 bg-green-500 rounded-full'></div>
                                       <span className='text-sm font-medium text-gray-900'>
@@ -723,281 +983,121 @@ export function BlockConfigPanel({
                                 )
                               )}
                             </div>
+                          </div>
+                        )}
 
-                            {/* Sample Data Section */}
-                            {nodeSampleData && (
-                              <div className='mt-4 p-3 bg-blue-50 rounded-md border border-blue-200'>
-                                <div className='flex items-center space-x-2 mb-2'>
-                                  <div className='w-4 h-4 bg-blue-500 rounded-full'></div>
-                                  <Label className='text-sm font-medium text-gray-700'>
-                                    Sample Data from Previous Execution:
-                                  </Label>
-                                </div>
-                                <pre className='text-xs bg-white p-2 rounded border overflow-auto max-h-32'>
-                                  {JSON.stringify(nodeSampleData, null, 2)}
-                                </pre>
+                        {/* Example Output */}
+                        {executionData?.lastResponse && (
+                          <div className='mt-4 p-3 bg-green-50 rounded-md border border-green-200'>
+                            <div className='flex items-center space-x-2 mb-2'>
+                              <CheckCircle className='w-4 h-4 text-green-600' />
+                              <Label className='text-sm font-medium text-gray-700'>
+                                Last Execution Output:
+                              </Label>
+                            </div>
+                            <pre className='text-xs bg-white p-2 rounded border overflow-auto max-h-32'>
+                              {JSON.stringify(
+                                executionData.lastResponse,
+                                null,
+                                2
+                              )}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className='text-center py-8 text-gray-500'>
+                        <Info className='w-12 h-12 mx-auto mb-4 text-gray-300' />
+                        <p className='font-medium text-gray-900 mb-2'>
+                          No Output Data
+                        </p>
+                        <p className='text-sm'>
+                          This block doesn&apos;t produce any output data
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Execution Tab */}
+              <TabsContent value='execution' className='space-y-4 pb-6'>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className='text-base'>
+                      Execution Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {executionStatus !== "idle" ? (
+                      <div className='space-y-4'>
+                        <div className='flex items-center space-x-2'>
+                          {getExecutionStatusIcon(executionStatus)}
+                          <span className='capitalize'>{executionStatus}</span>
+                        </div>
+
+                        {executionData && (
+                          <div className='space-y-2'>
+                            {executionData.startTime && (
+                              <div className='flex justify-between'>
+                                <span className='text-sm text-gray-600'>
+                                  Start Time:
+                                </span>
+                                <span className='text-sm'>
+                                  {executionData.startTime}
+                                </span>
                               </div>
+                            )}
+
+                            {executionData.endTime && (
+                              <div className='flex justify-between'>
+                                <span className='text-sm text-gray-600'>
+                                  End Time:
+                                </span>
+                                <span className='text-sm'>
+                                  {executionData.endTime}
+                                </span>
+                              </div>
+                            )}
+
+                            {executionData.duration && (
+                              <div className='flex justify-between'>
+                                <span className='text-sm text-gray-600'>
+                                  Duration:
+                                </span>
+                                <span className='text-sm'>
+                                  {executionData.duration}ms
+                                </span>
+                              </div>
+                            )}
+
+                            {executionData.error && (
+                              <Alert variant='destructive'>
+                                <AlertCircle className='h-4 w-4' />
+                                <AlertDescription>
+                                  {executionData.error}
+                                </AlertDescription>
+                              </Alert>
                             )}
                           </div>
                         )}
-                      </Card>
-                    );
-                  })}
-                </div>
-              ) : enhancedSchema?.inputSchema ? (
-                <div className='space-y-4'>
-                  <Alert>
-                    <Info className='h-4 w-4' />
-                    <AlertDescription>
-                      This block expects specific data. Connect it to another
-                      block to provide the required information.
-                    </AlertDescription>
-                  </Alert>
-
-                  {showInputSchema && (
-                    <div className='space-y-3'>
-                      <div className='flex items-center space-x-2'>
-                        <Label className='text-sm font-medium text-gray-700'>
-                          Required Data Fields:
-                        </Label>
-                        <Badge variant='secondary' className='text-xs'>
-                          {
-                            Object.keys(
-                              extractSchemaDefinition(
-                                enhancedSchema.inputSchema
-                              )?.properties || {}
-                            ).length
-                          }{" "}
-                          fields
-                        </Badge>
                       </div>
-
-                      <div className='grid gap-2'>
-                        {Object.entries(
-                          extractSchemaDefinition(enhancedSchema.inputSchema)
-                            ?.properties || {}
-                        ).map(([fieldName, fieldSchema]: [string, any]) => (
-                          <div
-                            key={fieldName}
-                            className='flex items-center justify-between p-2 bg-blue-50 rounded-md border border-blue-200'>
-                            <div className='flex items-center space-x-2'>
-                              <div className='w-2 h-2 bg-blue-500 rounded-full'></div>
-                              <span className='text-sm font-medium text-gray-900'>
-                                {fieldName}
-                              </span>
-                              <Badge variant='outline' className='text-xs'>
-                                {fieldSchema.type}
-                              </Badge>
-                              {extractSchemaDefinition(
-                                enhancedSchema.inputSchema
-                              )?.required?.includes(fieldName) && (
-                                <Badge
-                                  variant='destructive'
-                                  className='text-xs'>
-                                  Required
-                                </Badge>
-                              )}
-                            </div>
-                            {fieldSchema.description && (
-                              <span className='text-xs text-gray-500'>
-                                {fieldSchema.description}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className='text-center py-8 text-gray-500'>
-                  <Unlink className='w-12 h-12 mx-auto mb-4 text-gray-300' />
-                  <p className='font-medium text-gray-900 mb-2'>
-                    No Input Data
-                  </p>
-                  <p className='text-sm'>
-                    Connect this block to another block to see what data it will
-                    receive
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Outputs Tab - Show this block's output schema */}
-        <TabsContent value='outputs' className='space-y-4'>
-          <Card>
-            <CardHeader>
-              <div className='flex items-center justify-between'>
-                <CardTitle className='text-base'>Output Data</CardTitle>
-                <div className='flex items-center space-x-2'>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={() => setShowOutputSchema(!showOutputSchema)}>
-                    {showOutputSchema ? (
-                      <EyeOff className='w-4 h-4' />
                     ) : (
-                      <Eye className='w-4 h-4' />
+                      <div className='text-center py-8 text-gray-500'>
+                        <Info className='w-12 h-12 mx-auto mb-4 text-gray-300' />
+                        <p>No execution data</p>
+                        <p className='text-sm'>
+                          Run the block to see execution details
+                        </p>
+                      </div>
                     )}
-                    {showOutputSchema ? "Hide" : "Show"} Details
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {enhancedSchema?.outputSchema ? (
-                <div className='space-y-4'>
-                  {showOutputSchema && (
-                    <div className='space-y-3'>
-                      <div className='flex items-center space-x-2'>
-                        <Label className='text-sm font-medium text-gray-700'>
-                          Available Output Fields:
-                        </Label>
-                        <Badge variant='secondary' className='text-xs'>
-                          {
-                            Object.keys(
-                              extractSchemaDefinition(
-                                enhancedSchema.outputSchema
-                              )?.properties || {}
-                            ).length
-                          }{" "}
-                          fields
-                        </Badge>
-                      </div>
-
-                      <div className='grid gap-2'>
-                        {Object.entries(
-                          extractSchemaDefinition(enhancedSchema.outputSchema)
-                            ?.properties || {}
-                        ).map(([fieldName, fieldSchema]: [string, any]) => (
-                          <div
-                            key={fieldName}
-                            className='flex items-center justify-between p-2 bg-green-50 rounded-md border border-green-200'>
-                            <div className='flex items-center space-x-2'>
-                              <div className='w-2 h-2 bg-green-500 rounded-full'></div>
-                              <span className='text-sm font-medium text-gray-900'>
-                                {fieldName}
-                              </span>
-                              <Badge variant='outline' className='text-xs'>
-                                {fieldSchema.type}
-                              </Badge>
-                            </div>
-                            {fieldSchema.description && (
-                              <span className='text-xs text-gray-500'>
-                                {fieldSchema.description}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Example Output */}
-                  {executionData?.lastResponse && (
-                    <div className='mt-4 p-3 bg-green-50 rounded-md border border-green-200'>
-                      <div className='flex items-center space-x-2 mb-2'>
-                        <CheckCircle className='w-4 h-4 text-green-600' />
-                        <Label className='text-sm font-medium text-gray-700'>
-                          Last Execution Output:
-                        </Label>
-                      </div>
-                      <pre className='text-xs bg-white p-2 rounded border overflow-auto max-h-32'>
-                        {JSON.stringify(executionData.lastResponse, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className='text-center py-8 text-gray-500'>
-                  <Info className='w-12 h-12 mx-auto mb-4 text-gray-300' />
-                  <p className='font-medium text-gray-900 mb-2'>
-                    No Output Data
-                  </p>
-                  <p className='text-sm'>
-                    This block doesn't produce any output data
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Execution Tab */}
-        <TabsContent value='execution' className='space-y-4'>
-          <Card>
-            <CardHeader>
-              <CardTitle className='text-base'>Execution Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {executionStatus !== "idle" ? (
-                <div className='space-y-4'>
-                  <div className='flex items-center space-x-2'>
-                    {getExecutionStatusIcon(executionStatus)}
-                    <span className='capitalize'>{executionStatus}</span>
-                  </div>
-
-                  {executionData && (
-                    <div className='space-y-2'>
-                      {executionData.startTime && (
-                        <div className='flex justify-between'>
-                          <span className='text-sm text-gray-600'>
-                            Start Time:
-                          </span>
-                          <span className='text-sm'>
-                            {executionData.startTime}
-                          </span>
-                        </div>
-                      )}
-
-                      {executionData.endTime && (
-                        <div className='flex justify-between'>
-                          <span className='text-sm text-gray-600'>
-                            End Time:
-                          </span>
-                          <span className='text-sm'>
-                            {executionData.endTime}
-                          </span>
-                        </div>
-                      )}
-
-                      {executionData.duration && (
-                        <div className='flex justify-between'>
-                          <span className='text-sm text-gray-600'>
-                            Duration:
-                          </span>
-                          <span className='text-sm'>
-                            {executionData.duration}ms
-                          </span>
-                        </div>
-                      )}
-
-                      {executionData.error && (
-                        <Alert variant='destructive'>
-                          <AlertCircle className='h-4 w-4' />
-                          <AlertDescription>
-                            {executionData.error}
-                          </AlertDescription>
-                        </Alert>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className='text-center py-8 text-gray-500'>
-                  <Info className='w-12 h-12 mx-auto mb-4 text-gray-300' />
-                  <p>No execution data</p>
-                  <p className='text-sm'>
-                    Run the block to see execution details
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </ScrollArea>
+          </div>
+        </Tabs>
+      </div>
 
       {/* Test Button */}
       {onTest && (

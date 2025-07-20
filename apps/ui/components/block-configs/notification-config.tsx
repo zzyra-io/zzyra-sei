@@ -42,6 +42,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 // Remove circular dependency - don't self-register
 // import blockConfigRegistry from "@/lib/block-config-registry";
@@ -247,10 +248,10 @@ export function NotificationConfig({
     <div className='space-y-6'>
       {/* Status Bar */}
       {executionStatus !== "idle" && (
-        <Alert className={getStatusColor()}>
-          <div className='flex items-center space-x-2'>
+        <Alert className={cn(getStatusColor(), "border-l-4")}>
+          <div className='flex items-center space-x-3'>
             {getStatusIcon()}
-            <AlertDescription>
+            <AlertDescription className='font-medium'>
               {executionStatus === "running" && "Sending notification..."}
               {executionStatus === "success" &&
                 "Notification sent successfully"}
@@ -264,39 +265,49 @@ export function NotificationConfig({
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
-        <TabsList className='grid w-full grid-cols-3'>
-          <TabsTrigger value='config' className='flex items-center space-x-2'>
+        <TabsList className='grid w-full grid-cols-3 h-12 bg-muted/50'>
+          <TabsTrigger
+            value='config'
+            className='flex items-center space-x-2 data-[state=active]:bg-background'>
             <Settings className='h-4 w-4' />
             <span>Configuration</span>
           </TabsTrigger>
-          <TabsTrigger value='template' className='flex items-center space-x-2'>
+          <TabsTrigger
+            value='template'
+            className='flex items-center space-x-2 data-[state=active]:bg-background'>
             <Code className='h-4 w-4' />
             <span>Templates</span>
           </TabsTrigger>
-          <TabsTrigger value='test' className='flex items-center space-x-2'>
+          <TabsTrigger
+            value='test'
+            className='flex items-center space-x-2 data-[state=active]:bg-background'>
             <Play className='h-4 w-4' />
             <span>Test</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value='config' className='space-y-4'>
+        <TabsContent value='config' className='mt-6 space-y-6'>
           {/* Notification Type Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className='flex items-center space-x-2'>
+          <Card className='border-l-4 border-l-primary/20'>
+            <CardHeader className='pb-4'>
+              <CardTitle className='flex items-center space-x-3 text-lg'>
                 {getNotificationTypeIcon(notificationType)}
                 <span>Notification Type</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className='space-y-4'>
-              <div className='space-y-2'>
-                <Label htmlFor='notificationType'>Type</Label>
+            <CardContent className='space-y-6'>
+              <div className='space-y-3'>
+                <Label
+                  htmlFor='notificationType'
+                  className='text-sm font-medium'>
+                  Type
+                </Label>
                 <Select
                   value={notificationType}
                   onValueChange={(value) =>
                     handleChange("notificationType", value)
                   }>
-                  <SelectTrigger id='notificationType'>
+                  <SelectTrigger id='notificationType' className='h-11'>
                     <SelectValue placeholder='Select notification type' />
                   </SelectTrigger>
                   <SelectContent>
@@ -333,23 +344,28 @@ export function NotificationConfig({
                   </SelectContent>
                 </Select>
                 {getFieldError("notificationType") && (
-                  <p className='text-sm text-red-500'>
-                    {getFieldError("notificationType")}
-                  </p>
+                  <div className='flex items-center space-x-2 text-sm text-red-500'>
+                    <AlertCircle className='h-4 w-4' />
+                    <span>{getFieldError("notificationType")}</span>
+                  </div>
                 )}
               </div>
 
               {/* Email Configuration */}
               {notificationType === "email" && (
-                <div className='space-y-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='emailProvider'>Email Provider</Label>
+                <div className='space-y-6 pt-4 border-t border-border/50'>
+                  <div className='space-y-3'>
+                    <Label
+                      htmlFor='emailProvider'
+                      className='text-sm font-medium'>
+                      Email Provider
+                    </Label>
                     <Select
                       value={(config.emailProvider as string) || "smtp"}
                       onValueChange={(value) =>
                         handleChange("emailProvider", value)
                       }>
-                      <SelectTrigger id='emailProvider'>
+                      <SelectTrigger id='emailProvider' className='h-11'>
                         <SelectValue placeholder='Select provider' />
                       </SelectTrigger>
                       <SelectContent>
@@ -361,74 +377,92 @@ export function NotificationConfig({
                     </Select>
                   </div>
 
-                  <div className='space-y-2'>
-                    <Label htmlFor='to'>To</Label>
+                  <div className='space-y-3'>
+                    <Label htmlFor='to' className='text-sm font-medium'>
+                      To <span className='text-red-500'>*</span>
+                    </Label>
                     <Input
                       id='to'
                       placeholder='recipient@example.com'
                       value={(config.to as string) || ""}
                       onChange={(e) => handleChange("to", e.target.value)}
+                      className='h-11'
                     />
                     {getFieldError("to") && (
-                      <p className='text-sm text-red-500'>
-                        {getFieldError("to")}
-                      </p>
+                      <div className='flex items-center space-x-2 text-sm text-red-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>{getFieldError("to")}</span>
+                      </div>
                     )}
                   </div>
 
-                  <div className='space-y-2'>
-                    <Label htmlFor='subject'>Subject</Label>
+                  <div className='space-y-3'>
+                    <Label htmlFor='subject' className='text-sm font-medium'>
+                      Subject <span className='text-red-500'>*</span>
+                    </Label>
                     <Input
                       id='subject'
                       placeholder='Notification subject'
                       value={(config.subject as string) || ""}
                       onChange={(e) => handleChange("subject", e.target.value)}
+                      className='h-11'
                     />
                     {getFieldError("subject") && (
-                      <p className='text-sm text-red-500'>
-                        {getFieldError("subject")}
-                      </p>
+                      <div className='flex items-center space-x-2 text-sm text-red-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>{getFieldError("subject")}</span>
+                      </div>
                     )}
                   </div>
 
-                  <div className='space-y-2'>
-                    <Label htmlFor='body'>Body</Label>
+                  <div className='space-y-3'>
+                    <Label htmlFor='body' className='text-sm font-medium'>
+                      Body <span className='text-red-500'>*</span>
+                    </Label>
                     <Textarea
                       id='body'
                       placeholder='Notification message...'
                       value={(config.body as string) || ""}
                       onChange={(e) => handleChange("body", e.target.value)}
                       rows={6}
+                      className='resize-none'
                     />
                     {getFieldError("body") && (
-                      <p className='text-sm text-red-500'>
-                        {getFieldError("body")}
-                      </p>
+                      <div className='flex items-center space-x-2 text-sm text-red-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>{getFieldError("body")}</span>
+                      </div>
                     )}
                   </div>
 
                   <div className='grid grid-cols-2 gap-4'>
-                    <div className='space-y-2'>
-                      <Label htmlFor='cc'>CC (optional)</Label>
+                    <div className='space-y-3'>
+                      <Label htmlFor='cc' className='text-sm font-medium'>
+                        CC (optional)
+                      </Label>
                       <Input
                         id='cc'
                         placeholder='cc@example.com'
                         value={(config.cc as string) || ""}
                         onChange={(e) => handleChange("cc", e.target.value)}
+                        className='h-11'
                       />
                     </div>
-                    <div className='space-y-2'>
-                      <Label htmlFor='bcc'>BCC (optional)</Label>
+                    <div className='space-y-3'>
+                      <Label htmlFor='bcc' className='text-sm font-medium'>
+                        BCC (optional)
+                      </Label>
                       <Input
                         id='bcc'
                         placeholder='bcc@example.com'
                         value={(config.bcc as string) || ""}
                         onChange={(e) => handleChange("bcc", e.target.value)}
+                        className='h-11'
                       />
                     </div>
                   </div>
 
-                  <div className='flex items-center space-x-2'>
+                  <div className='flex items-center space-x-3 p-3 bg-muted/30 rounded-lg'>
                     <Switch
                       id='htmlFormat'
                       checked={(config.htmlFormat as boolean) !== false}
@@ -436,16 +470,20 @@ export function NotificationConfig({
                         handleChange("htmlFormat", checked)
                       }
                     />
-                    <Label htmlFor='htmlFormat'>Send as HTML</Label>
+                    <Label htmlFor='htmlFormat' className='text-sm font-medium'>
+                      Send as HTML
+                    </Label>
                   </div>
                 </div>
               )}
 
               {/* Webhook Configuration */}
               {notificationType === "webhook" && (
-                <div className='space-y-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='webhookUrl'>Webhook URL</Label>
+                <div className='space-y-6 pt-4 border-t border-border/50'>
+                  <div className='space-y-3'>
+                    <Label htmlFor='webhookUrl' className='text-sm font-medium'>
+                      Webhook URL
+                    </Label>
                     <Input
                       id='webhookUrl'
                       placeholder='https://api.example.com/webhook'
@@ -453,22 +491,28 @@ export function NotificationConfig({
                       onChange={(e) =>
                         handleChange("webhookUrl", e.target.value)
                       }
+                      className='h-11'
                     />
                     {getFieldError("webhookUrl") && (
-                      <p className='text-sm text-red-500'>
-                        {getFieldError("webhookUrl")}
-                      </p>
+                      <div className='flex items-center space-x-2 text-sm text-red-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>{getFieldError("webhookUrl")}</span>
+                      </div>
                     )}
                   </div>
 
-                  <div className='space-y-2'>
-                    <Label htmlFor='webhookMethod'>HTTP Method</Label>
+                  <div className='space-y-3'>
+                    <Label
+                      htmlFor='webhookMethod'
+                      className='text-sm font-medium'>
+                      HTTP Method
+                    </Label>
                     <Select
                       value={(config.webhookMethod as string) || "POST"}
                       onValueChange={(value) =>
                         handleChange("webhookMethod", value)
                       }>
-                      <SelectTrigger id='webhookMethod'>
+                      <SelectTrigger id='webhookMethod' className='h-11'>
                         <SelectValue placeholder='Select method' />
                       </SelectTrigger>
                       <SelectContent>
@@ -554,9 +598,11 @@ export function NotificationConfig({
 
               {/* Discord Configuration */}
               {notificationType === "discord" && (
-                <div className='space-y-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='discordWebhookUrl'>
+                <div className='space-y-6 pt-4 border-t border-border/50'>
+                  <div className='space-y-3'>
+                    <Label
+                      htmlFor='discordWebhookUrl'
+                      className='text-sm font-medium'>
                       Discord Webhook URL
                     </Label>
                     <Input
@@ -566,11 +612,13 @@ export function NotificationConfig({
                       onChange={(e) =>
                         handleChange("discordWebhookUrl", e.target.value)
                       }
+                      className='h-11'
                     />
                     {getFieldError("discordWebhookUrl") && (
-                      <p className='text-sm text-red-500'>
-                        {getFieldError("discordWebhookUrl")}
-                      </p>
+                      <div className='flex items-center space-x-2 text-sm text-red-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>{getFieldError("discordWebhookUrl")}</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -578,9 +626,13 @@ export function NotificationConfig({
 
               {/* Slack Configuration */}
               {notificationType === "slack" && (
-                <div className='space-y-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='slackWebhookUrl'>Slack Webhook URL</Label>
+                <div className='space-y-6 pt-4 border-t border-border/50'>
+                  <div className='space-y-3'>
+                    <Label
+                      htmlFor='slackWebhookUrl'
+                      className='text-sm font-medium'>
+                      Slack Webhook URL
+                    </Label>
                     <Input
                       id='slackWebhookUrl'
                       placeholder='https://hooks.slack.com/...'
@@ -588,11 +640,13 @@ export function NotificationConfig({
                       onChange={(e) =>
                         handleChange("slackWebhookUrl", e.target.value)
                       }
+                      className='h-11'
                     />
                     {getFieldError("slackWebhookUrl") && (
-                      <p className='text-sm text-red-500'>
-                        {getFieldError("slackWebhookUrl")}
-                      </p>
+                      <div className='flex items-center space-x-2 text-sm text-red-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>{getFieldError("slackWebhookUrl")}</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -600,9 +654,13 @@ export function NotificationConfig({
 
               {/* Telegram Configuration */}
               {notificationType === "telegram" && (
-                <div className='space-y-4'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='telegramBotToken'>Bot Token</Label>
+                <div className='space-y-6 pt-4 border-t border-border/50'>
+                  <div className='space-y-3'>
+                    <Label
+                      htmlFor='telegramBotToken'
+                      className='text-sm font-medium'>
+                      Bot Token
+                    </Label>
                     <div className='relative'>
                       <Input
                         id='telegramBotToken'
@@ -612,6 +670,7 @@ export function NotificationConfig({
                         onChange={(e) =>
                           handleChange("telegramBotToken", e.target.value)
                         }
+                        className='h-11'
                       />
                       <Button
                         type='button'
@@ -627,14 +686,19 @@ export function NotificationConfig({
                       </Button>
                     </div>
                     {getFieldError("telegramBotToken") && (
-                      <p className='text-sm text-red-500'>
-                        {getFieldError("telegramBotToken")}
-                      </p>
+                      <div className='flex items-center space-x-2 text-sm text-red-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>{getFieldError("telegramBotToken")}</span>
+                      </div>
                     )}
                   </div>
 
-                  <div className='space-y-2'>
-                    <Label htmlFor='telegramChatId'>Chat ID</Label>
+                  <div className='space-y-3'>
+                    <Label
+                      htmlFor='telegramChatId'
+                      className='text-sm font-medium'>
+                      Chat ID
+                    </Label>
                     <Input
                       id='telegramChatId'
                       placeholder='123456789'
@@ -642,11 +706,13 @@ export function NotificationConfig({
                       onChange={(e) =>
                         handleChange("telegramChatId", e.target.value)
                       }
+                      className='h-11'
                     />
                     {getFieldError("telegramChatId") && (
-                      <p className='text-sm text-red-500'>
-                        {getFieldError("telegramChatId")}
-                      </p>
+                      <div className='flex items-center space-x-2 text-sm text-red-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>{getFieldError("telegramChatId")}</span>
+                      </div>
                     )}
                   </div>
                 </div>
