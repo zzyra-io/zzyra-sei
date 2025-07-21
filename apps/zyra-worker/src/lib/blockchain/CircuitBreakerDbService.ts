@@ -259,9 +259,60 @@ export class CircuitBreakerDbService {
   }
 
   /**
+   * Get circuit breaker state
+   */
+  async getCircuitState(circuitId: string): Promise<string> {
+    try {
+      const circuit = await this.databaseService.prisma.circuitBreakerState.findFirst({
+        where: { circuitId },
+        select: { state: true },
+      });
+
+      return circuit?.state || 'CLOSED';
+    } catch (error) {
+      this.logger.error(`Failed to get circuit state for ${circuitId}:`, error);
+      return 'CLOSED'; // Default to CLOSED on error
+    }
+  }
+
+  /**
+   * Get detailed circuit breaker information
+   */
+  async getCircuitDetails(circuitId: string): Promise<{
+    circuitId: string;
+    state: string;
+    failureCount: number;
+    successCount: number;
+    lastFailureTime?: Date;
+    lastSuccessTime?: Date;
+  } | null> {
+    try {
+      const circuit = await this.databaseService.prisma.circuitBreakerState.findFirst({
+        where: { circuitId },
+      });
+
+      if (!circuit) {
+        return null;
+      }
+
+      return {
+        circuitId: circuit.circuitId,
+        state: circuit.state,
+        failureCount: circuit.failureCount,
+        successCount: circuit.successCount,
+        lastFailureTime: circuit.lastFailureTime,
+        lastSuccessTime: circuit.lastSuccessTime,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get circuit details for ${circuitId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Clean up old circuit breaker states
    */
-  async cleanup(olderThanDays: number = 7): Promise<number> {
+  async cleanupOldStates(olderThanDays: number = 7): Promise<number> {
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);

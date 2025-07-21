@@ -7,16 +7,21 @@ import { ExecutionLogger } from '../../workers/execution-logger';
 import { ErrorHandler } from '../../workers/error-handler';
 import { NotificationModule } from '../../services/notification.module';
 import { MagicModule } from '../../services/magic.module';
+import { ExecutionMonitorService } from '../../services/execution-monitor.service';
+import { MultiLevelCircuitBreakerService } from '../../services/multi-level-circuit-breaker.service';
+import { BlockchainModule } from '../blockchain/BlockchainModule';
 
 @Global()
 @Module({
-  imports: [NotificationModule, MagicModule],
+  imports: [NotificationModule, MagicModule, BlockchainModule],
   providers: [
     WorkflowService,
     WorkflowExecutor,
     NodeExecutor,
     ExecutionLogger,
     ErrorHandler,
+    ExecutionMonitorService,
+    MultiLevelCircuitBreakerService,
   ],
   exports: [
     WorkflowService,
@@ -24,6 +29,8 @@ import { MagicModule } from '../../services/magic.module';
     NodeExecutor,
     ExecutionLogger,
     ErrorHandler,
+    ExecutionMonitorService,
+    MultiLevelCircuitBreakerService,
   ],
 })
 export class WorkflowModule {}

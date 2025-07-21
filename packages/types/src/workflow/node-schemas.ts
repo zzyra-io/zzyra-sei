@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { BlockType } from './block-types';
+import { z } from "zod";
+import { BlockType } from "./block-types";
 
 /**
  * SCHEMA APPROACH: Use Zod for validation and type inference
@@ -16,44 +16,50 @@ export const BlockTypeSchema = z.nativeEnum(BlockType);
 export const NodeTypeSchema = z.enum(["TRIGGER", "ACTION", "LOGIC"]);
 
 // Core workflow node data schema (backend requirements)
-export const WorkflowNodeDataSchema = z.object({
-  blockType: BlockTypeSchema,
-  label: z.string().min(1),
-  nodeType: NodeTypeSchema,
-  iconName: z.string(),
-  isEnabled: z.boolean().default(true),
-  description: z.string().optional(),
-  config: z.record(z.unknown()).default({}),
-  inputs: z.array(z.unknown()).default([]),
-  outputs: z.array(z.unknown()).default([]),
-  // Allow additional properties for React Flow
-}).passthrough();
+export const WorkflowNodeDataSchema = z
+  .object({
+    blockType: BlockTypeSchema,
+    label: z.string().min(1),
+    nodeType: NodeTypeSchema,
+    iconName: z.string(),
+    isEnabled: z.boolean().default(true),
+    description: z.string().optional(),
+    config: z.record(z.unknown()).default({}),
+    inputs: z.array(z.unknown()).default([]),
+    outputs: z.array(z.unknown()).default([]),
+    // Allow additional properties for React Flow
+  })
+  .passthrough();
 
 // Full workflow node schema
-export const WorkflowNodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.string().default('default'),
-  position: PositionSchema,
-  data: WorkflowNodeDataSchema,
-  // React Flow specific properties (optional)
-  dragHandle: z.string().optional(),
-  connectable: z.boolean().optional(),
-  selected: z.boolean().optional(),
-  dragging: z.boolean().optional(),
-}).passthrough(); // Allow additional React Flow properties
+export const WorkflowNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.string().default("default"),
+    position: PositionSchema,
+    data: WorkflowNodeDataSchema,
+    // React Flow specific properties (optional)
+    dragHandle: z.string().optional(),
+    connectable: z.boolean().optional(),
+    selected: z.boolean().optional(),
+    dragging: z.boolean().optional(),
+  })
+  .passthrough(); // Allow additional React Flow properties
 
 // Workflow edge schema
-export const WorkflowEdgeSchema = z.object({
-  id: z.string().min(1),
-  source: z.string().min(1),
-  target: z.string().min(1),
-  sourceHandle: z.string().optional(),
-  targetHandle: z.string().optional(),
-  type: z.string().optional(),
-  animated: z.boolean().default(false),
-  // React Flow specific properties (optional)
-  selected: z.boolean().optional(),
-}).passthrough(); // Allow additional React Flow properties
+export const WorkflowEdgeSchema = z
+  .object({
+    id: z.string().min(1),
+    source: z.string().min(1),
+    target: z.string().min(1),
+    sourceHandle: z.string().optional(),
+    targetHandle: z.string().optional(),
+    type: z.string().optional(),
+    animated: z.boolean().default(false),
+    // React Flow specific properties (optional)
+    selected: z.boolean().optional(),
+  })
+  .passthrough(); // Allow additional React Flow properties
 
 // Array schemas
 export const WorkflowNodesSchema = z.array(WorkflowNodeSchema);
@@ -74,7 +80,11 @@ export type Workflow = z.infer<typeof WorkflowSchema>;
 /**
  * Validation and transformation functions
  */
-export function validateWorkflowNode(node: unknown): { success: true; data: WorkflowNode } | { success: false; error: z.ZodError } {
+export function validateWorkflowNode(
+  node: unknown
+):
+  | { success: true; data: WorkflowNode }
+  | { success: false; error: z.ZodError } {
   const result = WorkflowNodeSchema.safeParse(node);
   if (result.success) {
     return { success: true, data: result.data };
@@ -83,7 +93,11 @@ export function validateWorkflowNode(node: unknown): { success: true; data: Work
   }
 }
 
-export function validateWorkflowEdge(edge: unknown): { success: true; data: WorkflowEdge } | { success: false; error: z.ZodError } {
+export function validateWorkflowEdge(
+  edge: unknown
+):
+  | { success: true; data: WorkflowEdge }
+  | { success: false; error: z.ZodError } {
   const result = WorkflowEdgeSchema.safeParse(edge);
   if (result.success) {
     return { success: true, data: result.data };
@@ -92,7 +106,9 @@ export function validateWorkflowEdge(edge: unknown): { success: true; data: Work
   }
 }
 
-export function validateWorkflow(workflow: unknown): { success: true; data: Workflow } | { success: false; error: z.ZodError } {
+export function validateWorkflow(
+  workflow: unknown
+): { success: true; data: Workflow } | { success: false; error: z.ZodError } {
   const result = WorkflowSchema.safeParse(workflow);
   if (result.success) {
     return { success: true, data: result.data };
@@ -106,7 +122,7 @@ export function validateWorkflow(workflow: unknown): { success: true; data: Work
  */
 export function sanitizeNodesForApi(nodes: unknown[]): WorkflowNode[] {
   return nodes
-    .map(node => {
+    .map((node) => {
       const result = validateWorkflowNode(node);
       return result.success ? result.data : null;
     })
@@ -115,7 +131,7 @@ export function sanitizeNodesForApi(nodes: unknown[]): WorkflowNode[] {
 
 export function sanitizeEdgesForApi(edges: unknown[]): WorkflowEdge[] {
   return edges
-    .map(edge => {
+    .map((edge) => {
       const result = validateWorkflowEdge(edge);
       return result.success ? result.data : null;
     })
@@ -131,7 +147,7 @@ export function createValidatedNode(
   overrides?: Partial<WorkflowNodeData>
 ): WorkflowNode {
   const metadata = getBlockMetadata(blockType);
-  
+
   const nodeData: WorkflowNodeData = {
     blockType,
     label: metadata.label,
@@ -171,22 +187,35 @@ function getBlockMetadata(blockType: BlockType): {
     case BlockType.WEBHOOK:
     case BlockType.SCHEDULE:
     case BlockType.PRICE_MONITOR:
-    case BlockType.WALLET_LISTENER:
-      return { nodeType: "TRIGGER", iconName: "play", label: `${blockType} Trigger` };
-    
+    case BlockType.WALLET_LISTEN:
+    case BlockType.SEI_CONTRACT_CALL:
+      return {
+        nodeType: "TRIGGER",
+        iconName: "play",
+        label: `${blockType} Trigger`,
+      };
+
     case BlockType.HTTP_REQUEST:
     case BlockType.EMAIL:
     case BlockType.NOTIFICATION:
-    case BlockType.PAYMENT:
-    case BlockType.NFT:
-    case BlockType.SMART_CONTRACT_CALL:
-      return { nodeType: "ACTION", iconName: "zap", label: `${blockType} Action` };
-    
+    case BlockType.SEI_PAYMENT:
+    case BlockType.SEI_NFT:
+    case BlockType.SEI_CONTRACT_CALL:
+      return {
+        nodeType: "ACTION",
+        iconName: "zap",
+        label: `${blockType} Action`,
+      };
+
     case BlockType.CONDITION:
     case BlockType.DATA_TRANSFORM:
     case BlockType.CUSTOM:
-      return { nodeType: "LOGIC", iconName: "settings", label: `${blockType} Logic` };
-    
+      return {
+        nodeType: "LOGIC",
+        iconName: "settings",
+        label: `${blockType} Logic`,
+      };
+
     default:
       return { nodeType: "ACTION", iconName: "box", label: "Unknown Block" };
   }

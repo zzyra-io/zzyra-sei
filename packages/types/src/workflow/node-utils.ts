@@ -1,5 +1,10 @@
-import { BlockType } from './block-types';
-import { WorkflowNode, WorkflowEdge, ReactFlowNode, ReactFlowEdge } from './workflow-node';
+import { BlockType } from "./block-types";
+import {
+  WorkflowNode,
+  WorkflowEdge,
+  ReactFlowNode,
+  ReactFlowEdge,
+} from "./workflow-node";
 
 /**
  * Get block metadata for node type conversion
@@ -13,22 +18,35 @@ function getBlockMetadata(blockType: BlockType): {
     case BlockType.WEBHOOK:
     case BlockType.SCHEDULE:
     case BlockType.PRICE_MONITOR:
-    case BlockType.WALLET_LISTENER:
-      return { nodeType: "TRIGGER", iconName: "play", label: `${blockType} Trigger` };
-    
+    case BlockType.WALLET_LISTEN:
+    case BlockType.SEI_CONTRACT_CALL:
+      return {
+        nodeType: "TRIGGER",
+        iconName: "play",
+        label: `${blockType} Trigger`,
+      };
+
     case BlockType.HTTP_REQUEST:
     case BlockType.EMAIL:
     case BlockType.NOTIFICATION:
-    case BlockType.PAYMENT:
-    case BlockType.NFT:
-    case BlockType.SMART_CONTRACT_CALL:
-      return { nodeType: "ACTION", iconName: "zap", label: `${blockType} Action` };
-    
+    case BlockType.SEI_PAYMENT:
+    case BlockType.SEI_NFT:
+    case BlockType.SEI_CONTRACT_CALL:
+      return {
+        nodeType: "ACTION",
+        iconName: "zap",
+        label: `${blockType} Action`,
+      };
+
     case BlockType.CONDITION:
     case BlockType.DATA_TRANSFORM:
     case BlockType.CUSTOM:
-      return { nodeType: "LOGIC", iconName: "settings", label: `${blockType} Logic` };
-    
+      return {
+        nodeType: "LOGIC",
+        iconName: "settings",
+        label: `${blockType} Logic`,
+      };
+
     default:
       return { nodeType: "ACTION", iconName: "box", label: "Unknown Block" };
   }
@@ -41,10 +59,10 @@ export function reactFlowNodeToWorkflowNode(node: ReactFlowNode): WorkflowNode {
   // Extract blockType from node data, with fallback
   const blockType = (node.data?.blockType as BlockType) || BlockType.CUSTOM;
   const metadata = getBlockMetadata(blockType);
-  
+
   return {
     id: node.id,
-    type: node.type || 'default',
+    type: node.type || "default",
     position: node.position,
     data: {
       blockType,
@@ -88,7 +106,7 @@ export function reactFlowEdgeToWorkflowEdge(edge: ReactFlowEdge): WorkflowEdge {
     target: edge.target,
     sourceHandle: edge.sourceHandle,
     targetHandle: edge.targetHandle,
-    type: edge.type || 'default',
+    type: edge.type || "default",
     animated: edge.animated || false,
   };
 }
@@ -112,7 +130,7 @@ export function workflowEdgeToReactFlowEdge(edge: WorkflowEdge): ReactFlowEdge {
  * Convert arrays of React Flow nodes/edges to WorkflowNodes/WorkflowEdges
  */
 export function convertToWorkflowData(
-  reactFlowNodes: ReactFlowNode[], 
+  reactFlowNodes: ReactFlowNode[],
   reactFlowEdges: ReactFlowEdge[]
 ): { nodes: WorkflowNode[]; edges: WorkflowEdge[] } {
   return {
@@ -125,7 +143,7 @@ export function convertToWorkflowData(
  * Convert arrays of WorkflowNodes/WorkflowEdges to React Flow nodes/edges
  */
 export function convertToReactFlowData(
-  workflowNodes: WorkflowNode[], 
+  workflowNodes: WorkflowNode[],
   workflowEdges: WorkflowEdge[]
 ): { nodes: ReactFlowNode[]; edges: ReactFlowEdge[] } {
   return {
@@ -137,15 +155,18 @@ export function convertToReactFlowData(
 /**
  * Validate that a node has the minimum required data for backend processing
  */
-export function validateWorkflowNode(node: WorkflowNode): { isValid: boolean; errors: string[] } {
+export function validateWorkflowNode(node: WorkflowNode): {
+  isValid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
-  
+
   if (!node.id) errors.push("Node must have an ID");
   if (!node.data.blockType) errors.push("Node must have a blockType");
   if (!node.data.label) errors.push("Node must have a label");
   if (!node.data.nodeType) errors.push("Node must have a nodeType");
   if (!node.position) errors.push("Node must have a position");
-  
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -158,14 +179,14 @@ export function validateWorkflowNode(node: WorkflowNode): { isValid: boolean; er
 export function createWorkflowNode(
   blockType: BlockType,
   position: { x: number; y: number },
-  overrides?: Partial<WorkflowNode['data']>
+  overrides?: Partial<WorkflowNode["data"]>
 ): WorkflowNode {
   const metadata = getBlockMetadata(blockType);
   const id = `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   return {
     id,
-    type: 'default',
+    type: "default",
     position,
     data: {
       blockType,

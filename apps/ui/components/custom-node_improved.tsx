@@ -1,9 +1,11 @@
 import { Handle, Position, useConnection } from "@xyflow/react";
-import { Database, Loader2, CheckCircle2, XCircle, Eye, X } from "lucide-react";
+import { Database, Loader2, CheckCircle2, XCircle, Eye, X, Activity, Zap, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useBlockExecution } from "@/hooks/useBlockExecution";
+import { useExecutionWebSocket, NodeExecutionUpdate } from "@/hooks/use-execution-websocket";
+import { useLiveNode } from "./workflow/LiveWorkflowProvider";
 
 interface NodeData {
   blockType: string;
@@ -15,6 +17,14 @@ interface NodeData {
   inputCount?: number;
   outputCount?: number;
   status?: string;
+  executionStatus?: 'pending' | 'running' | 'completed' | 'failed';
+  isExecuting?: boolean;
+  executionProgress?: number;
+  executionStartTime?: Date;
+  executionEndTime?: Date;
+  executionDuration?: number;
+  executionOutput?: any;
+  executionError?: string;
   config?: Record<string, unknown>;
   iconName?: string;
   style?: {
@@ -29,6 +39,10 @@ interface NodeData {
     message: string;
     timestamp?: string;
   }>;
+  // Real-time execution data
+  executionId?: string;
+  workflowId?: string;
+  isLive?: boolean;
 }
 
 export default function CustomNode({
@@ -44,12 +58,106 @@ export default function CustomNode({
   const isTarget = isConnecting && connection.fromNode?.id !== id;
   const [showLogs, setShowLogs] = useState(false);
 
-  // Initialize block execution monitoring
+  // Real-time execution state
+  const [realtimeStatus, setRealtimeStatus] = useState<'pending' | 'running' | 'completed' | 'failed'>('pending');
+  const [realtimeProgress, setRealtimeProgress] = useState<number>(0);
+  const [realtimeDuration, setRealtimeDuration] = useState<number | undefined>();
+  const [realtimeError, setRealtimeError] = useState<string | undefined>();
+  const [realtimeLogs, setRealtimeLogs] = useState<Array<{
+    level: "info" | "warn" | "error";
+    message: string;
+    timestamp?: string;
+  }>>([]);
+  const [isLiveExecution, setIsLiveExecution] = useState(false);
+
+  // Initialize block execution monitoring (legacy)
   const blockExecution = useBlockExecution({
     blockId: id,
     blockType: data.blockType,
     blockName: data.label,
   });
+
+  // Use the new live node system for real-time updates
+  const liveNode = useLiveNode(id);
+
+  // Handle real-time node updates from WebSocket (legacy)
+  const handleNodeUpdate = useCallback((update: NodeExecutionUpdate) => {
+    if (update.nodeId === id) {
+      setRealtimeStatus(update.status);
+      setRealtimeProgress(update.progress || 0);
+      setRealtimeDuration(update.duration);
+      setRealtimeError(update.error);
+      setIsLiveExecution(true);
+      
+      // Add to logs
+      setRealtimeLogs(prev => [...prev, {
+        level: update.status === 'failed' ? 'error' : 'info',
+        message: `Node ${update.status}: ${update.nodeLabel || data.label}`,
+        timestamp: new Date().toISOString()
+      }]);
+    }
+  }, [id, data.label]);
+
+  // Initialize WebSocket connection for real-time updates (legacy)
+  const { isConnected: wsConnected } = useExecutionWebSocket({
+    executionId: data.executionId,
+    onNodeUpdate: handleNodeUpdate,
+    onExecutionLog: (log) => {
+      if (log.nodeId === id) {
+        setRealtimeLogs(prev => [...prev, {
+          level: log.level,
+          message: log.message,
+          timestamp: log.timestamp.toISOString()
+        }]);
+      }
+    },
+  });
+
+  // Reset real-time state when execution changes
+  useEffect(() => {
+    if (data.executionId) {
+      setRealtimeStatus('pending');
+      setRealtimeProgress(0);
+      setRealtimeDuration(undefined);
+      setRealtimeError(undefined);
+      setRealtimeLogs([]);
+      setIsLiveExecution(false);
+    }
+  }, [data.executionId]);
+
+  // Use live node data when available
+  const isUsingLiveNode = liveNode.isLive && liveNode.nodeState;
+  const effectiveStatus = isUsingLiveNode 
+    ? liveNode.nodeState?.status || 'pending'
+    : isLiveExecution && data.executionId 
+      ? realtimeStatus 
+      : (data.executionStatus || blockExecution.currentState || "idle");
+  
+  const effectiveLogs = isUsingLiveNode 
+    ? liveNode.nodeState?.logs || []
+    : isLiveExecution 
+      ? realtimeLogs 
+      : (data.logs || blockExecution.currentBlock?.logs || []);
+      
+  const effectiveProgress = isUsingLiveNode 
+    ? liveNode.nodeState?.progress
+    : isLiveExecution 
+      ? realtimeProgress 
+      : data.executionProgress;
+      
+  const effectiveDuration = isUsingLiveNode 
+    ? liveNode.nodeState?.duration
+    : isLiveExecution 
+      ? realtimeDuration 
+      : (data.executionDuration || blockExecution.currentBlock?.duration);
+      
+  const effectiveError = isUsingLiveNode 
+    ? liveNode.nodeState?.error
+    : isLiveExecution 
+      ? realtimeError 
+      : data.executionError;
+
+  const isConnectedToLive = isUsingLiveNode ? liveNode.isConnected : wsConnected;
 
   const {
     label = data.blockType || "Node",
@@ -59,8 +167,12 @@ export default function CustomNode({
     style = {},
   } = data;
 
-  // Use the monitoring system status instead of basic data.status
-  const status = blockExecution.currentState || "idle";
+  // Use the effective values determined above
+  const status = effectiveStatus;
+  const currentLogs = effectiveLogs;
+  const currentProgress = effectiveProgress;
+  const currentDuration = effectiveDuration;
+  const currentError = effectiveError;
 
   const icon = <Database className='w-5 h-5' />; // TODO: Map iconName to actual icons
 
@@ -70,27 +182,42 @@ export default function CustomNode({
   const accentColor = style.accentColor || "primary";
   const backgroundColor = style.backgroundColor || "bg-card";
 
-  // Enhanced Status Indicator with animations and log access
+  // Enhanced Status Indicator with real-time execution data and animations
   const statusIndicator = React.useMemo(() => {
-    const logs = blockExecution.currentBlock?.logs || [];
-    const duration = blockExecution.currentBlock?.duration;
+    const logs = currentLogs;
+    const duration = currentDuration;
+    const progress = currentProgress;
+    const error = currentError;
 
     switch (status) {
-      case "queued":
+      case "pending":
         return (
-          <div className='flex items-center gap-1.5 text-gray-500'>
-            <div className='w-3.5 h-3.5 rounded-full bg-gray-300 animate-pulse' />
-            <span className='text-xs font-medium'>Queued</span>
+          <div className='flex items-center gap-1.5 text-amber-500'>
+            <div className='w-3.5 h-3.5 rounded-full bg-amber-300 animate-pulse' />
+            <span className='text-xs font-medium'>Pending</span>
           </div>
         );
       case "running":
         return (
-          <div className='flex items-center gap-1.5 text-blue-500 animate-pulse'>
+          <div className='flex items-center gap-1.5 text-blue-500'>
             <div className='relative'>
               <Loader2 className='w-3.5 h-3.5 animate-spin' />
               <div className='absolute -inset-1 bg-blue-500/20 rounded-full animate-ping' />
             </div>
-            <span className='text-xs font-medium'>Running...</span>
+            <div className='flex flex-col'>
+              <span className='text-xs font-medium'>Running...</span>
+              {progress && (
+                <div className='flex items-center gap-1'>
+                  <div className='w-16 h-1.5 bg-blue-200 rounded-full overflow-hidden'>
+                    <div 
+                      className='h-full bg-blue-500 transition-all duration-300 ease-out'
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <span className='text-xs text-blue-600'>{Math.round(progress)}%</span>
+                </div>
+              )}
+            </div>
             {logs.length > 0 && (
               <button
                 onClick={(e) => {
@@ -103,7 +230,7 @@ export default function CustomNode({
             )}
           </div>
         );
-      case "success":
+      case "completed":
         return (
           <div className='flex items-center gap-1.5 text-green-500'>
             <div className='relative'>
@@ -125,14 +252,21 @@ export default function CustomNode({
             )}
           </div>
         );
-      case "error":
+      case "failed":
         return (
           <div className='flex items-center gap-1.5 text-red-500'>
             <div className='relative'>
               <XCircle className='w-3.5 h-3.5' />
               <div className='absolute -inset-1 bg-red-500/20 rounded-full animate-pulse' />
             </div>
-            <span className='text-xs font-medium'>Failed</span>
+            <div className='flex flex-col'>
+              <span className='text-xs font-medium'>Failed</span>
+              {error && (
+                <span className='text-xs text-red-600 truncate max-w-32'>
+                  {error}
+                </span>
+              )}
+            </div>
             {logs.length > 0 && (
               <button
                 onClick={(e) => {
@@ -187,7 +321,44 @@ export default function CustomNode({
           </div>
         );
     }
-  }, [status, blockExecution.currentBlock]);
+  }, [status, currentLogs, currentDuration, currentProgress, currentError]);
+
+  // Live connection indicator
+  const liveIndicator = React.useMemo(() => {
+    // Show live indicator if using new live node system
+    if (isUsingLiveNode) {
+      return (
+        <div className='absolute -top-1 -right-1 flex items-center'>
+          <div className='relative'>
+            <Radio className='w-3 h-3 text-emerald-500' />
+            <div className='absolute -inset-1 bg-emerald-500/30 rounded-full animate-ping' />
+          </div>
+        </div>
+      );
+    }
+    
+    // Fallback to legacy WebSocket indicator
+    if (!data.executionId) return null;
+    
+    if (wsConnected && isLiveExecution) {
+      return (
+        <div className='absolute -top-1 -right-1 flex items-center'>
+          <div className='relative'>
+            <Activity className='w-3 h-3 text-green-500' />
+            <div className='absolute -inset-1 bg-green-500/30 rounded-full animate-ping' />
+          </div>
+        </div>
+      );
+    } else if (data.executionId && wsConnected) {
+      return (
+        <div className='absolute -top-1 -right-1 flex items-center'>
+          <Zap className='w-3 h-3 text-blue-500 animate-pulse' />
+        </div>
+      );
+    }
+    
+    return null;
+  }, [isUsingLiveNode, wsConnected, isLiveExecution, data.executionId]);
 
   const configSummary = Object.entries(config)
     .filter(([key]) => key && key !== "blockType" && key !== "label")
@@ -245,18 +416,31 @@ export default function CustomNode({
           ? "border-2 border-primary shadow-lg shadow-primary/20"
           : "border-border/30",
         theme === "dark" && !isTarget && "shadow-black/20",
-        // Enhanced status-based styling
+        // Enhanced status-based styling with live execution feedback
         status === "running" &&
-          "animate-pulse border-blue-500 shadow-lg shadow-blue-500/30",
-        status === "success" &&
-          "border-green-500 shadow-lg shadow-green-500/20",
-        status === "error" && "border-red-500 shadow-lg shadow-red-500/20"
+          (isUsingLiveNode || isLiveExecution 
+            ? "animate-pulse border-blue-500 shadow-lg shadow-blue-500/30 ring-2 ring-blue-500/20" 
+            : "animate-pulse border-blue-500 shadow-lg shadow-blue-500/30"),
+        status === "completed" &&
+          (isUsingLiveNode || isLiveExecution
+            ? "border-green-500 shadow-lg shadow-green-500/20 ring-2 ring-green-500/20"
+            : "border-green-500 shadow-lg shadow-green-500/20"),
+        status === "failed" && 
+          (isUsingLiveNode || isLiveExecution
+            ? "border-red-500 shadow-lg shadow-red-500/20 ring-2 ring-red-500/20"
+            : "border-red-500 shadow-lg shadow-red-500/20"),
+        // Live connection indicators
+        isUsingLiveNode && "ring-1 ring-emerald-500/20",
+        isConnectedToLive && data.executionId && "ring-1 ring-blue-500/10"
       )}
       style={{
         width: nodeWidth,
         height: nodeHeight ? `${nodeHeight}px` : "auto",
         minHeight: nodeHeight ? `${nodeHeight}px` : undefined,
       }}>
+      
+      {/* Live execution indicator */}
+      {liveIndicator}
       {/* Header */}
       <div
         className={cn(
@@ -346,9 +530,9 @@ export default function CustomNode({
             </button>
           </div>
           <div className='p-3 max-h-64 overflow-y-auto'>
-            {data.logs && data.logs.length > 0 ? (
+            {currentLogs && currentLogs.length > 0 ? (
               <div className='space-y-2'>
-                {data.logs.map((log, index) => (
+                {currentLogs.map((log, index) => (
                   <div
                     key={index}
                     className={cn(

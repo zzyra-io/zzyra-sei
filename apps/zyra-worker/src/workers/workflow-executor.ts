@@ -14,6 +14,8 @@ import {
   NotificationService,
   NotificationType,
 } from '../services/notification.service';
+import { ExecutionMonitorService } from '../services/execution-monitor.service';
+import { MultiLevelCircuitBreakerService, ExecutionContext } from '../services/multi-level-circuit-breaker.service';
 import { BlockType, getEnhancedBlockSchema } from '@zyra/types';
 
 @Injectable()
@@ -26,6 +28,8 @@ export class WorkflowExecutor {
     private readonly nodeExecutor: NodeExecutor,
     private readonly executionLogger: ExecutionLogger,
     private readonly notificationService: NotificationService,
+    private readonly executionMonitorService: ExecutionMonitorService,
+    private readonly multiLevelCircuitBreaker: MultiLevelCircuitBreakerService,
   ) {}
 
   /**
@@ -223,6 +227,9 @@ export class WorkflowExecutor {
     const activeNodeExecutions = new Set<string>();
     let workflowId: string = 'unknown';
 
+    // Define execution context for circuit breaker - accessible in both try and catch blocks
+    let executionContext: ExecutionContext;
+
     try {
       // Fetch execution details to get workflow info
       const execution =
@@ -285,6 +292,40 @@ export class WorkflowExecutor {
       validateAcyclic(nodes, edges);
       validateOrphans(nodes, edges);
       validateTerminals(nodes, edges);
+
+      // Check multi-level circuit breaker before execution
+      executionContext = {
+        workflowId,
+        userId,
+        executionId
+      };
+
+      const circuitCheck = await this.multiLevelCircuitBreaker.shouldAllowExecution(executionContext);
+      if (!circuitCheck.allowed) {
+        const error = `Execution blocked by ${circuitCheck.blockedBy?.level} circuit breaker: ${circuitCheck.reason}`;
+        this.logger.error(`[executionId=${executionId}] ${error}`);
+        
+        // Log the circuit breaker block
+        await this.executionLogger.logExecutionEvent(executionId, {
+          level: 'error',
+          message: `Workflow execution blocked: ${error}`,
+          node_id: 'system',
+          data: { 
+            circuitLevel: circuitCheck.blockedBy?.level,
+            circuitId: circuitCheck.blockedBy?.circuitId,
+            reason: circuitCheck.reason
+          },
+        });
+
+        // Record the execution as failed due to circuit breaker
+        await this.executionMonitorService.failExecution(executionId, error);
+
+        return {
+          status: 'failed',
+          outputs: {},
+          error
+        };
+      }
 
       // Check for type compatibility issues
       const typeCompatibilityIssues = this.checkTypeCompatibility(nodes, edges);
@@ -410,6 +451,14 @@ export class WorkflowExecutor {
         },
       });
 
+      // Start real-time monitoring for this execution
+      await this.executionMonitorService.startExecution(
+        executionId,
+        workflowId,
+        sortedNodes.length,
+        { nodes, edges }
+      );
+
       // Execute each node in order
       for (const node of sortedNodes) {
         // Check if we need to start executing from this node
@@ -462,35 +511,135 @@ export class WorkflowExecutor {
             );
           }
 
-          // Update block status to running
+          // Update block status to running and send real-time update
+          const startTime = new Date();
           await this.databaseService.prisma.blockExecution.update({
             where: { id: blockExecution.id },
             data: {
               status: 'running',
-              startTime: new Date(),
+              startTime: startTime,
             },
           });
 
-          // Execute the node
-          outputs[node.id] = await this.nodeExecutor.executeNode(
-            node,
+          // Send real-time update: node execution started
+          await this.executionMonitorService.updateNodeExecution({
             executionId,
-            userId,
-            relevantOutputs,
-          );
+            nodeId: node.id,
+            status: 'running',
+            nodeType: node.data?.type || node.data?.blockType || node.type,
+            nodeLabel: node.data?.label || node.data?.name || node.id,
+            startTime: startTime,
+          });
+
+          // Execute the node with enhanced data validation
+          try {
+            // Validate input data before execution
+            const inputValidationResult = await this.validateNodeInputData(
+              node,
+              relevantOutputs,
+              executionId
+            );
+
+            if (!inputValidationResult.isValid) {
+              throw new Error(
+                `Input validation failed for node ${node.id}: ${inputValidationResult.errors.join(', ')}`
+              );
+            }
+
+            // Execute the node
+            const nodeOutput = await this.nodeExecutor.executeNode(
+              node,
+              executionId,
+              userId,
+              relevantOutputs,
+            );
+
+            // Validate output data after execution
+            const outputValidationResult = await this.validateNodeOutputData(
+              node,
+              nodeOutput,
+              executionId
+            );
+
+            if (!outputValidationResult.isValid) {
+              this.logger.warn(
+                `Output validation warnings for node ${node.id}: ${outputValidationResult.errors.join(', ')}`,
+                { executionId, nodeId: node.id }
+              );
+              
+              // Log validation warnings but don't fail execution
+              await this.executionLogger.logExecutionEvent(executionId, {
+                level: 'warn',
+                message: `Output validation warnings for node ${node.id}`,
+                node_id: node.id,
+                data: {
+                  validation_errors: outputValidationResult.errors,
+                  output_data: nodeOutput,
+                },
+              });
+            }
+
+            outputs[node.id] = nodeOutput;
+
+          } catch (nodeError) {
+            // Handle node execution error
+            const endTime = new Date();
+            const duration = endTime.getTime() - startTime.getTime();
+
+            // Update block status to failed
+            await this.databaseService.prisma.blockExecution.update({
+              where: { id: blockExecution.id },
+              data: {
+                status: 'failed',
+                endTime: endTime,
+                output: null,
+              },
+            });
+
+            // Send real-time update: node execution failed
+            await this.executionMonitorService.updateNodeExecution({
+              executionId,
+              nodeId: node.id,
+              status: 'failed',
+              error: nodeError instanceof Error ? nodeError.message : String(nodeError),
+              duration,
+              nodeType: node.data?.type || node.data?.blockType || node.type,
+              nodeLabel: node.data?.label || node.data?.name || node.id,
+              startTime: startTime,
+              endTime: endTime,
+            });
+
+            throw nodeError; // Re-throw to fail the workflow
+          }
 
           // Update block status to completed
+          const endTime = new Date();
+          const duration = endTime.getTime() - startTime.getTime();
+          
           await this.databaseService.prisma.blockExecution.update({
             where: { id: blockExecution.id },
             data: {
               status: 'completed',
-              endTime: new Date(),
+              endTime: endTime,
               output: outputs[node.id],
             },
           });
 
+          // Send real-time update: node execution completed
+          await this.executionMonitorService.updateNodeExecution({
+            executionId,
+            nodeId: node.id,
+            status: 'completed',
+            output: outputs[node.id],
+            duration,
+            nodeType: node.data?.type || node.data?.blockType || node.type,
+            nodeLabel: node.data?.label || node.data?.name || node.id,
+            startTime: startTime,
+            endTime: endTime,
+          });
+
           this.logger.log(
-            `[executionId=${executionId}] Completed node ${node.id}`,
+            `[executionId=${executionId}] Completed node ${node.id} in ${duration}ms`,
           );
 
           // Remove from active executions after successful completion
@@ -519,6 +668,9 @@ export class WorkflowExecutor {
         `[executionId=${executionId}] Workflow completed successfully in ${duration}s`,
       );
 
+      // Send real-time update: workflow completed
+      await this.executionMonitorService.completeExecution(executionId, outputs);
+
       // Log workflow completion
       await this.executionLogger.logExecutionEvent(executionId, {
         level: 'info',
@@ -530,6 +682,9 @@ export class WorkflowExecutor {
         },
       });
 
+      // Record successful execution in circuit breaker
+      await this.multiLevelCircuitBreaker.recordSuccess(executionContext);
+
       finalStatus = 'completed';
       finalError = null;
     } catch (error) {
@@ -540,6 +695,9 @@ export class WorkflowExecutor {
       );
       span.recordException(error as Error);
       span.setStatus({ code: 2, message: finalError });
+
+      // Record failure in circuit breaker
+      await this.multiLevelCircuitBreaker.recordFailure(executionContext, error as Error);
 
       // Update workflow execution status to failed
       await this.databaseService.executions.updateStatus(
@@ -576,6 +734,9 @@ export class WorkflowExecutor {
           }
         }),
       );
+
+      // Send real-time update: workflow failed
+      await this.executionMonitorService.failExecution(executionId, finalError || 'Unknown error');
 
       // Log final failure event
       await this.executionLogger.logExecutionEvent(executionId, {
@@ -653,5 +814,197 @@ export class WorkflowExecutor {
         }
       }),
     );
+  }
+
+  /**
+   * Enhanced data flow validation - validate input data before node execution
+   */
+  private async validateNodeInputData(
+    node: any,
+    inputData: Record<string, any>,
+    executionId: string
+  ): Promise<{ isValid: boolean; errors: string[] }> {
+    const errors: string[] = [];
+    const nodeId = node.id;
+    const blockType = node.data?.blockType || node.data?.type || node.type;
+
+    try {
+      // Get enhanced block schema for validation
+      const enhancedSchema = getEnhancedBlockSchema(blockType as BlockType);
+      
+      if (enhancedSchema) {
+        // Validate input data against schema
+        try {
+          enhancedSchema.inputSchema.parse({
+            data: inputData,
+            context: {
+              workflowId: executionId,
+              executionId,
+              nodeId,
+              timestamp: new Date().toISOString(),
+            },
+          });
+        } catch (validationError: any) {
+          if (validationError.errors) {
+            validationError.errors.forEach((err: any) => {
+              errors.push(`${err.path?.join('.')}: ${err.message}`);
+            });
+          } else {
+            errors.push(validationError.message || 'Schema validation failed');
+          }
+        }
+      }
+
+      // Additional validation based on block type
+      switch (blockType) {
+        case BlockType.HTTP_REQUEST:
+        case BlockType.WEBHOOK:
+          if (node.data?.config?.url && !this.isValidUrl(node.data.config.url)) {
+            errors.push('Invalid URL format');
+          }
+          break;
+
+        case BlockType.EMAIL:
+          if (node.data?.config?.to && !this.isValidEmail(node.data.config.to)) {
+            errors.push('Invalid email address format');
+          }
+          break;
+
+        case BlockType.CONDITION:
+          if (!node.data?.config?.condition || node.data.config.condition.trim() === '') {
+            errors.push('Condition expression is required');
+          }
+          break;
+
+        case BlockType.DATA_TRANSFORM:
+          if (!node.data?.config?.code || node.data.config.code.trim() === '') {
+            errors.push('Transformation code is required');
+          }
+          break;
+      }
+
+      // Log validation results
+      if (errors.length > 0) {
+        await this.executionLogger.logExecutionEvent(executionId, {
+          level: 'warn',
+          message: `Input validation failed for node ${nodeId}`,
+          node_id: nodeId,
+          data: {
+            block_type: blockType,
+            validation_errors: errors,
+            input_data: inputData,
+          },
+        });
+      }
+
+    } catch (error) {
+      this.logger.error(`Error during input validation for node ${nodeId}:`, error);
+      errors.push('Validation process failed');
+    }
+
+    return { isValid: errors.length === 0, errors };
+  }
+
+  /**
+   * Enhanced data flow validation - validate output data after node execution
+   */
+  private async validateNodeOutputData(
+    node: any,
+    outputData: any,
+    executionId: string
+  ): Promise<{ isValid: boolean; errors: string[] }> {
+    const errors: string[] = [];
+    const nodeId = node.id;
+    const blockType = node.data?.blockType || node.data?.type || node.type;
+
+    try {
+      // Get enhanced block schema for validation
+      const enhancedSchema = getEnhancedBlockSchema(blockType as BlockType);
+      
+      if (enhancedSchema) {
+        // Validate output data against schema
+        try {
+          enhancedSchema.outputSchema.parse(outputData);
+        } catch (validationError: any) {
+          if (validationError.errors) {
+            validationError.errors.forEach((err: any) => {
+              errors.push(`${err.path?.join('.')}: ${err.message}`);
+            });
+          } else {
+            errors.push(validationError.message || 'Output schema validation failed');
+          }
+        }
+      }
+
+      // Additional validation based on block type
+      switch (blockType) {
+        case BlockType.HTTP_REQUEST:
+        case BlockType.WEBHOOK:
+          if (outputData && typeof outputData.status !== 'number') {
+            errors.push('HTTP response should include status code');
+          }
+          break;
+
+        case BlockType.EMAIL:
+          if (outputData && !outputData.messageId) {
+            errors.push('Email output should include messageId');
+          }
+          break;
+
+        case BlockType.CONDITION:
+          if (outputData && typeof outputData.outcome !== 'boolean') {
+            errors.push('Condition output should include boolean outcome');
+          }
+          break;
+
+        case BlockType.PRICE_MONITOR:
+          if (outputData) {
+            if (typeof outputData.price !== 'number') {
+              errors.push('Price monitor should output numeric price');
+            }
+            if (typeof outputData.conditionMet !== 'boolean') {
+              errors.push('Price monitor should output boolean conditionMet');
+            }
+          }
+          break;
+      }
+
+      // Log validation results
+      if (errors.length > 0) {
+        await this.executionLogger.logExecutionEvent(executionId, {
+          level: 'warn',
+          message: `Output validation warnings for node ${nodeId}`,
+          node_id: nodeId,
+          data: {
+            block_type: blockType,
+            validation_errors: errors,
+            output_data: outputData,
+          },
+        });
+      }
+
+    } catch (error) {
+      this.logger.error(`Error during output validation for node ${nodeId}:`, error);
+      errors.push('Output validation process failed');
+    }
+
+    return { isValid: errors.length === 0, errors };
+  }
+
+  /**
+   * Utility methods for validation
+   */
+  private isValidUrl(url: string): boolean {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   }
 }

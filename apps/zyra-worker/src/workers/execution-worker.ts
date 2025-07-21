@@ -13,6 +13,44 @@ import { ExecutionLogger } from './execution-logger';
 import { ErrorHandler } from './error-handler';
 import { DatabaseService } from '../services/database.service';
 import { RabbitMQService, QueueMessage } from '../services/rabbitmq.service';
+import { CircuitBreakerDbService } from '../lib/blockchain/CircuitBreakerDbService';
+
+// Enhanced error classification
+export enum ExecutionErrorType {
+  VALIDATION_ERROR = 'validation_error',
+  CONFIGURATION_ERROR = 'configuration_error',
+  NETWORK_ERROR = 'network_error',
+  AUTHENTICATION_ERROR = 'auth_error',
+  RATE_LIMIT_ERROR = 'rate_limit_error',
+  TIMEOUT_ERROR = 'timeout_error',
+  EXTERNAL_SERVICE_ERROR = 'external_service_error',
+  CIRCUIT_BREAKER_ERROR = 'circuit_breaker_error',
+  RESOURCE_ERROR = 'resource_error',
+  QUOTA_EXCEEDED_ERROR = 'quota_exceeded_error',
+  UNKNOWN_ERROR = 'unknown_error'
+}
+
+export class EnhancedExecutionError extends Error {
+  public readonly type: ExecutionErrorType;
+  public readonly isRetryable: boolean;
+  public readonly retryDelay: number;
+  public readonly context: Record<string, any>;
+
+  constructor(
+    type: ExecutionErrorType,
+    message: string,
+    isRetryable = false,
+    retryDelay = 1000,
+    context: Record<string, any> = {}
+  ) {
+    super(message);
+    this.type = type;
+    this.isRetryable = isRetryable;
+    this.retryDelay = retryDelay;
+    this.context = context;
+    this.name = 'EnhancedExecutionError';
+  }
+}
 
 @Global()
 @Injectable()
@@ -36,6 +74,7 @@ export class ExecutionWorker implements OnModuleInit {
     private readonly executionLogger: ExecutionLogger,
     private readonly errorHandler: ErrorHandler,
     private readonly databaseService: DatabaseService,
+    private readonly circuitBreakerService: CircuitBreakerDbService,
   ) {}
 
   async onModuleInit() {
@@ -53,6 +92,156 @@ export class ExecutionWorker implements OnModuleInit {
     }
   }
 
+  /**
+   * Classify errors for better handling and retry logic
+   */
+  private classifyError(error: any): EnhancedExecutionError {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Network errors
+    if (errorMessage.includes('fetch failed') || errorMessage.includes('ENOTFOUND') || 
+        errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ETIMEDOUT')) {
+      return new EnhancedExecutionError(
+        ExecutionErrorType.NETWORK_ERROR,
+        errorMessage,
+        true, // Retryable
+        2000, // 2 second delay
+        { originalError: error }
+      );
+    }
+
+    // Rate limit errors
+    if (errorMessage.includes('rate limit') || errorMessage.includes('429') || 
+        errorMessage.includes('too many requests')) {
+      return new EnhancedExecutionError(
+        ExecutionErrorType.RATE_LIMIT_ERROR,
+        errorMessage,
+        true, // Retryable
+        5000, // 5 second delay for rate limits
+        { originalError: error }
+      );
+    }
+
+    // Authentication errors
+    if (errorMessage.includes('unauthorized') || errorMessage.includes('401') || 
+        errorMessage.includes('403') || errorMessage.includes('invalid token')) {
+      return new EnhancedExecutionError(
+        ExecutionErrorType.AUTHENTICATION_ERROR,
+        errorMessage,
+        false, // Not retryable
+        0,
+        { originalError: error }
+      );
+    }
+
+    // Configuration errors
+    if (errorMessage.includes('missing') || errorMessage.includes('required') || 
+        errorMessage.includes('invalid configuration')) {
+      return new EnhancedExecutionError(
+        ExecutionErrorType.CONFIGURATION_ERROR,
+        errorMessage,
+        false, // Not retryable
+        0,
+        { originalError: error }
+      );
+    }
+
+    // Quota exceeded errors
+    if (errorMessage.includes('quota exceeded') || errorMessage.includes('limit exceeded')) {
+      return new EnhancedExecutionError(
+        ExecutionErrorType.QUOTA_EXCEEDED_ERROR,
+        errorMessage,
+        false, // Not retryable
+        0,
+        { originalError: error }
+      );
+    }
+
+    // Circuit breaker errors
+    if (errorMessage.includes('Circuit breaker is OPEN')) {
+      return new EnhancedExecutionError(
+        ExecutionErrorType.CIRCUIT_BREAKER_ERROR,
+        errorMessage,
+        true, // Retryable after cooldown
+        30000, // 30 second delay
+        { originalError: error }
+      );
+    }
+
+    // External service errors (5xx status codes)
+    if (errorMessage.includes('HTTP 5') || errorMessage.includes('Internal Server Error')) {
+      return new EnhancedExecutionError(
+        ExecutionErrorType.EXTERNAL_SERVICE_ERROR,
+        errorMessage,
+        true, // Retryable
+        3000, // 3 second delay
+        { originalError: error }
+      );
+    }
+
+    // Default to unknown retryable error
+    return new EnhancedExecutionError(
+      ExecutionErrorType.UNKNOWN_ERROR,
+      errorMessage,
+      true, // Default to retryable
+      1000, // 1 second delay
+      { originalError: error }
+    );
+  }
+
+  /**
+   * Enhanced retry logic with circuit breaker integration
+   */
+  private async shouldRetryExecution(
+    error: EnhancedExecutionError, 
+    executionId: string, 
+    currentRetryCount: number
+  ): Promise<{ shouldRetry: boolean; delay: number; reason: string }> {
+    const maxRetries = 3;
+    
+    // Don't retry if max retries exceeded
+    if (currentRetryCount >= maxRetries) {
+      return { 
+        shouldRetry: false, 
+        delay: 0, 
+        reason: `Maximum retries (${maxRetries}) exceeded` 
+      };
+    }
+
+    // Don't retry non-retryable errors
+    if (!error.isRetryable) {
+      return { 
+        shouldRetry: false, 
+        delay: 0, 
+        reason: `Error type ${error.type} is not retryable` 
+      };
+    }
+
+    // Check circuit breaker state
+    const circuitId = this.circuitBreakerService.generateCircuitId('execution-worker', 'workflow-execution');
+    const isAllowed = await this.circuitBreakerService.isOperationAllowed(circuitId);
+    
+    if (!isAllowed) {
+      return { 
+        shouldRetry: false, 
+        delay: 0, 
+        reason: 'Circuit breaker is OPEN' 
+      };
+    }
+
+    // Calculate delay with exponential backoff
+    const baseDelay = error.retryDelay;
+    const backoffMultiplier = Math.pow(2, currentRetryCount);
+    const jitter = Math.random() * 1000; // Add up to 1 second jitter
+    const delay = Math.min(baseDelay * backoffMultiplier + jitter, 30000); // Max 30 seconds
+
+    return { 
+      shouldRetry: true, 
+      delay, 
+      reason: `Retrying ${error.type} after ${delay}ms delay` 
+    };
+  }
+
   private async setupMessageConsumers() {
     // Setup execution queue consumer
     await this.rabbitmqService.consumeExecutions(async (message, ack, nack) => {
@@ -67,24 +256,63 @@ export class ExecutionWorker implements OnModuleInit {
         this.logger.log(
           `📥 Processing execution message: ${message.executionId}`,
         );
-        await this.processMessageFromQueue(message);
-        ack(); // Acknowledge successful processing
+        
+        // Record execution attempt in circuit breaker
+        const circuitId = this.circuitBreakerService.generateCircuitId('execution-worker', 'workflow-execution');
+        
+        try {
+          await this.processMessageFromQueue(message);
+          
+          // Record success in circuit breaker
+          await this.circuitBreakerService.recordSuccess(circuitId);
+          ack(); // Acknowledge successful processing
+        } catch (processingError) {
+          throw processingError; // Let the outer catch handle classification and retry logic
+        }
       } catch (err) {
+        // Classify the error for better handling
+        const classifiedError = this.classifyError(err);
+        
         this.logger.error(
-          `Message processing failed: ${err instanceof Error ? err.message : err}`,
+          `Message processing failed (${classifiedError.type}): ${classifiedError.message}`,
           err instanceof Error ? err.stack : undefined,
         );
         span.recordException(err as Error);
 
-        // Check if we should retry
-        const maxRetries = 3;
-        if ((message.retryCount || 0) < maxRetries) {
-          // Publish to retry queue with exponential backoff
-          const delayMs = Math.pow(2, message.retryCount || 0) * 1000;
-          await this.rabbitmqService.publishRetry(message, delayMs);
+        // Record failure in circuit breaker
+        const circuitId = this.circuitBreakerService.generateCircuitId('execution-worker', 'workflow-execution');
+        await this.circuitBreakerService.recordFailure(circuitId);
+
+        // Enhanced retry logic
+        const retryDecision = await this.shouldRetryExecution(
+          classifiedError, 
+          message.executionId, 
+          message.retryCount || 0
+        );
+
+        this.logger.log(`Retry decision for ${message.executionId}: ${retryDecision.reason}`);
+
+        if (retryDecision.shouldRetry) {
+          // Update retry count and publish to retry queue
+          const retryMessage = {
+            ...message,
+            retryCount: (message.retryCount || 0) + 1,
+          };
+          await this.rabbitmqService.publishRetry(retryMessage, retryDecision.delay);
           ack(); // Ack original message since we've queued retry
         } else {
-          // Max retries exceeded, send to DLQ
+          // No retry - log detailed failure information
+          await this.databaseService.executions.addLog(
+            message.executionId,
+            'error',
+            `Execution failed permanently: ${classifiedError.message}`,
+            {
+              error_type: classifiedError.type,
+              retry_count: message.retryCount || 0,
+              failure_reason: retryDecision.reason,
+              context: classifiedError.context,
+            },
+          );
           nack(false); // Don't requeue, goes to DLQ
         }
       } finally {
@@ -218,7 +446,17 @@ export class ExecutionWorker implements OnModuleInit {
         this.profileCache.get(userId) ||
         (await this.databaseService.getOrCreateUserProfile(userId));
       if (profile.monthlyExecutionCount >= profile.monthlyExecutionQuota) {
-        throw new Error('Monthly execution quota exceeded');
+        throw new EnhancedExecutionError(
+          ExecutionErrorType.QUOTA_EXCEEDED_ERROR,
+          'Monthly execution quota exceeded',
+          false, // Not retryable
+          0,
+          { 
+            userId, 
+            currentCount: profile.monthlyExecutionCount, 
+            quota: profile.monthlyExecutionQuota 
+          }
+        );
       }
 
       // Increment execution count

@@ -1,4 +1,4 @@
-import { BlockType } from './block-types';
+import { BlockType } from "./block-types";
 
 /**
  * FACTORY APPROACH: Generate nodes in the correct format from the start
@@ -30,24 +30,41 @@ export class WorkflowNodeFactory {
       case BlockType.WEBHOOK:
       case BlockType.SCHEDULE:
       case BlockType.PRICE_MONITOR:
-      case BlockType.WALLET_LISTENER:
-        return { nodeType: "TRIGGER" as const, iconName: "play", defaultLabel: `${blockType} Trigger` };
-      
+      case BlockType.WALLET_LISTEN:
+      case BlockType.SEI_CONTRACT_CALL:
+        return {
+          nodeType: "TRIGGER" as const,
+          iconName: "play",
+          defaultLabel: `${blockType} Trigger`,
+        };
+
       case BlockType.HTTP_REQUEST:
       case BlockType.EMAIL:
       case BlockType.NOTIFICATION:
-      case BlockType.PAYMENT:
-      case BlockType.NFT:
-      case BlockType.SMART_CONTRACT_CALL:
-        return { nodeType: "ACTION" as const, iconName: "zap", defaultLabel: `${blockType} Action` };
-      
+      case BlockType.SEI_PAYMENT:
+      case BlockType.SEI_NFT:
+      case BlockType.SEI_CONTRACT_CALL:
+        return {
+          nodeType: "ACTION" as const,
+          iconName: "zap",
+          defaultLabel: `${blockType} Action`,
+        };
+
       case BlockType.CONDITION:
       case BlockType.DATA_TRANSFORM:
       case BlockType.CUSTOM:
-        return { nodeType: "LOGIC" as const, iconName: "settings", defaultLabel: `${blockType} Logic` };
-      
+        return {
+          nodeType: "LOGIC" as const,
+          iconName: "settings",
+          defaultLabel: `${blockType} Logic`,
+        };
+
       default:
-        return { nodeType: "ACTION" as const, iconName: "box", defaultLabel: "Unknown Block" };
+        return {
+          nodeType: "ACTION" as const,
+          iconName: "box",
+          defaultLabel: "Unknown Block",
+        };
     }
   }
 
@@ -57,7 +74,7 @@ export class WorkflowNodeFactory {
   static createNode(options: NodeCreationOptions) {
     const metadata = this.getBlockMetadata(options.blockType);
     const id = `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     return {
       id,
       type: options.blockType, // React Flow uses this for component rendering
@@ -85,14 +102,14 @@ export class WorkflowNodeFactory {
    */
   static createEdge(options: EdgeCreationOptions) {
     const id = `edge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     return {
       id,
       source: options.source,
       target: options.target,
       sourceHandle: options.sourceHandle,
       targetHandle: options.targetHandle,
-      type: 'smoothstep', // React Flow edge type
+      type: "smoothstep", // React Flow edge type
       animated: options.animated || false,
     };
   }
@@ -101,14 +118,14 @@ export class WorkflowNodeFactory {
    * Batch create multiple nodes
    */
   static createNodes(nodeOptions: NodeCreationOptions[]) {
-    return nodeOptions.map(options => this.createNode(options));
+    return nodeOptions.map((options) => this.createNode(options));
   }
 
   /**
    * Batch create multiple edges
    */
   static createEdges(edgeOptions: EdgeCreationOptions[]) {
-    return edgeOptions.map(options => this.createEdge(options));
+    return edgeOptions.map((options) => this.createEdge(options));
   }
 }
 

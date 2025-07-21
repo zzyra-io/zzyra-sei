@@ -6,6 +6,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { type Edge, type Node } from "@xyflow/react";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useExecutionWebSocket, type NodeExecutionUpdate, type EdgeFlowUpdate, type ExecutionMetrics } from "./use-execution-websocket";
 
 // Define types for execution status
 export type ExecutionStatus = {
@@ -34,7 +35,7 @@ export type WorkflowExecutionParams = {
 
 // useWorkflowExecution.ts
 export function useWorkflowExecution() {
-  const { nodes, edges, workflowId, updateNode } = useWorkflowStore();
+  const { nodes, edges, workflowId, updateNode, updateEdge } = useWorkflowStore();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -43,8 +44,119 @@ export function useWorkflowExecution() {
   const [executionStartTime, setExecutionStartTime] = useState<number | null>(
     null
   );
+  const [executionMetrics, setExecutionMetrics] = useState<ExecutionMetrics | null>(null);
+  const [isRealTimeConnected, setIsRealTimeConnected] = useState(false);
 
-  // Use React Query to fetch execution status
+  // WebSocket connection for real-time updates
+  const { isConnected: wsConnected, connectionError } = useExecutionWebSocket({
+    executionId,
+    onNodeUpdate: (update: NodeExecutionUpdate) => {
+      console.log('Real-time node update:', update);
+      
+      // Update node with real-time status and enhanced visualization
+      updateNode(update.nodeId, {
+        data: {
+          ...nodes.find(n => n.id === update.nodeId)?.data,
+          status: update.status,
+          executionStatus: update.status,
+          isExecuting: update.status === 'running',
+          executionProgress: update.progress,
+          executionStartTime: update.startTime,
+          executionEndTime: update.endTime,
+          executionDuration: update.duration,
+          executionOutput: update.output,
+          executionError: update.error,
+          logs: [
+            {
+              level: update.status === 'failed' ? 'error' : 'info' as const,
+              message: `Node ${update.status === 'running' ? 'started' : 
+                         update.status === 'completed' ? 'completed' :
+                         update.status === 'failed' ? 'failed' : update.status}${
+                update.duration ? ` (${update.duration}ms)` : ''
+              }`,
+              timestamp: new Date().toLocaleTimeString(),
+              metadata: { update }
+            }
+          ]
+        },
+      });
+    },
+    onEdgeFlow: (update: EdgeFlowUpdate) => {
+      console.log('Real-time edge flow:', update);
+      
+      // Update edge with animation state
+      const edge = edges.find(e => e.id === update.edgeId || 
+        (e.source === update.sourceNodeId && e.target === update.targetNodeId));
+      
+      if (edge) {
+        updateEdge(edge.id, {
+          ...edge,
+          animated: update.status === 'flowing',
+          style: {
+            ...edge.style,
+            stroke: update.status === 'flowing' ? '#22c55e' : '#64748b',
+            strokeWidth: update.status === 'flowing' ? 3 : 2,
+          },
+          data: {
+            ...edge.data,
+            isFlowing: update.status === 'flowing',
+            flowData: update.data,
+            lastFlowTime: update.timestamp,
+          }
+        });
+        
+        // Reset edge animation after flow completes
+        if (update.status === 'completed') {
+          setTimeout(() => {
+            updateEdge(edge.id, {
+              ...edge,
+              animated: false,
+              style: {
+                ...edge.style,
+                stroke: '#64748b',
+                strokeWidth: 2,
+              },
+              data: {
+                ...edge.data,
+                isFlowing: false,
+              }
+            });
+          }, 2000);
+        }
+      }
+    },
+    onExecutionComplete: (data) => {
+      console.log('Real-time execution completed:', data);
+      toast({
+        title: "Execution Complete",
+        description: `Workflow executed successfully in ${data.duration}ms`,
+      });
+    },
+    onExecutionFailed: (data) => {
+      console.log('Real-time execution failed:', data);
+      toast({
+        title: "Execution Failed",
+        description: data.error,
+        variant: "destructive",
+      });
+    },
+    onMetricsUpdate: (metrics) => {
+      console.log('Real-time metrics update:', metrics);
+      setExecutionMetrics(metrics);
+    },
+    onExecutionLog: (log) => {
+      console.log('Real-time execution log:', log);
+      // This will be handled by the builder page to collect logs
+      // We don't store logs in this hook to avoid memory issues
+    },
+  });
+
+  // Update connection status
+  useEffect(() => {
+    setIsRealTimeConnected(wsConnected);
+  }, [wsConnected]);
+
+  // Use React Query to fetch execution status (fallback for non-WebSocket updates)
   const { data: executionStatus, isLoading: isLoadingStatus } = useQuery({
     queryKey: ["executionStatus", executionId],
     queryFn: async () => {
@@ -337,5 +449,9 @@ export function useWorkflowExecution() {
     isExecuting: isPending,
     executionStatus,
     isLoadingStatus,
+    executionMetrics,
+    isRealTimeConnected,
+    connectionError,
+    executionId,
   };
 }

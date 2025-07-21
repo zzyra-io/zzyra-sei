@@ -29,12 +29,17 @@ import NlWorkflowGenerator from "@/components/workflow/enhanced-nl-workflow-gene
 import { useSaveAndExecute } from "@/hooks/use-save-and-execute";
 import { useCreateCustomBlock } from "@/hooks/use-custom-blocks";
 import { useWorkflowExecution } from "@/hooks/use-workflow-execution";
+import { useExecutionWebSocket } from "@/hooks/use-execution-websocket";
+import { ExecutionMetricsPanel } from "@/components/execution-metrics-panel";
+import { ExecutionHistoryPanel } from "@/components/execution-history-panel";
 import { generateFlow } from "@/lib/api";
 import { refineWorkflow } from "@/lib/api/workflow-generation";
 import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
 import { workflowService } from "@/lib/services/workflow-service";
 import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
-import { BlockType, CustomBlockDefinition, UnifiedWorkflowNode, UnifiedWorkflowEdge, prepareNodesForApi, prepareEdgesForApi, ensureValidWorkflowNode } from "@zyra/types";
+import { BlockType, CustomBlockDefinition } from "@zyra/types";
+import type { UnifiedWorkflowNode, UnifiedWorkflowEdge } from "@zyra/types";
+import { ensureValidWorkflowNode, prepareNodesForApi, prepareEdgesForApi } from "@zyra/types";
 import { ArrowLeft, Loader2, Play, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -65,7 +70,6 @@ export default function BuilderPage() {
     setHasUnsavedChanges,
     isGenerating,
     isRefining,
-    isLoading,
     setGenerating,
     setRefining,
     setLoading,
@@ -82,7 +86,7 @@ export default function BuilderPage() {
 
   const toolbar = useFlowToolbar();
   const { validateWorkflow } = useWorkflowValidation();
-  const { mutateAsync: saveAndExecute } = useSaveAndExecute();
+  useSaveAndExecute();
   const { mutateAsync: createCustomBlock } = useCreateCustomBlock();
   // Other hooks
   const { toast } = useToast();
@@ -206,7 +210,7 @@ export default function BuilderPage() {
   ]);
 
   // Prepare nodes for API calls - ensures all required fields are present
-  const prepareNodesForApiCall = useCallback((nodes: Node[]): UnifiedWorkflowNode[] => {
+  const prepareNodesForApi = useCallback((nodes: Node[]): UnifiedWorkflowNode[] => {
     return prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node as UnifiedWorkflowNode)));
   }, []);
 
@@ -215,9 +219,8 @@ export default function BuilderPage() {
     if (workflowId && initialId && hasUnsavedChanges && workflowName) {
       const autoSaveTimeoutId = setTimeout(async () => {
         try {
-          const apiNodes = prepareNodesForApiCall(nodes);
-          const apiEdges = prepareEdgesForApi(edges as UnifiedWorkflowEdge[]);
-          await workflowService.updateWorkflow(workflowId, {
+          const apiNodes = prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node)));
+            await workflowService.updateWorkflow(workflowId, {
             name: workflowName,
             description: workflowDescription,
             nodes: apiNodes,
@@ -246,7 +249,7 @@ export default function BuilderPage() {
     workflowName,
     workflowDescription,
     toast,
-    prepareNodesForApiCall,
+    prepareNodesForApi,
   ]);
 
   // Handlers using store actions
@@ -254,12 +257,10 @@ export default function BuilderPage() {
     (blockType: BlockType, position?: { x: number; y: number }) => {
       const newNode: UnifiedWorkflowNode = ensureValidWorkflowNode({
         id: `${Date.now()}`,
-        type: blockType,
         position: position || { x: 100, y: 100 },
         data: {
           blockType: blockType,
           label: `${blockType} Node`,
-          config: {},
         },
       });
       addNode(newNode as Node);
@@ -295,10 +296,30 @@ export default function BuilderPage() {
     isExecuting: isExecutionPending,
     executionStatus,
     isLoadingStatus,
+    executionMetrics,
+    isRealTimeConnected,
+    connectionError,
+    executionId,
   } = useWorkflowExecution();
 
   // State to control execution panel visibility
   const [showExecutionPanel, setShowExecutionPanel] = useState(false);
+  const [executionLogs, setExecutionLogs] = useState<any[]>([]);
+
+  // Enhanced WebSocket connection for collecting logs
+  useExecutionWebSocket({
+    executionId: executionId || undefined,
+    onExecutionLog: (log) => {
+      setExecutionLogs(prev => [...prev.slice(-49), log]); // Keep last 50 logs
+    },
+  });
+
+  // Reset logs when starting a new execution
+  useEffect(() => {
+    if (executionId) {
+      setExecutionLogs([]);
+    }
+  }, [executionId]);
 
   // Show execution panel when execution is pending or we have a status
   useEffect(() => {
@@ -333,12 +354,11 @@ export default function BuilderPage() {
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const apiNodes = prepareNodesForApiCall(nodes);
-        const apiEdges = prepareEdgesForApi(edges as UnifiedWorkflowEdge[]);
+        const apiNodes = prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node)));
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
-          nodes: normalizedNodes,
+          nodes: apiNodes,
           edges,
           is_public: false,
           tags,
@@ -373,7 +393,7 @@ export default function BuilderPage() {
       setWorkflowId,
       setHasUnsavedChanges,
       setLoading,
-      prepareNodesForApiCall,
+      prepareNodesForApi,
     ]
   );
 
@@ -381,8 +401,7 @@ export default function BuilderPage() {
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const apiNodes = prepareNodesForApiCall(nodes);
-        const apiEdges = prepareEdgesForApi(edges as UnifiedWorkflowEdge[]);
+        const apiNodes = prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node)));
         if (workflowId && initialId) {
           await workflowService.updateWorkflow(workflowId, {
             name,
@@ -420,7 +439,7 @@ export default function BuilderPage() {
       toast,
       setHasUnsavedChanges,
       setLoading,
-      prepareNodesForApiCall,
+      prepareNodesForApi,
     ]
   );
 
@@ -428,12 +447,11 @@ export default function BuilderPage() {
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const apiNodes = prepareNodesForApiCall(nodes);
-        const apiEdges = prepareEdgesForApi(edges as UnifiedWorkflowEdge[]);
+        const apiNodes = prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node)));
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
-          nodes: normalizedNodes,
+          nodes: apiNodes,
           edges,
           is_public: false,
           tags,
@@ -469,7 +487,7 @@ export default function BuilderPage() {
       setWorkflowId,
       setHasUnsavedChanges,
       setLoading,
-      prepareNodesForApiCall,
+      prepareNodesForApi,
       resetFlow,
     ]
   );
@@ -917,6 +935,44 @@ export default function BuilderPage() {
                 </div>
               )}
             </ResizablePanel>
+
+            {/* Enhanced Execution Monitoring Panels */}
+            {(showExecutionPanel || isExecutionPending || executionId) && (
+              <>
+                <ResizableHandle />
+                <ResizablePanel
+                  defaultSize={30}
+                  minSize={25}
+                  maxSize={40}
+                  className='h-full'>
+                  <div className='h-full flex flex-col gap-4 p-4'>
+                    {/* Real-time Execution Metrics */}
+                    <div className='flex-1'>
+                      <ExecutionMetricsPanel 
+                        metrics={executionMetrics}
+                        isConnected={isRealTimeConnected}
+                      />
+                    </div>
+                    
+                    {/* Execution History and Logs */}
+                    <div className='flex-1'>
+                      <ExecutionHistoryPanel
+                        logs={executionLogs}
+                        isConnected={isRealTimeConnected}
+                        executionId={executionId || undefined}
+                      />
+                    </div>
+
+                    {/* Connection Status Indicator */}
+                    {connectionError && (
+                      <div className='p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs'>
+                        WebSocket Error: {connectionError}
+                      </div>
+                    )}
+                  </div>
+                </ResizablePanel>
+              </>
+            )}
           </ResizablePanelGroup>
 
           {/* AI Workflow Generation Component */}

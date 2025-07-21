@@ -10,11 +10,9 @@ export * from "./categories";
 export * from "./custom-block";
 export * from "./execution";
 export * from "./metadata";
-export * from "./workflow-node";
 export * from "./node-utils";
 export * from "./unified-types";
-export * from "./node-factory";
-export * from "./node-schemas";
+export * from "./workflow-node";
 
 // Export functions
 export { getBlockMetadata, getBlockType } from "./metadata";
