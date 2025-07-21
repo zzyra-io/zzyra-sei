@@ -1,21 +1,19 @@
-import { BlockType } from "@zyra/types";
 import { ComponentType } from "react";
-import { DataTransformConfig } from "@/components/block-configs/data-transform-config";
-import { CalculatorConfig } from "@/components/block-configs/calculator-config";
-import { ComparatorConfig } from "@/components/block-configs/comparator-config";
-import { DatabaseConfig } from "@/components/block-configs/database-config";
-import { DelayConfig } from "@/components/block-configs/delay-config";
-import { TransformConfig } from "@/components/block-configs/transform-config";
-import { HttpRequestConfig } from "@/components/block-configs/http-request-config";
-import { PriceMonitorConfig } from "@/components/block-configs/price-monitor-config";
-import { EmailConfig } from "@/components/block-configs/email-config";
-import { NotificationConfig } from "@/components/block-configs/notification-config";
-import { ScheduleConfig } from "@/components/block-configs/schedule-config";
-import { WebhookConfig } from "@/components/block-configs/webhook-config";
-import { CustomConfig } from "@/components/block-configs/custom-config";
-import { WalletListenerConfig } from "@/components/block-configs/wallet-listen-config";
+import { BlockType } from "@zyra/types";
 
-export interface BlockConfigComponentProps {
+// Existing block config imports
+import { HttpRequestConfig } from "@/components/block-configs/http-request-config";
+import { NotificationConfig } from "@/components/block-configs/notification-config";
+import { CustomConfig } from "@/components/block-configs/custom-config";
+
+// Sei block config imports
+import SeiWalletListenerConfig from "@/components/block-configs/sei/SeiWalletListenerConfig";
+import SeiSmartContractCallConfig from "@/components/block-configs/sei/SeiSmartContractCallConfig";
+import SeiOnchainDataFetchConfig from "@/components/block-configs/sei/SeiOnchainDataFetchConfig";
+import SeiPaymentConfig from "@/components/block-configs/sei/SeiPaymentConfig";
+import SeiNftConfig from "@/components/block-configs/sei/SeiNftConfig";
+
+interface BlockConfigComponent {
   config: Record<string, unknown>;
   onChange: (config: Record<string, unknown>) => void;
   executionStatus?: "idle" | "running" | "success" | "error" | "warning";
@@ -29,68 +27,50 @@ export interface BlockConfigComponentProps {
   onTest?: () => void;
 }
 
-type BlockConfigComponent = ComponentType<BlockConfigComponentProps>;
+type BlockConfigComponentType = ComponentType<BlockConfigComponent>;
 
 class BlockConfigRegistry {
-  private configs = new Map<BlockType | string, BlockConfigComponent>();
+  private registry = new Map<BlockType, BlockConfigComponentType>();
 
-  register(blockType: BlockType | string, component: BlockConfigComponent) {
-    this.configs.set(blockType, component);
+  register(blockType: BlockType, component: BlockConfigComponentType) {
+    this.registry.set(blockType, component);
   }
 
-  get(blockType: BlockType | string): BlockConfigComponent | undefined {
-    console.log("BlockConfigRegistry.get called with:", blockType);
-    console.log("Available registered types:", Array.from(this.configs.keys()));
-
-    // Try exact match first
-    const exactMatch = this.configs.get(blockType);
-    if (exactMatch) {
-      console.log("Found exact match for:", blockType);
-      return exactMatch;
-    }
-
-    // Try case-insensitive match
-    const upperBlockType = blockType.toUpperCase();
-    for (const [key, component] of Array.from(this.configs.entries())) {
-      if (key.toUpperCase() === upperBlockType) {
-        console.log("Found case-insensitive match:", blockType, "->", key);
-        return component;
-      }
-    }
-
-    console.log("No match found for:", blockType);
-    return undefined;
+  get(blockType: BlockType): BlockConfigComponentType | undefined {
+    return this.registry.get(blockType);
   }
 
-  has(blockType: BlockType | string): boolean {
-    return this.configs.has(blockType);
+  getAll(): [BlockType, BlockConfigComponentType][] {
+    return Array.from(this.registry.entries());
   }
 
-  getAllRegisteredTypes(): (BlockType | string)[] {
-    return Array.from(this.configs.keys());
+  has(blockType: BlockType): boolean {
+    return this.registry.has(blockType);
   }
 }
 
-// Create singleton instance
-export const blockConfigRegistry = new BlockConfigRegistry();
+const blockConfigRegistry = new BlockConfigRegistry();
 
-// Register the Data Transform config component
-blockConfigRegistry.register("DATA_TRANSFORM", DataTransformConfig);
+// Register existing block components
+blockConfigRegistry.register(BlockType.HTTP_REQUEST, HttpRequestConfig);
+blockConfigRegistry.register(BlockType.NOTIFICATION, NotificationConfig);
+blockConfigRegistry.register(BlockType.CUSTOM, CustomConfig);
 
-// Register additional config components that don't self-register
-blockConfigRegistry.register("CALCULATOR", CalculatorConfig);
-blockConfigRegistry.register("COMPARATOR", ComparatorConfig);
-blockConfigRegistry.register("DATABASE", DatabaseConfig);
-blockConfigRegistry.register("DELAY", DelayConfig);
-blockConfigRegistry.register("WALLET_LISTEN", WalletListenerConfig);
-blockConfigRegistry.register("TRANSFORM", TransformConfig);
-blockConfigRegistry.register("HTTP_REQUEST", HttpRequestConfig);
-blockConfigRegistry.register("PRICE_MONITOR", PriceMonitorConfig);
-blockConfigRegistry.register("EMAIL", EmailConfig);
-blockConfigRegistry.register("NOTIFICATION", NotificationConfig);
-blockConfigRegistry.register("SCHEDULE", ScheduleConfig);
-blockConfigRegistry.register("WEBHOOK", WebhookConfig);
-blockConfigRegistry.register("CUSTOM", CustomConfig);
+// Register Sei blockchain block components
+blockConfigRegistry.register(
+  BlockType.SEI_WALLET_LISTEN,
+  SeiWalletListenerConfig
+);
+blockConfigRegistry.register(
+  BlockType.SEI_CONTRACT_CALL,
+  SeiSmartContractCallConfig
+);
+blockConfigRegistry.register(
+  BlockType.SEI_DATA_FETCH,
+  SeiOnchainDataFetchConfig
+);
+blockConfigRegistry.register(BlockType.SEI_PAYMENT, SeiPaymentConfig);
+blockConfigRegistry.register(BlockType.SEI_NFT, SeiNftConfig);
 
-// Export the registry instance
-export default blockConfigRegistry;
+export { blockConfigRegistry };
+export type { BlockConfigComponentType };

@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { BlockType } from "../workflow/block-types";
 import { walletListenerSchema } from "./blockchains/wallet-listener/schema";
+import {
+  seiWalletListenerSchema,
+  seiSmartContractCallSchema,
+  seiOnchainDataFetchSchema,
+  seiPaymentSchema,
+  seiNftSchema,
+} from "./blockchains/sei";
 
 /**
  * Enhanced block schema definition with input/output schemas
@@ -440,6 +447,11 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
   [BlockType.CUSTOM]: enhancedCustomSchema.configSchema,
   [BlockType.DATA_TRANSFORM]: enhancedDataTransformSchema.configSchema,
   [BlockType.WALLET_LISTEN]: walletListenerSchema.configSchema,
+  [BlockType.SEI_WALLET_LISTEN]: seiWalletListenerSchema.configSchema,
+  [BlockType.SEI_CONTRACT_CALL]: seiSmartContractCallSchema.configSchema,
+  [BlockType.SEI_DATA_FETCH]: seiOnchainDataFetchSchema.configSchema,
+  [BlockType.SEI_PAYMENT]: seiPaymentSchema.configSchema,
+  [BlockType.SEI_NFT]: seiNftSchema.configSchema,
   [BlockType.UNKNOWN]: z.any(),
 };
 
@@ -460,6 +472,11 @@ export const enhancedBlockSchemas: Partial<
   [BlockType.CUSTOM]: enhancedCustomSchema,
   [BlockType.DATA_TRANSFORM]: enhancedDataTransformSchema,
   [BlockType.WALLET_LISTEN]: walletListenerSchema,
+  [BlockType.SEI_WALLET_LISTEN]: seiWalletListenerSchema,
+  [BlockType.SEI_CONTRACT_CALL]: seiSmartContractCallSchema,
+  [BlockType.SEI_DATA_FETCH]: seiOnchainDataFetchSchema,
+  [BlockType.SEI_PAYMENT]: seiPaymentSchema,
+  [BlockType.SEI_NFT]: seiNftSchema,
 };
 
 /**

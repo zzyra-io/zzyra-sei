@@ -17,6 +17,7 @@ export {
 
 // Export blockchain schemas
 export { walletListenerSchema } from "./schemas/blockchains/wallet-listener/schema";
+export * from "./schemas/blockchains/sei";
 
 // Export metadata catalog
 export { BLOCK_CATALOG } from "./workflow/metadata";

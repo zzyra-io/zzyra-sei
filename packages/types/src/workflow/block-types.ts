@@ -15,6 +15,14 @@ export enum BlockType {
   CUSTOM = "CUSTOM",
   DATA_TRANSFORM = "DATA_TRANSFORM", // New transformation block
   WALLET_LISTEN = "WALLET_LISTEN",
+  
+  // Sei blockchain blocks
+  SEI_WALLET_LISTEN = "SEI_WALLET_LISTEN",
+  SEI_CONTRACT_CALL = "SEI_CONTRACT_CALL",
+  SEI_DATA_FETCH = "SEI_DATA_FETCH",
+  SEI_PAYMENT = "SEI_PAYMENT",
+  SEI_NFT = "SEI_NFT",
+  
   // Default/unknown
   UNKNOWN = "UNKNOWN",
 }
@@ -35,4 +43,9 @@ export const BLOCK_TYPES = [
   "CUSTOM",
   "DATA_TRANSFORM", // New transformation block
   "WALLET_LISTEN",
+  "SEI_WALLET_LISTEN",
+  "SEI_CONTRACT_CALL",
+  "SEI_DATA_FETCH",
+  "SEI_PAYMENT",
+  "SEI_NFT",
 ] as const;
