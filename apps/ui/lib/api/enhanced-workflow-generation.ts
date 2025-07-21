@@ -25,12 +25,12 @@ interface WorkflowEdge {
 
 // Validation interfaces
 interface ValidationError {
-  type: 'schema' | 'business' | 'graph' | 'security';
+  type: "schema" | "business" | "graph" | "security";
   code: string;
   message: string;
   nodeId?: string;
   edgeId?: string;
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
 }
 
 interface ValidationWarning {
@@ -51,8 +51,12 @@ interface ValidationResult {
 
 // Security interfaces
 interface SecurityIssue {
-  type: 'prompt_injection' | 'code_injection' | 'sensitive_data' | 'malicious_pattern';
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  type:
+    | "prompt_injection"
+    | "code_injection"
+    | "sensitive_data"
+    | "malicious_pattern";
+  severity: "low" | "medium" | "high" | "critical";
   description: string;
   location?: string;
   suggestion?: string;
@@ -72,7 +76,7 @@ interface VersionInfo {
   description?: string;
   createdAt: string;
   createdBy: string;
-  status: 'draft' | 'active' | 'archived' | 'deprecated';
+  status: "draft" | "active" | "archived" | "deprecated";
 }
 
 interface VersionDiff {
@@ -111,7 +115,7 @@ interface GenerationOptions {
   detailedMode: boolean;
   prefillConfig: boolean;
   domainHint?: string;
-  userLevel?: 'beginner' | 'intermediate' | 'expert';
+  userLevel?: "beginner" | "intermediate" | "expert";
   enableSecurity?: boolean;
   enableValidation?: boolean;
   autoHeal?: boolean;
@@ -126,7 +130,7 @@ interface RefinementOptions {
 interface GenerationMetadata {
   workflowId?: string;
   createVersion?: boolean;
-  userLevel?: 'beginner' | 'intermediate' | 'expert';
+  userLevel?: "beginner" | "intermediate" | "expert";
   parentVersionId?: string;
   tags?: string[];
 }
@@ -161,19 +165,19 @@ type StatusCallback = (
 // Utility functions for user context
 function getUserId(): string {
   // Get from auth context or localStorage
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('userId') || 'anonymous';
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("userId") || "anonymous";
   }
-  return 'anonymous';
+  return "anonymous";
 }
 
 function getSessionId(): string {
   // Generate or get existing session ID
-  if (typeof window !== 'undefined') {
-    let sessionId = sessionStorage.getItem('sessionId');
+  if (typeof window !== "undefined") {
+    let sessionId = sessionStorage.getItem("sessionId");
     if (!sessionId) {
       sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-      sessionStorage.setItem('sessionId', sessionId);
+      sessionStorage.setItem("sessionId", sessionId);
     }
     return sessionId;
   }
@@ -181,7 +185,7 @@ function getSessionId(): string {
 }
 
 function getClientMetadata() {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     return {
       userAgent: navigator.userAgent,
       timestamp: new Date().toISOString(),
@@ -235,7 +239,7 @@ export const generateWorkflow = async (
 
     onStatusUpdate?.("Understanding requirements...", 20);
 
-    const response = await api.post("/ai/enhanced/generate-workflow", requestData);
+    const response = await api.post("/ai/generate-workflow", requestData);
 
     if (response.status !== 200 && response.status !== 201) {
       throw new Error(`Generation failed: ${response.statusText}`);
@@ -248,57 +252,62 @@ export const generateWorkflow = async (
     // Handle security validation
     if (result.securityResult) {
       onStatusUpdate?.(
-        "Security validation complete", 
-        60, 
-        undefined, 
-        undefined, 
+        "Security validation complete",
+        60,
+        undefined,
+        undefined,
         result.securityResult
       );
-      
+
       if (!result.securityResult.isSecure) {
-        console.warn('Security issues detected:', result.securityResult.issues);
+        console.warn("Security issues detected:", result.securityResult.issues);
       }
     }
 
     // Handle validation results
     if (result.validationResult) {
       onStatusUpdate?.(
-        "Workflow validation complete", 
-        70, 
-        undefined, 
+        "Workflow validation complete",
+        70,
+        undefined,
         result.validationResult
       );
-      
+
       if (result.validationResult.errors.length > 0) {
-        console.warn('Validation errors found:', result.validationResult.errors);
+        console.warn(
+          "Validation errors found:",
+          result.validationResult.errors
+        );
       }
-      
+
       if (result.validationResult.correctedWorkflow) {
-        console.info('Auto-corrections applied to workflow');
+        console.info("Auto-corrections applied to workflow");
       }
 
       if (result.validationResult.warnings.length > 0) {
-        console.info('Validation warnings:', result.validationResult.warnings);
+        console.info("Validation warnings:", result.validationResult.warnings);
       }
     }
 
     // Handle versioning
     if (result.versionInfo) {
       onStatusUpdate?.("Version created", 80);
-      console.info(`Created workflow version ${result.versionInfo.version}: ${result.versionInfo.name}`);
+      console.info(
+        `Created workflow version ${result.versionInfo.version}: ${result.versionInfo.name}`
+      );
     }
 
     // Report metrics
     if (result.metrics) {
       onStatusUpdate?.(
-        "Generation metrics calculated", 
-        90, 
-        undefined, 
-        undefined, 
-        undefined, 
+        "Generation metrics calculated",
+        90,
+        undefined,
+        undefined,
+        undefined,
         result.metrics
       );
-      console.info('Generation metrics:', result.metrics);
+      console.info("Generation metrics:", result.metrics);
     }
 
     onStatusUpdate?.("Complete", 100);
@@ -356,7 +365,7 @@ export const refineWorkflow = async (
 
     onStatusUpdate?.("Processing refinement...", 30);
 
-    const response = await api.post("/ai/enhanced/refine-workflow", requestData);
+    const response = await api.post("/ai/refine-workflow", requestData);
 
     if (response.status !== 200 && response.status !== 201) {
       throw new Error(`Refinement failed: ${response.statusText}`);
@@ -369,32 +378,35 @@ export const refineWorkflow = async (
     // Handle validation results
     if (result.validationResult) {
       onStatusUpdate?.(
-        "Validating refined workflow...", 
-        80, 
-        undefined, 
+        "Validating refined workflow...",
+        80,
+        undefined,
         result.validationResult
       );
-      
+
       if (result.validationResult.errors.length > 0) {
-        console.warn('Validation errors in refined workflow:', result.validationResult.errors);
+        console.warn(
+          "Validation errors in refined workflow:",
+          result.validationResult.errors
+        );
       }
-      
+
       if (result.validationResult.warnings.length > 0) {
-        console.info('Validation warnings:', result.validationResult.warnings);
+        console.info("Validation warnings:", result.validationResult.warnings);
       }
     }
 
     // Report metrics
     if (result.metrics) {
       onStatusUpdate?.(
-        "Refinement complete", 
-        90, 
-        undefined, 
-        undefined, 
-        undefined, 
+        "Refinement complete",
+        90,
+        undefined,
+        undefined,
+        undefined,
         result.metrics
       );
-      console.info('Refinement metrics:', result.metrics);
+      console.info("Refinement metrics:", result.metrics);
     }
 
     onStatusUpdate?.("Complete", 100);
@@ -471,7 +483,7 @@ export const generateBlock = async (
 
     onStatusUpdate?.("Generating block...", 30);
 
-    const response = await api.post("/ai/enhanced/generate-block", requestData);
+    const response = await api.post("/ai/generate-block", requestData);
 
     if (response.status !== 200 && response.status !== 201) {
       throw new Error(`Block generation failed: ${response.statusText}`);
@@ -481,7 +493,10 @@ export const generateBlock = async (
 
     if (result.securityResult && !result.securityResult.isSecure) {
       onStatusUpdate?.("Security validation failed", 50);
-      console.warn('Security issues in generated block:', result.securityResult.issues);
+      console.warn(
+        "Security issues in generated block:",
+        result.securityResult.issues
+      );
     } else {
       onStatusUpdate?.("Security validation passed", 70);
     }
@@ -511,7 +526,7 @@ export const getWorkflowVersions = async (
   const response = await api.get(`/ai/workflow/${workflowId}/versions`, {
     params: options,
   });
-  
+
   return response.data;
 };
 
@@ -532,7 +547,7 @@ export const compareVersions = async (
       },
     }
   );
-  
+
   return response.data;
 };
 
@@ -553,16 +568,17 @@ export const rollbackWorkflow = async (
     targetVersionId,
     reason,
   });
-  
+
   return response.data;
 };
 
 /**
  * Get generation analytics
  */
-export const getAnalytics = async (
-  timeRange?: { start: Date; end: Date }
-): Promise<{
+export const getAnalytics = async (timeRange?: {
+  start: Date;
+  end: Date;
+}): Promise<{
   metrics: {
     totalGenerations: number;
     successfulGenerations: number;
@@ -590,13 +606,15 @@ export const getAnalytics = async (
     recommendations: string[];
   };
 }> => {
-  const response = await api.get('/ai/analytics', {
-    params: timeRange ? {
-      startDate: timeRange.start.toISOString(),
-      endDate: timeRange.end.toISOString(),
-    } : {},
+  const response = await api.get("/ai/analytics", {
+    params: timeRange
+      ? {
+          startDate: timeRange.start.toISOString(),
+          endDate: timeRange.end.toISOString(),
+        }
+      : {},
   });
-  
+
   return response.data;
 };
 
@@ -604,19 +622,23 @@ export const getAnalytics = async (
  * Submit feedback on generated content
  */
 export const submitFeedback = async (
-  feedbackType: 'workflow_generation' | 'block_generation' | 'validation' | 'general',
+  feedbackType:
+    | "workflow_generation"
+    | "block_generation"
+    | "validation"
+    | "general",
   rating: number, // 1-5 scale
   feedback: string,
   metadata?: {
     generationPrompt?: string;
     generatedOutput?: unknown;
-    executionResult?: 'success' | 'failure' | 'partial';
+    executionResult?: "success" | "failure" | "partial";
   }
 ): Promise<{ feedbackId: string }> => {
   const userId = getUserId();
   const sessionId = getSessionId();
-  
-  const response = await api.post('/ai/feedback', {
+
+  const response = await api.post("/ai/feedback", {
     userId,
     sessionId,
     feedbackType,
@@ -624,7 +646,7 @@ export const submitFeedback = async (
     feedback,
     metadata,
   });
-  
+
   return response.data;
 };
 

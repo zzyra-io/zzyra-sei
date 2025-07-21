@@ -11,8 +11,14 @@ import { BlockType, DataType } from "@zyra/types";
 import { WorkflowValidatorService } from "./services/workflow-validator.service";
 import { SecurityService } from "./services/security.service";
 import { AuditService } from "./services/audit.service";
-import { WorkflowVersioningService, type RollbackResult } from "./services/workflow-versioning.service";
-import { type AuditEvent, type GenerationMetrics } from "./services/audit.service";
+import {
+  WorkflowVersioningService,
+  type RollbackResult,
+} from "./services/workflow-versioning.service";
+import {
+  type AuditEvent,
+  type GenerationMetrics,
+} from "./services/audit.service";
 
 const MODEL_TO_USE = "gpt-4o-mini";
 
@@ -137,16 +143,17 @@ export class EnhancedAiService {
 
     try {
       // Step 1: Security validation of input prompt
-      const securityValidation = this.securityService.sanitizePromptInput(prompt);
+      const securityValidation =
+        this.securityService.sanitizePromptInput(prompt);
       if (!securityValidation.isSecure) {
         await this.auditService.logSecurityViolation(
           userId,
           {
-            type: 'prompt_injection',
-            severity: 'high',
-            description: 'Insecure prompt detected in block generation',
+            type: "prompt_injection",
+            severity: "high",
+            description: "Insecure prompt detected in block generation",
             input: prompt,
-            context: 'block_generation',
+            context: "block_generation",
           },
           {
             sessionId,
@@ -154,8 +161,10 @@ export class EnhancedAiService {
             userAgent: metadata?.userAgent,
           }
         );
-        
-        throw new Error('Security validation failed: prompt contains unsafe content');
+
+        throw new Error(
+          "Security validation failed: prompt contains unsafe content"
+        );
       }
 
       const sanitizedPrompt = securityValidation.sanitizedInput || prompt;
@@ -219,16 +228,18 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
       const parsedResponse = JSON.parse(cleanedText);
 
       // Step 3: Security analysis of generated code
-      const codeSecurityResult = this.securityService.analyzeCodeSecurity(parsedResponse.code || '');
-      
+      const codeSecurityResult = this.securityService.analyzeCodeSecurity(
+        parsedResponse.code || ""
+      );
+
       if (!codeSecurityResult.isSafe) {
         await this.auditService.logSecurityViolation(
           userId,
           {
-            type: 'code_injection',
-            severity: 'high',
-            description: 'Generated code contains security vulnerabilities',
-            context: 'block_generation',
+            type: "code_injection",
+            severity: "high",
+            description: "Generated code contains security vulnerabilities",
+            context: "block_generation",
           },
           {
             sessionId,
@@ -236,7 +247,7 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
             userAgent: metadata?.userAgent,
           }
         );
-        
+
         // Use sanitized code if available
         if (codeSecurityResult.sanitizedCode) {
           parsedResponse.code = codeSecurityResult.sanitizedCode;
@@ -248,8 +259,8 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
       // Step 4: Audit logging
       await this.auditService.logUserAction(
         userId,
-        'generate_block',
-        'custom_block',
+        "generate_block",
+        "custom_block",
         {
           prompt: sanitizedPrompt,
           generatedBlock: {
@@ -264,7 +275,7 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
           sessionId,
           ipAddress: metadata?.ipAddress,
           userAgent: metadata?.userAgent,
-          outcome: 'success',
+          outcome: "success",
         }
       );
 
@@ -275,27 +286,27 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
       };
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error('AI Custom Block Generation Error:', error);
-      
+
+      this.logger.error("AI Custom Block Generation Error:", error);
+
       // Audit failed generation
       await this.auditService.logUserAction(
         userId,
-        'generate_block',
-        'custom_block',
+        "generate_block",
+        "custom_block",
         {
           prompt,
           processingTime,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
         },
         {
           sessionId,
           ipAddress: metadata?.ipAddress,
           userAgent: metadata?.userAgent,
-          outcome: 'failure',
+          outcome: "failure",
         }
       );
-      
+
       throw new Error("Failed to generate CUSTOM block");
     }
   }
@@ -311,8 +322,8 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
     existingNodes: WorkflowNode[] = [],
     existingEdges: WorkflowEdge[] = [],
     metadata?: GenerationMetadata
-  ): Promise<{ 
-    nodes: WorkflowNode[]; 
+  ): Promise<{
+    nodes: WorkflowNode[];
     edges: WorkflowEdge[];
     validationResult?: unknown;
     versionInfo?: unknown;
@@ -322,16 +333,17 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
 
     try {
       // Step 1: Security validation of input
-      const securityValidation = this.securityService.sanitizePromptInput(description);
+      const securityValidation =
+        this.securityService.sanitizePromptInput(description);
       if (!securityValidation.isSecure) {
         await this.auditService.logSecurityViolation(
           userId,
           {
-            type: 'prompt_injection',
-            severity: 'high',
-            description: 'Insecure prompt detected in workflow generation',
+            type: "prompt_injection",
+            severity: "high",
+            description: "Insecure prompt detected in workflow generation",
             input: description,
-            context: 'workflow_generation',
+            context: "workflow_generation",
           },
           {
             sessionId,
@@ -339,18 +351,25 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
             userAgent: metadata?.userAgent,
           }
         );
-        
+
         // Use sanitized input but log the security issue
         description = securityValidation.sanitizedInput || description;
       }
 
-      this.logger.log(`Generating workflow for user ${userId}: ${description.substring(0, 100)}...`);
+      this.logger.log(
+        `Generating workflow for user ${userId}: ${description.substring(0, 100)}...`
+      );
 
       // Step 2: Generate workflow with LLM
       const systemPrompt = this.generateSystemPrompt();
-      const userContext = existingNodes.length > 0
-        ? this.generateExistingContext(description, existingNodes, existingEdges)
-        : this.generateNewContext(description);
+      const userContext =
+        existingNodes.length > 0
+          ? this.generateExistingContext(
+              description,
+              existingNodes,
+              existingEdges
+            )
+          : this.generateNewContext(description);
 
       const { text } = await generateText({
         model: this.openrouter(MODEL_TO_USE),
@@ -406,7 +425,7 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
             }
           );
         } catch (versionError) {
-          this.logger.warn('Failed to create workflow version:', versionError);
+          this.logger.warn("Failed to create workflow version:", versionError);
         }
       }
 
@@ -432,7 +451,7 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
         {
           ipAddress: metadata?.ipAddress,
           userAgent: metadata?.userAgent,
-          outcome: validationResult.isValid ? 'success' : 'partial',
+          outcome: validationResult.isValid ? "success" : "partial",
           errors: validationResult.errors,
         }
       );
@@ -450,9 +469,9 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
       };
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error('AI Workflow Generation Error:', error);
-      
+
+      this.logger.error("AI Workflow Generation Error:", error);
+
       // Audit failed generation
       await this.auditService.logWorkflowGeneration(
         userId,
@@ -472,11 +491,11 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
         {
           ipAddress: metadata?.ipAddress,
           userAgent: metadata?.userAgent,
-          outcome: 'failure',
-          errors: [error instanceof Error ? error.message : 'Unknown error'],
+          outcome: "failure",
+          errors: [error instanceof Error ? error.message : "Unknown error"],
         }
       );
-      
+
       throw error;
     }
   }
@@ -496,8 +515,8 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
     nodes: WorkflowNode[],
     edges: WorkflowEdge[],
     metadata?: GenerationMetadata
-  ): Promise<{ 
-    nodes: WorkflowNode[]; 
+  ): Promise<{
+    nodes: WorkflowNode[];
     edges: WorkflowEdge[];
     validationResult?: unknown;
     metrics?: unknown;
@@ -506,16 +525,17 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
 
     try {
       // Security validation
-      const securityValidation = this.securityService.sanitizePromptInput(prompt);
+      const securityValidation =
+        this.securityService.sanitizePromptInput(prompt);
       if (!securityValidation.isSecure) {
         await this.auditService.logSecurityViolation(
           userId,
           {
-            type: 'prompt_injection',
-            severity: 'medium',
-            description: 'Insecure prompt detected in workflow refinement',
+            type: "prompt_injection",
+            severity: "medium",
+            description: "Insecure prompt detected in workflow refinement",
             input: prompt,
-            context: 'workflow_refinement',
+            context: "workflow_refinement",
           },
           {
             sessionId,
@@ -523,7 +543,7 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
             userAgent: metadata?.userAgent,
           }
         );
-        
+
         prompt = securityValidation.sanitizedInput || prompt;
       }
 
@@ -563,16 +583,18 @@ Edges: ${JSON.stringify(edges, null, 2)}
         { autoHeal: true, strictMode: false }
       );
 
-      const finalNodes = validationResult.correctedWorkflow?.nodes || enhancedNodes;
-      const finalEdges = validationResult.correctedWorkflow?.edges || enhancedEdges;
+      const finalNodes =
+        validationResult.correctedWorkflow?.nodes || enhancedNodes;
+      const finalEdges =
+        validationResult.correctedWorkflow?.edges || enhancedEdges;
 
       const processingTime = Date.now() - startTime;
 
       // Audit the refinement
       await this.auditService.logUserAction(
         userId,
-        'refine_workflow',
-        'workflow',
+        "refine_workflow",
+        "workflow",
         {
           prompt,
           options: options as unknown as Record<string, unknown>,
@@ -587,7 +609,7 @@ Edges: ${JSON.stringify(edges, null, 2)}
           sessionId,
           ipAddress: metadata?.ipAddress,
           userAgent: metadata?.userAgent,
-          outcome: validationResult.isValid ? 'success' : 'partial',
+          outcome: validationResult.isValid ? "success" : "partial",
         }
       );
 
@@ -604,26 +626,26 @@ Edges: ${JSON.stringify(edges, null, 2)}
       };
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      
-      this.logger.error('AI Workflow Refinement Error:', error);
-      
+
+      this.logger.error("AI Workflow Refinement Error:", error);
+
       await this.auditService.logUserAction(
         userId,
-        'refine_workflow',
-        'workflow',
+        "refine_workflow",
+        "workflow",
         {
           prompt,
           processingTime,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: error instanceof Error ? error.message : "Unknown error",
         },
         {
           sessionId,
           ipAddress: metadata?.ipAddress,
           userAgent: metadata?.userAgent,
-          outcome: 'failure',
+          outcome: "failure",
         }
       );
-      
+
       throw error;
     }
   }
@@ -631,7 +653,10 @@ Edges: ${JSON.stringify(edges, null, 2)}
   /**
    * Get comprehensive analytics and metrics
    */
-  async getAnalytics(userId: string, timeRange?: { start: Date; end: Date }): Promise<{
+  async getAnalytics(
+    userId: string,
+    timeRange?: { start: Date; end: Date }
+  ): Promise<{
     metrics: GenerationMetrics;
     userActivity: {
       totalEvents: number;
@@ -653,10 +678,10 @@ Edges: ${JSON.stringify(edges, null, 2)}
   }> {
     const [metrics, userAuditTrail, securityReport] = await Promise.all([
       this.auditService.getMetrics(timeRange),
-      this.auditService.getUserAuditTrail(userId, { 
-        startDate: timeRange?.start, 
+      this.auditService.getUserAuditTrail(userId, {
+        startDate: timeRange?.start,
         endDate: timeRange?.end,
-        limit: 100 
+        limit: 100,
       }),
       timeRange ? this.auditService.getSecurityReport(timeRange) : null,
     ]);
@@ -665,7 +690,7 @@ Edges: ${JSON.stringify(edges, null, 2)}
       metrics,
       userActivity: {
         totalEvents: userAuditTrail.length,
-        recentEvents: userAuditTrail.slice(0, 10).map(event => ({
+        recentEvents: userAuditTrail.slice(0, 10).map((event) => ({
           id: event.eventId,
           eventType: event.eventType,
           timestamp: event.timestamp,
@@ -685,15 +710,11 @@ Edges: ${JSON.stringify(edges, null, 2)}
     userId: string,
     reason?: string
   ): Promise<RollbackResult> {
-    return this.versioningService.rollback(
-      workflowId,
-      targetVersionId,
-      {
-        performedBy: userId,
-        reason,
-        createBackup: true,
-      }
-    );
+    return this.versioningService.rollback(workflowId, targetVersionId, {
+      performedBy: userId,
+      reason,
+      createBackup: true,
+    });
   }
 
   // Private methods (keeping existing implementations)

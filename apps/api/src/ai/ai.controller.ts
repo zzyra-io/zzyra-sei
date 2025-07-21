@@ -1,6 +1,6 @@
 import { Controller, Post, Body } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
-import { AiService } from "./ai.service";
+import { EnhancedAiService } from "./enhanced-ai.service";
 import {
   GenerateWorkflowDto,
   RefineWorkflowDto,
@@ -10,7 +10,7 @@ import {
 @ApiTags("ai")
 @Controller("ai")
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(private readonly aiService: EnhancedAiService) {}
 
   @Post("generate-block")
   @ApiOperation({ summary: "Generate block using AI" })
@@ -19,10 +19,19 @@ export class AiController {
     description: "Block generated successfully",
   })
   async generateBlock(@Body() data: { prompt: string }) {
-    return this.aiService.generateBlock(data.prompt);
+    // TODO: Replace with real user/session/metadata extraction
+    const userId = "anonymous";
+    const sessionId = "session_dummy";
+    const metadata = undefined;
+    return this.aiService.generateBlock(
+      data.prompt,
+      userId,
+      sessionId,
+      metadata
+    );
   }
 
-  @Post("/enhanced/generate-workflow")
+  @Post("/generate-workflow")
   @ApiOperation({ summary: "Generate workflow using AI" })
   @ApiResponse({
     status: 200,
@@ -32,11 +41,18 @@ export class AiController {
   async generateWorkflow(
     @Body() data: GenerateWorkflowDto
   ): Promise<WorkflowResponseDto> {
+    // TODO: Replace with real user/session/metadata extraction
+    const userId = "anonymous";
+    const sessionId = "session_dummy";
+    const metadata = undefined;
     const result = await this.aiService.generateWorkflow(
       data.description,
+      userId,
+      sessionId,
       data.options || { detailedMode: true, prefillConfig: true },
       data.existingNodes || [],
-      data.existingEdges || []
+      data.existingEdges || [],
+      metadata
     );
 
     return {
@@ -55,11 +71,18 @@ export class AiController {
   async refineWorkflow(
     @Body() data: RefineWorkflowDto
   ): Promise<WorkflowResponseDto> {
+    // TODO: Replace with real user/session/metadata extraction
+    const userId = "anonymous";
+    const sessionId = "session_dummy";
+    const metadata = undefined;
     const result = await this.aiService.refineWorkflow(
       data.prompt,
+      userId,
+      sessionId,
       data.options || {},
       data.nodes,
-      data.edges
+      data.edges,
+      metadata
     );
 
     return {
