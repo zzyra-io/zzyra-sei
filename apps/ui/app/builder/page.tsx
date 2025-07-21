@@ -34,11 +34,12 @@ import { refineWorkflow } from "@/lib/api/workflow-generation";
 import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
 import { workflowService } from "@/lib/services/workflow-service";
 import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
-import { BlockType, CustomBlockDefinition } from "@zyra/types";
+import { BlockType, CustomBlockDefinition, UnifiedWorkflowNode, UnifiedWorkflowEdge, prepareNodesForApi, prepareEdgesForApi, ensureValidWorkflowNode } from "@zyra/types";
 import { ArrowLeft, Loader2, Play, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
+import type { Node, Edge } from "@xyflow/react";
 
 // Simplified save state interface
 interface SaveState {
@@ -58,7 +59,6 @@ export default function BuilderPage() {
     workflowName,
     workflowDescription,
     hasUnsavedChanges,
-    executionId,
     setWorkflowId,
     setWorkflowName,
     setWorkflowDescription,
@@ -77,6 +77,7 @@ export default function BuilderPage() {
     setRecentPrompts,
     setGenerationStatus,
     setPartialNodes,
+    resetFlow,
   } = useWorkflowStore();
 
   const toolbar = useFlowToolbar();
@@ -118,8 +119,8 @@ export default function BuilderPage() {
             setWorkflowId(workflow.id);
             setWorkflowName(workflow.name);
             setWorkflowDescription(workflow.description || "");
-            setNodes(workflow.nodes || []);
-            setEdges(workflow.edges || []);
+            setNodes((workflow.nodes || []) as Node[]);
+            setEdges((workflow.edges || []) as Edge[]);
             setHasUnsavedChanges(false);
             toast({
               title: "Workflow loaded",
@@ -137,6 +138,9 @@ export default function BuilderPage() {
           setLoading(false);
         }
       })();
+    } else {
+      // Reset workflow state when no ID is provided (new workflow)
+      resetFlow();
     }
   }, [
     initialId,
@@ -149,11 +153,12 @@ export default function BuilderPage() {
     setEdges,
     setHasUnsavedChanges,
     setLoading,
+    resetFlow,
   ]);
 
-  // Add draft persistence effect
+  // Draft persistence effect (only for new workflows)
   useEffect(() => {
-    if (hasUnsavedChanges) {
+    if (!workflowId && hasUnsavedChanges) {
       const draft = {
         nodes,
         edges,
@@ -163,11 +168,18 @@ export default function BuilderPage() {
       };
       localStorage.setItem("workflow_draft", JSON.stringify(draft));
     }
-  }, [nodes, edges, workflowName, workflowDescription, hasUnsavedChanges]);
+  }, [
+    nodes,
+    edges,
+    workflowName,
+    workflowDescription,
+    hasUnsavedChanges,
+    workflowId,
+  ]);
 
-  // Load draft on mount if no workflowId
+  // Load draft on mount if no workflowId (only for new workflows)
   useEffect(() => {
-    if (!workflowId) {
+    if (!workflowId && !initialId) {
       const draft = localStorage.getItem("workflow_draft");
       if (draft) {
         const {
@@ -176,87 +188,81 @@ export default function BuilderPage() {
           workflowName: draftName,
           workflowDescription: draftDesc,
         } = JSON.parse(draft);
-        setNodes(draftNodes);
-        setEdges(draftEdges);
-        setWorkflowName(draftName);
-        setWorkflowDescription(draftDesc);
+        setNodes((draftNodes || []) as Node[]);
+        setEdges((draftEdges || []) as Edge[]);
+        setWorkflowName(draftName || "Untitled Workflow");
+        setWorkflowDescription(draftDesc || "");
         setHasUnsavedChanges(true);
       }
     }
-  }, [workflowId]);
+  }, [
+    workflowId,
+    initialId,
+    setNodes,
+    setEdges,
+    setWorkflowName,
+    setWorkflowDescription,
+    setHasUnsavedChanges,
+  ]);
 
-  // Utility to normalize blockType to lowercase string
-  const normalizeNodesBlockType = useCallback((nodes: any[]) => {
-    return nodes.map((node: any) => ({
-      ...node,
-      data: {
-        ...node.data,
-        blockType:
-          typeof node.data.blockType === "string"
-            ? node.data.blockType.toLowerCase()
-            : node.data.blockType,
-      },
-    }));
+  // Prepare nodes for API calls - ensures all required fields are present
+  const prepareNodesForApiCall = useCallback((nodes: Node[]): UnifiedWorkflowNode[] => {
+    return prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node as UnifiedWorkflowNode)));
   }, []);
 
-  // Background auto-save for existing workflows
+  // Background auto-save for existing workflows only
   useEffect(() => {
-    if (workflowId && hasUnsavedChanges && workflowName) {
+    if (workflowId && initialId && hasUnsavedChanges && workflowName) {
       const autoSaveTimeoutId = setTimeout(async () => {
         try {
-          // Silently auto-save in background
-          const normalizedNodes = normalizeNodesBlockType(nodes);
+          const apiNodes = prepareNodesForApiCall(nodes);
+          const apiEdges = prepareEdgesForApi(edges as UnifiedWorkflowEdge[]);
           await workflowService.updateWorkflow(workflowId, {
             name: workflowName,
             description: workflowDescription,
-            nodes: normalizedNodes,
-            edges,
+            nodes: apiNodes,
+            edges: apiEdges,
             is_public: false,
           });
           setHasUnsavedChanges(false);
-
-          // Subtle feedback
           toast({
             title: "Auto-saved",
             description: "Your workflow has been automatically saved.",
             duration: 2000,
           });
         } catch (error) {
+          // Only log, don't toast to avoid spam
           console.error("Auto-save failed:", error);
-          // Don't show error toast for auto-save failures to avoid spam
         }
-      }, 30000); // Auto-save after 30 seconds of inactivity
-
+      }, 30000);
       return () => clearTimeout(autoSaveTimeoutId);
     }
   }, [
     workflowId,
+    initialId,
     hasUnsavedChanges,
     nodes,
     edges,
     workflowName,
     workflowDescription,
     toast,
-    normalizeNodesBlockType,
+    prepareNodesForApiCall,
   ]);
 
   // Handlers using store actions
   const handleAddBlock = useCallback(
-    (blockType: BlockType) => {
-      const newNode = {
+    (blockType: BlockType, position?: { x: number; y: number }) => {
+      const newNode: UnifiedWorkflowNode = ensureValidWorkflowNode({
         id: `${Date.now()}`,
         type: blockType,
-        position: { x: 100, y: 100 },
+        position: position || { x: 100, y: 100 },
         data: {
+          blockType: blockType,
           label: `${blockType} Node`,
-          blockType: blockType, // Store the actual block type enum value (e.g., "webhook")
           config: {},
         },
-        dragHandle: ".custom-drag-handle",
-        isConnectable: true,
-      };
-      console.log("newNode", newNode);
-      addNode(newNode);
+      });
+      addNode(newNode as Node);
       setHasUnsavedChanges(true);
     },
     [addNode, setHasUnsavedChanges]
@@ -264,22 +270,20 @@ export default function BuilderPage() {
 
   const handleAddCustomBlock = useCallback(
     (
-      customData: CustomBlockDefinition,
-      position: { x: number; y: number },
-      method: "manual" | "ai"
+      customBlock: CustomBlockDefinition,
+      method: "manual" | "ai",
+      position?: { x: number; y: number }
     ) => {
-      const newNode = {
+      const newNode: Node = {
         id: `${Date.now()}`,
         type: "CUSTOM",
-        blockType: customData.category,
-        position,
-        data: customData,
+        position: position || { x: 100, y: 100 },
+        data: customBlock as unknown as Record<string, unknown>,
         dragHandle: ".custom-drag-handle",
-        isConnectable: true,
+        connectable: true,
       };
-      createCustomBlock({ customBlock: customData, method });
-      addNode(newNode as unknown as Node);
-
+      createCustomBlock({ customBlock, method });
+      addNode(newNode);
       setHasUnsavedChanges(true);
     },
     [addNode, setHasUnsavedChanges, createCustomBlock]
@@ -304,36 +308,33 @@ export default function BuilderPage() {
   }, [isExecutionPending, executionStatus, setShowExecutionPanel]);
 
   const handleWorkflowDetailsChange = useCallback(
-    ({ name, description }: { name: string; description: string }) => {
-      setWorkflowName(name);
-      setWorkflowDescription(description);
+    (details: { name?: string; description?: string }) => {
+      if (details.name !== undefined) setWorkflowName(details.name);
+      if (details.description !== undefined)
+        setWorkflowDescription(details.description);
       setHasUnsavedChanges(true);
     },
     [setWorkflowName, setWorkflowDescription, setHasUnsavedChanges]
   );
 
-  // Update handleSmartSave - immediate save for existing workflows
+  // Save logic
   const handleSmartSave = useCallback(async () => {
-    if (workflowId) {
-      // ✅ Save immediately for existing workflows without dialog
+    if (workflowId && initialId) {
       await handleUpdateWorkflow(workflowName, workflowDescription);
     } else {
-      // ✅ Only open dialog for new workflows
       setSaveState({
         isOpen: true,
         mode: "new",
       });
     }
-  }, [workflowId, workflowName, workflowDescription]);
+  }, [workflowId, initialId, workflowName, workflowDescription]);
 
-  // Update handleSaveNewWorkflow
   const handleSaveNewWorkflow = useCallback(
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const normalizedNodes = normalizeNodesBlockType(nodes);
-
-        // Create new workflow
+        const apiNodes = prepareNodesForApiCall(nodes);
+        const apiEdges = prepareEdgesForApi(edges as UnifiedWorkflowEdge[]);
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
@@ -342,19 +343,12 @@ export default function BuilderPage() {
           is_public: false,
           tags,
         });
-
         if (savedWorkflow && savedWorkflow.id) {
-          // Reset all workflow-related state
           setWorkflowId(savedWorkflow.id);
           setHasUnsavedChanges(false);
           setSaveState((prev) => ({ ...prev, isOpen: false }));
-
-          // Update URL without triggering a reload
           router.replace(`/builder?id=${savedWorkflow.id}`, { scroll: false });
-
-          // Clear any draft data
           localStorage.removeItem("workflow_draft");
-
           toast({
             title: "Workflow saved",
             description: "Your workflow has been saved successfully.",
@@ -362,7 +356,6 @@ export default function BuilderPage() {
         }
       } catch (error: unknown) {
         const err = error as Error;
-        console.error("Error saving new workflow:", err);
         toast({
           title: "Error",
           description: err.message || "Failed to save workflow.",
@@ -380,38 +373,36 @@ export default function BuilderPage() {
       setWorkflowId,
       setHasUnsavedChanges,
       setLoading,
-      normalizeNodesBlockType,
+      prepareNodesForApiCall,
     ]
   );
 
-  // Update handleUpdateWorkflow - simplified without execution logic
   const handleUpdateWorkflow = useCallback(
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const normalizedNodes = normalizeNodesBlockType(nodes);
-
-        if (workflowId) {
+        const apiNodes = prepareNodesForApiCall(nodes);
+        const apiEdges = prepareEdgesForApi(edges as UnifiedWorkflowEdge[]);
+        if (workflowId && initialId) {
           await workflowService.updateWorkflow(workflowId, {
             name,
             description,
-            nodes: normalizedNodes,
-            edges,
+            nodes: apiNodes,
+            edges: apiEdges,
             is_public: false,
             tags,
           });
-
           setHasUnsavedChanges(false);
           setSaveState((prev) => ({ ...prev, isOpen: false }));
-
           toast({
             title: "Workflow updated",
             description: "Your workflow has been updated successfully.",
           });
+        } else {
+          throw new Error("Cannot update workflow: No valid workflow ID");
         }
       } catch (error: unknown) {
         const err = error as Error;
-        console.error("Error updating workflow:", err);
         toast({
           title: "Error",
           description: err.message || "Failed to update workflow.",
@@ -423,25 +414,22 @@ export default function BuilderPage() {
     },
     [
       workflowId,
+      initialId,
       nodes,
       edges,
       toast,
       setHasUnsavedChanges,
       setLoading,
-      normalizeNodesBlockType,
+      prepareNodesForApiCall,
     ]
   );
 
-  // Handler for "Save as New" from update dialog
   const handleSaveAsNew = useCallback(
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const normalizedNodes = normalizeNodesBlockType(nodes);
-        console.log(
-          "🟢 [DEBUG] Save as new workflow. Node blockTypes:",
-          normalizedNodes.map((n) => n.data?.blockType)
-        );
+        const apiNodes = prepareNodesForApiCall(nodes);
+        const apiEdges = prepareEdgesForApi(edges as UnifiedWorkflowEdge[]);
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
@@ -450,21 +438,20 @@ export default function BuilderPage() {
           is_public: false,
           tags,
         });
-
         if (savedWorkflow && savedWorkflow.id) {
+          resetFlow();
           setWorkflowId(savedWorkflow.id);
-          router.replace(`/builder?id=${savedWorkflow.id}`);
+          router.replace(`/builder?id=${savedWorkflow.id}`, { scroll: false });
+          setHasUnsavedChanges(false);
+          setSaveState((prev) => ({ ...prev, isOpen: false }));
+          localStorage.removeItem("workflow_draft");
           toast({
             title: "New workflow created",
             description: "Your workflow has been saved as a new workflow.",
           });
         }
-
-        setHasUnsavedChanges(false);
-        setSaveState((prev) => ({ ...prev, isOpen: false }));
       } catch (error: unknown) {
         const err = error as Error;
-        console.error("Error saving as new workflow:", err);
         toast({
           title: "Error",
           description: err.message || "Failed to save as new workflow.",
@@ -482,7 +469,8 @@ export default function BuilderPage() {
       setWorkflowId,
       setHasUnsavedChanges,
       setLoading,
-      normalizeNodesBlockType,
+      prepareNodesForApiCall,
+      resetFlow,
     ]
   );
 
@@ -502,18 +490,18 @@ export default function BuilderPage() {
         return;
       }
 
-      // 2. Optional save prompt for unsaved workflows (non-blocking)
-      if (!workflowId || hasUnsavedChanges) {
-        // Show subtle toast suggestion but don't block execution
+      // 2. Check if workflow is saved
+      if (!workflowId || !initialId) {
         toast({
-          title: "Executing unsaved workflow",
+          title: "Unsaved Workflow",
           description:
-            "Consider saving your workflow first. Use Cmd+S to save quickly.",
-          duration: 3000,
+            "Please save your workflow before executing. Use Cmd+S to save quickly.",
+          variant: "destructive",
         });
+        return;
       }
 
-      // 3. Execute workflow immediately regardless of save state
+      // 3. Execute workflow
       setShowExecutionPanel(true);
       await executeWorkflow();
     } catch (error: unknown) {
@@ -530,7 +518,7 @@ export default function BuilderPage() {
     nodes,
     edges,
     workflowId,
-    hasUnsavedChanges,
+    initialId,
     executeWorkflow,
     toast,
   ]);
@@ -733,7 +721,7 @@ export default function BuilderPage() {
               onClick={handleSmartSave}
               className='font-medium hover:bg-muted/80 border-border/60'>
               <Save className='h-4 w-4 mr-2' />
-              <span>{workflowId ? "Save" : "Save As..."}</span>
+              <span>{workflowId && initialId ? "Save" : "Save As..."}</span>
             </Button>
             <Button
               onClick={handleExecuteWorkflow}
@@ -796,7 +784,9 @@ export default function BuilderPage() {
               className='h-full'>
               <BuilderSidebar
                 onAddNode={handleAddBlock}
-                onAddCustomBlock={handleAddCustomBlock}
+                onAddCustomBlock={(customBlock, position, method) =>
+                  handleAddCustomBlock(customBlock, method, position)
+                }
                 workflowName={workflowName}
                 workflowDescription={workflowDescription}
                 onWorkflowDetailsChange={handleWorkflowDetailsChange}
@@ -810,7 +800,7 @@ export default function BuilderPage() {
             </ResizablePanel>
             <ResizableHandle />
             <ResizablePanel defaultSize={75} className='h-full relative'>
-              <FlowCanvas executionId={executionId} />
+              <FlowCanvas />
 
               {/* Empty State Overlay */}
               {nodes.length === 0 && (

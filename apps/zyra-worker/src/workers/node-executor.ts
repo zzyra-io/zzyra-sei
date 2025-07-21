@@ -10,47 +10,8 @@ import {
   getEnhancedBlockSchema,
 } from '@zyra/types';
 import { BlockHandlerRegistry } from './handlers/BlockHandlerRegistry';
+import { CircuitBreakerDbService } from '../lib/blockchain/CircuitBreakerDbService';
 
-class CircuitBreaker {
-  private failures = 0;
-  private lastFailureTime = 0;
-  private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
-
-  constructor(
-    private threshold: number = 5,
-    private timeout: number = 30000,
-  ) {}
-
-  async execute<T>(fn: () => Promise<T>): Promise<T> {
-    if (this.state === 'OPEN') {
-      if (Date.now() - this.lastFailureTime > this.timeout) {
-        this.state = 'HALF_OPEN';
-      } else {
-        throw new Error('Circuit breaker is OPEN');
-      }
-    }
-
-    try {
-      const result = await fn();
-      if (this.state === 'HALF_OPEN') {
-        this.reset();
-      }
-      return result;
-    } catch (error) {
-      this.failures++;
-      this.lastFailureTime = Date.now();
-      if (this.failures >= this.threshold) {
-        this.state = 'OPEN';
-      }
-      throw error;
-    }
-  }
-
-  private reset() {
-    this.failures = 0;
-    this.state = 'CLOSED';
-  }
-}
 
 @Injectable()
 export class NodeExecutor {
@@ -58,7 +19,7 @@ export class NodeExecutor {
   private tracer = trace.getTracer('workflow-execution');
   private handlers: Record<BlockType, BlockHandler>;
   private blockHandlerRegistry: BlockHandlerRegistry;
-  private circuitBreaker: CircuitBreaker;
+  private circuitBreakerService: CircuitBreakerDbService;
 
   private static readonly MAX_RETRIES = parseInt(
     process.env.NODE_MAX_RETRIES || '3',
@@ -82,7 +43,7 @@ export class NodeExecutor {
     private readonly executionLogger: ExecutionLogger,
     private readonly magicAdminService: MagicAdminService,
   ) {
-    this.circuitBreaker = new CircuitBreaker();
+    this.circuitBreakerService = new CircuitBreakerDbService(this.databaseService);
     // Initialize BlockHandlerRegistry with class-level logger and database service
     this.blockHandlerRegistry = new BlockHandlerRegistry(
       this.logger,
@@ -233,11 +194,23 @@ export class NodeExecutor {
         // Update node with prepared data
         node.data = blockData;
 
-        // Execute with circuit breaker and timeout protection
+        // Generate circuit ID for this node type
+        const circuitId = this.circuitBreakerService.generateCircuitId('node-executor', blockType);
+        
+        // Check if circuit breaker allows operation
+        const isAllowed = await this.circuitBreakerService.isOperationAllowed(circuitId);
+        if (!isAllowed) {
+          throw new Error(`Circuit breaker is OPEN for ${blockType}`);
+        }
+
+        // Execute with timeout protection
         result = await Promise.race([
-          this.circuitBreaker.execute(() => handler.execute(node, ctx)),
+          handler.execute(node, ctx),
           timeoutPromise,
         ]);
+        
+        // Record success
+        await this.circuitBreakerService.recordSuccess(circuitId);
 
         // Validate output data against enhanced schema if available
         if (enhancedSchema && result) {
@@ -289,6 +262,17 @@ export class NodeExecutor {
       } catch (err: any) {
         attempt++;
         const duration = Date.now() - startTime;
+
+        // Record circuit breaker failure
+        const blockType = node.data?.blockType || node.data?.type || node.type;
+        if (blockType) {
+          try {
+            const circuitId = this.circuitBreakerService.generateCircuitId('node-executor', blockType);
+            await this.circuitBreakerService.recordFailure(circuitId);
+          } catch (cbError) {
+            this.logger.warn(`Failed to record circuit breaker failure: ${cbError instanceof Error ? cbError.message : String(cbError)}`);
+          }
+        }
 
         // Enhance error details
         const errorDetails = {
