@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BlockType } from "../workflow/block-types";
+import { walletListenerSchema } from "./blockchains/wallet-listener/schema";
 
 /**
  * Enhanced block schema definition with input/output schemas
@@ -438,6 +439,7 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
   [BlockType.HTTP_REQUEST]: enhancedHttpRequestSchema.configSchema,
   [BlockType.CUSTOM]: enhancedCustomSchema.configSchema,
   [BlockType.DATA_TRANSFORM]: enhancedDataTransformSchema.configSchema,
+  [BlockType.WALLET_LISTEN]: walletListenerSchema.configSchema,
   [BlockType.UNKNOWN]: z.any(),
 };
 
@@ -457,6 +459,7 @@ export const enhancedBlockSchemas: Partial<
   [BlockType.WEBHOOK]: enhancedWebhookSchema,
   [BlockType.CUSTOM]: enhancedCustomSchema,
   [BlockType.DATA_TRANSFORM]: enhancedDataTransformSchema,
+  [BlockType.WALLET_LISTEN]: walletListenerSchema,
 };
 
 /**

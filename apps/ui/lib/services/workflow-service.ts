@@ -91,6 +91,10 @@ class WorkflowService {
           "Workflow contains a cycle; please remove loops before saving."
         );
       }
+      // Prevent saving empty workflows
+      if (!nodes || nodes.length === 0) {
+        throw new Error("Workflow must have at least one block.");
+      }
 
       // Only send fields that the backend expects (CreateWorkflowDto)
       const createWorkflowData = {
@@ -126,6 +130,10 @@ class WorkflowService {
             "Workflow update contains a cycle; please remove loops before saving."
           );
         }
+      }
+      // Prevent saving empty workflows
+      if (workflow.nodes && workflow.nodes.length === 0) {
+        throw new Error("Workflow must have at least one block.");
       }
 
       // Only send fields that the backend expects (UpdateWorkflowDto)

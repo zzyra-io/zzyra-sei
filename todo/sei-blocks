@@ -1,0 +1,393 @@
+Here’s a detailed breakdown for each block, including all the info you should gather and consider before building them for Zyra on Sei:
+
+---
+
+## 1. **Sei Wallet Listener Block**
+
+**Purpose:**  
+Triggers workflows when specific wallet activities occur (transfers, swaps, contract interactions).
+
+**Inputs:**
+
+- List of Sei wallet addresses to monitor
+- Event types to listen for (transfers, swaps, contract calls, NFT events, etc.)
+- Optional: Filters (min amount, specific token, contract address, etc.)
+- Polling interval or webhook endpoint (if supported)
+
+**Outputs:**
+
+- Event data (type, tx hash, block number, timestamp, involved addresses, token info, value, etc.)
+- Trigger signal for downstream blocks
+
+**Sei Integration:**
+
+- Use Sei’s RPC, REST API, or a third-party indexer (e.g., Sei’s official endpoints or Covalent, if available)
+- Must support real-time or near-real-time event detection
+
+**Security:**
+
+- No private key needed (read-only)
+- Ensure user cannot overload the system with too many addresses/events
+
+**Error Handling:**
+
+- Handle API downtime, rate limits, and malformed events
+- Return clear error/status messages
+
+**User Configuration:**
+
+- UI for entering wallet addresses and selecting event types/filters
+- Validation for address format and event type
+
+**Testing:**
+
+- Use Sei testnet for event simulation
+- Provide mock events for local testing
+
+**Reusability:**
+
+- Should be able to monitor any wallet and any event type
+- Output format should be standard for easy chaining
+
+**Performance:**
+
+- Efficient polling or use of webhooks/WS if available
+- Debounce or batch events if high frequency
+
+**Documentation:**
+
+- Example: “Trigger when wallet X receives >100 SEI”
+- Link to Sei event docs
+
+---
+
+## 2. **Sei Smart Contract Call Block**
+
+**Purpose:**  
+Lets users call any Sei smart contract function from a workflow.
+
+**Inputs:**
+
+- Contract address
+- ABI or function signature
+- Function parameters (static or dynamic)
+- Wallet credentials (private key, mnemonic, or wallet connect)
+- Optional: Gas/fee settings
+
+**Outputs:**
+
+- Transaction hash
+- Status (pending, confirmed, failed)
+- Any return data from the contract call
+
+**Sei Integration:**
+
+- Use Sei’s SDK, RPC, or REST API for contract calls
+- Must support transaction signing and broadcasting
+
+**Security:**
+
+- Secure storage/handling of private keys (never expose in logs/UI)
+- Warn users about risks of contract calls
+
+**Error Handling:**
+
+- Handle contract reverts, out-of-gas, invalid params
+- Return clear error/status messages
+
+**User Configuration:**
+
+- UI for entering contract address, ABI, function, params
+- UI for wallet connection or key entry
+- Input validation for all fields
+
+**Testing:**
+
+- Use Sei testnet for contract call simulation
+- Provide a “dry run” mode if possible
+
+**Reusability:**
+
+- Should support any contract and function
+- Output should be chainable to other blocks
+
+**Performance:**
+
+- Handle transaction queueing and confirmation polling
+
+**Documentation:**
+
+- Example: “Call mint() on NFT contract with metadata X”
+- Link to Sei contract call docs
+
+---
+
+## 3. **Onchain Data Fetch Block**
+
+**Purpose:**  
+Pulls data from the Sei blockchain (balances, NFTs, DeFi positions, transaction history, etc.).
+
+**Inputs:**
+
+- Data type to fetch (balance, NFTs, DeFi, tx history, etc.)
+- Target address or contract
+- Optional: Token/contract filters, block range, etc.
+
+**Outputs:**
+
+- Requested data (e.g., balance, NFT list, DeFi positions, tx list)
+- Standardized data format for downstream blocks
+
+**Sei Integration:**
+
+- Use Sei’s RPC, REST API, or indexer for data queries
+
+**Security:**
+
+- No private key needed (read-only)
+
+**Error Handling:**
+
+- Handle missing data, API errors, invalid addresses
+- Return clear error/status messages
+
+**User Configuration:**
+
+- UI for selecting data type and entering address/filters
+- Input validation
+
+**Testing:**
+
+- Use testnet and mock data
+
+**Reusability:**
+
+- Should support any address and data type
+- Output should be chainable
+
+**Performance:**
+
+- Efficient queries, handle pagination for large data sets
+
+**Documentation:**
+
+- Example: “Fetch all NFTs owned by wallet X”
+- Link to Sei data API docs
+
+---
+
+## 4. **Payment Block**
+
+**Purpose:**  
+Automates sending tokens/payments based on workflow logic.
+
+**Inputs:**
+
+- Recipient address(es)
+- Amount(s)
+- Token type (if multiple tokens supported)
+- Wallet credentials (private key, mnemonic, or wallet connect)
+- Optional: Memo, gas/fee settings
+
+**Outputs:**
+
+- Transaction hash
+- Status (pending, confirmed, failed)
+
+**Sei Integration:**
+
+- Use Sei’s SDK, RPC, or REST API for sending payments
+- Must support transaction signing and broadcasting
+
+**Security:**
+
+- Secure storage/handling of private keys
+- Warn users about sending funds
+
+**Error Handling:**
+
+- Handle insufficient funds, invalid addresses, network errors
+- Return clear error/status messages
+
+**User Configuration:**
+
+- UI for entering recipient, amount, token, wallet
+- Input validation
+
+**Testing:**
+
+- Use testnet for payment simulation
+
+**Reusability:**
+
+- Should support single and batch payments
+- Output should be chainable
+
+**Performance:**
+
+- Handle transaction queueing and confirmation polling
+
+**Documentation:**
+
+- Example: “Send 10 SEI to wallet X after workflow Y”
+- Link to Sei payment docs
+
+---
+
+## 5. **NFT Block**
+
+**Purpose:**  
+Monitors, mints, or transfers NFTs on Sei.
+
+**Inputs:**
+
+- **Monitor:** NFT contract address, wallet address, event types (mint, transfer, sale)
+- **Mint:** NFT contract address, metadata (image, name, description, etc.), wallet credentials
+- **Transfer:** NFT contract address, token ID, recipient address, wallet credentials
+
+**Outputs:**
+
+- **Monitor:** Event data (type, token ID, from/to, tx hash, etc.)
+- **Mint/Transfer:** Transaction hash, status
+
+**Sei Integration:**
+
+- Use Sei’s NFT contract standards and APIs
+- For monitoring, use event logs or indexer
+- For mint/transfer, use contract call APIs
+
+**Security:**
+
+- Secure handling of private keys for mint/transfer
+- No key needed for monitoring
+
+**Error Handling:**
+
+- Handle contract errors, invalid params, network issues
+- Return clear error/status messages
+
+**User Configuration:**
+
+- UI for entering contract, wallet, metadata, recipient, etc.
+- Input validation
+
+**Testing:**
+
+- Use testnet for mint/transfer simulation
+- Provide mock events for monitoring
+
+**Reusability:**
+
+- Should support any NFT contract and event type
+- Output should be chainable
+
+**Performance:**
+
+- Efficient event monitoring, handle high-frequency events
+
+**Documentation:**
+
+- Example: “Mint a badge NFT to user X after workflow Y”
+- Link to Sei NFT docs
+
+---
+
+## **How These Blocks Work Together (Example Workflow)**
+
+1. **Sei Wallet Listener Block** detects a large incoming transfer.
+2. **Onchain Data Fetch Block** checks the wallet’s new balance.
+3. **AI Analysis Block** determines if the transfer is suspicious.
+4. If yes, **Notification Block** alerts the user.
+5. If a reward is due, **Payment Block** sends tokens.
+6. If a badge is earned, **NFT Block** mints and sends an NFT.
+
+---
+
+Here are three real-world use cases that utilize **all five Sei-related blocks** (Wallet Listener, Smart Contract Call, Onchain Data Fetch, Payment, NFT) and also incorporate existing Zyra blocks (from `blockSchemas.ts`), such as HTTP Request, Notification, Condition, Schedule, and Data Transform. Each use case is designed to be practical and demonstrates how these blocks can be composed in a workflow.
+
+---
+
+## **Use Case 1: Automated NFT Reward for High-Value Transfers**
+
+**Scenario:**  
+A DeFi platform wants to reward users who receive a large transfer (e.g., >10,000 SEI) with a special NFT badge and notify them via email and Telegram.
+
+**Workflow:**
+
+1. **Sei Wallet Listener Block**
+   - Monitors user wallets for incoming transfers.
+2. **Condition Block**
+   - Checks if the transfer amount is greater than 10,000 SEI.
+3. **Onchain Data Fetch Block**
+   - Fetches the new wallet balance and recent transaction history for context.
+4. **NFT Block (Mint)**
+   - Mints a “Whale Badge” NFT to the user’s wallet.
+5. **Notification Block**
+   - Sends an email and Telegram message to the user with the badge details.
+6. **Data Transform Block**
+   - Formats the notification content with transaction and NFT info.
+7. **HTTP Request Block**
+   - Optionally, logs the event to an external analytics API.
+
+---
+
+## **Use Case 2: Automated Payroll with Compliance Check**
+
+**Scenario:**  
+A DAO automates monthly payroll for contributors, but only if they have completed a minimum number of onchain actions (e.g., governance votes, contract interactions). Each payment is logged, and contributors receive an NFT “Pay Stub” as proof.
+
+**Workflow:**
+
+1. **Schedule Block**
+   - Triggers the workflow monthly.
+2. **Onchain Data Fetch Block**
+   - Fetches each contributor’s onchain activity (votes, contract calls) for the past month.
+3. **Condition Block**
+   - Checks if the contributor meets the minimum activity threshold.
+4. **Payment Block**
+   - Sends SEI tokens to eligible contributors.
+5. **NFT Block (Mint)**
+   - Mints a “Pay Stub” NFT to each paid contributor.
+6. **Notification Block**
+   - Notifies contributors via email/Discord about their payment and NFT.
+7. **HTTP Request Block**
+   - Logs payroll and compliance data to an external HR system.
+8. **Custom Block**
+   - Optionally, runs custom compliance logic or generates a payroll report.
+
+---
+
+## **Use Case 3: Real-Time NFT Marketplace Alert & Automated Purchase**
+
+**Scenario:**  
+A collector wants to automatically buy rare NFTs as soon as they are listed below a certain price, and receive instant notifications and a summary report.
+
+**Workflow:**
+
+1. **Sei Wallet Listener Block**
+   - Monitors NFT marketplace contracts for new listings.
+2. **Onchain Data Fetch Block**
+   - Fetches NFT metadata and listing price.
+3. **Condition Block**
+   - Checks if the NFT matches the collector’s criteria (e.g., rarity, price < 500 SEI).
+4. **Sei Smart Contract Call Block**
+   - Executes a purchase transaction for the NFT.
+5. **NFT Block (Transfer/Monitor)**
+   - Confirms the NFT was received in the collector’s wallet.
+6. **Notification Block**
+   - Sends a Telegram/Discord alert and an email with NFT details.
+7. **Data Transform Block**
+   - Formats the summary report.
+8. **HTTP Request Block**
+   - Posts the purchase event to a portfolio tracking API.
+
+---
+
+### **How These Use Cases Leverage Existing Zyra Blocks**
+
+- **Condition Block:** For logic and branching (e.g., thresholds, eligibility).
+- **Notification Block:** For multi-channel user alerts.
+- **HTTP Request Block:** For external integrations/logging.
+- **Schedule Block:** For recurring workflows (e.g., payroll).
+- **Data Transform Block:** For formatting and preparing data for notifications or APIs.
+- **Custom Block:** For any custom logic or reporting.

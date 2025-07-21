@@ -15,6 +15,9 @@ export {
   enhancedDataTransformSchema,
 } from "./schemas/blockSchemas";
 
+// Export blockchain schemas
+export { walletListenerSchema } from "./schemas/blockchains/wallet-listener/schema";
+
 // Export metadata catalog
 export { BLOCK_CATALOG } from "./workflow/metadata";
 

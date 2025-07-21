@@ -14,7 +14,7 @@ export enum BlockType {
   WEBHOOK = "WEBHOOK",
   CUSTOM = "CUSTOM",
   DATA_TRANSFORM = "DATA_TRANSFORM", // New transformation block
-
+  WALLET_LISTEN = "WALLET_LISTEN",
   // Default/unknown
   UNKNOWN = "UNKNOWN",
 }
@@ -34,4 +34,5 @@ export const BLOCK_TYPES = [
   "WEBHOOK",
   "CUSTOM",
   "DATA_TRANSFORM", // New transformation block
+  "WALLET_LISTEN",
 ] as const;

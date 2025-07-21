@@ -154,6 +154,20 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
       inputs: {},
     },
   },
+
+  [BlockType.WALLET_LISTEN]: {
+    type: BlockType.WALLET_LISTEN,
+    label: "Wallet Listener",
+    description: "Listen for wallet events",
+    category: NodeCategory.TRIGGER,
+    icon: "wallet",
+    defaultConfig: {
+      network: "sei",
+      walletAddresses: [],
+      eventTypes: [],
+      minAmount: 0,
+    },
+  },
 };
 
 /**
