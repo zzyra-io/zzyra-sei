@@ -22,7 +22,7 @@ export class AiController {
     return this.aiService.generateBlock(data.prompt);
   }
 
-  @Post("generate-workflow")
+  @Post("/enhanced/generate-workflow")
   @ApiOperation({ summary: "Generate workflow using AI" })
   @ApiResponse({
     status: 200,

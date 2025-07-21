@@ -25,7 +25,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { UpdateWorkflowDialog } from "@/components/update-workflow-dialog";
 import { WorkflowRefinement } from "@/components/workflow-refinement";
 import { WorkflowToolbar } from "@/components/workflow-toolbar";
-import NlWorkflowGenerator from "@/components/workflow/nl-workflow-generator";
+import NlWorkflowGenerator from "@/components/workflow/enhanced-nl-workflow-generator";
 import { useSaveAndExecute } from "@/hooks/use-save-and-execute";
 import { useCreateCustomBlock } from "@/hooks/use-custom-blocks";
 import { useWorkflowExecution } from "@/hooks/use-workflow-execution";
