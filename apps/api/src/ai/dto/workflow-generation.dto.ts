@@ -24,6 +24,26 @@ export class GenerationOptionsDto {
   @IsOptional()
   @IsString()
   domainHint?: string;
+
+  @ApiProperty({ description: "User level", required: false })
+  @IsOptional()
+  @IsString()
+  userLevel?: string;
+
+  @ApiProperty({ description: "Enable security", required: false })
+  @IsOptional()
+  @IsBoolean()
+  enableSecurity?: boolean;
+
+  @ApiProperty({ description: "Enable validation", required: false })
+  @IsOptional()
+  @IsBoolean()
+  enableValidation?: boolean;
+
+  @ApiProperty({ description: "Auto heal", required: false })
+  @IsOptional()
+  @IsBoolean()
+  autoHeal?: boolean;
 }
 
 export class WorkflowNodeDto {
@@ -40,6 +60,18 @@ export class WorkflowNodeDto {
 
   @ApiProperty({ description: "Node data" })
   data: Record<string, unknown>;
+
+  @ApiProperty({ description: "Node measured", required: false })
+  @IsOptional()
+  measured?: Record<string, unknown>;
+
+  @ApiProperty({ description: "Node selected", required: false })
+  @IsOptional()
+  selected?: boolean;
+
+  @ApiProperty({ description: "Node dragging", required: false })
+  @IsOptional()
+  dragging?: boolean;
 }
 
 export class WorkflowEdgeDto {
@@ -64,12 +96,38 @@ export class WorkflowEdgeDto {
   @IsOptional()
   @IsString()
   targetHandle?: string;
+
+  @ApiProperty({ description: "Edge type", required: false })
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @ApiProperty({ description: "Edge markerEnd", required: false })
+  @IsOptional()
+  markerEnd?: Record<string, unknown>;
+
+  @ApiProperty({ description: "Edge animated", required: false })
+  @IsOptional()
+  animated?: boolean;
+
+  @ApiProperty({ description: "Edge style", required: false })
+  @IsOptional()
+  style?: Record<string, unknown>;
 }
 
 export class GenerateWorkflowDto {
   @ApiProperty({ description: "Natural language description of the workflow" })
   @IsString()
   description: string;
+
+  @ApiProperty({ description: "Session ID", required: false })
+  @IsOptional()
+  @IsString()
+  sessionId?: string;
+
+  @ApiProperty({ description: "Metadata", required: false })
+  @IsOptional()
+  metadata?: Record<string, unknown>;
 
   @ApiProperty({ description: "Generation options", required: false })
   @IsOptional()

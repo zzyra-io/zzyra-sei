@@ -933,7 +933,8 @@ export default function BuilderPage() {
           <div className='absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 w-full max-w-2xl px-4 pointer-events-none'>
             <div className='pointer-events-auto'>
               <NlWorkflowGenerator
-                onNodesGenerated={(newNodes, newEdges) => {
+                onNodesGenerated={(result) => {
+                  const { nodes: newNodes, edges: newEdges } = result;
                   const updatedNodes = [...nodes, ...newNodes];
                   const updatedEdges = [...edges, ...newEdges];
                   setNodes(updatedNodes);

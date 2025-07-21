@@ -162,15 +162,6 @@ type StatusCallback = (
   metrics?: GenerationMetrics
 ) => void;
 
-// Utility functions for user context
-function getUserId(): string {
-  // Get from auth context or localStorage
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("userId") || "anonymous";
-  }
-  return "anonymous";
-}
-
 function getSessionId(): string {
   // Generate or get existing session ID
   if (typeof window !== "undefined") {
@@ -212,7 +203,6 @@ export const generateWorkflow = async (
     onStatusUpdate?.("Initializing generation...", 5);
 
     // Get user context
-    const userId = getUserId();
     const sessionId = getSessionId();
     const clientMetadata = getClientMetadata();
 
@@ -221,7 +211,6 @@ export const generateWorkflow = async (
     // Prepare the request data with enhanced metadata
     const requestData = {
       description,
-      userId,
       sessionId,
       options: {
         ...options,
@@ -345,14 +334,12 @@ export const refineWorkflow = async (
     onStatusUpdate?.("Analyzing current workflow...", 10);
 
     // Get user context
-    const userId = getUserId();
     const sessionId = getSessionId();
     const clientMetadata = getClientMetadata();
 
     // Prepare the request payload with enhanced metadata
     const requestData = {
       prompt,
-      userId,
       sessionId,
       options,
       nodes,
@@ -470,13 +457,11 @@ export const generateBlock = async (
   try {
     onStatusUpdate?.("Analyzing block requirements...", 10);
 
-    const userId = getUserId();
     const sessionId = getSessionId();
     const clientMetadata = getClientMetadata();
 
     const requestData = {
       prompt,
-      userId,
       sessionId,
       metadata: clientMetadata,
     };
@@ -635,11 +620,9 @@ export const submitFeedback = async (
     executionResult?: "success" | "failure" | "partial";
   }
 ): Promise<{ feedbackId: string }> => {
-  const userId = getUserId();
   const sessionId = getSessionId();
 
   const response = await api.post("/ai/feedback", {
-    userId,
     sessionId,
     feedbackType,
     rating,
