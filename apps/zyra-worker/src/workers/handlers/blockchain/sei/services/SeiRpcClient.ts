@@ -9,11 +9,11 @@ export class SeiRpcClient {
   private rpcClient: AxiosInstance;
   private restClient: AxiosInstance;
   private provider: ethers.JsonRpcProvider;
-  
+
   constructor(
     private rpcUrl: string,
     private restUrl?: string,
-    private timeout: number = 10000
+    private timeout: number = 10000,
   ) {
     this.rpcClient = axios.create({
       baseURL: rpcUrl,
@@ -34,7 +34,26 @@ export class SeiRpcClient {
   }
 
   /**
-   * Get the latest block number
+   * Get the ethers provider
+   */
+  getProvider(): ethers.JsonRpcProvider {
+    return this.provider;
+  }
+
+  /**
+   * Health check for the RPC endpoint
+   */
+  async healthCheck(): Promise<boolean> {
+    try {
+      await this.getLatestBlockNumber();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get latest block number
    */
   async getLatestBlockNumber(): Promise<number> {
     const response = await this.rpcClient.post('', {
@@ -43,7 +62,7 @@ export class SeiRpcClient {
       params: [],
       id: 1,
     });
-    
+
     return parseInt(response.data.result, 16);
   }
 
@@ -51,28 +70,17 @@ export class SeiRpcClient {
    * Get block by number
    */
   async getBlock(blockNumber: number | string): Promise<any> {
-    const blockNum = typeof blockNumber === 'number' ? ethers.toBeHex(blockNumber) : blockNumber;
+    const blockNum =
+      typeof blockNumber === 'number'
+        ? ethers.toBeHex(blockNumber)
+        : blockNumber;
     const response = await this.rpcClient.post('', {
       jsonrpc: '2.0',
       method: 'eth_getBlockByNumber',
       params: [blockNum, true],
       id: 1,
     });
-    
-    return response.data.result;
-  }
 
-  /**
-   * Get transaction by hash
-   */
-  async getTransaction(txHash: string): Promise<any> {
-    const response = await this.rpcClient.post('', {
-      jsonrpc: '2.0',
-      method: 'eth_getTransactionByHash',
-      params: [txHash],
-      id: 1,
-    });
-    
     return response.data.result;
   }
 
@@ -86,69 +94,84 @@ export class SeiRpcClient {
       params: [txHash],
       id: 1,
     });
-    
+
     return response.data.result;
   }
 
   /**
-   * Get logs for events
+   * Get transaction by hash
    */
-  async getLogs(filter: {
-    fromBlock?: string;
-    toBlock?: string;
-    address?: string | string[];
-    topics?: (string | string[] | null)[];
-  }): Promise<any[]> {
+  async getTransaction(txHash: string): Promise<any> {
+    const response = await this.rpcClient.post('', {
+      jsonrpc: '2.0',
+      method: 'eth_getTransactionByHash',
+      params: [txHash],
+      id: 1,
+    });
+
+    return response.data.result;
+  }
+
+  /**
+   * Get logs with filter
+   */
+  async getLogs(filter: any): Promise<any[]> {
     const response = await this.rpcClient.post('', {
       jsonrpc: '2.0',
       method: 'eth_getLogs',
       params: [filter],
       id: 1,
     });
-    
+
     return response.data.result || [];
   }
 
   /**
    * Get account balance (EVM)
    */
-  async getEvmBalance(address: string, blockTag: string = 'latest'): Promise<bigint> {
+  async getEvmBalance(
+    address: string,
+    blockTag: string = 'latest',
+  ): Promise<bigint> {
     const response = await this.rpcClient.post('', {
       jsonrpc: '2.0',
       method: 'eth_getBalance',
       params: [address, blockTag],
       id: 1,
     });
-    
+
     return BigInt(response.data.result);
   }
 
   /**
-   * Estimate gas for a transaction
+   * Get token balance (ERC20)
    */
-  async estimateGas(transaction: any): Promise<bigint> {
-    const response = await this.rpcClient.post('', {
-      jsonrpc: '2.0',
-      method: 'eth_estimateGas',
-      params: [transaction],
-      id: 1,
-    });
-    
-    return BigInt(response.data.result);
-  }
+  async getTokenBalance(
+    tokenAddress: string,
+    walletAddress: string,
+    blockTag: string = 'latest',
+  ): Promise<bigint> {
+    // ERC20 balanceOf function signature
+    const balanceOfSignature = 'balanceOf(address)';
+    const balanceOfSelector = ethers.id(balanceOfSignature).slice(0, 10);
 
-  /**
-   * Send raw transaction
-   */
-  async sendRawTransaction(signedTransaction: string): Promise<string> {
+    const callData =
+      balanceOfSelector + ethers.zeroPadValue(walletAddress, 32).slice(2);
+
     const response = await this.rpcClient.post('', {
       jsonrpc: '2.0',
-      method: 'eth_sendRawTransaction',
-      params: [signedTransaction],
+      method: 'eth_call',
+      params: [
+        {
+          to: tokenAddress,
+          data: callData,
+        },
+        blockTag,
+      ],
       id: 1,
     });
-    
-    return response.data.result;
+
+    return BigInt(response.data.result);
   }
 
   /**
@@ -161,22 +184,22 @@ export class SeiRpcClient {
       params: [transaction, blockTag],
       id: 1,
     });
-    
+
     return response.data.result;
   }
 
   /**
-   * Get nonce for an address
+   * Estimate gas for transaction
    */
-  async getTransactionCount(address: string, blockTag: string = 'pending'): Promise<number> {
+  async estimateGas(transaction: any): Promise<bigint> {
     const response = await this.rpcClient.post('', {
       jsonrpc: '2.0',
-      method: 'eth_getTransactionCount',
-      params: [address, blockTag],
+      method: 'eth_estimateGas',
+      params: [transaction],
       id: 1,
     });
-    
-    return parseInt(response.data.result, 16);
+
+    return BigInt(response.data.result);
   }
 
   /**
@@ -189,8 +212,25 @@ export class SeiRpcClient {
       params: [],
       id: 1,
     });
-    
+
     return BigInt(response.data.result);
+  }
+
+  /**
+   * Get nonce for address
+   */
+  async getNonce(
+    address: string,
+    blockTag: string = 'latest',
+  ): Promise<number> {
+    const response = await this.rpcClient.post('', {
+      jsonrpc: '2.0',
+      method: 'eth_getTransactionCount',
+      params: [address, blockTag],
+      id: 1,
+    });
+
+    return parseInt(response.data.result, 16);
   }
 
   /**
@@ -198,22 +238,12 @@ export class SeiRpcClient {
    */
   async getAccount(address: string): Promise<any> {
     try {
-      const response = await this.restClient.get(`/cosmos/auth/v1beta1/accounts/${address}`);
-      return response.data.account;
+      const response = await this.restClient.get(
+        `/cosmos/auth/v1beta1/accounts/${address}`,
+      );
+      return response.data;
     } catch (error) {
       throw new Error(`Failed to get account info: ${error}`);
-    }
-  }
-
-  /**
-   * Cosmos SDK: Get all balances for an address
-   */
-  async getAllBalances(address: string): Promise<any[]> {
-    try {
-      const response = await this.restClient.get(`/cosmos/bank/v1beta1/balances/${address}`);
-      return response.data.balances || [];
-    } catch (error) {
-      throw new Error(`Failed to get balances: ${error}`);
     }
   }
 
@@ -223,7 +253,7 @@ export class SeiRpcClient {
   async getBalance(address: string, denom: string): Promise<number> {
     try {
       const response = await this.restClient.get(
-        `/cosmos/bank/v1beta1/balances/${address}/by_denom?denom=${denom}`
+        `/cosmos/bank/v1beta1/balances/${address}/by_denom?denom=${denom}`,
       );
       return parseInt(response.data.balance?.amount || '0');
     } catch (error) {
@@ -232,80 +262,47 @@ export class SeiRpcClient {
   }
 
   /**
-   * Cosmos SDK: Get delegation info
+   * Cosmos SDK: Get all balances for address
    */
-  async getDelegations(delegatorAddress: string): Promise<any[]> {
+  async getAllBalances(address: string): Promise<any[]> {
     try {
       const response = await this.restClient.get(
-        `/cosmos/staking/v1beta1/delegations/${delegatorAddress}`
+        `/cosmos/bank/v1beta1/balances/${address}`,
       );
-      return response.data.delegation_responses || [];
+      return response.data.balances || [];
     } catch (error) {
-      throw new Error(`Failed to get delegations: ${error}`);
+      throw new Error(`Failed to get all balances: ${error}`);
     }
   }
 
   /**
-   * Cosmos SDK: Get rewards
+   * Cosmos SDK: Get transaction history
    */
-  async getRewards(delegatorAddress: string): Promise<any> {
+  async getTransactionHistory(
+    address: string,
+    limit: number = 50,
+  ): Promise<any[]> {
     try {
       const response = await this.restClient.get(
-        `/cosmos/distribution/v1beta1/delegators/${delegatorAddress}/rewards`
+        `/cosmos/tx/v1beta1/txs?events=message.sender='${address}'&limit=${limit}`,
       );
-      return response.data.rewards || [];
+      return response.data.txs || [];
     } catch (error) {
-      throw new Error(`Failed to get rewards: ${error}`);
+      throw new Error(`Failed to get transaction history: ${error}`);
     }
   }
 
   /**
-   * Wait for transaction confirmation
+   * Cosmos SDK: Get NFT tokens for address
    */
-  async waitForTransaction(
-    txHash: string, 
-    timeout: number = 60000,
-    confirmations: number = 1
-  ): Promise<any> {
-    const startTime = Date.now();
-    
-    while (Date.now() - startTime < timeout) {
-      try {
-        const receipt = await this.getTransactionReceipt(txHash);
-        if (receipt && receipt.blockNumber) {
-          const currentBlock = await this.getLatestBlockNumber();
-          const confirmationCount = currentBlock - parseInt(receipt.blockNumber, 16) + 1;
-          
-          if (confirmationCount >= confirmations) {
-            return receipt;
-          }
-        }
-      } catch (error) {
-        // Transaction might not be mined yet, continue polling
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    
-    throw new Error(`Transaction ${txHash} not confirmed within timeout`);
-  }
-
-  /**
-   * Get the ethers provider for advanced operations
-   */
-  getProvider(): ethers.JsonRpcProvider {
-    return this.provider;
-  }
-
-  /**
-   * Health check
-   */
-  async healthCheck(): Promise<boolean> {
+  async getNFTs(address: string): Promise<any[]> {
     try {
-      await this.getLatestBlockNumber();
-      return true;
+      // This would depend on the specific NFT module implementation
+      // For now, return empty array as placeholder
+      console.warn('NFT querying not yet implemented for Cosmos SDK');
+      return [];
     } catch (error) {
-      return false;
+      throw new Error(`Failed to get NFTs: ${error}`);
     }
   }
 }

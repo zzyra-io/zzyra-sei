@@ -11,26 +11,34 @@ import { Button } from "./ui/button";
 import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 
 const DevelopmentWarning = () => {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
+
+  // Only show in development environment
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
+
+  // Show warning in development
   return (
     <Dialog open={open} onOpenChange={(v) => setOpen(v)}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Development Warning</DialogTitle>
+          <DialogTitle>Development Environment</DialogTitle>
         </DialogHeader>
         <DialogDescription>
-          <Alert variant='destructive'>
-            <AlertTitle>Zyra is in still DEVELOPMENT stage</AlertTitle>
+          <Alert variant='default'>
+            <AlertTitle>Zyra Development Build</AlertTitle>
             <AlertDescription>
-              NONE of these are real results.
+              This is a development version of Zyra. Some features may be
+              experimental or incomplete.
               <br />
-              DONOT USE THIS FOR REAL WORKFLOWS.
+              For production use, please use the official release.
             </AlertDescription>
           </Alert>
         </DialogDescription>
         <DialogFooter>
           <Button variant='outline' onClick={() => setOpen(false)}>
-            Close
+            Continue
           </Button>
         </DialogFooter>
       </DialogContent>

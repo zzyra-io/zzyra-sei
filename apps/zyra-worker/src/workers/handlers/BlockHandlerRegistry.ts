@@ -1,27 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { BlockType } from '@zyra/types';
 import { DatabaseService } from '../../services/database.service';
-import { MagicAdminService } from '../../services/magic-admin.service';
-
-import {
-  BlockExecutionContext,
-  BlockHandler,
-  BlockType,
-  getBlockType,
-  getBlockMetadata,
-} from '@zyra/types';
-import * as vm from 'vm';
-import { EmailBlockHandler } from './EmailBlockHandler';
-import { HttpRequestHandler } from './HttpRequestHandler';
+import { ExecutionLogger } from '../execution-logger';
+import { BlockExecutionContext, BlockHandler } from '@zyra/types';
+import { EnhancedBlockRegistry } from './enhanced/EnhancedBlockRegistry';
 import { MetricsBlockHandler } from './MetricsBlockHandler';
-import { ScheduleBlockHandler } from './ScheduleBlockHandler';
-import { CustomBlockHandler } from './CustomBlockHandler';
 import { PriceMonitorBlockHandler } from './PriceMonitorBlockHandler';
 import { DataTransformHandler } from './DataTransformHandler';
-
-// Import enhanced block system
-import { EnhancedBlockRegistry } from './enhanced/EnhancedBlockRegistry';
+import { CustomBlockHandler } from './CustomBlockHandler';
+import { ScheduleBlockHandler } from './ScheduleBlockHandler';
+import { HttpRequestHandler } from './HttpRequestHandler';
 import { ZyraTemplateProcessor } from '../../utils/template-processor';
-import { ExecutionLogger } from '../execution-logger';
+import * as vm from 'vm';
+
+// Import Sei blockchain handlers
+import { SeiWalletListenerHandler } from './blockchain/sei/SeiWalletListenerHandler';
+import { SeiSmartContractCallHandler } from './blockchain/sei/SeiSmartContractCallHandler';
+import { SeiOnchainDataFetchHandler } from './blockchain/sei/SeiOnchainDataFetchHandler';
+import { SeiPaymentHandler } from './blockchain/sei/SeiPaymentHandler';
+import { SeiNftHandler } from './blockchain/sei/SeiNftHandler';
 
 /**
  * Central registry for all block handlers.
@@ -89,14 +86,38 @@ export class BlockHandlerRegistry {
       ),
 
       // Additional block types mapped to existing handlers
-
       [BlockType.WEBHOOK]: new MetricsBlockHandler(
         BlockType.WEBHOOK,
         new HttpRequestHandler(),
       ),
 
-      // Placeholder handlers for unimplemented block types
+      // Sei blockchain blocks
+      [BlockType.SEI_WALLET_LISTEN]: new MetricsBlockHandler(
+        BlockType.SEI_WALLET_LISTEN,
+        new SeiWalletListenerHandler(),
+      ),
 
+      [BlockType.SEI_CONTRACT_CALL]: new MetricsBlockHandler(
+        BlockType.SEI_CONTRACT_CALL,
+        new SeiSmartContractCallHandler(),
+      ),
+
+      [BlockType.SEI_DATA_FETCH]: new MetricsBlockHandler(
+        BlockType.SEI_DATA_FETCH,
+        new SeiOnchainDataFetchHandler(),
+      ),
+
+      [BlockType.SEI_PAYMENT]: new MetricsBlockHandler(
+        BlockType.SEI_PAYMENT,
+        new SeiPaymentHandler(),
+      ),
+
+      [BlockType.SEI_NFT]: new MetricsBlockHandler(
+        BlockType.SEI_NFT,
+        new SeiNftHandler(),
+      ),
+
+      // Placeholder handlers for unimplemented block types
       [BlockType.UNKNOWN]: new MetricsBlockHandler(BlockType.UNKNOWN, {
         execute: (inputs: any, context: any) => {
           const blockType = context?.blockType || 'unknown';

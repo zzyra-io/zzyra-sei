@@ -29,6 +29,11 @@ export class SeiSmartContractCallHandler {
     const startTime = Date.now();
 
     try {
+      // Validate user context
+      if (!ctx.userId) {
+        throw new Error('User ID is required for contract operations');
+      }
+
       const config = this.validateAndExtractConfig(node, ctx);
       const inputs = this.validateInputs(
         ctx.inputs || {},
@@ -36,36 +41,69 @@ export class SeiSmartContractCallHandler {
         ctx,
       );
 
-      if (!ctx.userId) {
-        throw new Error('User ID is required for contract execution');
-      }
-
-      const client = this.getRpcClient(config.network);
+      // Get wallet service for the network
       const walletService = this.getWalletService(config.network);
 
-      // Build transaction object
-      const transaction = await this.buildContractTransaction(
-        config,
-        inputs,
-        client,
+      // Validate user session before proceeding
+      const isValidSession = await walletService.validateUserSession(
         ctx.userId,
       );
-
-      // Validate transaction
-      walletService.validateTransaction(transaction);
-
-      // Check user balance
-      const hasBalance = await walletService.checkSufficientBalance(
-        ctx.userId,
-        BigInt(transaction.value || 0) +
-          BigInt(transaction.gasLimit || 0) * BigInt(transaction.gasPrice || 0),
-      );
-
-      if (!hasBalance) {
-        throw new Error('Insufficient balance for contract execution');
+      if (!isValidSession) {
+        throw new Error('Invalid user session. Please log in again.');
       }
 
-      // Delegate transaction execution
+      // Get user's wallet address
+      const userAddress = await walletService.getUserWalletAddress(ctx.userId);
+      if (!userAddress) {
+        throw new Error('No wallet found for user');
+      }
+
+      // Validate contract address
+      if (!ethers.isAddress(config.contractAddress)) {
+        throw new Error('Invalid contract address');
+      }
+
+      // Prepare transaction data
+      const contractInterface = new ethers.Interface(config.abi || []);
+      const functionData = contractInterface.encodeFunctionData(
+        config.method,
+        inputs.params || [],
+      );
+
+      // Prepare transaction
+      const transaction = {
+        to: config.contractAddress,
+        data: functionData,
+        value: inputs.value ? BigInt(inputs.value) : BigInt(0),
+        gasLimit: config.gasLimit ? BigInt(config.gasLimit) : undefined,
+        gasPrice: config.gasPrice ? BigInt(config.gasPrice) : undefined,
+      };
+
+      // Estimate gas if not provided
+      if (!transaction.gasLimit) {
+        const gasEstimate = await walletService.estimateGasForUser(
+          ctx.userId,
+          transaction,
+        );
+        transaction.gasLimit = gasEstimate.gasLimit;
+        transaction.gasPrice = gasEstimate.gasPrice;
+      }
+
+      // For high-value transactions, request approval
+      const highValueThreshold = BigInt('1000000000000000000'); // 1 ETH
+      if (transaction.value > highValueThreshold) {
+        const approved = await walletService.requestTransactionApproval(
+          ctx.userId,
+          transaction,
+          `Contract call to ${config.contractAddress} with value ${transaction.value}`,
+        );
+
+        if (!approved) {
+          throw new Error('Transaction approval denied by user');
+        }
+      }
+
+      // Execute transaction through Magic delegation
       const result = await walletService.delegateTransaction(
         ctx.userId,
         transaction,
@@ -74,67 +112,35 @@ export class SeiSmartContractCallHandler {
 
       // Wait for confirmation if configured
       let receipt = null;
-      if (config.waitForConfirmation && result.txHash) {
-        receipt = await walletService.waitForTransactionConfirmation(
+      if (config.waitForConfirmation) {
+        receipt = await walletService.waitForTransaction(
           result.txHash,
-          config.confirmationTimeout,
+          config.confirmations || 1,
         );
       }
-
-      // Log successful execution
-      await walletService.logTransactionAttempt(
-        ctx.userId,
-        transaction,
-        'success',
-      );
 
       const executionTime = Date.now() - startTime;
 
       return {
         success: true,
-        transaction: {
-          txHash: result.txHash,
-          status: result.status,
-          blockNumber: receipt?.blockNumber,
-          gasUsed: receipt?.gasUsed?.toString(),
-          fees:
-            receipt?.gasUsed && receipt?.gasPrice
-              ? (BigInt(receipt.gasUsed) * BigInt(receipt.gasPrice)).toString()
-              : undefined,
-        },
+        txHash: result.txHash,
+        status: result.status,
         contractAddress: config.contractAddress,
-        functionName: config.functionName,
-        returnData: receipt?.logs?.length
-          ? 'Contract execution completed'
-          : undefined,
-        events: this.parseContractEvents(receipt?.logs || []),
+        method: config.method,
+        params: inputs,
+        network: config.network,
         executionTime,
+        receipt,
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
-      // Log failed execution
-      if (ctx.userId) {
-        const walletService = this.getWalletService(
-          node.config?.network || 'sei-testnet',
-        );
-        await walletService.logTransactionAttempt(
-          ctx.userId,
-          {},
-          'failure',
-          error.message,
-        );
-      }
+      const executionTime = Date.now() - startTime;
 
       return {
         success: false,
-        transaction: {
-          txHash: '',
-          status: 'failed' as const,
-        },
-        contractAddress: node.config?.contractAddress || '',
-        functionName: node.config?.functionName || '',
         error: error.message,
-        executionTime: Date.now() - startTime,
+        network: node.config?.network || 'unknown',
+        executionTime,
         timestamp: new Date().toISOString(),
       };
     }

@@ -2,9 +2,9 @@ import { ethers } from 'ethers';
 import axios from 'axios';
 
 /**
- * Sei Wallet Service for transaction delegation and wallet management
- * Uses Magic SDK delegation pattern - no private keys are stored in the worker
- * All transactions are executed on behalf of users through delegation
+ * Sei Wallet Service for transaction delegation using Magic SDK
+ * All transactions are executed through Magic's delegation pattern
+ * No private keys are stored in the worker - all signing happens through Magic
  */
 export class SeiWalletService {
   constructor(private provider: ethers.JsonRpcProvider) {}
@@ -17,60 +17,82 @@ export class SeiWalletService {
   async delegateTransaction(
     userId: string,
     transaction: any,
-    network: string
+    network: string,
   ): Promise<{
     txHash: string;
     status: 'pending' | 'confirmed' | 'failed';
   }> {
     try {
-      const response = await axios.post('/api/wallet/delegate-transaction', {
-        userId,
-        transaction,
-        network,
-        timestamp: new Date().toISOString(),
-      }, {
-        headers: {
-          'Authorization': `Bearer ${process.env.WORKER_API_KEY}`,
-          'Content-Type': 'application/json',
+      // Call the Magic delegation API endpoint
+      const response = await axios.post(
+        '/api/magic/delegate-transaction',
+        {
+          userId,
+          transaction,
+          network,
+          timestamp: new Date().toISOString(),
         },
-        timeout: 60000, // 60 second timeout for transaction execution
-      });
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 60000, // 60 second timeout for transaction execution
+        },
+      );
 
       return {
         txHash: response.data.txHash,
         status: response.data.status || 'pending',
       };
     } catch (error: any) {
-      throw new Error(`Transaction delegation failed: ${error.response?.data?.message || error.message}`);
+      throw new Error(
+        `Transaction delegation failed: ${error.response?.data?.message || error.message}`,
+      );
     }
   }
 
   /**
-   * Get user's wallet address through delegation
+   * Get user's wallet address through Magic delegation
    */
   async getUserWalletAddress(userId: string): Promise<string> {
     try {
-      const response = await axios.get(`/api/wallet/address/${userId}`, {
+      const response = await axios.get(`/api/magic/wallet-address/${userId}`, {
         headers: {
-          'Authorization': `Bearer ${process.env.WORKER_API_KEY}`,
+          Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
         },
       });
 
       return response.data.address;
     } catch (error: any) {
-      throw new Error(`Failed to get user wallet address: ${error.response?.data?.message || error.message}`);
+      throw new Error(
+        `Failed to get user wallet address: ${error.response?.data?.message || error.message}`,
+      );
     }
   }
 
   /**
-   * Get wallet balance for user
+   * Get user's wallet balance through Magic delegation
    */
-  async getUserWalletBalance(userId: string): Promise<bigint> {
+  async getUserWalletBalance(
+    userId: string,
+    tokenAddress?: string,
+  ): Promise<bigint> {
     try {
-      const address = await this.getUserWalletAddress(userId);
-      return await this.provider.getBalance(address);
+      const response = await axios.get(`/api/magic/wallet-balance/${userId}`, {
+        headers: {
+          Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
+        },
+        params: {
+          tokenAddress,
+        },
+      });
+
+      return BigInt(response.data.balance);
     } catch (error: any) {
-      throw new Error(`Failed to get wallet balance: ${error.message}`);
+      throw new Error(
+        `Failed to get wallet balance: ${error.response?.data?.message || error.message}`,
+      );
     }
   }
 
@@ -80,16 +102,10 @@ export class SeiWalletService {
   async checkSufficientBalance(
     userId: string,
     requiredAmount: bigint,
-    tokenAddress?: string
+    tokenAddress?: string,
   ): Promise<boolean> {
     try {
-      if (tokenAddress) {
-        // For ERC20 tokens, we'd need to check token balance
-        // For now, just check native balance
-        console.warn('Token balance checking not yet implemented, checking native balance');
-      }
-
-      const balance = await this.getUserWalletBalance(userId);
+      const balance = await this.getUserWalletBalance(userId, tokenAddress);
       return balance >= requiredAmount;
     } catch (error) {
       return false;
@@ -97,103 +113,170 @@ export class SeiWalletService {
   }
 
   /**
-   * Estimate gas for transaction through delegation
+   * Estimate gas for user transaction through Magic delegation
    */
   async estimateGasForUser(
     userId: string,
-    transaction: any
+    transaction: any,
   ): Promise<{
     gasLimit: bigint;
     gasPrice: bigint;
-    totalFee: bigint;
+    estimatedCost: bigint;
   }> {
     try {
-      const userAddress = await this.getUserWalletAddress(userId);
-      const transactionWithFrom = { ...transaction, from: userAddress };
-      
-      const gasLimit = await this.provider.estimateGas(transactionWithFrom);
-      const feeData = await this.provider.getFeeData();
-      const gasPrice = feeData.gasPrice || 0n;
-      const totalFee = gasLimit * gasPrice;
+      const response = await axios.post(
+        '/api/magic/estimate-gas',
+        {
+          userId,
+          transaction,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
+          },
+        },
+      );
 
-      return { gasLimit, gasPrice, totalFee };
+      return {
+        gasLimit: BigInt(response.data.gasLimit),
+        gasPrice: BigInt(response.data.gasPrice),
+        estimatedCost: BigInt(response.data.estimatedCost),
+      };
     } catch (error: any) {
-      throw new Error(`Gas estimation failed: ${error.message}`);
+      throw new Error(
+        `Failed to estimate gas: ${error.response?.data?.message || error.message}`,
+      );
     }
   }
 
   /**
-   * Wait for transaction confirmation through polling
-   */
-  async waitForTransactionConfirmation(
-    txHash: string,
-    timeout: number = 60000,
-    confirmations: number = 1
-  ): Promise<any> {
-    const startTime = Date.now();
-    
-    while (Date.now() - startTime < timeout) {
-      try {
-        const receipt = await this.provider.getTransactionReceipt(txHash);
-        if (receipt && receipt.blockNumber) {
-          const currentBlock = await this.provider.getBlockNumber();
-          const confirmationCount = currentBlock - receipt.blockNumber + 1;
-          
-          if (confirmationCount >= confirmations) {
-            return receipt;
-          }
-        }
-      } catch (error) {
-        // Transaction might not be mined yet, continue polling
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-    
-    throw new Error(`Transaction ${txHash} not confirmed within timeout`);
-  }
-
-  /**
-   * Validate transaction parameters before delegation
+   * Validate transaction parameters
    */
   validateTransaction(transaction: any): void {
-    if (!transaction.to || !ethers.isAddress(transaction.to)) {
+    if (!transaction.to) {
+      throw new Error('Transaction must have a recipient address (to)');
+    }
+
+    if (!ethers.isAddress(transaction.to)) {
       throw new Error('Invalid recipient address');
     }
 
-    if (transaction.value && transaction.value < 0) {
-      throw new Error('Transaction value cannot be negative');
+    if (transaction.value && typeof transaction.value !== 'bigint') {
+      throw new Error('Transaction value must be a bigint');
     }
 
-    if (transaction.gasLimit && transaction.gasLimit <= 0) {
-      throw new Error('Gas limit must be positive');
+    if (transaction.gasLimit && typeof transaction.gasLimit !== 'bigint') {
+      throw new Error('Gas limit must be a bigint');
     }
 
-    if (transaction.gasPrice && transaction.gasPrice <= 0) {
-      throw new Error('Gas price must be positive');
+    if (transaction.gasPrice && typeof transaction.gasPrice !== 'bigint') {
+      throw new Error('Gas price must be a bigint');
+    }
+
+    if (transaction.data && typeof transaction.data !== 'string') {
+      throw new Error('Transaction data must be a string');
     }
   }
 
   /**
-   * Request transaction approval from admin/user
+   * Wait for transaction confirmation through Magic delegation
+   */
+  async waitForTransaction(
+    txHash: string,
+    confirmations: number = 1,
+    timeout: number = 60000,
+  ): Promise<any> {
+    try {
+      const response = await axios.post(
+        '/api/magic/wait-transaction',
+        {
+          txHash,
+          confirmations,
+          timeout,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
+          },
+        },
+      );
+
+      return response.data.receipt;
+    } catch (error: any) {
+      throw new Error(
+        `Transaction confirmation failed: ${error.response?.data?.message || error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Get transaction status through Magic delegation
+   */
+  async getTransactionStatus(
+    txHash: string,
+  ): Promise<'pending' | 'confirmed' | 'failed'> {
+    try {
+      const response = await axios.get(
+        `/api/magic/transaction-status/${txHash}`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
+          },
+        },
+      );
+
+      return response.data.status;
+    } catch (error) {
+      return 'pending';
+    }
+  }
+
+  /**
+   * Get transaction details through Magic delegation
+   */
+  async getTransactionDetails(txHash: string): Promise<any> {
+    try {
+      const response = await axios.get(
+        `/api/magic/transaction-details/${txHash}`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(
+        `Failed to get transaction details: ${error.response?.data?.message || error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Request transaction approval from user through Magic
    * This adds an extra security layer for high-value transactions
    */
   async requestTransactionApproval(
     userId: string,
     transaction: any,
-    reason: string
+    reason: string,
   ): Promise<boolean> {
     try {
-      const response = await axios.post('/api/wallet/request-approval', {
-        userId,
-        transaction,
-        reason,
-        timestamp: new Date().toISOString(),
-      }, {
-        headers: {
-          'Authorization': `Bearer ${process.env.WORKER_API_KEY}`,
+      const response = await axios.post(
+        '/api/magic/request-approval',
+        {
+          userId,
+          transaction,
+          reason,
+          timestamp: new Date().toISOString(),
         },
-      });
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
+          },
+        },
+      );
 
       return response.data.approved === true;
     } catch (error: any) {
@@ -203,60 +286,31 @@ export class SeiWalletService {
   }
 
   /**
-   * Log transaction attempt for auditing
+   * Get user's Magic session info
    */
-  async logTransactionAttempt(
-    userId: string,
-    transaction: any,
-    result: 'success' | 'failure',
-    error?: string
-  ): Promise<void> {
+  async getUserSession(userId: string): Promise<any> {
     try {
-      await axios.post('/api/wallet/audit-log', {
-        userId,
-        transaction: {
-          to: transaction.to,
-          value: transaction.value?.toString(),
-          gasLimit: transaction.gasLimit?.toString(),
-          gasPrice: transaction.gasPrice?.toString(),
-        },
-        result,
-        error,
-        timestamp: new Date().toISOString(),
-        workerInstance: process.env.WORKER_INSTANCE_ID || 'unknown',
-      }, {
+      const response = await axios.get(`/api/magic/user-session/${userId}`, {
         headers: {
-          'Authorization': `Bearer ${process.env.WORKER_API_KEY}`,
+          Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
         },
       });
-    } catch (error) {
-      // Don't throw on logging failure, but log it
-      console.error('Failed to log transaction attempt:', error);
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(
+        `Failed to get user session: ${error.response?.data?.message || error.message}`,
+      );
     }
   }
 
   /**
-   * Validate Sei address format
+   * Validate user's Magic session
    */
-  static isValidSeiAddress(address: string): boolean {
-    return /^sei[0-9a-z]{38}$/.test(address);
-  }
-
-  /**
-   * Get current gas price
-   */
-  async getGasPrice(): Promise<bigint> {
-    const feeData = await this.provider.getFeeData();
-    return feeData.gasPrice || 0n;
-  }
-
-  /**
-   * Health check
-   */
-  async healthCheck(): Promise<boolean> {
+  async validateUserSession(userId: string): Promise<boolean> {
     try {
-      await this.provider.getBlockNumber();
-      return true;
+      const session = await this.getUserSession(userId);
+      return session && session.isValid;
     } catch (error) {
       return false;
     }

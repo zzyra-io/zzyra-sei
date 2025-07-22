@@ -392,10 +392,45 @@ export class SeiWalletListenerHandler {
     toBlock: number,
     filters?: any,
   ): Promise<any[]> {
-    // Implementation would depend on specific contract interaction patterns
-    // For now, return empty array with TODO
-    console.warn('Contract call event monitoring not yet implemented');
-    return [];
+    try {
+      // Get contract interaction events
+      const events: any[] = [];
+
+      // Look for contract calls to the monitored address
+      const logs = await client.getLogs({
+        fromBlock: ethers.toBeHex(fromBlock),
+        toBlock: ethers.toBeHex(toBlock),
+        topics: [
+          null, // Any event signature
+          null, // Any from address
+          ethers.zeroPadValue(address, 32), // To address
+        ],
+      });
+
+      for (const log of logs) {
+        // Parse contract call event
+        const from = ethers.getAddress('0x' + log.topics[1]?.slice(26) || '0');
+        const to = ethers.getAddress('0x' + log.topics[2]?.slice(26) || '0');
+
+        events.push({
+          eventType: 'contract_call',
+          txHash: log.transactionHash,
+          blockNumber: parseInt(log.blockNumber, 16),
+          timestamp: new Date().toISOString(),
+          fromAddress: from,
+          toAddress: to,
+          contractAddress: to,
+          methodSignature: log.topics[0]?.slice(0, 10) || '',
+          rawEvent: log,
+          success: true,
+        });
+      }
+
+      return events;
+    } catch (error: any) {
+      console.warn(`Failed to get contract call events: ${error.message}`);
+      return [];
+    }
   }
 
   /**
@@ -408,13 +443,50 @@ export class SeiWalletListenerHandler {
     toBlock: number,
     filters?: any,
   ): Promise<any[]> {
-    // Similar to ERC20 transfers but for ERC721/ERC1155
-    console.warn('NFT transfer event monitoring not yet implemented');
-    return [];
+    try {
+      // ERC721 Transfer event signature
+      const transferEventTopic = ethers.id('Transfer(address,address,uint256)');
+
+      const logs = await client.getLogs({
+        fromBlock: ethers.toBeHex(fromBlock),
+        toBlock: ethers.toBeHex(toBlock),
+        topics: [
+          transferEventTopic,
+          null, // From address
+          ethers.zeroPadValue(address, 32), // To address
+        ],
+      });
+
+      const events: any[] = [];
+
+      for (const log of logs) {
+        const from = ethers.getAddress('0x' + log.topics[1]?.slice(26) || '0');
+        const to = ethers.getAddress('0x' + log.topics[2]?.slice(26) || '0');
+        const tokenId = BigInt(log.data);
+
+        events.push({
+          eventType: 'nft_transfer',
+          txHash: log.transactionHash,
+          blockNumber: parseInt(log.blockNumber, 16),
+          timestamp: new Date().toISOString(),
+          fromAddress: from,
+          toAddress: to,
+          tokenId: tokenId.toString(),
+          contractAddress: log.address,
+          rawEvent: log,
+          success: true,
+        });
+      }
+
+      return events;
+    } catch (error: any) {
+      console.warn(`Failed to get NFT transfer events: ${error.message}`);
+      return [];
+    }
   }
 
   /**
-   * Get swap events (DEX interactions)
+   * Get swap events
    */
   private async getSwapEvents(
     client: SeiRpcClient,
@@ -423,9 +495,43 @@ export class SeiWalletListenerHandler {
     toBlock: number,
     filters?: any,
   ): Promise<any[]> {
-    // Would monitor DEX swap events
-    console.warn('Swap event monitoring not yet implemented');
-    return [];
+    try {
+      // Common DEX swap event signatures
+      const swapEventTopics = [
+        ethers.id('Swap(address,uint256,uint256,uint256,uint256,address)'), // Uniswap V2
+        ethers.id('Swap(address,address,int256,int256,uint160,uint128,int24)'), // Uniswap V3
+        ethers.id('TokenPurchase(address,uint256,uint256)'), // Bancor
+      ];
+
+      const events: any[] = [];
+
+      for (const topic of swapEventTopics) {
+        const logs = await client.getLogs({
+          fromBlock: ethers.toBeHex(fromBlock),
+          toBlock: ethers.toBeHex(toBlock),
+          topics: [topic],
+        });
+
+        for (const log of logs) {
+          // Parse swap event (simplified)
+          events.push({
+            eventType: 'swap',
+            txHash: log.transactionHash,
+            blockNumber: parseInt(log.blockNumber, 16),
+            timestamp: new Date().toISOString(),
+            contractAddress: log.address,
+            methodSignature: topic.slice(0, 10),
+            rawEvent: log,
+            success: true,
+          });
+        }
+      }
+
+      return events;
+    } catch (error: any) {
+      console.warn(`Failed to get swap events: ${error.message}`);
+      return [];
+    }
   }
 
   /**
