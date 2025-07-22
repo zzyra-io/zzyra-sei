@@ -13,10 +13,10 @@ import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 const DevelopmentWarning = () => {
   const [open, setOpen] = useState(false);
 
-  // Only show in development environment
-  if (process.env.NODE_ENV === "production") {
-    return null;
-  }
+  // // Only show in development environment
+  // if (process.env.NODE_ENV === "production") {
+  //   return null;
+  // }
 
   // Show warning in development
   return (
