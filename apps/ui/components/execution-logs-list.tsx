@@ -1,18 +1,11 @@
 "use client";
-
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { executionsApi } from "@/lib/services/api";
-import { type NodeLog, type UnifiedLog } from "@/lib/services/logs-service";
+import type { NodeLog, UnifiedLog } from "@/lib/services/logs-service";
 import { formatDistance } from "date-fns";
 import {
   AlertCircle,
@@ -20,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Code,
   FileText,
   Loader2,
   Pause,
@@ -29,7 +23,7 @@ import {
   XCircle,
 } from "lucide-react";
 import React, {
-  JSX,
+  type JSX,
   useCallback,
   useEffect,
   useMemo,
@@ -75,7 +69,6 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
   workflow,
 }: ExecutionLogsListProps) {
   const { toast } = useToast();
-
   const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +92,6 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
   const executionsRef = useRef<WorkflowExecution[]>([]);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadingRef = useRef<HTMLDivElement>(null);
-
   const ITEMS_PER_PAGE = 5; // Reduced for better performance
 
   // Persist expanded state to localStorage
@@ -135,9 +127,7 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
   const loadDetailedData = useCallback(
     async (executionId: string) => {
       if (detailedData[executionId]) return; // Already loaded
-
       setLoadingExecutionIds((prev) => new Set(prev).add(executionId));
-
       try {
         const detailedExecution =
           await executionsApi.getCompleteExecution(executionId);
@@ -188,14 +178,12 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
       try {
         setLoading(page === 1);
         setError(null);
-
         // Only fetch basic execution data initially
         const response = await executionsApi.getWorkflowExecutions(
           workflowId,
           ITEMS_PER_PAGE,
           (page - 1) * ITEMS_PER_PAGE
         );
-
         const transformedExecutions = response.data.map((execution: any) => ({
           id: execution.id,
           workflow_id: execution.workflowId,
@@ -211,13 +199,11 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
           nodeInputs: {},
           nodeOutputs: {},
         }));
-
         if (append) {
           setExecutions((prev) => [...prev, ...transformedExecutions]);
         } else {
           setExecutions(transformedExecutions);
         }
-
         setHasMore(response.data.length === ITEMS_PER_PAGE);
         setCurrentPage(page);
       } catch (error) {
@@ -242,7 +228,6 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
   // Intersection Observer for infinite scroll
   useEffect(() => {
     if (!loadingRef.current) return;
-
     observerRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
@@ -252,9 +237,7 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
       },
       { threshold: 0.1 }
     );
-
     observerRef.current.observe(loadingRef.current);
-
     return () => {
       if (observerRef.current) {
         observerRef.current.disconnect();
@@ -270,13 +253,11 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
   // Polling for real-time updates - optimized to not reset state
   useEffect(() => {
     if (!shouldPoll) return;
-
     const interval = setInterval(() => {
       // Only update running executions, don't reset the entire list
       const runningExecutions = executions.filter(
         (exec) => exec.status === "running" || exec.status === "pending"
       );
-
       if (runningExecutions.length > 0) {
         // Update only the running executions instead of fetching all
         Promise.all(
@@ -304,7 +285,6 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
         );
       }
     }, 5000);
-
     return () => clearInterval(interval);
   }, [shouldPoll, executions]); // Only depend on shouldPoll and executions
 
@@ -315,7 +295,6 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
         [executionId]: !expandedLogs[executionId],
       };
       updateExpandedLogs(newExpandedState);
-
       // Load detailed data when expanding
       if (!expandedLogs[executionId] && !detailedData[executionId]) {
         loadDetailedData(executionId);
@@ -333,14 +312,12 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
       failed: 0,
       paused: 0,
     };
-
     executions.forEach((log) => {
       const status = log.status as keyof typeof counts;
       if (counts[status] !== undefined) {
         counts[status]++;
       }
     });
-
     return counts;
   }, [executions]);
 
@@ -359,13 +336,11 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
 
   const formatDate = useCallback((date: string | null | undefined) => {
     if (!date) return "Unknown time";
-
     try {
       const dateObject = new Date(date);
       if (isNaN(dateObject.getTime())) {
         return "Invalid date";
       }
-
       return new Intl.DateTimeFormat("en-US", {
         month: "short",
         day: "numeric",
@@ -391,41 +366,36 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
     switch (status) {
       case "completed":
         return (
-          <Badge
-            variant='outline'
-            className='bg-green-50 text-green-700 border-green-200'>
+          <Badge className='bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:text-emerald-800'>
+            <CheckCircle className='w-3 h-3 mr-1' />
             Completed
           </Badge>
         );
       case "failed":
         return (
-          <Badge
-            variant='outline'
-            className='bg-red-50 text-red-700 border-red-200'>
+          <Badge className='bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:text-rose-800'>
+            <XCircle className='w-3 h-3 mr-1' />
             Failed
           </Badge>
         );
       case "running":
         return (
-          <Badge
-            variant='outline'
-            className='bg-blue-50 text-blue-700 border-blue-200'>
+          <Badge className='bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100 hover:text-sky-800'>
+            <Loader2 className='w-3 h-3 mr-1 animate-spin' />
             Running
           </Badge>
         );
       case "paused":
         return (
-          <Badge
-            variant='outline'
-            className='bg-amber-50 text-amber-700 border-amber-200'>
+          <Badge className='bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:text-amber-800'>
+            <Pause className='w-3 h-3 mr-1' />
             Paused
           </Badge>
         );
       default:
         return (
-          <Badge
-            variant='outline'
-            className='bg-gray-50 text-gray-700 border-gray-200'>
+          <Badge className='bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-800'>
+            <Clock className='w-3 h-3 mr-1' />
             Pending
           </Badge>
         );
@@ -436,7 +406,6 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
     async (action: string, logId: string, nodeId?: string) => {
       try {
         let result: any;
-
         if (action === "retry") {
           result = await executionsApi.retryExecution(logId, nodeId);
         } else if (action === "cancel") {
@@ -448,18 +417,15 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
         } else {
           throw new Error(`Unknown action: ${action}`);
         }
-
         if (result && !result.success) {
           throw new Error(
             `Failed to ${action} execution: ${result.message || "Unknown error"}`
           );
         }
-
         toast({
           title: `Execution ${action}ed`,
           description: `The workflow execution has been ${action}ed successfully.`,
         });
-
         memoizedFetchExecutions(); // Refetch executions to update status
       } catch (error) {
         console.error(`Error ${action}ing execution:`, error);
@@ -476,50 +442,135 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
   const viewJsonData = (data: Record<string, unknown> | null) => {
     setJsonViewerData(data || {});
     setIsJsonDialogOpen(true);
+    // For demo purposes, just log the data
+    console.log("JSON Data:", data);
   };
 
   if (loading && executions.length === 0) {
     return (
-      <div className='flex items-center justify-center p-8'>
-        <Loader2 className='h-8 w-8 animate-spin' />
-        <span className='ml-2'>Loading executions...</span>
+      <div className='flex flex-col items-center justify-center p-8 gap-3'>
+        <Loader2 className='h-10 w-10 animate-spin text-primary' />
+        <span className='text-muted-foreground font-medium'>
+          Loading executions...
+        </span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className='flex items-center justify-center p-8'>
-        <AlertCircle className='h-8 w-8 text-red-500' />
-        <span className='ml-2 text-red-600'>{error}</span>
+      <div className='flex flex-col items-center justify-center p-8 gap-3 text-center'>
+        <div className='h-12 w-12 rounded-full bg-rose-100 flex items-center justify-center'>
+          <AlertCircle className='h-6 w-6 text-rose-600' />
+        </div>
+        <div>
+          <h3 className='font-semibold text-lg'>Failed to load executions</h3>
+          <p className='text-muted-foreground mt-1'>{error}</p>
+        </div>
+        <Button
+          variant='outline'
+          onClick={() => memoizedFetchExecutions(1)}
+          className='mt-2'>
+          <RefreshCw className='h-4 w-4 mr-2' />
+          Try Again
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className='space-y-4'>
+    <div className='space-y-5'>
       {/* Header with refresh */}
       <div className='flex items-center justify-between'>
-        <h3 className='text-lg font-semibold'>Execution History</h3>
+        <h3 className='text-xl font-semibold tracking-tight'>
+          Execution History
+        </h3>
         <Button
           variant='outline'
           size='sm'
           onClick={() => memoizedFetchExecutions(1)}
-          disabled={loading}>
-          <RefreshCw
-            className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
-          />
+          disabled={loading}
+          className='gap-2'>
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
       </div>
 
+      {/* Status filters */}
+      <div className='flex flex-wrap gap-2'>
+        <Button
+          variant={activeTab === "all" ? "default" : "outline"}
+          size='sm'
+          onClick={() => setActiveTab("all")}
+          className='gap-1.5'>
+          All
+          <span className='inline-flex items-center justify-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium leading-none text-primary'>
+            {statusCounts.all}
+          </span>
+        </Button>
+        <Button
+          variant={activeTab === "running" ? "default" : "outline"}
+          size='sm'
+          onClick={() => setActiveTab("running")}
+          className='gap-1.5'>
+          <Loader2 className='h-3 w-3 animate-spin' />
+          Running
+          <span className='inline-flex items-center justify-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium leading-none text-primary'>
+            {statusCounts.running}
+          </span>
+        </Button>
+        <Button
+          variant={activeTab === "completed" ? "default" : "outline"}
+          size='sm'
+          onClick={() => setActiveTab("completed")}
+          className='gap-1.5'>
+          <CheckCircle className='h-3 w-3' />
+          Completed
+          <span className='inline-flex items-center justify-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium leading-none text-primary'>
+            {statusCounts.completed}
+          </span>
+        </Button>
+        <Button
+          variant={activeTab === "failed" ? "default" : "outline"}
+          size='sm'
+          onClick={() => setActiveTab("failed")}
+          className='gap-1.5'>
+          <XCircle className='h-3 w-3' />
+          Failed
+          <span className='inline-flex items-center justify-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium leading-none text-primary'>
+            {statusCounts.failed}
+          </span>
+        </Button>
+        <Button
+          variant={activeTab === "paused" ? "default" : "outline"}
+          size='sm'
+          onClick={() => setActiveTab("paused")}
+          className='gap-1.5'>
+          <Pause className='h-3 w-3' />
+          Paused
+          <span className='inline-flex items-center justify-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium leading-none text-primary'>
+            {statusCounts.paused}
+          </span>
+        </Button>
+        <Button
+          variant={activeTab === "pending" ? "default" : "outline"}
+          size='sm'
+          onClick={() => setActiveTab("pending")}
+          className='gap-1.5'>
+          <Clock className='h-3 w-3' />
+          Pending
+          <span className='inline-flex items-center justify-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium leading-none text-primary'>
+            {statusCounts.pending}
+          </span>
+        </Button>
+      </div>
+
       {/* Executions List */}
-      <div className='space-y-3'>
-        {executions.map((log) => {
+      <div className='space-y-4'>
+        {filteredLogs.map((log) => {
           const isExpanded = expandedLogs[log.id];
           const isLoadingDetails = loadingExecutionIds.has(log.id);
           const detailedExecution = detailedData[log.id] || log;
-
           return (
             <ExecutionLogCard
               key={log.id}
@@ -548,7 +599,12 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
       {hasMore && (
         <div ref={loadingRef} className='flex items-center justify-center p-4'>
           {isLoadingMore ? (
-            <Loader2 className='h-6 w-6 animate-spin' />
+            <div className='flex items-center gap-2'>
+              <Loader2 className='h-5 w-5 animate-spin text-primary' />
+              <span className='text-sm text-muted-foreground'>
+                Loading more executions...
+              </span>
+            </div>
           ) : (
             <div className='text-sm text-muted-foreground'>
               Scroll to load more
@@ -559,54 +615,51 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
 
       {/* Empty state */}
       {executions.length === 0 && !loading && (
-        <div className='text-center py-12 text-muted-foreground'>
-          <div className='flex flex-col items-center gap-4'>
-            <div className='w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center'>
-              <FileText className='h-8 w-8 opacity-50' />
-            </div>
-            <div className='max-w-md'>
-              <h3 className='text-lg font-medium mb-2'>No executions yet</h3>
-              <p className='text-sm text-muted-foreground mb-4'>
-                This workflow hasn't been executed yet. Once you run this
-                workflow, execution history will appear here.
-              </p>
-              <div className='space-y-2 text-xs'>
-                <div className='flex items-center gap-2'>
-                  <div className='w-2 h-2 bg-blue-500 rounded-full'></div>
-                  <span>Execution status and timing</span>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <div className='w-2 h-2 bg-green-500 rounded-full'></div>
-                  <span>Node-by-node progress</span>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <div className='w-2 h-2 bg-purple-500 rounded-full'></div>
-                  <span>Input and output data</span>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <div className='w-2 h-2 bg-orange-500 rounded-full'></div>
-                  <span>Detailed logs and errors</span>
-                </div>
+        <div className='flex flex-col items-center justify-center py-16 text-center'>
+          <div className='w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-6'>
+            <FileText className='h-10 w-10 text-muted-foreground/50' />
+          </div>
+          <div className='max-w-md'>
+            <h3 className='text-xl font-semibold mb-3'>No executions yet</h3>
+            <p className='text-muted-foreground mb-6'>
+              This workflow hasn't been executed yet. Once you run this
+              workflow, execution history will appear here.
+            </p>
+            <div className='grid grid-cols-2 gap-4 text-sm max-w-sm mx-auto mb-8'>
+              <div className='flex items-center gap-2 bg-muted/30 p-3 rounded-lg'>
+                <div className='w-2 h-2 bg-sky-500 rounded-full'></div>
+                <span>Execution status and timing</span>
+              </div>
+              <div className='flex items-center gap-2 bg-muted/30 p-3 rounded-lg'>
+                <div className='w-2 h-2 bg-emerald-500 rounded-full'></div>
+                <span>Node-by-node progress</span>
+              </div>
+              <div className='flex items-center gap-2 bg-muted/30 p-3 rounded-lg'>
+                <div className='w-2 h-2 bg-violet-500 rounded-full'></div>
+                <span>Input and output data</span>
+              </div>
+              <div className='flex items-center gap-2 bg-muted/30 p-3 rounded-lg'>
+                <div className='w-2 h-2 bg-amber-500 rounded-full'></div>
+                <span>Detailed logs and errors</span>
               </div>
             </div>
-            <div className='mt-6'>
-              <Button
-                variant='outline'
-                size='sm'
-                onClick={() => {
-                  // You could add a link to execute the workflow here
-                  console.log("Navigate to execute workflow");
-                }}>
-                <Play className='h-4 w-4 mr-2' />
-                Execute Workflow
-              </Button>
-            </div>
+            <Button
+              size='lg'
+              onClick={() => {
+                // You could add a link to execute the workflow here
+                console.log("Navigate to execute workflow");
+              }}
+              className='gap-2'>
+              <Play className='h-4 w-4' />
+              Execute Workflow
+            </Button>
           </div>
         </div>
       )}
     </div>
   );
 });
+
 ExecutionLogsList.displayName = "ExecutionLogsList";
 
 interface ExecutionLogCardProps {
@@ -658,12 +711,10 @@ export const ExecutionLogCard = React.memo(
 
     const allLogs = useMemo(() => {
       const logs: UnifiedLog[] = [];
-
       // Add execution logs
       if (log.executionLogs) {
         logs.push(...log.executionLogs);
       }
-
       // Add node logs
       if (nodeExecutions) {
         nodeExecutions.forEach((nodeExec: any) => {
@@ -678,7 +729,6 @@ export const ExecutionLogCard = React.memo(
           }
         });
       }
-
       // Sort by timestamp
       return logs.sort(
         (a, b) =>
@@ -686,42 +736,58 @@ export const ExecutionLogCard = React.memo(
       );
     }, [log.executionLogs, nodeExecutions]);
 
+    // Get status icon for the header
+    const getStatusIcon = () => {
+      switch (log.status) {
+        case "running":
+          return <Loader2 className='h-5 w-5 animate-spin text-sky-500' />;
+        case "completed":
+          return <CheckCircle className='h-5 w-5 text-emerald-500' />;
+        case "failed":
+          return <XCircle className='h-5 w-5 text-rose-500' />;
+        case "paused":
+          return <Pause className='h-5 w-5 text-amber-500' />;
+        default:
+          return <Clock className='h-5 w-5 text-slate-500' />;
+      }
+    };
+
     return (
-      <Card className='overflow-hidden'>
-        <CardHeader className='pb-3'>
+      <Card className='overflow-hidden border shadow-sm hover:shadow-md transition-shadow duration-200'>
+        <CardHeader className='py-4 px-5'>
           <div className='flex items-center justify-between'>
             <div className='flex items-center gap-3'>
-              <div className='flex items-center gap-2'>
-                {log.status === "running" ? (
-                  <Loader2 className='h-4 w-4 animate-spin text-blue-500' />
-                ) : log.status === "completed" ? (
-                  <CheckCircle className='h-4 w-4 text-green-500' />
-                ) : log.status === "failed" ? (
-                  <XCircle className='h-4 w-4 text-red-500' />
-                ) : (
-                  <Clock className='h-4 w-4 text-gray-500' />
-                )}
-                <div>
-                  <p className='text-sm font-medium'>
+              <div className='flex h-10 w-10 items-center justify-center rounded-full bg-muted/30'>
+                {getStatusIcon()}
+              </div>
+              <div>
+                <div className='flex items-center gap-2'>
+                  <p className='font-medium'>
                     Execution {log.id.slice(0, 8)}...
                   </p>
-                  <p className='text-xs text-muted-foreground'>
-                    Started {formatDate(log.started_at)} • Duration: {duration}
-                  </p>
+                  {getStatusBadge(log.status)}
+                </div>
+                <div className='flex items-center gap-2 text-sm text-muted-foreground mt-0.5'>
+                  <span className='flex items-center gap-1'>
+                    <Clock className='h-3.5 w-3.5' />
+                    Started {formatDate(log.started_at)}
+                  </span>
+                  <span className='text-muted-foreground/50'>•</span>
+                  <span>Duration: {duration}</span>
                 </div>
               </div>
             </div>
             <div className='flex items-center gap-2'>
-              {getStatusBadge(log.status)}
               <Button
                 variant='ghost'
                 size='sm'
                 onClick={onToggleExpanded}
-                className='h-8 w-8 p-0'>
+                className='h-9 w-9 p-0 rounded-full'
+                aria-label={isExpanded ? "Collapse" : "Expand"}>
                 {isExpanded ? (
-                  <ChevronDown className='h-4 w-4' />
+                  <ChevronDown className='h-5 w-5' />
                 ) : (
-                  <ChevronRight className='h-4 w-4' />
+                  <ChevronRight className='h-5 w-5' />
                 )}
               </Button>
             </div>
@@ -729,714 +795,825 @@ export const ExecutionLogCard = React.memo(
         </CardHeader>
 
         {isExpanded && (
-          <CardContent className='pt-0'>
+          <CardContent className='px-5 pb-5 pt-0'>
             {isLoading ? (
-              <div className='flex items-center justify-center p-8'>
-                <Loader2 className='h-6 w-6 animate-spin' />
-                <span className='ml-2'>Loading detailed data...</span>
+              <div className='flex items-center justify-center p-8 gap-3'>
+                <Loader2 className='h-6 w-6 animate-spin text-primary' />
+                <span className='text-muted-foreground'>
+                  Loading detailed data...
+                </span>
               </div>
             ) : (
-              <Tabs defaultValue='logs' className='w-full'>
-                <TabsList className='grid w-full grid-cols-4'>
-                  <TabsTrigger value='logs'>
-                    Logs ({allLogs.length})
-                  </TabsTrigger>
-                  <TabsTrigger value='nodes'>
-                    Nodes ({nodeExecutions?.length || 0})
-                  </TabsTrigger>
-                  <TabsTrigger value='input'>Input</TabsTrigger>
-                  <TabsTrigger value='output'>Output</TabsTrigger>
-                </TabsList>
+              <div className='space-y-4'>
+                {/* Action buttons */}
+                <div className='flex flex-wrap gap-2'>
+                  {log.status === "running" && (
+                    <>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        className='gap-1.5 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800'
+                        onClick={() => handleAction("pause", log.id)}>
+                        <Pause className='h-3.5 w-3.5' />
+                        Pause Execution
+                      </Button>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        className='gap-1.5 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800'
+                        onClick={() => handleAction("cancel", log.id)}>
+                        <XCircle className='h-3.5 w-3.5' />
+                        Cancel Execution
+                      </Button>
+                    </>
+                  )}
+                  {log.status === "paused" && (
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      className='gap-1.5 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800'
+                      onClick={() => handleAction("resume", log.id)}>
+                      <Play className='h-3.5 w-3.5' />
+                      Resume Execution
+                    </Button>
+                  )}
+                  {log.status === "failed" && (
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      className='gap-1.5 border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:text-sky-800'
+                      onClick={() => handleAction("retry", log.id)}>
+                      <RotateCcw className='h-3.5 w-3.5' />
+                      Retry Execution
+                    </Button>
+                  )}
+                </div>
 
-                <TabsContent value='logs' className='space-y-4'>
-                  {allLogs.length > 0 ? (
-                    <div className='space-y-3'>
-                      {/* Log Summary */}
-                      <div className='flex items-center justify-between p-3 bg-muted/30 rounded-lg'>
-                        <div className='flex items-center gap-4'>
-                          <div className='text-center'>
-                            <p className='text-sm font-medium'>
+                <Tabs defaultValue='logs' className='w-full'>
+                  <TabsList className='grid w-full grid-cols-4 mb-4'>
+                    <TabsTrigger value='logs' className='gap-1.5'>
+                      <FileText className='h-4 w-4' />
+                      Logs{" "}
+                      <span className='text-xs opacity-70'>
+                        ({allLogs.length})
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value='nodes' className='gap-1.5'>
+                      <Code className='h-4 w-4' />
+                      Nodes{" "}
+                      <span className='text-xs opacity-70'>
+                        ({nodeExecutions?.length || 0})
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value='input' className='gap-1.5'>
+                      Input
+                    </TabsTrigger>
+                    <TabsTrigger value='output' className='gap-1.5'>
+                      Output
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value='logs' className='space-y-4'>
+                    {allLogs.length > 0 ? (
+                      <div className='space-y-4'>
+                        {/* Log Summary */}
+                        <div className='grid grid-cols-4 gap-3'>
+                          <div className='flex flex-col items-center justify-center p-4 bg-muted/30 rounded-lg'>
+                            <p className='text-2xl font-semibold'>
                               {allLogs.length}
                             </p>
                             <p className='text-xs text-muted-foreground'>
                               Total Logs
                             </p>
                           </div>
-                          <div className='text-center'>
-                            <p className='text-sm font-medium text-red-600'>
+                          <div className='flex flex-col items-center justify-center p-4 bg-rose-50 rounded-lg'>
+                            <p className='text-2xl font-semibold text-rose-700'>
                               {
                                 allLogs.filter((log) => log.level === "error")
                                   .length
                               }
                             </p>
-                            <p className='text-xs text-muted-foreground'>
-                              Errors
-                            </p>
+                            <p className='text-xs text-rose-600'>Errors</p>
                           </div>
-                          <div className='text-center'>
-                            <p className='text-sm font-medium text-yellow-600'>
+                          <div className='flex flex-col items-center justify-center p-4 bg-amber-50 rounded-lg'>
+                            <p className='text-2xl font-semibold text-amber-700'>
                               {
                                 allLogs.filter((log) => log.level === "warn")
                                   .length
                               }
                             </p>
-                            <p className='text-xs text-muted-foreground'>
-                              Warnings
-                            </p>
+                            <p className='text-xs text-amber-600'>Warnings</p>
                           </div>
-                          <div className='text-center'>
-                            <p className='text-sm font-medium text-blue-600'>
+                          <div className='flex flex-col items-center justify-center p-4 bg-sky-50 rounded-lg'>
+                            <p className='text-2xl font-semibold text-sky-700'>
                               {
                                 allLogs.filter((log) => log.level === "info")
                                   .length
                               }
                             </p>
-                            <p className='text-xs text-muted-foreground'>
-                              Info
-                            </p>
+                            <p className='text-xs text-sky-600'>Info</p>
                           </div>
                         </div>
-                        <div className='text-xs text-muted-foreground'>
-                          {allLogs.length > 0 && (
-                            <span>
-                              {new Date(
-                                allLogs[0].timestamp
-                              ).toLocaleDateString()}{" "}
-                              -{" "}
-                              {new Date(
-                                allLogs[allLogs.length - 1].timestamp
-                              ).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
 
-                      {/* Logs List */}
-                      <div className='space-y-2 max-h-96 overflow-y-auto'>
-                        {allLogs.map((logEntry: any, idx: number) => {
-                          const levelClass =
-                            logEntry.level === "error"
-                              ? "text-red-700 bg-red-50 border-red-100"
-                              : logEntry.level === "warn"
-                                ? "text-yellow-700 bg-yellow-50 border-yellow-100"
-                                : "text-gray-700 bg-gray-50 border-gray-100";
+                        {/* Logs List */}
+                        <div className='space-y-2 max-h-[500px] overflow-y-auto rounded-lg border'>
+                          {allLogs.map((logEntry: any, idx: number) => {
+                            const levelClass =
+                              logEntry.level === "error"
+                                ? "border-l-4 border-l-rose-500 bg-rose-50"
+                                : logEntry.level === "warn"
+                                  ? "border-l-4 border-l-amber-500 bg-amber-50"
+                                  : "border-l-4 border-l-sky-500 bg-sky-50";
 
-                          return (
-                            <div
-                              key={idx}
-                              className={`p-3 rounded border ${levelClass}`}>
-                              <div className='flex items-center justify-between mb-2'>
-                                <div className='flex items-center gap-2'>
-                                  <Badge variant='outline' className='text-xs'>
-                                    {logEntry.source === "node"
-                                      ? `Node: ${logEntry.node_id}`
-                                      : "System"}
-                                  </Badge>
-                                  <Badge
-                                    variant={
-                                      logEntry.level === "error"
-                                        ? "destructive"
-                                        : "secondary"
-                                    }
-                                    className='text-xs'>
-                                    {logEntry.level}
-                                  </Badge>
-                                  <span className='text-xs opacity-80'>
-                                    {new Date(
-                                      logEntry.timestamp
-                                    ).toLocaleTimeString()}
-                                  </span>
+                            const levelBadge =
+                              logEntry.level === "error" ? (
+                                <Badge
+                                  variant='destructive'
+                                  className='h-5 px-1.5'>
+                                  ERROR
+                                </Badge>
+                              ) : logEntry.level === "warn" ? (
+                                <Badge className='bg-amber-100 text-amber-800 hover:bg-amber-200 h-5 px-1.5'>
+                                  WARN
+                                </Badge>
+                              ) : (
+                                <Badge className='bg-sky-100 text-sky-800 hover:bg-sky-200 h-5 px-1.5'>
+                                  INFO
+                                </Badge>
+                              );
+
+                            return (
+                              <div key={idx} className={`p-3 ${levelClass}`}>
+                                <div className='flex items-center justify-between mb-2'>
+                                  <div className='flex items-center gap-2'>
+                                    {levelBadge}
+                                    <Badge
+                                      variant='outline'
+                                      className='h-5 px-1.5'>
+                                      {logEntry.source === "node"
+                                        ? `Node: ${logEntry.node_id}`
+                                        : "System"}
+                                    </Badge>
+                                    <span className='text-xs text-muted-foreground'>
+                                      {new Date(
+                                        logEntry.timestamp
+                                      ).toLocaleTimeString()}
+                                    </span>
+                                  </div>
+                                  <div className='flex items-center gap-1'>
+                                    {logEntry.metadata &&
+                                      Object.keys(logEntry.metadata).length >
+                                        0 && (
+                                        <Button
+                                          variant='outline'
+                                          size='sm'
+                                          className='h-6 text-xs px-2 bg-transparent'
+                                          onClick={() =>
+                                            viewJsonData(logEntry.metadata)
+                                          }>
+                                          View Metadata
+                                        </Button>
+                                      )}
+                                  </div>
                                 </div>
-                                <div className='flex items-center gap-1'>
-                                  {logEntry.metadata &&
-                                    Object.keys(logEntry.metadata).length >
-                                      0 && (
-                                      <Button
-                                        variant='ghost'
-                                        size='sm'
-                                        className='text-xs p-0 h-5 px-1.5'
-                                        onClick={() =>
-                                          viewJsonData(logEntry.metadata)
-                                        }>
-                                        Metadata
-                                      </Button>
-                                    )}
+                                <div className='text-sm mb-2 font-mono'>
+                                  {logEntry.message}
                                 </div>
-                              </div>
-                              <div className='text-sm mb-2'>
-                                {logEntry.message}
-                              </div>
-
-                              {/* Metadata Preview */}
-                              {logEntry.metadata &&
-                                Object.keys(logEntry.metadata).length > 0 && (
-                                  <div className='text-xs bg-black/5 p-2 rounded'>
-                                    <p className='font-medium mb-1'>
-                                      Metadata Preview:
-                                    </p>
-                                    <div className='space-y-1'>
-                                      {Object.entries(logEntry.metadata)
-                                        .slice(0, 3)
-                                        .map(([key, value]) => (
-                                          <div
-                                            key={key}
-                                            className='flex justify-between'>
-                                            <span className='text-muted-foreground'>
-                                              {key}:
-                                            </span>
-                                            <span className='truncate max-w-32'>
-                                              {typeof value === "object"
-                                                ? JSON.stringify(value).slice(
-                                                    0,
-                                                    30
-                                                  ) + "..."
-                                                : String(value)}
-                                            </span>
-                                          </div>
-                                        ))}
+                                {/* Metadata Preview */}
+                                {logEntry.metadata &&
+                                  Object.keys(logEntry.metadata).length > 0 && (
+                                    <div className='text-xs bg-black/5 p-2 rounded mt-2'>
+                                      <p className='font-medium mb-1'>
+                                        Metadata Preview:
+                                      </p>
+                                      <div className='grid grid-cols-1 md:grid-cols-2 gap-2'>
+                                        {Object.entries(logEntry.metadata)
+                                          .slice(0, 4)
+                                          .map(([key, value]) => (
+                                            <div
+                                              key={key}
+                                              className='flex justify-between bg-white/50 p-1.5 rounded'>
+                                              <span className='text-muted-foreground font-medium'>
+                                                {key}:
+                                              </span>
+                                              <span className='truncate max-w-32 font-mono'>
+                                                {typeof value === "object"
+                                                  ? JSON.stringify(value).slice(
+                                                      0,
+                                                      30
+                                                    ) + "..."
+                                                  : String(value)}
+                                              </span>
+                                            </div>
+                                          ))}
+                                      </div>
                                       {Object.keys(logEntry.metadata).length >
-                                        3 && (
-                                        <div className='text-muted-foreground text-xs'>
+                                        4 && (
+                                        <div className='text-muted-foreground text-xs mt-1 text-center'>
                                           +
                                           {Object.keys(logEntry.metadata)
-                                            .length - 3}{" "}
+                                            .length - 4}{" "}
                                           more fields
                                         </div>
                                       )}
                                     </div>
+                                  )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className='flex flex-col items-center justify-center py-12 text-center'>
+                        <div className='w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4'>
+                          <FileText className='h-8 w-8 text-muted-foreground/50' />
+                        </div>
+                        <h4 className='text-lg font-medium mb-2'>
+                          No logs available
+                        </h4>
+                        <p className='text-sm text-muted-foreground max-w-md'>
+                          {log.status === "running"
+                            ? "Logs will appear as the execution progresses"
+                            : log.status === "pending"
+                              ? "Execution is queued and waiting to start"
+                              : "No logs were generated for this execution"}
+                        </p>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value='nodes' className='space-y-4'>
+                    {nodeExecutions && nodeExecutions.length > 0 ? (
+                      <div className='space-y-4'>
+                        {nodeExecutions.map((nodeExec: any) => {
+                          const nodeInputs =
+                            log.nodeInputs?.[nodeExec.node_id] || [];
+                          const nodeOutputs =
+                            log.nodeOutputs?.[nodeExec.node_id] || [];
+                          const duration =
+                            nodeExec.duration_ms ||
+                            (nodeExec.started_at && nodeExec.completed_at
+                              ? new Date(nodeExec.completed_at).getTime() -
+                                new Date(nodeExec.started_at).getTime()
+                              : 0);
+
+                          // Get node status icon
+                          const getNodeStatusIcon = () => {
+                            switch (nodeExec.status) {
+                              case "running":
+                                return (
+                                  <Loader2 className='h-4 w-4 animate-spin text-sky-500' />
+                                );
+                              case "completed":
+                                return (
+                                  <CheckCircle className='h-4 w-4 text-emerald-500' />
+                                );
+                              case "failed":
+                                return (
+                                  <XCircle className='h-4 w-4 text-rose-500' />
+                                );
+                              case "paused":
+                                return (
+                                  <Pause className='h-4 w-4 text-amber-500' />
+                                );
+                              default:
+                                return (
+                                  <Clock className='h-4 w-4 text-slate-500' />
+                                );
+                            }
+                          };
+
+                          return (
+                            <Card key={nodeExec.id} className='overflow-hidden'>
+                              {/* Node Header */}
+                              <CardHeader className='py-3 px-4 bg-muted/30'>
+                                <div className='flex items-center justify-between'>
+                                  <div className='flex items-center gap-3'>
+                                    <div className='flex h-8 w-8 items-center justify-center rounded-full bg-background'>
+                                      {getNodeStatusIcon()}
+                                    </div>
+                                    <div>
+                                      <p className='font-medium'>
+                                        {nodeExec.node_id}
+                                      </p>
+                                      <div className='flex items-center gap-2 text-xs text-muted-foreground'>
+                                        <span>{nodeExec.status}</span>
+                                        <span>•</span>
+                                        <span>{duration}ms</span>
+                                        {nodeExec.retry_count > 0 && (
+                                          <>
+                                            <span>•</span>
+                                            <span>
+                                              Retries: {nodeExec.retry_count}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className='flex items-center gap-2'>
+                                    {nodeExec.status === "running" && (
+                                      <Button
+                                        size='sm'
+                                        variant='outline'
+                                        className='h-7 text-xs px-2 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                        onClick={() =>
+                                          handleAction(
+                                            "pause",
+                                            log.id,
+                                            nodeExec.node_id
+                                          )
+                                        }>
+                                        <Pause className='h-3 w-3 mr-1' />
+                                        Pause
+                                      </Button>
+                                    )}
+                                    {nodeExec.status === "paused" && (
+                                      <Button
+                                        size='sm'
+                                        variant='outline'
+                                        className='h-7 text-xs px-2 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                        onClick={() =>
+                                          handleAction(
+                                            "resume",
+                                            log.id,
+                                            nodeExec.node_id
+                                          )
+                                        }>
+                                        <Play className='h-3 w-3 mr-1' />
+                                        Resume
+                                      </Button>
+                                    )}
+                                    {nodeExec.status === "failed" && (
+                                      <Button
+                                        size='sm'
+                                        variant='outline'
+                                        className='h-7 text-xs px-2 border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100'
+                                        onClick={() =>
+                                          handleAction(
+                                            "retry",
+                                            log.id,
+                                            nodeExec.node_id
+                                          )
+                                        }>
+                                        <RotateCcw className='h-3 w-3 mr-1' />
+                                        Retry
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </CardHeader>
+
+                              {/* Node Details */}
+                              <CardContent className='p-4 space-y-4'>
+                                {/* Error Display */}
+                                {nodeExec.error && (
+                                  <div className='bg-rose-50 border border-rose-200 rounded-lg p-4'>
+                                    <div className='flex items-center gap-2 mb-2'>
+                                      <XCircle className='h-5 w-5 text-rose-500' />
+                                      <p className='font-medium text-rose-800'>
+                                        Error
+                                      </p>
+                                    </div>
+                                    <pre className='text-sm text-rose-700 bg-rose-100/50 p-3 rounded overflow-auto max-h-[200px]'>
+                                      {nodeExec.error}
+                                    </pre>
                                   </div>
                                 )}
-                            </div>
+
+                                {/* Input/Output Data */}
+                                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                                  {/* Input Data */}
+                                  <div className='space-y-2'>
+                                    <div className='flex items-center justify-between'>
+                                      <p className='font-medium'>Input Data</p>
+                                      <Badge
+                                        variant='outline'
+                                        className='text-xs'>
+                                        {nodeInputs.length} items
+                                      </Badge>
+                                    </div>
+                                    {nodeInputs.length > 0 ? (
+                                      <div className='space-y-2 max-h-[300px] overflow-y-auto rounded-lg border p-2'>
+                                        {nodeInputs.map(
+                                          (input: any, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              className='bg-muted/30 p-3 rounded text-sm'>
+                                              <div className='flex items-center justify-between mb-2'>
+                                                <span className='font-medium text-muted-foreground'>
+                                                  Input {idx + 1}
+                                                </span>
+                                                <Button
+                                                  variant='outline'
+                                                  size='sm'
+                                                  className='h-7 text-xs px-2 bg-transparent'
+                                                  onClick={() =>
+                                                    viewJsonData(
+                                                      input.input_data
+                                                    )
+                                                  }>
+                                                  View JSON
+                                                </Button>
+                                              </div>
+                                              <pre className='text-xs overflow-auto max-h-[150px] bg-background p-2 rounded'>
+                                                {JSON.stringify(
+                                                  input.input_data,
+                                                  null,
+                                                  2
+                                                )}
+                                              </pre>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className='flex items-center justify-center p-6 text-center bg-muted/20 rounded-lg'>
+                                        <p className='text-sm text-muted-foreground'>
+                                          No input data available
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Output Data */}
+                                  <div className='space-y-2'>
+                                    <div className='flex items-center justify-between'>
+                                      <p className='font-medium'>Output Data</p>
+                                      <Badge
+                                        variant='outline'
+                                        className='text-xs'>
+                                        {nodeOutputs.length} items
+                                      </Badge>
+                                    </div>
+                                    {nodeOutputs.length > 0 ? (
+                                      <div className='space-y-2 max-h-[300px] overflow-y-auto rounded-lg border p-2'>
+                                        {nodeOutputs.map(
+                                          (output: any, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              className='bg-muted/30 p-3 rounded text-sm'>
+                                              <div className='flex items-center justify-between mb-2'>
+                                                <span className='font-medium text-muted-foreground'>
+                                                  Output {idx + 1}
+                                                </span>
+                                                <Button
+                                                  variant='outline'
+                                                  size='sm'
+                                                  className='h-7 text-xs px-2 bg-transparent'
+                                                  onClick={() =>
+                                                    viewJsonData(
+                                                      output.output_data
+                                                    )
+                                                  }>
+                                                  View JSON
+                                                </Button>
+                                              </div>
+                                              <pre className='text-xs overflow-auto max-h-[150px] bg-background p-2 rounded'>
+                                                {JSON.stringify(
+                                                  output.output_data,
+                                                  null,
+                                                  2
+                                                )}
+                                              </pre>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className='flex items-center justify-center p-6 text-center bg-muted/20 rounded-lg'>
+                                        <p className='text-sm text-muted-foreground'>
+                                          No output data available
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Node Logs */}
+                                {nodeExec.logs && nodeExec.logs.length > 0 && (
+                                  <div className='space-y-2'>
+                                    <div className='flex items-center justify-between'>
+                                      <p className='font-medium'>Node Logs</p>
+                                      <Badge
+                                        variant='outline'
+                                        className='text-xs'>
+                                        {nodeExec.logs.length} logs
+                                      </Badge>
+                                    </div>
+                                    <div className='space-y-2 max-h-[300px] overflow-y-auto rounded-lg border p-2'>
+                                      {nodeExec.logs.map(
+                                        (logEntry: any, idx: number) => {
+                                          const levelClass =
+                                            logEntry.level === "error"
+                                              ? "border-l-4 border-l-rose-500 bg-rose-50"
+                                              : logEntry.level === "warn"
+                                                ? "border-l-4 border-l-amber-500 bg-amber-50"
+                                                : "border-l-4 border-l-sky-500 bg-sky-50";
+
+                                          const levelBadge =
+                                            logEntry.level === "error" ? (
+                                              <Badge
+                                                variant='destructive'
+                                                className='h-5 px-1.5'>
+                                                ERROR
+                                              </Badge>
+                                            ) : logEntry.level === "warn" ? (
+                                              <Badge className='bg-amber-100 text-amber-800 hover:bg-amber-200 h-5 px-1.5'>
+                                                WARN
+                                              </Badge>
+                                            ) : (
+                                              <Badge className='bg-sky-100 text-sky-800 hover:bg-sky-200 h-5 px-1.5'>
+                                                INFO
+                                              </Badge>
+                                            );
+
+                                          return (
+                                            <div
+                                              key={idx}
+                                              className={`p-2 ${levelClass}`}>
+                                              <div className='flex items-center justify-between mb-1'>
+                                                <div className='flex items-center gap-2'>
+                                                  {levelBadge}
+                                                  <span className='text-xs text-muted-foreground'>
+                                                    {new Date(
+                                                      logEntry.timestamp
+                                                    ).toLocaleTimeString()}
+                                                  </span>
+                                                </div>
+                                                {logEntry.metadata && (
+                                                  <Button
+                                                    variant='outline'
+                                                    size='sm'
+                                                    className='h-6 text-xs px-2 bg-transparent'
+                                                    onClick={() =>
+                                                      viewJsonData(
+                                                        logEntry.metadata
+                                                      )
+                                                    }>
+                                                    View Metadata
+                                                  </Button>
+                                                )}
+                                              </div>
+                                              <div className='text-sm font-mono'>
+                                                {logEntry.message}
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
                           );
                         })}
                       </div>
-                    </div>
-                  ) : (
-                    <div className='text-center py-8 text-muted-foreground'>
-                      <div className='flex flex-col items-center gap-2'>
-                        <div className='w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center'>
-                          <FileText className='h-6 w-6 opacity-50' />
+                    ) : (
+                      <div className='flex flex-col items-center justify-center py-12 text-center'>
+                        <div className='w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4'>
+                          <Code className='h-8 w-8 text-muted-foreground/50' />
                         </div>
-                        <div>
-                          <p className='font-medium'>No logs available</p>
-                          <p className='text-xs mt-1'>
-                            {log.status === "running"
-                              ? "Logs will appear as the execution progresses"
+                        <h4 className='text-lg font-medium mb-2'>
+                          No node executions found
+                        </h4>
+                        <p className='text-sm text-muted-foreground max-w-md'>
+                          {log.status === "failed"
+                            ? "Execution failed before nodes could start"
+                            : log.status === "running"
+                              ? "Nodes are starting up..."
                               : log.status === "pending"
                                 ? "Execution is queued and waiting to start"
-                                : "No logs were generated for this execution"}
-                          </p>
-                        </div>
+                                : "Nodes have not started yet"}
+                        </p>
                       </div>
-                    </div>
-                  )}
-                </TabsContent>
+                    )}
+                  </TabsContent>
 
-                <TabsContent value='nodes' className='space-y-4'>
-                  {nodeExecutions && nodeExecutions.length > 0 ? (
+                  <TabsContent value='input' className='space-y-4'>
                     <div className='space-y-4'>
-                      {nodeExecutions.map((nodeExec: any) => {
-                        const nodeInputs =
-                          log.nodeInputs?.[nodeExec.node_id] || [];
-                        const nodeOutputs =
-                          log.nodeOutputs?.[nodeExec.node_id] || [];
-                        const duration =
-                          nodeExec.duration_ms ||
-                          (nodeExec.started_at && nodeExec.completed_at
-                            ? new Date(nodeExec.completed_at).getTime() -
-                              new Date(nodeExec.started_at).getTime()
-                            : 0);
-
-                        return (
-                          <div
-                            key={nodeExec.id}
-                            className='border rounded-lg overflow-hidden'>
-                            {/* Node Header */}
-                            <div className='bg-muted/50 p-3 border-b'>
-                              <div className='flex items-center justify-between'>
-                                <div className='flex items-center gap-3'>
-                                  <div className='flex items-center gap-2'>
-                                    {nodeExec.status === "running" ? (
-                                      <Loader2 className='h-4 w-4 animate-spin text-blue-500' />
-                                    ) : nodeExec.status === "completed" ? (
-                                      <CheckCircle className='h-4 w-4 text-green-500' />
-                                    ) : nodeExec.status === "failed" ? (
-                                      <XCircle className='h-4 w-4 text-red-500' />
-                                    ) : (
-                                      <Clock className='h-4 w-4 text-gray-500' />
-                                    )}
-                                    <div>
-                                      <p className='font-medium text-sm'>
-                                        {nodeExec.node_id}
-                                      </p>
-                                      <p className='text-xs text-muted-foreground'>
-                                        {nodeExec.status} • {duration}ms
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className='flex items-center gap-2'>
-                                  <Badge
-                                    variant={
-                                      nodeExec.status === "completed"
-                                        ? "default"
-                                        : nodeExec.status === "failed"
-                                          ? "destructive"
-                                          : nodeExec.status === "running"
-                                            ? "secondary"
-                                            : "outline"
-                                    }>
-                                    {nodeExec.status}
-                                  </Badge>
-                                  {nodeExec.retry_count > 0 && (
-                                    <Badge
-                                      variant='outline'
-                                      className='text-xs'>
-                                      Retries: {nodeExec.retry_count}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Node Details */}
-                            <div className='p-3 space-y-3'>
-                              {/* Error Display */}
-                              {nodeExec.error && (
-                                <div className='bg-red-50 border border-red-200 rounded-lg p-3'>
-                                  <div className='flex items-center gap-2 mb-2'>
-                                    <XCircle className='h-4 w-4 text-red-500' />
-                                    <p className='text-sm font-medium text-red-800'>
-                                      Error
-                                    </p>
-                                  </div>
-                                  <pre className='text-xs text-red-700 bg-red-100 p-2 rounded overflow-auto'>
-                                    {nodeExec.error}
-                                  </pre>
-                                </div>
-                              )}
-
-                              {/* Input/Output Data */}
-                              <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-                                {/* Input Data */}
-                                <div className='space-y-2'>
-                                  <div className='flex items-center justify-between'>
-                                    <p className='text-sm font-medium'>
-                                      Input Data
-                                    </p>
-                                    <Badge
-                                      variant='outline'
-                                      className='text-xs'>
-                                      {nodeInputs.length} items
-                                    </Badge>
-                                  </div>
-                                  {nodeInputs.length > 0 ? (
-                                    <div className='space-y-2'>
-                                      {nodeInputs.map(
-                                        (input: any, idx: number) => (
-                                          <div
-                                            key={idx}
-                                            className='bg-muted/30 p-2 rounded text-xs'>
-                                            <div className='flex items-center justify-between mb-1'>
-                                              <span className='text-muted-foreground'>
-                                                Input {idx + 1}
-                                              </span>
-                                              <Button
-                                                variant='ghost'
-                                                size='sm'
-                                                className='text-xs p-0 h-4 px-1'
-                                                onClick={() =>
-                                                  viewJsonData(input.input_data)
-                                                }>
-                                                View
-                                              </Button>
-                                            </div>
-                                            <pre className='text-xs overflow-auto max-h-20'>
-                                              {JSON.stringify(
-                                                input.input_data,
-                                                null,
-                                                2
-                                              )}
-                                            </pre>
-                                          </div>
-                                        )
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div className='text-xs text-muted-foreground bg-muted/30 p-2 rounded'>
-                                      No input data
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Output Data */}
-                                <div className='space-y-2'>
-                                  <div className='flex items-center justify-between'>
-                                    <p className='text-sm font-medium'>
-                                      Output Data
-                                    </p>
-                                    <Badge
-                                      variant='outline'
-                                      className='text-xs'>
-                                      {nodeOutputs.length} items
-                                    </Badge>
-                                  </div>
-                                  {nodeOutputs.length > 0 ? (
-                                    <div className='space-y-2'>
-                                      {nodeOutputs.map(
-                                        (output: any, idx: number) => (
-                                          <div
-                                            key={idx}
-                                            className='bg-muted/30 p-2 rounded text-xs'>
-                                            <div className='flex items-center justify-between mb-1'>
-                                              <span className='text-muted-foreground'>
-                                                Output {idx + 1}
-                                              </span>
-                                              <Button
-                                                variant='ghost'
-                                                size='sm'
-                                                className='text-xs p-0 h-4 px-1'
-                                                onClick={() =>
-                                                  viewJsonData(
-                                                    output.output_data
-                                                  )
-                                                }>
-                                                View
-                                              </Button>
-                                            </div>
-                                            <pre className='text-xs overflow-auto max-h-20'>
-                                              {JSON.stringify(
-                                                output.output_data,
-                                                null,
-                                                2
-                                              )}
-                                            </pre>
-                                          </div>
-                                        )
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div className='text-xs text-muted-foreground bg-muted/30 p-2 rounded'>
-                                      No output data
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Node Logs */}
-                              {nodeExec.logs && nodeExec.logs.length > 0 && (
-                                <div className='space-y-2'>
-                                  <div className='flex items-center justify-between'>
-                                    <p className='text-sm font-medium'>
-                                      Node Logs
-                                    </p>
-                                    <Badge
-                                      variant='outline'
-                                      className='text-xs'>
-                                      {nodeExec.logs.length} logs
-                                    </Badge>
-                                  </div>
-                                  <div className='space-y-1 max-h-40 overflow-y-auto'>
-                                    {nodeExec.logs.map(
-                                      (logEntry: any, idx: number) => {
-                                        const levelClass =
-                                          logEntry.level === "error"
-                                            ? "text-red-700 bg-red-50 border-red-100"
-                                            : logEntry.level === "warn"
-                                              ? "text-yellow-700 bg-yellow-50 border-yellow-100"
-                                              : "text-gray-700 bg-gray-50 border-gray-100";
-
-                                        return (
-                                          <div
-                                            key={idx}
-                                            className={`p-2 rounded border text-xs ${levelClass}`}>
-                                            <div className='flex items-center justify-between mb-1'>
-                                              <div className='flex items-center gap-2'>
-                                                <Badge
-                                                  variant={
-                                                    logEntry.level === "error"
-                                                      ? "destructive"
-                                                      : "secondary"
-                                                  }
-                                                  className='text-xs'>
-                                                  {logEntry.level}
-                                                </Badge>
-                                                <span className='text-xs opacity-80'>
-                                                  {new Date(
-                                                    logEntry.timestamp
-                                                  ).toLocaleTimeString()}
-                                                </span>
-                                              </div>
-                                              {logEntry.metadata && (
-                                                <Button
-                                                  variant='ghost'
-                                                  size='sm'
-                                                  className='text-xs p-0 h-4 px-1'
-                                                  onClick={() =>
-                                                    viewJsonData(
-                                                      logEntry.metadata
-                                                    )
-                                                  }>
-                                                  JSON
-                                                </Button>
-                                              )}
-                                            </div>
-                                            <div className='text-xs'>
-                                              {logEntry.message}
-                                            </div>
-                                          </div>
-                                        );
-                                      }
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className='text-center py-8 text-muted-foreground'>
-                      <div className='flex flex-col items-center gap-2'>
-                        <div className='w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center'>
-                          <FileText className='h-6 w-6 opacity-50' />
-                        </div>
-                        <div>
-                          <p className='font-medium'>
-                            No node executions found
-                          </p>
-                          <p className='text-xs mt-1'>
-                            {log.status === "failed"
-                              ? "Execution failed before nodes could start"
-                              : log.status === "running"
-                                ? "Nodes are starting up..."
-                                : log.status === "pending"
-                                  ? "Execution is queued and waiting to start"
-                                  : "Nodes have not started yet"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value='input' className='space-y-4'>
-                  <div className='space-y-3'>
-                    {/* Input Summary */}
-                    <div className='flex items-center justify-between p-3 bg-muted/30 rounded-lg'>
-                      <div className='flex items-center gap-4'>
-                        <div className='text-center'>
-                          <p className='text-sm font-medium'>
+                      {/* Input Summary */}
+                      <div className='grid grid-cols-2 gap-4'>
+                        <div className='flex flex-col items-center justify-center p-4 bg-muted/30 rounded-lg'>
+                          <p className='text-2xl font-semibold'>
                             {Object.keys(log.input_data || {}).length}
                           </p>
                           <p className='text-xs text-muted-foreground'>
                             Input Fields
                           </p>
                         </div>
-                        <div className='text-center'>
-                          <p className='text-sm font-medium'>
+                        <div className='flex flex-col items-center justify-center p-4 bg-muted/30 rounded-lg'>
+                          <p className='text-2xl font-semibold'>
                             {JSON.stringify(log.input_data || {}).length}
                           </p>
                           <p className='text-xs text-muted-foreground'>Bytes</p>
                         </div>
                       </div>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='text-xs'
-                        onClick={() => viewJsonData(log.input_data)}>
-                        View Full JSON
-                      </Button>
-                    </div>
 
-                    {/* Input Data Display */}
-                    <div className='relative'>
-                      <div className='bg-muted/20 p-3 rounded-lg border'>
-                        <div className='flex items-center justify-between mb-2'>
-                          <p className='text-sm font-medium'>Input Data</p>
-                          <p className='text-xs text-muted-foreground'>
-                            {log.input_data ? "Available" : "No input data"}
-                          </p>
-                        </div>
-                        <pre className='text-xs bg-background p-3 rounded border overflow-auto max-h-60'>
-                          {JSON.stringify(log.input_data || {}, null, 2)}
-                        </pre>
-                      </div>
-                    </div>
-
-                    {/* Node Inputs */}
-                    {log.nodeInputs &&
-                      Object.keys(log.nodeInputs).length > 0 && (
-                        <div className='space-y-3'>
+                      {/* Input Data Display */}
+                      <Card>
+                        <CardHeader className='py-3 px-4'>
                           <div className='flex items-center justify-between'>
-                            <p className='text-sm font-medium'>Node Inputs</p>
-                            <Badge variant='outline' className='text-xs'>
-                              {Object.keys(log.nodeInputs).length} nodes
-                            </Badge>
+                            <h4 className='font-medium'>Input Data</h4>
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              className='h-8 text-xs bg-transparent'
+                              onClick={() => viewJsonData(log.input_data)}>
+                              View Full JSON
+                            </Button>
                           </div>
-                          <div className='space-y-2'>
-                            {Object.entries(log.nodeInputs).map(
-                              ([nodeId, inputs]) => (
-                                <div
-                                  key={nodeId}
-                                  className='border rounded-lg p-3'>
-                                  <div className='flex items-center justify-between mb-2'>
-                                    <p className='text-sm font-medium'>
-                                      Node: {nodeId}
-                                    </p>
-                                    <Badge
-                                      variant='outline'
-                                      className='text-xs'>
-                                      {inputs.length} inputs
-                                    </Badge>
-                                  </div>
-                                  <div className='space-y-2'>
-                                    {inputs.map((input: any, idx: number) => (
-                                      <div
-                                        key={idx}
-                                        className='bg-muted/30 p-2 rounded text-xs'>
-                                        <div className='flex items-center justify-between mb-1'>
-                                          <span className='text-muted-foreground'>
-                                            Input {idx + 1}
-                                          </span>
-                                          <Button
-                                            variant='ghost'
-                                            size='sm'
-                                            className='text-xs p-0 h-4 px-1'
-                                            onClick={() =>
-                                              viewJsonData(input.input_data)
-                                            }>
-                                            View
-                                          </Button>
-                                        </div>
-                                        <pre className='text-xs overflow-auto max-h-20'>
-                                          {JSON.stringify(
-                                            input.input_data,
-                                            null,
-                                            2
-                                          )}
-                                        </pre>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      )}
-                  </div>
-                </TabsContent>
+                        </CardHeader>
+                        <CardContent className='p-0'>
+                          <pre className='text-sm bg-muted/20 p-4 overflow-auto max-h-[300px] rounded-b-lg font-mono'>
+                            {JSON.stringify(log.input_data || {}, null, 2)}
+                          </pre>
+                        </CardContent>
+                      </Card>
 
-                <TabsContent value='output' className='space-y-4'>
-                  <div className='space-y-3'>
-                    {/* Output Summary */}
-                    <div className='flex items-center justify-between p-3 bg-muted/30 rounded-lg'>
-                      <div className='flex items-center gap-4'>
-                        <div className='text-center'>
-                          <p className='text-sm font-medium'>
+                      {/* Node Inputs */}
+                      {log.nodeInputs &&
+                        Object.keys(log.nodeInputs).length > 0 && (
+                          <div className='space-y-3'>
+                            <div className='flex items-center justify-between'>
+                              <h4 className='font-medium'>Node Inputs</h4>
+                              <Badge variant='outline' className='text-xs'>
+                                {Object.keys(log.nodeInputs).length} nodes
+                              </Badge>
+                            </div>
+                            <div className='space-y-3'>
+                              {Object.entries(log.nodeInputs).map(
+                                ([nodeId, inputs]) => (
+                                  <Card key={nodeId}>
+                                    <CardHeader className='py-3 px-4'>
+                                      <div className='flex items-center justify-between'>
+                                        <h5 className='font-medium'>
+                                          Node: {nodeId}
+                                        </h5>
+                                        <Badge
+                                          variant='outline'
+                                          className='text-xs'>
+                                          {inputs.length} inputs
+                                        </Badge>
+                                      </div>
+                                    </CardHeader>
+                                    <CardContent className='p-4 pt-0'>
+                                      <div className='space-y-3 max-h-[300px] overflow-y-auto'>
+                                        {inputs.map(
+                                          (input: any, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              className='bg-muted/30 p-3 rounded'>
+                                              <div className='flex items-center justify-between mb-2'>
+                                                <span className='font-medium text-muted-foreground'>
+                                                  Input {idx + 1}
+                                                </span>
+                                                <Button
+                                                  variant='outline'
+                                                  size='sm'
+                                                  className='h-7 text-xs px-2 bg-transparent'
+                                                  onClick={() =>
+                                                    viewJsonData(
+                                                      input.input_data
+                                                    )
+                                                  }>
+                                                  View JSON
+                                                </Button>
+                                              </div>
+                                              <pre className='text-xs overflow-auto max-h-[150px] bg-background p-2 rounded font-mono'>
+                                                {JSON.stringify(
+                                                  input.input_data,
+                                                  null,
+                                                  2
+                                                )}
+                                              </pre>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value='output' className='space-y-4'>
+                    <div className='space-y-4'>
+                      {/* Output Summary */}
+                      <div className='grid grid-cols-2 gap-4'>
+                        <div className='flex flex-col items-center justify-center p-4 bg-muted/30 rounded-lg'>
+                          <p className='text-2xl font-semibold'>
                             {Object.keys(log.output_data || {}).length}
                           </p>
                           <p className='text-xs text-muted-foreground'>
                             Output Fields
                           </p>
                         </div>
-                        <div className='text-center'>
-                          <p className='text-sm font-medium'>
+                        <div className='flex flex-col items-center justify-center p-4 bg-muted/30 rounded-lg'>
+                          <p className='text-2xl font-semibold'>
                             {JSON.stringify(log.output_data || {}).length}
                           </p>
                           <p className='text-xs text-muted-foreground'>Bytes</p>
                         </div>
                       </div>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='text-xs'
-                        onClick={() => viewJsonData(log.output_data)}>
-                        View Full JSON
-                      </Button>
-                    </div>
 
-                    {/* Output Data Display */}
-                    <div className='relative'>
-                      <div className='bg-muted/20 p-3 rounded-lg border'>
-                        <div className='flex items-center justify-between mb-2'>
-                          <p className='text-sm font-medium'>Output Data</p>
-                          <p className='text-xs text-muted-foreground'>
-                            {log.output_data ? "Available" : "No output data"}
-                          </p>
-                        </div>
-                        <pre className='text-xs bg-background p-3 rounded border overflow-auto max-h-60'>
-                          {JSON.stringify(log.output_data || {}, null, 2)}
-                        </pre>
-                      </div>
-                    </div>
-
-                    {/* Node Outputs */}
-                    {log.nodeOutputs &&
-                      Object.keys(log.nodeOutputs).length > 0 && (
-                        <div className='space-y-3'>
+                      {/* Output Data Display */}
+                      <Card>
+                        <CardHeader className='py-3 px-4'>
                           <div className='flex items-center justify-between'>
-                            <p className='text-sm font-medium'>Node Outputs</p>
-                            <Badge variant='outline' className='text-xs'>
-                              {Object.keys(log.nodeOutputs).length} nodes
-                            </Badge>
+                            <h4 className='font-medium'>Output Data</h4>
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              className='h-8 text-xs bg-transparent'
+                              onClick={() => viewJsonData(log.output_data)}>
+                              View Full JSON
+                            </Button>
                           </div>
-                          <div className='space-y-2'>
-                            {Object.entries(log.nodeOutputs).map(
-                              ([nodeId, outputs]) => (
-                                <div
-                                  key={nodeId}
-                                  className='border rounded-lg p-3'>
-                                  <div className='flex items-center justify-between mb-2'>
-                                    <p className='text-sm font-medium'>
-                                      Node: {nodeId}
-                                    </p>
-                                    <Badge
-                                      variant='outline'
-                                      className='text-xs'>
-                                      {outputs.length} outputs
-                                    </Badge>
-                                  </div>
-                                  <div className='space-y-2'>
-                                    {outputs.map((output: any, idx: number) => (
-                                      <div
-                                        key={idx}
-                                        className='bg-muted/30 p-2 rounded text-xs'>
-                                        <div className='flex items-center justify-between mb-1'>
-                                          <span className='text-muted-foreground'>
-                                            Output {idx + 1}
-                                          </span>
-                                          <Button
-                                            variant='ghost'
-                                            size='sm'
-                                            className='text-xs p-0 h-4 px-1'
-                                            onClick={() =>
-                                              viewJsonData(output.output_data)
-                                            }>
-                                            View
-                                          </Button>
-                                        </div>
-                                        <pre className='text-xs overflow-auto max-h-20'>
-                                          {JSON.stringify(
-                                            output.output_data,
-                                            null,
-                                            2
-                                          )}
-                                        </pre>
+                        </CardHeader>
+                        <CardContent className='p-0'>
+                          <pre className='text-sm bg-muted/20 p-4 overflow-auto max-h-[300px] rounded-b-lg font-mono'>
+                            {JSON.stringify(log.output_data || {}, null, 2)}
+                          </pre>
+                        </CardContent>
+                      </Card>
+
+                      {/* Node Outputs */}
+                      {log.nodeOutputs &&
+                        Object.keys(log.nodeOutputs).length > 0 && (
+                          <div className='space-y-3'>
+                            <div className='flex items-center justify-between'>
+                              <h4 className='font-medium'>Node Outputs</h4>
+                              <Badge variant='outline' className='text-xs'>
+                                {Object.keys(log.nodeOutputs).length} nodes
+                              </Badge>
+                            </div>
+                            <div className='space-y-3'>
+                              {Object.entries(log.nodeOutputs).map(
+                                ([nodeId, outputs]) => (
+                                  <Card key={nodeId}>
+                                    <CardHeader className='py-3 px-4'>
+                                      <div className='flex items-center justify-between'>
+                                        <h5 className='font-medium'>
+                                          Node: {nodeId}
+                                        </h5>
+                                        <Badge
+                                          variant='outline'
+                                          className='text-xs'>
+                                          {outputs.length} outputs
+                                        </Badge>
                                       </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )
-                            )}
+                                    </CardHeader>
+                                    <CardContent className='p-4 pt-0'>
+                                      <div className='space-y-3 max-h-[300px] overflow-y-auto'>
+                                        {outputs.map(
+                                          (output: any, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              className='bg-muted/30 p-3 rounded'>
+                                              <div className='flex items-center justify-between mb-2'>
+                                                <span className='font-medium text-muted-foreground'>
+                                                  Output {idx + 1}
+                                                </span>
+                                                <Button
+                                                  variant='outline'
+                                                  size='sm'
+                                                  className='h-7 text-xs px-2 bg-transparent'
+                                                  onClick={() =>
+                                                    viewJsonData(
+                                                      output.output_data
+                                                    )
+                                                  }>
+                                                  View JSON
+                                                </Button>
+                                              </div>
+                                              <pre className='text-xs overflow-auto max-h-[150px] bg-background p-2 rounded font-mono'>
+                                                {JSON.stringify(
+                                                  output.output_data,
+                                                  null,
+                                                  2
+                                                )}
+                                              </pre>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                )
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                  </div>
-                </TabsContent>
-              </Tabs>
+                        )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
             )}
           </CardContent>
         )}
@@ -1445,386 +1622,7 @@ export const ExecutionLogCard = React.memo(
   }
 );
 
-const NodeExecutionItem = React.memo(
-  ({
-    nodeExec,
-    nodeLogs,
-    nodeOutputs,
-    viewJsonData,
-    log,
-    expandedLogs,
-    setExpandedLogs,
-    getStatusBadge,
-    formatDate,
-    handleAction,
-    nodeInputs,
-  }: {
-    nodeExec: NodeExecution;
-    log: WorkflowExecution;
-    expandedLogs: Record<string, boolean>;
-    setExpandedLogs: React.Dispatch<
-      React.SetStateAction<Record<string, boolean>>
-    >;
-    getStatusBadge: (status: string) => JSX.Element;
-    formatDate: (dateString: string | null | undefined) => string;
-    handleAction: (
-      action: string,
-      logId: string,
-      nodeId?: string
-    ) => Promise<void>;
-    viewJsonData: (data: Record<string, unknown> | null) => void;
-    nodeInputs: Record<string, Record<string, unknown>>;
-    nodeOutputs: Record<string, Record<string, unknown>>;
-    nodeLogs: Record<string, NodeLog[]>;
-  }) => {
-    const [logLevel, setLogLevel] = useState<
-      "all" | "info" | "warning" | "error"
-    >("all");
-    console.log("nodeInputs", nodeInputs);
-
-    const nodeLogKey = `${log.id}_${nodeExec.node_id}`;
-
-    const filteredNodeLogs = useMemo(() => {
-      const logsArr = nodeLogs[nodeLogKey] || [];
-      if (logLevel === "all") return logsArr;
-      return logsArr.filter((l) => l.level === logLevel);
-    }, [nodeLogs, nodeLogKey, logLevel]);
-
-    return (
-      <div className='p-3 mb-3 border rounded-md '>
-        <div className='flex items-center justify-between'>
-          <div className='flex items-center gap-2'>
-            <span className='text-sm font-medium'>
-              Node: {nodeExec.node_id}
-            </span>
-          </div>
-          {getStatusBadge(nodeExec.status)}
-        </div>
-        <p className='text-xs text-muted-foreground mt-1'>
-          {formatDate(nodeExec.completed_at || nodeExec.started_at)}
-        </p>
-        <div className='flex flex-wrap gap-2 mt-3 items-center justify-between border-t pt-2'>
-          <div className='flex gap-1.5'>
-            {nodeExec.status === "running" && (
-              <Button
-                size='sm'
-                variant='outline'
-                className='h-7 text-xs px-2 bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700'
-                onClick={() => handleAction("pause", log.id, nodeExec.node_id)}>
-                <Pause className='w-3 h-3 mr-1' />
-                Pause
-              </Button>
-            )}
-            {(nodeExec.status === "running" ||
-              nodeExec.status === "paused") && (
-              <Button
-                size='sm'
-                variant='outline'
-                className='h-7 text-xs px-2 bg-red-50 hover:bg-red-100 border-red-200 text-red-700'
-                onClick={() =>
-                  handleAction("cancel", log.id, nodeExec.node_id)
-                }>
-                <XCircle className='w-3 h-3 mr-1' />
-                Cancel
-              </Button>
-            )}
-            {nodeExec.status === "failed" && (
-              <Button
-                size='sm'
-                variant='outline'
-                className='h-7 text-xs px-2 bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700'
-                onClick={() => handleAction("retry", log.id, nodeExec.node_id)}>
-                <RotateCcw className='w-3 h-3 mr-1' />
-                Retry
-              </Button>
-            )}
-          </div>
-          {nodeExec.status === "paused" && (
-            <Button
-              size='sm'
-              variant='default'
-              className='h-7 text-xs px-3 bg-green-600 hover:bg-green-700'
-              onClick={() => handleAction("resume", log.id, nodeExec.node_id)}>
-              <Play className='w-3 h-3 mr-1' />
-              Resume
-            </Button>
-          )}
-        </div>
-        <div className='mt-3'>
-          <Accordion
-            type='single'
-            collapsible
-            value={
-              expandedLogs[`${log.id}-${nodeExec.node_id}`]
-                ? `${log.id}-${nodeExec.node_id}`
-                : ""
-            }
-            onValueChange={(val) => {
-              const key = `${log.id}-${nodeExec.node_id}`;
-              setExpandedLogs((prev) => ({ ...prev, [key]: val === key }));
-            }}>
-            <AccordionItem value={`${log.id}-${nodeExec.node_id}`}>
-              <AccordionTrigger className='text-xs py-1 hover:no-underline'>
-                <span className='flex items-center gap-1'>
-                  <FileText className='h-3 w-3' />
-                  View Logs & Details
-                </span>
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className='mb-3 flex items-center justify-between'>
-                  <div className='flex items-center gap-2'>
-                    <span className='text-xs font-medium text-muted-foreground'>
-                      Filter:
-                    </span>
-                    <select
-                      className='text-xs bg-transparent border-none focus:outline-none focus:ring-0'
-                      value={logLevel}
-                      onChange={(e) =>
-                        setLogLevel(
-                          e.target.value as "all" | "info" | "warning" | "error"
-                        )
-                      }
-                      title='Filter logs by level'>
-                      <option value='all'>All Levels</option>
-                      <option value='info'>Info</option>
-                      <option value='warning'>Warning</option>
-                      <option value='error'>Error</option>
-                    </select>
-                  </div>
-                  <div className='text-xs text-muted-foreground'>
-                    {filteredNodeLogs.length} log entries
-                  </div>
-                </div>
-                <div className='mb-3 grid grid-cols-1 md:grid-cols-2 gap-2'>
-                  <div>
-                    <span className='text-xs font-medium text-muted-foreground'>
-                      Inputs
-                    </span>
-                    <pre className='bg-muted p-2 rounded text-xs overflow-x-auto mt-1'>
-                      {nodeInputs[`${log.id}_${nodeExec.node_id}`] ? (
-                        <div className='relative'>
-                          {JSON.stringify(
-                            nodeInputs[`${log.id}_${nodeExec.node_id}`],
-                            null,
-                            2
-                          )}
-                          <Button
-                            variant='outline'
-                            size='sm'
-                            className='absolute top-2 right-2 h-6 text-xs'
-                            onClick={() =>
-                              viewJsonData(
-                                nodeInputs[`${log.id}_${nodeExec.node_id}`]
-                              )
-                            }>
-                            Expand
-                          </Button>
-                        </div>
-                      ) : nodeExec?.input_data ? (
-                        <div className='relative'>
-                          {JSON.stringify(nodeExec.input_data, null, 2)}
-                          <Button
-                            variant='outline'
-                            size='sm'
-                            className='absolute top-2 right-2 h-6 text-xs'
-                            onClick={() => viewJsonData(nodeExec.input_data)}>
-                            Expand
-                          </Button>
-                        </div>
-                      ) : (
-                        "No input"
-                      )}
-                    </pre>
-                  </div>
-                  <div>
-                    <span className='text-xs font-medium text-muted-foreground'>
-                      Outputs
-                    </span>
-                    <pre className='bg-muted p-2 rounded text-xs overflow-x-auto mt-1'>
-                      {nodeOutputs[`${log.id}_${nodeExec.node_id}`] ? (
-                        <div className='relative'>
-                          {JSON.stringify(
-                            nodeOutputs[`${log.id}_${nodeExec.node_id}`],
-                            null,
-                            2
-                          )}
-                          <Button
-                            variant='outline'
-                            size='sm'
-                            className='absolute top-2 right-2 h-6 text-xs'
-                            onClick={() =>
-                              viewJsonData(
-                                nodeOutputs[`${log.id}_${nodeExec.node_id}`]
-                              )
-                            }>
-                            Expand
-                          </Button>
-                        </div>
-                      ) : nodeExec?.output_data ? (
-                        <div className='relative'>
-                          {JSON.stringify(nodeExec.output_data, null, 2)}
-                          <Button
-                            variant='outline'
-                            size='sm'
-                            className='absolute top-2 right-2 h-6 text-xs'
-                            onClick={() => viewJsonData(nodeExec.output_data)}>
-                            Expand
-                          </Button>
-                        </div>
-                      ) : (
-                        "No output"
-                      )}
-                    </pre>
-                  </div>
-                </div>
-                <div className='bg-gray-50 border rounded-md p-3 max-h-48 overflow-y-auto text-xs font-mono'>
-                  {filteredNodeLogs.length > 0 ? (
-                    filteredNodeLogs.map((logEntry, idx) => {
-                      let levelClass = "";
-                      let levelBadge = null;
-                      if (logEntry.level === "error") {
-                        levelClass = "text-red-700 bg-red-50 border-red-100";
-                        levelBadge = (
-                          <span className='inline-block px-1.5 py-0.5 bg-red-100 text-red-800 rounded text-[10px] font-medium'>
-                            ERROR
-                          </span>
-                        );
-                      } else if (logEntry.level === "warning") {
-                        levelClass =
-                          "text-amber-700 bg-amber-50 border-amber-100";
-                        levelBadge = (
-                          <span className='inline-block px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded text-[10px] font-medium'>
-                            WARN
-                          </span>
-                        );
-                      } else {
-                        levelClass = "text-blue-700 bg-blue-50 border-blue-100";
-                        levelBadge = (
-                          <span className='inline-block px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px] font-medium'>
-                            INFO
-                          </span>
-                        );
-                      }
-                      return (
-                        <div
-                          key={idx}
-                          className={`mb-2 p-1.5 rounded border ${levelClass}`}>
-                          <div className='flex items-center justify-between mb-1'>
-                            <div className='flex items-center gap-1.5'>
-                              {levelBadge}
-                              <span className='text-[10px] opacity-80'>
-                                {new Date(
-                                  logEntry.timestamp
-                                ).toLocaleTimeString()}
-                              </span>
-                            </div>
-                            {logEntry.metadata && (
-                              <Button
-                                variant='ghost'
-                                size='sm'
-                                className='text-[10px] p-0 h-5 px-1.5'
-                                onClick={() => viewJsonData(logEntry.metadata)}>
-                                View JSON
-                              </Button>
-                            )}
-                          </div>
-                          <div>{logEntry.message}</div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className='flex flex-col items-center justify-center py-6 text-muted-foreground'>
-                      <FileText className='h-8 w-8 mb-2 opacity-50' />
-                      <div>No logs available for this node</div>
-                      {nodeExec.status === "pending" && (
-                        <div className='text-xs mt-1'>
-                          Node has not started execution yet
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {/* Display Node Input Data */}
-                {nodeInputs[nodeExec.node_id] && (
-                  <div className='mt-2'>
-                    <div className='font-medium text-xs mb-1'>Input Data</div>
-                    <div className='relative'>
-                      <pre className='text-xs bg-muted p-2 rounded-md overflow-auto max-h-40'>
-                        {JSON.stringify(nodeInputs[nodeExec.node_id], null, 2)}
-                      </pre>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='absolute top-2 right-2 h-6 text-xs'
-                        onClick={() =>
-                          viewJsonData(nodeInputs[nodeExec.node_id])
-                        }>
-                        Expand
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Display Node Output Data */}
-                {nodeOutputs[nodeExec.node_id] && (
-                  <div className='mt-2'>
-                    <div className='font-medium text-xs mb-1'>Output Data</div>
-                    <div className='relative'>
-                      <pre className='text-xs bg-muted p-2 rounded-md overflow-auto max-h-40'>
-                        {JSON.stringify(nodeOutputs[nodeExec.node_id], null, 2)}
-                      </pre>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='absolute top-2 right-2 h-6 text-xs'
-                        onClick={() =>
-                          viewJsonData(nodeOutputs[nodeExec.node_id])
-                        }>
-                        Expand
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Fallback to output_data if nodeOutputs doesn't have this node's data */}
-                {!nodeOutputs[nodeExec.node_id] && nodeExec.output_data && (
-                  <div className='mt-2'>
-                    <div className='font-medium text-xs mb-1'>
-                      Output Data (Legacy)
-                    </div>
-                    <div className='relative'>
-                      <pre className='text-xs bg-muted p-2 rounded-md overflow-auto max-h-40'>
-                        {JSON.stringify(nodeExec.output_data, null, 2)}
-                      </pre>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        className='absolute top-2 right-2 h-6 text-xs'
-                        onClick={() => viewJsonData(nodeExec.output_data)}>
-                        Expand
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {nodeExec.error && (
-                  <div className='mt-2'>
-                    <div className='font-medium text-xs mb-1 text-red-700'>
-                      Error
-                    </div>
-                    <div className='bg-red-50 border border-red-200 rounded-md p-2'>
-                      <p className='text-xs text-red-700'>{nodeExec.error}</p>
-                    </div>
-                  </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </div>
-      </div>
-    );
-  }
-);
-NodeExecutionItem.displayName = "Node ExecutionItem";
+ExecutionLogCard.displayName = "ExecutionLogCard";
 
 // Add display names to components
 ExecutionLogsList.displayName = "ExecutionLogsList";
