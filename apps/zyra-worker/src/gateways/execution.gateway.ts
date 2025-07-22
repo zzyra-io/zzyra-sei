@@ -12,7 +12,6 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Server, Socket } from 'socket.io';
 import { DatabaseService } from '../services/database.service';
-import { ExecutionMonitorService } from '../services/execution-monitor.service';
 
 @WebSocketGateway({
   cors: {
@@ -36,7 +35,6 @@ export class ExecutionGateway
   constructor(
     private readonly configService: ConfigService,
     private readonly databaseService: DatabaseService,
-    private readonly executionMonitorService: ExecutionMonitorService,
   ) {
     this.logger = new Logger('ExecutionGateway');
     this.executionSubscriptions = new Map();
@@ -83,22 +81,11 @@ export class ExecutionGateway
     // Join execution-specific room
     client.join(`execution:${executionId}`);
 
-    // Get current execution status and send to client
-    try {
-      const status =
-        await this.executionMonitorService.getExecutionStatus(executionId);
-      if (status) {
-        client.emit('execution_status', status);
-      } else {
-        client.emit('error', { message: `Execution ${executionId} not found` });
-      }
-    } catch (error) {
-      this.logger.error(
-        `Failed to get execution status for ${executionId}:`,
-        error,
-      );
-      client.emit('error', { message: 'Failed to get execution status' });
-    }
+    // Send initial connection confirmation
+    client.emit('connected', {
+      message: `Connected to execution ${executionId}`,
+      executionId,
+    });
   }
 
   @SubscribeMessage('unsubscribe_execution')

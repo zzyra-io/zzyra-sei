@@ -633,7 +633,22 @@ export class WorkflowExecutor {
               `Input validation passed for node ${node.id}, executing...`,
             );
 
-            // Execute the node
+            // Execute the node with enhanced data tracking
+            const nodeStartTime = Date.now();
+
+            // Log input data summary
+            const inputSummary = this.summarizeData(transformedOutputs);
+            await this.executionLogger.logExecutionEvent(executionId, {
+              level: 'info',
+              message: `Node ${node.id} starting execution with ${inputSummary}`,
+              node_id: node.id,
+              data: {
+                inputSize: JSON.stringify(transformedOutputs).length,
+                inputFields: Object.keys(transformedOutputs).length,
+                inputSummary,
+              },
+            });
+
             const nodeOutput = await this.nodeExecutor.executeNode(
               node,
               executionId,
@@ -641,10 +656,28 @@ export class WorkflowExecutor {
               transformedOutputs,
             );
 
+            const nodeDuration = Date.now() - nodeStartTime;
+            const outputSummary = this.summarizeData(nodeOutput);
+
             this.logger.log(
-              `Node ${node.id} executed successfully, output:`,
-              nodeOutput,
+              `Node ${node.id} executed successfully in ${nodeDuration}ms, output: ${outputSummary}`,
             );
+
+            // Log output data summary
+            await this.executionLogger.logExecutionEvent(executionId, {
+              level: 'info',
+              message: `Node ${node.id} completed with ${outputSummary}`,
+              node_id: node.id,
+              data: {
+                duration: nodeDuration,
+                outputSize: JSON.stringify(nodeOutput).length,
+                outputFields:
+                  typeof nodeOutput === 'object'
+                    ? Object.keys(nodeOutput).length
+                    : 0,
+                outputSummary,
+              },
+            });
 
             // Validate output data after execution
             const outputValidationResult = await this.validateNodeOutputData(
@@ -1182,6 +1215,30 @@ export class WorkflowExecutor {
   private isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+  }
+
+  /**
+   * Summarize data for logging purposes
+   */
+  private summarizeData(data: any): string {
+    if (!data) return 'no data';
+
+    if (typeof data === 'string') {
+      return data.length > 50 ? `${data.substring(0, 50)}...` : data;
+    }
+
+    if (typeof data === 'object') {
+      const keys = Object.keys(data);
+      if (keys.length === 0) return 'empty object';
+
+      if (keys.length <= 3) {
+        return `object with ${keys.length} fields: ${keys.join(', ')}`;
+      }
+
+      return `object with ${keys.length} fields: ${keys.slice(0, 3).join(', ')}...`;
+    }
+
+    return String(data);
   }
 
   /**

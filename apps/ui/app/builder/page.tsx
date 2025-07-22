@@ -48,6 +48,7 @@ import {
   ArrowLeft,
   Loader2,
   Play,
+  RefreshCw,
   Save,
   XCircle,
   AlertCircle,
@@ -324,6 +325,9 @@ export default function BuilderPage() {
   // State to control execution panel visibility
   const [showExecutionPanel, setShowExecutionPanel] = useState(false);
   const [executionLogs, setExecutionLogs] = useState<any[]>([]);
+  const [workerConnectionStatus, setWorkerConnectionStatus] = useState<
+    "connected" | "disconnected" | "connecting"
+  >("disconnected");
 
   // Enhanced WebSocket connection for collecting logs
   useExecutionWebSocket({
@@ -1097,6 +1101,14 @@ export default function BuilderPage() {
                               The worker service may not be running. Check if
                               the worker is available at ws://localhost:3005
                             </p>
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              className='mt-2 text-xs'
+                              onClick={() => window.location.reload()}>
+                              <RefreshCw className='w-3 h-3 mr-1' />
+                              Retry Connection
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -1114,6 +1126,29 @@ export default function BuilderPage() {
                             </p>
                             <p className='text-xs mt-1'>
                               Using fallback API calls for execution data
+                            </p>
+                            <Button
+                              variant='outline'
+                              size='sm'
+                              className='mt-2 text-xs'
+                              onClick={() => window.location.reload()}>
+                              <RefreshCw className='w-3 h-3 mr-1' />
+                              Retry Connection
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Connected Status */}
+                    {isRealTimeConnected && (
+                      <div className='flex-shrink-0 p-3 bg-green-50 border border-green-200 rounded-lg'>
+                        <div className='flex items-center gap-2 text-green-700'>
+                          <div className='w-3 h-3 bg-green-500 rounded-full animate-pulse' />
+                          <div className='text-sm'>
+                            <p className='font-medium'>Connected</p>
+                            <p className='text-xs'>
+                              Real-time execution monitoring active
                             </p>
                           </div>
                         </div>

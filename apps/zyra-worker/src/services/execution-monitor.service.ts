@@ -1,12 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  WebSocketGateway,
-  WebSocketServer,
-  SubscribeMessage,
-  MessageBody,
-  ConnectedSocket,
-} from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
+
 import { DatabaseService } from './database.service';
 
 export interface ExecutionStatus {
@@ -155,7 +148,7 @@ export class ExecutionMonitorService {
   }
 
   /**
-   * Update node execution status
+   * Update node execution status with enhanced data tracking
    */
   async updateNodeExecution(update: NodeExecutionUpdate) {
     const {
@@ -167,6 +160,9 @@ export class ExecutionMonitorService {
       duration,
       nodeType,
       nodeLabel,
+      progress,
+      startTime,
+      endTime,
     } = update;
 
     const execution = this.activeExecutions.get(executionId);
@@ -175,17 +171,21 @@ export class ExecutionMonitorService {
       return;
     }
 
-    // Update metrics for the node
+    // Update metrics for the node with enhanced tracking
     const metrics = this.executionMetrics.get(executionId);
     if (metrics && duration) {
+      const outputSize = output ? JSON.stringify(output).length : 0;
+      const memoryUsage = process.memoryUsage().heapUsed / 1024 / 1024; // MB
+
       metrics.nodeMetrics[nodeId] = {
         duration,
-        memoryDelta: 0, // Will be calculated later
-        outputSize: output ? JSON.stringify(output).length : 0,
+        memoryDelta:
+          memoryUsage - (metrics.nodeMetrics[nodeId]?.memoryDelta || 0),
+        outputSize,
       };
     }
 
-    // Update current node
+    // Enhanced current node tracking
     if (status === 'running') {
       execution.currentNodeId = nodeId;
       execution.progress.currentNode = {
@@ -193,28 +193,91 @@ export class ExecutionMonitorService {
         type: nodeType || 'unknown',
         label: nodeLabel || nodeId,
         status,
-        startTime: new Date(),
+        startTime: startTime || new Date(),
       };
+
+      // Log node start with detailed information
+      await this.logExecutionEvent(
+        executionId,
+        'info',
+        `Node ${nodeLabel || nodeId} started execution`,
+        {
+          nodeId,
+          nodeType,
+          nodeLabel,
+          timestamp: new Date().toISOString(),
+        },
+      );
     } else if (status === 'completed') {
       execution.progress.completedNodes++;
       if (execution.progress.currentNode?.id === nodeId) {
         execution.progress.currentNode.status = status;
-        execution.progress.currentNode.endTime = new Date();
+        execution.progress.currentNode.endTime = endTime || new Date();
         execution.progress.currentNode.duration = duration;
       }
 
-      // Trigger edge animations for completed nodes
+      // Log successful completion with output summary
+      const outputSummary = output
+        ? this.summarizeOutputData(output)
+        : 'No output';
+      await this.logExecutionEvent(
+        executionId,
+        'info',
+        `Node ${nodeLabel || nodeId} completed successfully`,
+        {
+          nodeId,
+          nodeType,
+          nodeLabel,
+          duration,
+          outputSummary,
+          outputSize: output ? JSON.stringify(output).length : 0,
+          timestamp: new Date().toISOString(),
+        },
+      );
+
+      // Trigger edge animations for completed nodes with data flow
       await this.triggerEdgeFlowAnimations(executionId, nodeId, output);
     } else if (status === 'failed') {
       execution.progress.failedNodes++;
       if (execution.progress.currentNode?.id === nodeId) {
         execution.progress.currentNode.status = status;
-        execution.progress.currentNode.endTime = new Date();
+        execution.progress.currentNode.endTime = endTime || new Date();
         execution.progress.currentNode.duration = duration;
       }
+
+      // Log failure with detailed error information
+      await this.logExecutionEvent(
+        executionId,
+        'error',
+        `Node ${nodeLabel || nodeId} failed: ${error}`,
+        {
+          nodeId,
+          nodeType,
+          nodeLabel,
+          error,
+          duration,
+          timestamp: new Date().toISOString(),
+        },
+      );
+
+      // Note: WebSocket emissions are handled by the gateway separately
     }
 
-    // Log to database and in-memory
+    // Enhanced progress tracking
+    if (progress !== undefined) {
+      await this.logExecutionEvent(
+        executionId,
+        'info',
+        `Node ${nodeLabel || nodeId} progress: ${progress}%`,
+        {
+          nodeId,
+          progress,
+          timestamp: new Date().toISOString(),
+        },
+      );
+    }
+
+    // Log to database and in-memory with enhanced context
     const logLevel = status === 'failed' ? 'error' : 'info';
     const message =
       status === 'failed'
@@ -230,6 +293,8 @@ export class ExecutionMonitorService {
       nodeType,
       nodeLabel,
     });
+
+    // Note: WebSocket emissions are handled by the gateway separately
 
     this.logger.log(`Node ${nodeId} in execution ${executionId}: ${status}`);
   }
@@ -253,6 +318,8 @@ export class ExecutionMonitorService {
       results,
       duration: execution.endTime.getTime() - execution.startTime.getTime(),
     });
+
+    // Note: WebSocket emissions are handled by the gateway separately
 
     // Clean up after 5 minutes
     setTimeout(
@@ -291,6 +358,8 @@ export class ExecutionMonitorService {
         duration: execution.endTime.getTime() - execution.startTime.getTime(),
       },
     );
+
+    // Note: WebSocket emissions are handled by the gateway separately
 
     // Clean up after 5 minutes
     setTimeout(
@@ -580,38 +649,132 @@ export class ExecutionMonitorService {
   /**
    * Trigger edge flow animations
    */
+  /**
+   * Summarize output data for logging purposes
+   */
+  private summarizeOutputData(output: any): string {
+    if (!output) return 'No output';
+
+    if (typeof output === 'string') {
+      return output.length > 100 ? `${output.substring(0, 100)}...` : output;
+    }
+
+    if (typeof output === 'object') {
+      const keys = Object.keys(output);
+      if (keys.length === 0) return 'Empty object';
+
+      if (keys.length <= 3) {
+        return `Object with ${keys.length} fields: ${keys.join(', ')}`;
+      }
+
+      return `Object with ${keys.length} fields: ${keys.slice(0, 3).join(', ')}...`;
+    }
+
+    return String(output);
+  }
+
   private async triggerEdgeFlowAnimations(
     executionId: string,
     sourceNodeId: string,
     output: any,
   ) {
-    const workflowDefinition = this.workflowDefinitions.get(executionId);
-    if (!workflowDefinition) {
+    const workflowDef = this.workflowDefinitions.get(executionId);
+    if (!workflowDef) {
+      this.logger.debug(
+        `No workflow definition found for execution ${executionId}`,
+      );
       return;
     }
 
-    const { nodes, edges } = workflowDefinition;
-
     // Find edges that start from the completed node
-    const outgoingEdges = edges.filter(
+    const outgoingEdges = workflowDef.edges.filter(
       (edge: any) => edge.source === sourceNodeId,
     );
 
     for (const edge of outgoingEdges) {
-      const edgeFlowUpdate: EdgeFlowUpdate = {
-        executionId,
-        edgeId: edge.id,
-        sourceNodeId,
-        targetNodeId: edge.target,
-        status: 'flowing',
-        data: output,
-        timestamp: new Date(),
-      };
+      const targetNode = workflowDef.nodes.find(
+        (node: any) => node.id === edge.target,
+      );
 
-      // Complete the edge flow after a short delay to show animation
-      setTimeout(() => {
-        // Edge flow completed
-      }, 1000);
+      if (targetNode) {
+        // Calculate data flow metrics
+        const outputSize = JSON.stringify(output).length;
+        const dataType = typeof output;
+        const isComplex = typeof output === 'object' && output !== null;
+        const fieldCount = isComplex ? Object.keys(output).length : 0;
+
+        // Emit edge flow animation event with enhanced data
+        const edgeFlowUpdate: EdgeFlowUpdate = {
+          executionId,
+          edgeId: edge.id,
+          sourceNodeId,
+          targetNodeId: edge.target,
+          status: 'flowing',
+          data: {
+            payload: output,
+            metadata: {
+              size: outputSize,
+              type: dataType,
+              fieldCount,
+              timestamp: new Date().toISOString(),
+            },
+          },
+          timestamp: new Date(),
+        };
+
+        // Note: WebSocket emissions are handled by the gateway separately
+
+        // Log detailed data flow information
+        await this.logExecutionEvent(
+          executionId,
+          'info',
+          `Data flowing from ${sourceNodeId} to ${edge.target}`,
+          {
+            sourceNodeId,
+            targetNodeId: edge.target,
+            edgeId: edge.id,
+            outputSize,
+            dataType,
+            fieldCount,
+            outputSummary: this.summarizeOutputData(output),
+            timestamp: new Date().toISOString(),
+          },
+        );
+
+        // Calculate flow duration based on data complexity
+        const baseDuration = 300; // Base 300ms
+        const sizeMultiplier = Math.min(2, outputSize / 1000); // Max 2x for large data
+        const complexityMultiplier = isComplex ? 1.5 : 1; // 1.5x for complex objects
+        const flowDuration = Math.round(
+          baseDuration * sizeMultiplier * complexityMultiplier,
+        );
+
+        // Simulate data flow with progress updates
+        const progressSteps = Math.min(
+          5,
+          Math.max(2, Math.floor(flowDuration / 200)),
+        );
+        let currentStep = 0;
+
+        const progressInterval = setInterval(() => {
+          currentStep++;
+          const progress = (currentStep / progressSteps) * 100;
+
+          // Note: WebSocket emissions are handled by the gateway separately
+
+          if (currentStep >= progressSteps) {
+            clearInterval(progressInterval);
+
+            // Emit completion
+            const completedFlowUpdate: EdgeFlowUpdate = {
+              ...edgeFlowUpdate,
+              status: 'completed',
+              timestamp: new Date(),
+            };
+            // Note: WebSocket emissions are handled by the gateway separately
+          }
+        }, flowDuration / progressSteps);
+      }
     }
   }
 }

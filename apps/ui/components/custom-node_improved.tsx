@@ -152,7 +152,7 @@ export default function CustomNode({
           update.status === "failed" ? "error" : "info";
         setRealtimeLogs((prev) => {
           const newLog = {
-            level: logLevel,
+            level: logLevel as "info" | "warn" | "error",
             message: `Node ${update.status}: ${update.nodeLabel || data.label}`,
             timestamp: new Date().toISOString(),
           };
@@ -184,7 +184,7 @@ export default function CustomNode({
         setRealtimeLogs((prev) => [
           ...prev,
           {
-            level: log.level,
+            level: log.level as "info" | "warn" | "error",
             message: log.message,
             timestamp: log.timestamp.toISOString(),
           },
@@ -199,6 +199,8 @@ export default function CustomNode({
     CompatibilityIssue[]
   >([]);
   const [showSchemaInfo, setShowSchemaInfo] = useState(false);
+  const [showOutput, setShowOutput] = useState(false);
+  const [showError, setShowError] = useState(false);
 
   // Reset real-time state when execution changes
   useEffect(() => {
@@ -254,13 +256,30 @@ export default function CustomNode({
     }
   }, [nodeSchema, connection, id]);
 
-  // Use live node data when available
+  // Use live node data when available with enhanced status detection
   const isUsingLiveNode = liveNode.isLive && liveNode.nodeState;
   const effectiveStatus = isUsingLiveNode
     ? liveNode.nodeState?.status || "pending"
     : isLiveExecution && data.executionId
       ? realtimeStatus
       : data.executionStatus || blockExecution.currentState || "idle";
+
+  // Enhanced status detection for better user feedback
+  const getDisplayStatus = ():
+    | "pending"
+    | "running"
+    | "completed"
+    | "failed"
+    | "idle" => {
+    if (effectiveStatus === "running" || data.isExecuting) return "running";
+    if (effectiveStatus === "completed" && data.executionOutput)
+      return "completed";
+    if (effectiveStatus === "failed" || data.executionError) return "failed";
+    if (data.executionId && !isConnectedToLive) return "pending";
+    return "idle";
+  };
+
+  const displayStatus = getDisplayStatus();
 
   const effectiveLogs = isUsingLiveNode
     ? liveNode.nodeState?.logs || []
@@ -302,13 +321,19 @@ export default function CustomNode({
     const duration = effectiveDuration;
     const progress = effectiveProgress;
     const error = effectiveError;
+    const output = data.executionOutput;
 
-    switch (effectiveStatus) {
+    switch (displayStatus) {
       case "pending":
         return (
           <div className='flex items-center gap-1.5 text-amber-500'>
             <div className='w-3.5 h-3.5 rounded-full bg-amber-300 animate-pulse' />
             <span className='text-xs font-medium'>Pending</span>
+            {data.isExecuting && (
+              <div className='ml-2 text-xs text-amber-600'>
+                Queued for execution
+              </div>
+            )}
           </div>
         );
       case "running":
@@ -333,17 +358,34 @@ export default function CustomNode({
                   </span>
                 </div>
               )}
+              {duration && (
+                <span className='text-xs text-blue-600'>
+                  {duration}ms elapsed
+                </span>
+              )}
             </div>
-            {logs.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowLogs(true);
-                }}
-                className='ml-1 text-xs px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors'>
-                Logs ({logs.length})
-              </button>
-            )}
+            <div className='flex gap-1'>
+              {logs.length > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowLogs(true);
+                  }}
+                  className='text-xs px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors'>
+                  Logs ({logs.length})
+                </button>
+              )}
+              {output && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowOutput(true);
+                  }}
+                  className='text-xs px-1.5 py-0.5 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors'>
+                  Output
+                </button>
+              )}
+            </div>
           </div>
         );
       case "completed":
@@ -353,19 +395,38 @@ export default function CustomNode({
               <CheckCircle2 className='w-3.5 h-3.5' />
               <div className='absolute -inset-1 bg-green-500/20 rounded-full animate-pulse' />
             </div>
-            <span className='text-xs font-medium'>
-              Completed {duration && `(${duration}ms)`}
-            </span>
-            {logs.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowLogs(true);
-                }}
-                className='ml-1 text-xs px-1.5 py-0.5 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors'>
-                Logs
-              </button>
-            )}
+            <div className='flex flex-col'>
+              <span className='text-xs font-medium'>
+                Completed {duration && `(${duration}ms)`}
+              </span>
+              {output && (
+                <span className='text-xs text-green-600'>
+                  Data ready for next block
+                </span>
+              )}
+            </div>
+            <div className='flex gap-1'>
+              {logs.length > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowLogs(true);
+                  }}
+                  className='text-xs px-1.5 py-0.5 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors'>
+                  Logs
+                </button>
+              )}
+              {output && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowOutput(true);
+                  }}
+                  className='text-xs px-1.5 py-0.5 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 transition-colors'>
+                  View Data
+                </button>
+              )}
+            </div>
           </div>
         );
       case "failed":
@@ -382,53 +443,37 @@ export default function CustomNode({
                   {error}
                 </span>
               )}
+              {duration && (
+                <span className='text-xs text-red-600'>
+                  Failed after {duration}ms
+                </span>
+              )}
             </div>
-            {logs.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowLogs(true);
-                }}
-                className='ml-1 text-xs px-1.5 py-0.5 bg-red-100 hover:bg-red-200 rounded text-red-700 transition-colors'>
-                Logs ({logs.length})
-              </button>
-            )}
-          </div>
-        );
-      case "warning":
-        return (
-          <div className='flex items-center gap-1.5 text-yellow-500'>
-            <div className='relative'>
-              <XCircle className='w-3.5 h-3.5' />
-              <div className='absolute -inset-1 bg-yellow-500/20 rounded-full animate-pulse' />
+            <div className='flex gap-1'>
+              {logs.length > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowLogs(true);
+                  }}
+                  className='text-xs px-1.5 py-0.5 bg-red-100 hover:bg-red-200 rounded text-red-700 transition-colors'>
+                  Logs ({logs.length})
+                </button>
+              )}
+              {error && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowError(true);
+                  }}
+                  className='text-xs px-1.5 py-0.5 bg-red-100 hover:bg-red-200 rounded text-red-700 transition-colors'>
+                  Details
+                </button>
+              )}
             </div>
-            <span className='text-xs font-medium'>Warning</span>
-            {logs.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowLogs(true);
-                }}
-                className='ml-1 text-xs px-1.5 py-0.5 bg-yellow-100 hover:bg-yellow-200 rounded text-yellow-700 transition-colors'>
-                Logs ({logs.length})
-              </button>
-            )}
           </div>
         );
-      case "cancelled":
-        return (
-          <div className='flex items-center gap-1.5 text-gray-500'>
-            <X className='w-3.5 h-3.5' />
-            <span className='text-xs font-medium'>Cancelled</span>
-          </div>
-        );
-      case "skipped":
-        return (
-          <div className='flex items-center gap-1.5 text-gray-400'>
-            <div className='w-3.5 h-3.5 rounded-full bg-gray-300' />
-            <span className='text-xs font-medium'>Skipped</span>
-          </div>
-        );
+
       default:
         return (
           <div className='flex items-center gap-1.5 text-gray-400'>
@@ -761,6 +806,30 @@ export default function CustomNode({
             {statusIndicator}
           </div>
         )}
+
+        {/* Connection Status Indicator */}
+        {data.executionId && (
+          <div className='pt-2 mt-2 border-t border-dashed border-border/80'>
+            <div className='flex items-center justify-between text-xs'>
+              <span className='text-muted-foreground'>Connection:</span>
+              <div className='flex items-center gap-1'>
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    isConnectedToLive
+                      ? "bg-green-500 animate-pulse"
+                      : "bg-red-500"
+                  }`}
+                />
+                <span
+                  className={
+                    isConnectedToLive ? "text-green-600" : "text-red-600"
+                  }>
+                  {isConnectedToLive ? "Live" : "Disconnected"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Handles - styled to cover the entire node */}
@@ -841,6 +910,62 @@ export default function CustomNode({
                 <p className='text-sm'>No logs available</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Output Data Modal */}
+      {showOutput && data.executionOutput && (
+        <div className='absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-50 max-w-lg'>
+          <div className='flex items-center justify-between p-3 border-b border-border'>
+            <div className='flex items-center gap-2'>
+              <Database className='w-4 h-4 text-green-600' />
+              <span className='text-sm font-medium'>Output Data</span>
+            </div>
+            <button
+              onClick={() => setShowOutput(false)}
+              className='text-muted-foreground hover:text-foreground transition-colors'
+              title='Close output'>
+              <X className='w-4 h-4' />
+            </button>
+          </div>
+          <div className='p-3 max-h-64 overflow-y-auto'>
+            <div className='text-xs text-muted-foreground mb-2'>
+              Data produced by this block
+            </div>
+            <div className='bg-muted p-3 rounded text-xs font-mono overflow-x-auto'>
+              <pre>{JSON.stringify(data.executionOutput, null, 2)}</pre>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Details Modal */}
+      {showError && data.executionError && (
+        <div className='absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-50 max-w-md'>
+          <div className='flex items-center justify-between p-3 border-b border-border'>
+            <div className='flex items-center gap-2'>
+              <XCircle className='w-4 h-4 text-red-500' />
+              <span className='text-sm font-medium'>Execution Error</span>
+            </div>
+            <button
+              onClick={() => setShowError(false)}
+              className='text-muted-foreground hover:text-foreground transition-colors'
+              title='Close error details'>
+              <X className='w-4 h-4' />
+            </button>
+          </div>
+          <div className='p-3 max-h-64 overflow-y-auto'>
+            <div className='bg-red-50 border border-red-200 rounded p-3'>
+              <div className='text-xs text-red-700 whitespace-pre-wrap'>
+                {data.executionError}
+              </div>
+              {effectiveDuration && (
+                <div className='mt-2 text-xs text-red-600'>
+                  Failed after {effectiveDuration}ms
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
