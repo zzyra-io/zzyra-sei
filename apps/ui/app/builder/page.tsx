@@ -44,7 +44,14 @@ import {
   prepareNodesForApi,
   prepareEdgesForApi,
 } from "@zyra/types";
-import { ArrowLeft, Loader2, Play, Save } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  Play,
+  Save,
+  XCircle,
+  AlertCircle,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -327,38 +334,71 @@ export default function BuilderPage() {
   });
 
   // Fallback: Fetch logs from API when WebSocket fails or execution is completed
-  useEffect(() => {
-    const fetchLogsFromAPI = async () => {
-      if (!executionId) return;
+  const fetchLogsFromAPI = useCallback(async () => {
+    if (!executionId) return;
 
-      try {
-        // Use the unified logs service
-        const executionLogs =
-          await logsService.getExecutionLevelLogs(executionId);
+    try {
+      // Use the unified logs service
+      const executionLogs =
+        await logsService.getExecutionLevelLogs(executionId);
 
-        // Transform execution logs to ExecutionLog format
-        const logs = executionLogs.map((log) => ({
-          id: log.id,
-          timestamp: new Date(log.timestamp),
-          level: log.level as "info" | "warn" | "error" | "debug",
-          message: log.message,
-          nodeId: log.node_id,
-          metadata: log.data,
-        }));
+      // Transform execution logs to ExecutionLog format
+      const logs = executionLogs.map((log) => ({
+        id: log.id,
+        timestamp: new Date(log.timestamp),
+        level: log.level as "info" | "warn" | "error" | "debug",
+        message: log.message,
+        nodeId: log.node_id,
+        metadata: log.data,
+      }));
 
-        // Only update if we have logs and current logs are empty (WebSocket failed)
-        if (logs.length > 0 && executionLogs.length === 0) {
-          setExecutionLogs(logs);
-        }
-      } catch (error) {
-        console.error("Failed to fetch logs from API:", error);
+      // Update logs if we have any, or if current logs are empty
+      if (logs.length > 0 || executionLogs.length === 0) {
+        setExecutionLogs(logs);
       }
-    };
+    } catch (error) {
+      console.error("Failed to fetch logs from API:", error);
+      // Don't show error toast for 404s as they're expected for new executions
+      if (error instanceof Error && !error.message.includes("Not Found")) {
+        toast({
+          title: "Failed to fetch logs",
+          description: "Could not load execution logs. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [executionId, toast]);
 
+  // Add a fallback to create mock logs for testing when no real logs are available
+  const createMockLogs = useCallback(() => {
+    if (executionLogs.length === 0 && executionId) {
+      const mockLogs = [
+        {
+          id: "mock-1",
+          timestamp: new Date(),
+          level: "info" as const,
+          message: "Execution started",
+          nodeId: "system",
+          metadata: { executionId },
+        },
+        {
+          id: "mock-2",
+          timestamp: new Date(Date.now() - 1000),
+          level: "info" as const,
+          message: "Initializing workflow components",
+          nodeId: "system",
+          metadata: { executionId },
+        },
+      ];
+      setExecutionLogs(mockLogs);
+    }
+  }, [executionLogs.length, executionId]);
+
+  useEffect(() => {
     // Fetch logs after a delay to allow WebSocket to connect first
     const timer = setTimeout(fetchLogsFromAPI, 2000);
     return () => clearTimeout(timer);
-  }, [executionId]);
+  }, [fetchLogsFromAPI]);
 
   // Reset logs when starting a new execution
   useEffect(() => {
@@ -369,10 +409,21 @@ export default function BuilderPage() {
 
   // Show execution panel when execution is pending or we have a status
   useEffect(() => {
-    if (isExecutionPending || executionStatus) {
+    if (isExecutionPending || executionStatus || executionId) {
       setShowExecutionPanel(true);
     }
-  }, [isExecutionPending, executionStatus, setShowExecutionPanel]);
+  }, [isExecutionPending, executionStatus, executionId]);
+
+  // Auto-hide execution panel when execution is completed and no logs
+  useEffect(() => {
+    if (executionStatus?.status === "completed" && executionLogs.length === 0) {
+      // Keep panel open for a bit to show completion status
+      const timer = setTimeout(() => {
+        setShowExecutionPanel(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [executionStatus?.status, executionLogs.length]);
 
   const handleWorkflowDetailsChange = useCallback(
     (details: { name?: string; description?: string }) => {
@@ -987,13 +1038,32 @@ export default function BuilderPage() {
               <>
                 <ResizableHandle />
                 <ResizablePanel
-                  defaultSize={30}
-                  minSize={25}
-                  maxSize={40}
-                  className='h-full'>
-                  <div className='h-full flex flex-col gap-4 p-4'>
+                  defaultSize={35}
+                  minSize={30}
+                  maxSize={45}
+                  className='h-full bg-background border-l'>
+                  <div className='h-full flex flex-col p-4 space-y-4'>
+                    {/* Panel Header */}
+                    <div className='flex items-center justify-between pb-2 border-b'>
+                      <div>
+                        <h3 className='text-lg font-semibold'>
+                          Execution Monitor
+                        </h3>
+                        <p className='text-sm text-muted-foreground'>
+                          Real-time execution monitoring and logs
+                        </p>
+                      </div>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        onClick={() => setShowExecutionPanel(false)}
+                        className='h-8 w-8 p-0'>
+                        <XCircle className='w-4 h-4' />
+                      </Button>
+                    </div>
+
                     {/* Real-time Execution Metrics */}
-                    <div className='flex-1'>
+                    <div className='flex-shrink-0'>
                       <ExecutionMetricsPanel
                         metrics={executionMetrics}
                         isConnected={isRealTimeConnected}
@@ -1001,18 +1071,52 @@ export default function BuilderPage() {
                     </div>
 
                     {/* Execution History and Logs */}
-                    <div className='flex-1'>
+                    <div className='flex-1 min-h-0'>
                       <ExecutionHistoryPanel
                         logs={executionLogs}
                         isConnected={isRealTimeConnected}
                         executionId={executionId || undefined}
+                        onRefresh={fetchLogsFromAPI}
+                        isExecuting={
+                          isExecutionPending ||
+                          executionStatus?.status === "running"
+                        }
+                        onCreateMockLogs={createMockLogs}
                       />
                     </div>
 
                     {/* Connection Status Indicator */}
                     {connectionError && (
-                      <div className='p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs'>
-                        WebSocket Error: {connectionError}
+                      <div className='flex-shrink-0 p-3 bg-red-50 border border-red-200 rounded-lg'>
+                        <div className='flex items-center gap-2 text-red-700'>
+                          <AlertCircle className='w-4 h-4' />
+                          <div className='text-sm'>
+                            <p className='font-medium'>Connection Issue</p>
+                            <p className='text-xs'>{connectionError}</p>
+                            <p className='text-xs mt-1'>
+                              The worker service may not be running. Check if
+                              the worker is available at ws://localhost:3005
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Connection Status for No Error */}
+                    {!connectionError && !isRealTimeConnected && (
+                      <div className='flex-shrink-0 p-3 bg-yellow-50 border border-yellow-200 rounded-lg'>
+                        <div className='flex items-center gap-2 text-yellow-700'>
+                          <AlertCircle className='w-4 h-4' />
+                          <div className='text-sm'>
+                            <p className='font-medium'>Limited Connectivity</p>
+                            <p className='text-xs'>
+                              Real-time updates may not be available
+                            </p>
+                            <p className='text-xs mt-1'>
+                              Using fallback API calls for execution data
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

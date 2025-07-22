@@ -89,11 +89,19 @@ export function useExecutionWebSocket({
 
     const workerUrl = config.workerUrl;
 
+    // Check if worker URL is available
+    if (!workerUrl || workerUrl === "ws://localhost:3005") {
+      console.warn("Worker URL not configured, skipping WebSocket connection");
+      setConnectionError("Worker service not available");
+      return;
+    }
+
     // Create socket connection to execution namespace
     const socket = io(`${workerUrl}/execution`, {
       transports: ["websocket", "polling"],
-      timeout: 10000,
-      retries: 3,
+      timeout: 5000, // Reduced timeout
+      retries: 2, // Reduced retries
+      forceNew: true, // Force new connection for each execution
     });
 
     socketRef.current = socket;
@@ -108,14 +116,24 @@ export function useExecutionWebSocket({
       socket.emit("subscribe_execution", { executionId });
     });
 
-    socket.on("disconnect", () => {
-      console.log("WebSocket disconnected");
+    socket.on("disconnect", (reason) => {
+      console.log("WebSocket disconnected:", reason);
       setIsConnected(false);
+      if (reason === "io server disconnect") {
+        // Server disconnected, try to reconnect
+        socket.connect();
+      }
     });
 
     socket.on("connect_error", (error) => {
       console.error("WebSocket connection error:", error);
-      setConnectionError(error.message);
+      setConnectionError("Worker service unavailable");
+      setIsConnected(false);
+    });
+
+    socket.on("connect_timeout", () => {
+      console.error("WebSocket connection timeout");
+      setConnectionError("Connection timeout");
       setIsConnected(false);
     });
 

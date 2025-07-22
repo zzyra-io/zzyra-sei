@@ -45,8 +45,12 @@ class LogsService {
   async getExecutionLogs(executionId: string): Promise<UnifiedLog[]> {
     try {
       // Fetch execution details which includes executionLogs
-      const response = await fetch(`/api/executions/public/${executionId}`);
+      const response = await fetch(`/api/executions/${executionId}/complete`);
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(`Execution ${executionId} not found`);
+          return [];
+        }
         throw new Error(`Failed to fetch execution: ${response.statusText}`);
       }
 
@@ -104,7 +108,7 @@ class LogsService {
         `Failed to fetch logs for execution ${executionId}:`,
         error
       );
-      throw error;
+      return []; // Return empty array instead of throwing
     }
   }
 
@@ -113,8 +117,13 @@ class LogsService {
    */
   async getExecutionLevelLogs(executionId: string): Promise<ExecutionLog[]> {
     try {
-      const response = await fetch(`/api/executions/public/${executionId}`);
+      // Use the authenticated endpoint instead of public
+      const response = await fetch(`/api/executions/${executionId}/complete`);
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(`Execution ${executionId} not found`);
+          return [];
+        }
         throw new Error(`Failed to fetch execution: ${response.statusText}`);
       }
 
@@ -125,7 +134,7 @@ class LogsService {
         id: log.id,
         execution_id: executionId,
         node_id: log.metadata?.nodeId || "system",
-        level: log.level as "info" | "warning" | "error",
+        level: log.level as "info" | "warning" | "error" | "debug",
         message: log.message,
         data: log.metadata,
         timestamp: log.timestamp,
@@ -135,7 +144,7 @@ class LogsService {
         `Failed to fetch execution logs for ${executionId}:`,
         error
       );
-      throw error;
+      return []; // Return empty array instead of throwing
     }
   }
 
@@ -150,7 +159,7 @@ class LogsService {
       return response.data.logs || [];
     } catch (error) {
       console.error(`Failed to fetch node logs for ${nodeExecutionId}:`, error);
-      throw error;
+      return []; // Return empty array instead of throwing
     }
   }
 
@@ -171,7 +180,7 @@ class LogsService {
         `Failed to fetch node logs for ${executionId}/${nodeId}:`,
         error
       );
-      throw error;
+      return []; // Return empty array instead of throwing
     }
   }
 }
