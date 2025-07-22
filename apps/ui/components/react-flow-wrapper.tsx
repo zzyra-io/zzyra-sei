@@ -18,7 +18,7 @@ import ReactFlow, {
   useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { CustomNode } from "@/components/custom-node";
+import CustomNode from "@/components/custom-node_improved";
 import CustomEdge from "@/components/custom-edge";
 import { Button } from "@/components/ui/button";
 import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
@@ -31,6 +31,8 @@ const nodeTypes: NodeTypes = {
 // Define edge types
 const edgeTypes: EdgeTypes = {
   custom: CustomEdge,
+  CUSTOM: CustomEdge,
+  floating: CustomEdge,
 };
 
 interface ReactFlowWrapperProps {

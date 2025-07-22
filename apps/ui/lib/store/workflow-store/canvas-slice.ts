@@ -69,7 +69,8 @@ export const createCanvasSlice: StateCreator<
     const newNodes = [...nodes, node];
     console.log("newNodes", newNodes);
     set(() => ({ nodes: newNodes }));
-    addToHistory(newNodes, edges);
+    // Throttle history updates to prevent excessive calls
+    setTimeout(() => addToHistory(newNodes, edges), 0);
   },
 
   updateNode: (nodeId: string, updates: Partial<Node>) => {
@@ -99,7 +100,8 @@ export const createCanvasSlice: StateCreator<
       return node;
     });
     set(() => ({ nodes: newNodes }));
-    addToHistory(newNodes, edges);
+    // Throttle history updates to prevent excessive calls
+    setTimeout(() => addToHistory(newNodes, edges), 0);
   },
 
   removeNode: (nodeId: string) => {

@@ -15,7 +15,14 @@ import {
   NotificationType,
 } from '../services/notification.service';
 import { ExecutionMonitorService } from '../services/execution-monitor.service';
-import { MultiLevelCircuitBreakerService, ExecutionContext } from '../services/multi-level-circuit-breaker.service';
+import {
+  MultiLevelCircuitBreakerService,
+  ExecutionContext,
+} from '../services/multi-level-circuit-breaker.service';
+import { DataTransformationService } from '../services/data-transformation.service';
+import { DataStateService } from '../services/data-state.service';
+import { ParallelExecutionService } from '../services/parallel-execution.service';
+import { BlockchainDataSyncService } from '../services/blockchain-data-sync.service';
 import { BlockType, getEnhancedBlockSchema } from '@zyra/types';
 
 @Injectable()
@@ -30,6 +37,10 @@ export class WorkflowExecutor {
     private readonly notificationService: NotificationService,
     private readonly executionMonitorService: ExecutionMonitorService,
     private readonly multiLevelCircuitBreaker: MultiLevelCircuitBreakerService,
+    private readonly dataTransformationService: DataTransformationService,
+    private readonly dataStateService: DataStateService,
+    private readonly parallelExecutionService: ParallelExecutionService,
+    private readonly blockchainDataSyncService: BlockchainDataSyncService,
   ) {}
 
   /**
@@ -297,23 +308,26 @@ export class WorkflowExecutor {
       executionContext = {
         workflowId,
         userId,
-        executionId
+        executionId,
       };
 
-      const circuitCheck = await this.multiLevelCircuitBreaker.shouldAllowExecution(executionContext);
+      const circuitCheck =
+        await this.multiLevelCircuitBreaker.shouldAllowExecution(
+          executionContext,
+        );
       if (!circuitCheck.allowed) {
         const error = `Execution blocked by ${circuitCheck.blockedBy?.level} circuit breaker: ${circuitCheck.reason}`;
         this.logger.error(`[executionId=${executionId}] ${error}`);
-        
+
         // Log the circuit breaker block
         await this.executionLogger.logExecutionEvent(executionId, {
           level: 'error',
           message: `Workflow execution blocked: ${error}`,
           node_id: 'system',
-          data: { 
+          data: {
             circuitLevel: circuitCheck.blockedBy?.level,
             circuitId: circuitCheck.blockedBy?.circuitId,
-            reason: circuitCheck.reason
+            reason: circuitCheck.reason,
           },
         });
 
@@ -323,7 +337,7 @@ export class WorkflowExecutor {
         return {
           status: 'failed',
           outputs: {},
-          error
+          error,
         };
       }
 
@@ -456,7 +470,7 @@ export class WorkflowExecutor {
         executionId,
         workflowId,
         sortedNodes.length,
-        { nodes, edges }
+        { nodes, edges },
       );
 
       // Execute each node in order
@@ -489,6 +503,21 @@ export class WorkflowExecutor {
           node.id,
           dependencyMap,
           outputs,
+        );
+
+        // Apply data transformations if needed
+        const transformedOutputs = await this.applyDataTransformations(
+          node,
+          relevantOutputs,
+          executionId,
+        );
+
+        // Save intermediate data state
+        await this.dataStateService.saveDataState(
+          executionId,
+          `${node.id}_input`,
+          transformedOutputs,
+          { tags: ['input', 'intermediate'] },
         );
 
         this.logger.debug(
@@ -537,12 +566,12 @@ export class WorkflowExecutor {
             const inputValidationResult = await this.validateNodeInputData(
               node,
               relevantOutputs,
-              executionId
+              executionId,
             );
 
             if (!inputValidationResult.isValid) {
               throw new Error(
-                `Input validation failed for node ${node.id}: ${inputValidationResult.errors.join(', ')}`
+                `Input validation failed for node ${node.id}: ${inputValidationResult.errors.join(', ')}`,
               );
             }
 
@@ -551,22 +580,22 @@ export class WorkflowExecutor {
               node,
               executionId,
               userId,
-              relevantOutputs,
+              transformedOutputs,
             );
 
             // Validate output data after execution
             const outputValidationResult = await this.validateNodeOutputData(
               node,
               nodeOutput,
-              executionId
+              executionId,
             );
 
             if (!outputValidationResult.isValid) {
               this.logger.warn(
                 `Output validation warnings for node ${node.id}: ${outputValidationResult.errors.join(', ')}`,
-                { executionId, nodeId: node.id }
+                { executionId, nodeId: node.id },
               );
-              
+
               // Log validation warnings but don't fail execution
               await this.executionLogger.logExecutionEvent(executionId, {
                 level: 'warn',
@@ -581,6 +610,13 @@ export class WorkflowExecutor {
 
             outputs[node.id] = nodeOutput;
 
+            // Save output data state
+            await this.dataStateService.saveDataState(
+              executionId,
+              node.id,
+              nodeOutput,
+              { tags: ['output', 'completed'] },
+            );
           } catch (nodeError) {
             // Handle node execution error
             const endTime = new Date();
@@ -601,7 +637,10 @@ export class WorkflowExecutor {
               executionId,
               nodeId: node.id,
               status: 'failed',
-              error: nodeError instanceof Error ? nodeError.message : String(nodeError),
+              error:
+                nodeError instanceof Error
+                  ? nodeError.message
+                  : String(nodeError),
               duration,
               nodeType: node.data?.type || node.data?.blockType || node.type,
               nodeLabel: node.data?.label || node.data?.name || node.id,
@@ -615,7 +654,7 @@ export class WorkflowExecutor {
           // Update block status to completed
           const endTime = new Date();
           const duration = endTime.getTime() - startTime.getTime();
-          
+
           await this.databaseService.prisma.blockExecution.update({
             where: { id: blockExecution.id },
             data: {
@@ -669,7 +708,10 @@ export class WorkflowExecutor {
       );
 
       // Send real-time update: workflow completed
-      await this.executionMonitorService.completeExecution(executionId, outputs);
+      await this.executionMonitorService.completeExecution(
+        executionId,
+        outputs,
+      );
 
       // Log workflow completion
       await this.executionLogger.logExecutionEvent(executionId, {
@@ -697,7 +739,10 @@ export class WorkflowExecutor {
       span.setStatus({ code: 2, message: finalError });
 
       // Record failure in circuit breaker
-      await this.multiLevelCircuitBreaker.recordFailure(executionContext, error as Error);
+      await this.multiLevelCircuitBreaker.recordFailure(
+        executionContext,
+        error as Error,
+      );
 
       // Update workflow execution status to failed
       await this.databaseService.executions.updateStatus(
@@ -736,7 +781,10 @@ export class WorkflowExecutor {
       );
 
       // Send real-time update: workflow failed
-      await this.executionMonitorService.failExecution(executionId, finalError || 'Unknown error');
+      await this.executionMonitorService.failExecution(
+        executionId,
+        finalError || 'Unknown error',
+      );
 
       // Log final failure event
       await this.executionLogger.logExecutionEvent(executionId, {
@@ -822,7 +870,7 @@ export class WorkflowExecutor {
   private async validateNodeInputData(
     node: any,
     inputData: Record<string, any>,
-    executionId: string
+    executionId: string,
   ): Promise<{ isValid: boolean; errors: string[] }> {
     const errors: string[] = [];
     const nodeId = node.id;
@@ -831,7 +879,7 @@ export class WorkflowExecutor {
     try {
       // Get enhanced block schema for validation
       const enhancedSchema = getEnhancedBlockSchema(blockType as BlockType);
-      
+
       if (enhancedSchema) {
         // Validate input data against schema
         try {
@@ -859,19 +907,28 @@ export class WorkflowExecutor {
       switch (blockType) {
         case BlockType.HTTP_REQUEST:
         case BlockType.WEBHOOK:
-          if (node.data?.config?.url && !this.isValidUrl(node.data.config.url)) {
+          if (
+            node.data?.config?.url &&
+            !this.isValidUrl(node.data.config.url)
+          ) {
             errors.push('Invalid URL format');
           }
           break;
 
         case BlockType.EMAIL:
-          if (node.data?.config?.to && !this.isValidEmail(node.data.config.to)) {
+          if (
+            node.data?.config?.to &&
+            !this.isValidEmail(node.data.config.to)
+          ) {
             errors.push('Invalid email address format');
           }
           break;
 
         case BlockType.CONDITION:
-          if (!node.data?.config?.condition || node.data.config.condition.trim() === '') {
+          if (
+            !node.data?.config?.condition ||
+            node.data.config.condition.trim() === ''
+          ) {
             errors.push('Condition expression is required');
           }
           break;
@@ -896,9 +953,11 @@ export class WorkflowExecutor {
           },
         });
       }
-
     } catch (error) {
-      this.logger.error(`Error during input validation for node ${nodeId}:`, error);
+      this.logger.error(
+        `Error during input validation for node ${nodeId}:`,
+        error,
+      );
       errors.push('Validation process failed');
     }
 
@@ -911,7 +970,7 @@ export class WorkflowExecutor {
   private async validateNodeOutputData(
     node: any,
     outputData: any,
-    executionId: string
+    executionId: string,
   ): Promise<{ isValid: boolean; errors: string[] }> {
     const errors: string[] = [];
     const nodeId = node.id;
@@ -920,7 +979,7 @@ export class WorkflowExecutor {
     try {
       // Get enhanced block schema for validation
       const enhancedSchema = getEnhancedBlockSchema(blockType as BlockType);
-      
+
       if (enhancedSchema) {
         // Validate output data against schema
         try {
@@ -931,7 +990,9 @@ export class WorkflowExecutor {
               errors.push(`${err.path?.join('.')}: ${err.message}`);
             });
           } else {
-            errors.push(validationError.message || 'Output schema validation failed');
+            errors.push(
+              validationError.message || 'Output schema validation failed',
+            );
           }
         }
       }
@@ -982,9 +1043,11 @@ export class WorkflowExecutor {
           },
         });
       }
-
     } catch (error) {
-      this.logger.error(`Error during output validation for node ${nodeId}:`, error);
+      this.logger.error(
+        `Error during output validation for node ${nodeId}:`,
+        error,
+      );
       errors.push('Output validation process failed');
     }
 
@@ -1006,5 +1069,151 @@ export class WorkflowExecutor {
   private isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+  }
+
+  /**
+   * Apply data transformations between nodes if needed
+   */
+  private async applyDataTransformations(
+    node: any,
+    inputData: Record<string, any>,
+    executionId: string,
+  ): Promise<Record<string, any>> {
+    const nodeType = node.data?.blockType || node.data?.type || node.type;
+
+    // Check if this node has specific data transformation requirements
+    if (nodeType === 'DATA_TRANSFORM') {
+      // For DATA_TRANSFORM blocks, apply the configured transformations
+      const transformConfig = node.data?.config;
+      if (transformConfig?.transformations) {
+        try {
+          const pipeline = {
+            id: `pipeline-${node.id}`,
+            transformations: transformConfig.transformations,
+            metadata: {
+              name: `Transform for ${node.id}`,
+              description: 'Node-specific data transformation',
+              version: '1.0.0',
+            },
+          };
+
+          const result = await this.dataTransformationService.applyPipeline(
+            inputData,
+            pipeline,
+          );
+
+          if (result.success) {
+            this.logger.debug(
+              `Applied data transformations for node ${node.id}: ${result.metadata.transformationsApplied} transformations`,
+            );
+            return result.data;
+          } else {
+            this.logger.warn(
+              `Data transformation failed for node ${node.id}: ${result.errors.join(', ')}`,
+            );
+            return inputData; // Fallback to original data
+          }
+        } catch (error) {
+          this.logger.error(
+            `Error applying data transformations for node ${node.id}:`,
+            error,
+          );
+          return inputData;
+        }
+      }
+    }
+
+    // For other node types, apply basic filtering to keep only relevant data
+    const relevantKeys = this.getRelevantDataKeys(node, inputData);
+    if (relevantKeys.length > 0) {
+      const filtered = this.dataTransformationService.filterRelevantData(
+        inputData,
+        relevantKeys,
+      );
+      return filtered;
+    }
+
+    return inputData;
+  }
+
+  /**
+   * Determine which data keys are relevant for a specific node
+   */
+  private getRelevantDataKeys(
+    node: any,
+    inputData: Record<string, any>,
+  ): string[] {
+    const nodeType = node.data?.blockType || node.data?.type || node.type;
+    const allKeys = Object.keys(inputData);
+
+    // For most block types, all input data is potentially relevant
+    // But we can filter out obvious system metadata
+    const systemKeys = ['_metadata', '_version', '_timestamp', '_executionId'];
+    return allKeys.filter((key) => !systemKeys.includes(key));
+  }
+
+  /**
+   * Enhanced data flow validation - validate input data before node execution
+   * (Enhanced version of the existing method)
+   */
+  private async validateNodeInputDataEnhanced(
+    node: any,
+    inputData: Record<string, any>,
+    executionId: string,
+  ): Promise<{ isValid: boolean; errors: string[] }> {
+    // Use the existing validation method
+    const basicValidation = await this.validateNodeInputData(
+      node,
+      inputData,
+      executionId,
+    );
+
+    // Add enhanced validations
+    const enhancedErrors: string[] = [...basicValidation.errors];
+
+    try {
+      // Check data freshness
+      const freshness = await this.dataStateService.checkDataFreshness(node.id);
+      if (!freshness.isFresh) {
+        enhancedErrors.push(
+          `Input data may be stale due to dependencies: [${freshness.staleDependencies.join(', ')}]`,
+        );
+      }
+
+      // Check data size limits
+      const dataSize = JSON.stringify(inputData).length;
+      if (dataSize > 1024 * 1024) {
+        // 1MB limit
+        enhancedErrors.push(
+          `Input data size (${Math.round(dataSize / 1024)}KB) exceeds recommended limit of 1MB`,
+        );
+      }
+
+      // Node-specific validations
+      const nodeType = node.data?.blockType || node.data?.type || node.type;
+
+      if (nodeType === 'HTTP_REQUEST') {
+        // Validate HTTP request data structure
+        if (inputData.url && typeof inputData.url !== 'string') {
+          enhancedErrors.push('HTTP request URL must be a string');
+        }
+      } else if (nodeType === 'EMAIL') {
+        // Validate email data structure
+        if (inputData.to && !this.isValidEmail(inputData.to)) {
+          enhancedErrors.push('Invalid email address format in input data');
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error during enhanced input validation for node ${node.id}:`,
+        error,
+      );
+      enhancedErrors.push('Enhanced validation process failed');
+    }
+
+    return {
+      isValid: enhancedErrors.length === 0,
+      errors: enhancedErrors,
+    };
   }
 }

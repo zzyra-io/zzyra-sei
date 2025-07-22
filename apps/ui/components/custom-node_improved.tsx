@@ -1,11 +1,53 @@
-import { Handle, Position, useConnection } from "@xyflow/react";
-import { Database, Loader2, CheckCircle2, XCircle, Eye, X, Activity, Zap, Radio } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useTheme } from "next-themes";
-import React, { useState, useEffect, useCallback } from "react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  NodeExecutionUpdate,
+  useExecutionWebSocket,
+} from "@/hooks/use-execution-websocket";
 import { useBlockExecution } from "@/hooks/useBlockExecution";
-import { useExecutionWebSocket, NodeExecutionUpdate } from "@/hooks/use-execution-websocket";
+import { cn } from "@/lib/utils";
+import { Handle, Position, useConnection } from "@xyflow/react";
+import {
+  Activity,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Database,
+  Eye,
+  Loader2,
+  Radio,
+  Settings,
+  X,
+  XCircle,
+  Zap,
+} from "lucide-react";
+import { useTheme } from "next-themes";
+import React, { useCallback, useEffect, useState } from "react";
+import { getNodeSchema } from "./schema-aware-connection";
+// Define NodeSchema type locally since it's not exported
+interface SchemaField {
+  name: string;
+  type: "string" | "number" | "boolean" | "object" | "array" | "any";
+  required: boolean;
+  description?: string;
+}
+interface NodeSchema {
+  input: SchemaField[];
+  output: SchemaField[];
+}
 import { useLiveNode } from "./workflow/LiveWorkflowProvider";
+
+interface CompatibilityIssue {
+  field: string;
+  issue: string;
+  severity: "error" | "warning" | "info";
+  suggestion?: string;
+}
 
 interface NodeData {
   blockType: string;
@@ -17,7 +59,7 @@ interface NodeData {
   inputCount?: number;
   outputCount?: number;
   status?: string;
-  executionStatus?: 'pending' | 'running' | 'completed' | 'failed';
+  executionStatus?: "pending" | "running" | "completed" | "failed";
   isExecuting?: boolean;
   executionProgress?: number;
   executionStartTime?: Date;
@@ -53,21 +95,36 @@ export default function CustomNode({
   data: NodeData;
 }) {
   const { theme } = useTheme();
-  const connection = useConnection();
+  const connection = useConnection() as ReturnType<typeof useConnection>;
   const isConnecting = connection.inProgress;
   const isTarget = isConnecting && connection.fromNode?.id !== id;
   const [showLogs, setShowLogs] = useState(false);
 
+  // Destructure config and other fields from data at the top
+  const {
+    label = data.blockType || "Node",
+    description = "",
+    isEnabled = true,
+    config = {},
+    style = {},
+  } = data;
+
   // Real-time execution state
-  const [realtimeStatus, setRealtimeStatus] = useState<'pending' | 'running' | 'completed' | 'failed'>('pending');
+  const [realtimeStatus, setRealtimeStatus] = useState<
+    "pending" | "running" | "completed" | "failed"
+  >("pending");
   const [realtimeProgress, setRealtimeProgress] = useState<number>(0);
-  const [realtimeDuration, setRealtimeDuration] = useState<number | undefined>();
+  const [realtimeDuration, setRealtimeDuration] = useState<
+    number | undefined
+  >();
   const [realtimeError, setRealtimeError] = useState<string | undefined>();
-  const [realtimeLogs, setRealtimeLogs] = useState<Array<{
-    level: "info" | "warn" | "error";
-    message: string;
-    timestamp?: string;
-  }>>([]);
+  const [realtimeLogs, setRealtimeLogs] = useState<
+    Array<{
+      level: "info" | "warn" | "error";
+      message: string;
+      timestamp?: string;
+    }>
+  >([]);
   const [isLiveExecution, setIsLiveExecution] = useState(false);
 
   // Initialize block execution monitoring (legacy)
@@ -81,22 +138,42 @@ export default function CustomNode({
   const liveNode = useLiveNode(id);
 
   // Handle real-time node updates from WebSocket (legacy)
-  const handleNodeUpdate = useCallback((update: NodeExecutionUpdate) => {
-    if (update.nodeId === id) {
-      setRealtimeStatus(update.status);
-      setRealtimeProgress(update.progress || 0);
-      setRealtimeDuration(update.duration);
-      setRealtimeError(update.error);
-      setIsLiveExecution(true);
-      
-      // Add to logs
-      setRealtimeLogs(prev => [...prev, {
-        level: update.status === 'failed' ? 'error' : 'info',
-        message: `Node ${update.status}: ${update.nodeLabel || data.label}`,
-        timestamp: new Date().toISOString()
-      }]);
-    }
-  }, [id, data.label]);
+  const handleNodeUpdate = useCallback(
+    (update: NodeExecutionUpdate) => {
+      if (update.nodeId === id) {
+        setRealtimeStatus(update.status);
+        setRealtimeProgress(update.progress || 0);
+        setRealtimeDuration(update.duration);
+        setRealtimeError(update.error);
+        setIsLiveExecution(true);
+
+        // Only push logs with valid levels
+        const logLevel: "info" | "warn" | "error" =
+          update.status === "failed" ? "error" : "info";
+        setRealtimeLogs((prev) => {
+          const newLog = {
+            level: logLevel,
+            message: `Node ${update.status}: ${update.nodeLabel || data.label}`,
+            timestamp: new Date().toISOString(),
+          };
+          // Only allow logs with valid levels
+          return [...prev, newLog].filter(
+            (
+              log
+            ): log is {
+              level: "info" | "warn" | "error";
+              message: string;
+              timestamp?: string;
+            } =>
+              log.level === "info" ||
+              log.level === "warn" ||
+              log.level === "error"
+          );
+        });
+      }
+    },
+    [id, data.label]
+  );
 
   // Initialize WebSocket connection for real-time updates (legacy)
   const { isConnected: wsConnected } = useExecutionWebSocket({
@@ -104,19 +181,29 @@ export default function CustomNode({
     onNodeUpdate: handleNodeUpdate,
     onExecutionLog: (log) => {
       if (log.nodeId === id) {
-        setRealtimeLogs(prev => [...prev, {
-          level: log.level,
-          message: log.message,
-          timestamp: log.timestamp.toISOString()
-        }]);
+        setRealtimeLogs((prev) => [
+          ...prev,
+          {
+            level: log.level,
+            message: log.message,
+            timestamp: log.timestamp.toISOString(),
+          },
+        ]);
       }
     },
   });
 
+  // Schema-aware state variables
+  const [nodeSchema, setNodeSchema] = useState<NodeSchema | null>(null);
+  const [compatibilityIssues, setCompatibilityIssues] = useState<
+    CompatibilityIssue[]
+  >([]);
+  const [showSchemaInfo, setShowSchemaInfo] = useState(false);
+
   // Reset real-time state when execution changes
   useEffect(() => {
     if (data.executionId) {
-      setRealtimeStatus('pending');
+      setRealtimeStatus("pending");
       setRealtimeProgress(0);
       setRealtimeDuration(undefined);
       setRealtimeError(undefined);
@@ -125,56 +212,83 @@ export default function CustomNode({
     }
   }, [data.executionId]);
 
+  // Initialize node schema based on block type
+  useEffect(() => {
+    if (data.blockType) {
+      try {
+        const schema = getNodeSchema(data.blockType, config);
+        setNodeSchema(schema);
+      } catch (error) {
+        console.warn(`Failed to get schema for ${data.blockType}:`, error);
+        setNodeSchema(null);
+      }
+    }
+  }, [data.blockType, config]);
+
+  // Check compatibility with connected nodes (simplified version)
+  useEffect(() => {
+    if (nodeSchema && connection.inProgress) {
+      // During connection, perform basic compatibility checks
+      const issues: CompatibilityIssue[] = [];
+
+      // This is a simplified check - in a full implementation,
+      // you'd need access to the source node's schema
+      if (connection.fromNode && connection.fromNode.id !== id) {
+        // Check if we have required inputs
+        const requiredInputs = nodeSchema.input.filter(
+          (field: SchemaField) => field.required
+        );
+        if (requiredInputs.length > 0) {
+          issues.push({
+            field: "connection",
+            issue: `This node requires ${requiredInputs.length} input field(s)`,
+            severity: "info",
+            suggestion: "Ensure the source node provides the required data",
+          });
+        }
+      }
+
+      setCompatibilityIssues(issues);
+    } else {
+      setCompatibilityIssues([]);
+    }
+  }, [nodeSchema, connection, id]);
+
   // Use live node data when available
   const isUsingLiveNode = liveNode.isLive && liveNode.nodeState;
-  const effectiveStatus = isUsingLiveNode 
-    ? liveNode.nodeState?.status || 'pending'
-    : isLiveExecution && data.executionId 
-      ? realtimeStatus 
-      : (data.executionStatus || blockExecution.currentState || "idle");
-  
-  const effectiveLogs = isUsingLiveNode 
+  const effectiveStatus = isUsingLiveNode
+    ? liveNode.nodeState?.status || "pending"
+    : isLiveExecution && data.executionId
+      ? realtimeStatus
+      : data.executionStatus || blockExecution.currentState || "idle";
+
+  const effectiveLogs = isUsingLiveNode
     ? liveNode.nodeState?.logs || []
-    : isLiveExecution 
-      ? realtimeLogs 
-      : (data.logs || blockExecution.currentBlock?.logs || []);
-      
-  const effectiveProgress = isUsingLiveNode 
+    : isLiveExecution
+      ? realtimeLogs
+      : data.logs || blockExecution.currentBlock?.logs || [];
+
+  const effectiveProgress = isUsingLiveNode
     ? liveNode.nodeState?.progress
-    : isLiveExecution 
-      ? realtimeProgress 
+    : isLiveExecution
+      ? realtimeProgress
       : data.executionProgress;
-      
-  const effectiveDuration = isUsingLiveNode 
+
+  const effectiveDuration = isUsingLiveNode
     ? liveNode.nodeState?.duration
-    : isLiveExecution 
-      ? realtimeDuration 
-      : (data.executionDuration || blockExecution.currentBlock?.duration);
-      
-  const effectiveError = isUsingLiveNode 
+    : isLiveExecution
+      ? realtimeDuration
+      : data.executionDuration || blockExecution.currentBlock?.duration;
+
+  const effectiveError = isUsingLiveNode
     ? liveNode.nodeState?.error
-    : isLiveExecution 
-      ? realtimeError 
+    : isLiveExecution
+      ? realtimeError
       : data.executionError;
 
-  const isConnectedToLive = isUsingLiveNode ? liveNode.isConnected : wsConnected;
-
-  const {
-    label = data.blockType || "Node",
-    description = "",
-    isEnabled = true,
-    config = {},
-    style = {},
-  } = data;
-
-  // Use the effective values determined above
-  const status = effectiveStatus;
-  const currentLogs = effectiveLogs;
-  const currentProgress = effectiveProgress;
-  const currentDuration = effectiveDuration;
-  const currentError = effectiveError;
-
-  const icon = <Database className='w-5 h-5' />; // TODO: Map iconName to actual icons
+  const isConnectedToLive = isUsingLiveNode
+    ? liveNode.isConnected
+    : wsConnected;
 
   // Apply style configurations
   const nodeWidth = style.width || 280;
@@ -184,12 +298,12 @@ export default function CustomNode({
 
   // Enhanced Status Indicator with real-time execution data and animations
   const statusIndicator = React.useMemo(() => {
-    const logs = currentLogs;
-    const duration = currentDuration;
-    const progress = currentProgress;
-    const error = currentError;
+    const logs = effectiveLogs;
+    const duration = effectiveDuration;
+    const progress = effectiveProgress;
+    const error = effectiveError;
 
-    switch (status) {
+    switch (effectiveStatus) {
       case "pending":
         return (
           <div className='flex items-center gap-1.5 text-amber-500'>
@@ -209,12 +323,14 @@ export default function CustomNode({
               {progress && (
                 <div className='flex items-center gap-1'>
                   <div className='w-16 h-1.5 bg-blue-200 rounded-full overflow-hidden'>
-                    <div 
+                    <div
                       className='h-full bg-blue-500 transition-all duration-300 ease-out'
                       style={{ width: `${progress}%` }}
                     />
                   </div>
-                  <span className='text-xs text-blue-600'>{Math.round(progress)}%</span>
+                  <span className='text-xs text-blue-600'>
+                    {Math.round(progress)}%
+                  </span>
                 </div>
               )}
             </div>
@@ -321,7 +437,13 @@ export default function CustomNode({
           </div>
         );
     }
-  }, [status, currentLogs, currentDuration, currentProgress, currentError]);
+  }, [
+    effectiveStatus,
+    effectiveLogs,
+    effectiveDuration,
+    effectiveProgress,
+    effectiveError,
+  ]);
 
   // Live connection indicator
   const liveIndicator = React.useMemo(() => {
@@ -336,10 +458,10 @@ export default function CustomNode({
         </div>
       );
     }
-    
+
     // Fallback to legacy WebSocket indicator
     if (!data.executionId) return null;
-    
+
     if (wsConnected && isLiveExecution) {
       return (
         <div className='absolute -top-1 -right-1 flex items-center'>
@@ -356,7 +478,7 @@ export default function CustomNode({
         </div>
       );
     }
-    
+
     return null;
   }, [isUsingLiveNode, wsConnected, isLiveExecution, data.executionId]);
 
@@ -384,8 +506,24 @@ export default function CustomNode({
       );
     });
 
-  // Get accent color classes
+  // Get accent color classes with schema compatibility colors
   const getAccentColorClasses = (color: string) => {
+    // Override color based on compatibility issues
+    if (compatibilityIssues.length > 0) {
+      const hasErrors = compatibilityIssues.some(
+        (issue) => issue.severity === "error"
+      );
+      const hasWarnings = compatibilityIssues.some(
+        (issue) => issue.severity === "warning"
+      );
+
+      if (hasErrors) {
+        return "bg-red-500/10 text-red-600 border-red-500/20";
+      } else if (hasWarnings) {
+        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+      }
+    }
+
     switch (color) {
       case "blue":
         return "bg-blue-500/10 text-blue-600 border-blue-500/20";
@@ -406,6 +544,82 @@ export default function CustomNode({
     }
   };
 
+  // Schema compatibility indicator
+  const schemaIndicator = React.useMemo(() => {
+    if (!nodeSchema || compatibilityIssues.length === 0) return null;
+
+    const hasErrors = compatibilityIssues.some(
+      (issue) => issue.severity === "error"
+    );
+    const hasWarnings = compatibilityIssues.some(
+      (issue) => issue.severity === "warning"
+    );
+
+    if (hasErrors) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <AlertCircle className='w-3 h-3 text-red-500' />
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className='text-xs max-w-48'>
+                <div className='font-medium mb-1'>Schema Issues:</div>
+                {compatibilityIssues.slice(0, 3).map((issue, idx) => (
+                  <div key={idx} className='mb-1'>
+                    <div className='text-red-400'>
+                      {issue.field}: {issue.issue}
+                    </div>
+                    {issue.suggestion && (
+                      <div className='text-gray-300 text-xs'>
+                        {issue.suggestion}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    } else if (hasWarnings) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <AlertTriangle className='w-3 h-3 text-yellow-500' />
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className='text-xs max-w-48'>
+                <div className='font-medium mb-1'>Schema Warnings:</div>
+                {compatibilityIssues.slice(0, 3).map((issue, idx) => (
+                  <div key={idx} className='mb-1'>
+                    <div className='text-yellow-400'>
+                      {issue.field}: {issue.issue}
+                    </div>
+                    {issue.suggestion && (
+                      <div className='text-gray-300 text-xs'>
+                        {issue.suggestion}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return null;
+  }, [nodeSchema, compatibilityIssues]);
+
+  // Use the effective values determined above
+  const status = effectiveStatus;
+  const currentLogs = effectiveLogs;
+  const currentDuration = effectiveDuration;
+  const currentError = effectiveError;
+
   return (
     <div
       className={cn(
@@ -418,14 +632,14 @@ export default function CustomNode({
         theme === "dark" && !isTarget && "shadow-black/20",
         // Enhanced status-based styling with live execution feedback
         status === "running" &&
-          (isUsingLiveNode || isLiveExecution 
-            ? "animate-pulse border-blue-500 shadow-lg shadow-blue-500/30 ring-2 ring-blue-500/20" 
+          (isUsingLiveNode || isLiveExecution
+            ? "animate-pulse border-blue-500 shadow-lg shadow-blue-500/30 ring-2 ring-blue-500/20"
             : "animate-pulse border-blue-500 shadow-lg shadow-blue-500/30"),
         status === "completed" &&
           (isUsingLiveNode || isLiveExecution
             ? "border-green-500 shadow-lg shadow-green-500/20 ring-2 ring-green-500/20"
             : "border-green-500 shadow-lg shadow-green-500/20"),
-        status === "failed" && 
+        status === "failed" &&
           (isUsingLiveNode || isLiveExecution
             ? "border-red-500 shadow-lg shadow-red-500/20 ring-2 ring-red-500/20"
             : "border-red-500 shadow-lg shadow-red-500/20"),
@@ -438,7 +652,6 @@ export default function CustomNode({
         height: nodeHeight ? `${nodeHeight}px` : "auto",
         minHeight: nodeHeight ? `${nodeHeight}px` : undefined,
       }}>
-      
       {/* Live execution indicator */}
       {liveIndicator}
       {/* Header */}
@@ -454,13 +667,48 @@ export default function CustomNode({
               ? getAccentColorClasses(accentColor)
               : getAccentColorClasses(accentColor)
           )}>
-          {icon}
+          {/* icon is not defined in the provided code, so it's removed */}
         </div>
         <div className='flex-1 min-w-0'>
           <div className='font-bold text-sm truncate text-foreground'>
             {label}
           </div>
         </div>
+
+        {/* Schema compatibility indicator */}
+        {schemaIndicator && (
+          <div className='flex items-center gap-1'>{schemaIndicator}</div>
+        )}
+
+        {/* Schema info toggle */}
+        {nodeSchema && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* Use a span instead of a button to avoid nested <button> */}
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowSchemaInfo(!showSchemaInfo);
+                  }}
+                  className='text-muted-foreground hover:text-foreground transition-colors p-1 cursor-pointer'
+                  title='View schema details'
+                  role='button'
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      setShowSchemaInfo(!showSchemaInfo);
+                    }
+                  }}>
+                  <Settings className='w-3 h-3' />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className='text-xs'>View schema details</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
 
       {/* Body */}
@@ -471,6 +719,43 @@ export default function CustomNode({
           </p>
         )}
         <div className='space-y-1.5'>{configSummary}</div>
+
+        {/* Schema information panel */}
+        {showSchemaInfo && nodeSchema && (
+          <div className='mt-2 p-2 bg-muted/50 rounded border border-dashed'>
+            <div className='text-xs'>
+              <div className='font-medium mb-1 text-muted-foreground'>
+                Schema:
+              </div>
+              <div className='space-y-1'>
+                <div className='flex justify-between'>
+                  <span>Inputs:</span>
+                  <Badge variant='outline' className='text-xs py-0 px-1'>
+                    {nodeSchema.input.length}
+                  </Badge>
+                </div>
+                <div className='flex justify-between'>
+                  <span>Outputs:</span>
+                  <Badge variant='outline' className='text-xs py-0 px-1'>
+                    {nodeSchema.output.length}
+                  </Badge>
+                </div>
+                {nodeSchema.input.some((f: SchemaField) => f.required) && (
+                  <div className='flex justify-between text-red-600'>
+                    <span>Required:</span>
+                    <Badge variant='destructive' className='text-xs py-0 px-1'>
+                      {
+                        nodeSchema.input.filter((f: SchemaField) => f.required)
+                          .length
+                      }
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {statusIndicator && (
           <div className='pt-2 mt-2 border-t border-dashed border-border/80'>
             {statusIndicator}

@@ -21,30 +21,64 @@ export interface Workflow {
 
 // Utility: detect cycles in workflow graph
 function detectCycle(nodes: any[], edges: any[]): boolean {
+  // Early return for empty graphs
+  if (!nodes || nodes.length === 0) {
+    return false;
+  }
+
   const adj: Record<string, string[]> = {};
+
+  // Initialize adjacency list
   nodes.forEach((n) => {
     adj[n.id] = [];
   });
+
+  // Build adjacency list from edges
   edges.forEach((e) => {
     const src = (e as any).source ?? (e as any).sourceNodeId;
     const tgt = (e as any).target ?? (e as any).targetNodeId;
-    if (src && tgt && adj[src]) adj[src].push(tgt);
+    if (src && tgt && adj[src]) {
+      adj[src].push(tgt);
+    }
   });
+
   const visited: Record<string, boolean> = {};
   const recStack: Record<string, boolean> = {};
+
   function dfs(u: string): boolean {
-    if (!visited[u]) {
-      visited[u] = true;
-      recStack[u] = true;
-      for (const v of adj[u] || []) {
-        if (!visited[v] && dfs(v)) return true;
-        else if (recStack[v]) return true;
+    // Prevent infinite recursion with a maximum depth
+    if (recStack[u]) {
+      return true; // Found a cycle
+    }
+
+    if (visited[u]) {
+      return false; // Already processed this node
+    }
+
+    visited[u] = true;
+    recStack[u] = true;
+
+    // Check all adjacent nodes
+    for (const v of adj[u] || []) {
+      if (dfs(v)) {
+        return true; // Found a cycle
       }
     }
+
     recStack[u] = false;
     return false;
   }
-  return nodes.some((n) => dfs(n.id));
+
+  // Check for cycles starting from each node
+  for (const node of nodes) {
+    if (!visited[node.id]) {
+      if (dfs(node.id)) {
+        return true; // Found a cycle
+      }
+    }
+  }
+
+  return false; // No cycles found
 }
 
 class WorkflowService {

@@ -9,6 +9,10 @@ import { NotificationModule } from '../../services/notification.module';
 import { MagicModule } from '../../services/magic.module';
 import { ExecutionMonitorService } from '../../services/execution-monitor.service';
 import { MultiLevelCircuitBreakerService } from '../../services/multi-level-circuit-breaker.service';
+import { DataTransformationService } from '../../services/data-transformation.service';
+import { DataStateService } from '../../services/data-state.service';
+import { ParallelExecutionService } from '../../services/parallel-execution.service';
+import { BlockchainDataSyncService } from '../../services/blockchain-data-sync.service';
 import { BlockchainModule } from '../blockchain/BlockchainModule';
 
 @Global()
@@ -22,6 +26,10 @@ import { BlockchainModule } from '../blockchain/BlockchainModule';
     ErrorHandler,
     ExecutionMonitorService,
     MultiLevelCircuitBreakerService,
+    DataTransformationService,
+    DataStateService,
+    ParallelExecutionService,
+    BlockchainDataSyncService,
   ],
   exports: [
     WorkflowService,
@@ -31,6 +39,10 @@ import { BlockchainModule } from '../blockchain/BlockchainModule';
     ErrorHandler,
     ExecutionMonitorService,
     MultiLevelCircuitBreakerService,
+    DataTransformationService,
+    DataStateService,
+    ParallelExecutionService,
+    BlockchainDataSyncService,
   ],
 })
 export class WorkflowModule {}

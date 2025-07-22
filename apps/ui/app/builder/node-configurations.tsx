@@ -1,7 +1,7 @@
 import { BlockType } from "@/lib/types";
 import { useMemo } from "react";
 import CustomNode from "@/components/custom-node_improved";
-import CustomEdge from "@/components/custom-edge";
+import FloatingEdge from "@/components/custom-edge";
 import CustomConnectionLine from "@/components/custom-connection-line";
 import { MarkerType } from "@xyflow/react";
 
@@ -22,7 +22,8 @@ export const useNodeConfigurations = () => {
   //   }, []);
 
   const edgeTypes = {
-    floating: CustomEdge,
+    floating: FloatingEdge,
+    CUSTOM: FloatingEdge,
   };
 
   const connectionLineTypes = useMemo(() => {
@@ -35,7 +36,7 @@ export const useNodeConfigurations = () => {
   }, []);
 
   const defaultEdgeOptions = {
-    type: "floating",
+    type: "CUSTOM",
     markerEnd: {
       type: MarkerType.ArrowClosed,
       color: "#b1b1b7",

@@ -1,10 +1,16 @@
 import { ComponentType } from "react";
 import { BlockType } from "@zyra/types";
 
-// Existing block config imports
+// Core block config imports
 import { HttpRequestConfig } from "@/components/block-configs/http-request-config";
 import { NotificationConfig } from "@/components/block-configs/notification-config";
 import { CustomConfig } from "@/components/block-configs/custom-config";
+import { EmailConfig } from "@/components/block-configs/email-config";
+import { PriceMonitorConfig } from "@/components/block-configs/price-monitor-config";
+import { ScheduleConfig } from "@/components/block-configs/schedule-config";
+import { WebhookConfig } from "@/components/block-configs/webhook-config";
+import { DataTransformConfig } from "@/components/block-configs/data-transform-config";
+import WalletListenerConfig from "@/components/block-configs/wallet-listen-config";
 
 // Sei block config imports
 import SeiWalletListenerConfig from "@/components/block-configs/sei/SeiWalletListenerConfig";
@@ -51,10 +57,16 @@ class BlockConfigRegistry {
 
 const blockConfigRegistry = new BlockConfigRegistry();
 
-// Register existing block components
+// Register core block components
 blockConfigRegistry.register(BlockType.HTTP_REQUEST, HttpRequestConfig);
 blockConfigRegistry.register(BlockType.NOTIFICATION, NotificationConfig);
 blockConfigRegistry.register(BlockType.CUSTOM, CustomConfig);
+blockConfigRegistry.register(BlockType.EMAIL, EmailConfig);
+blockConfigRegistry.register(BlockType.PRICE_MONITOR, PriceMonitorConfig);
+blockConfigRegistry.register(BlockType.SCHEDULE, ScheduleConfig);
+blockConfigRegistry.register(BlockType.WEBHOOK, WebhookConfig);
+blockConfigRegistry.register(BlockType.DATA_TRANSFORM, DataTransformConfig);
+blockConfigRegistry.register(BlockType.WALLET_LISTEN, WalletListenerConfig);
 
 // Register Sei blockchain block components
 blockConfigRegistry.register(

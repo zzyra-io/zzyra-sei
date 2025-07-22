@@ -39,7 +39,11 @@ import { workflowService } from "@/lib/services/workflow-service";
 import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
 import { BlockType, CustomBlockDefinition } from "@zyra/types";
 import type { UnifiedWorkflowNode, UnifiedWorkflowEdge } from "@zyra/types";
-import { ensureValidWorkflowNode, prepareNodesForApi, prepareEdgesForApi } from "@zyra/types";
+import {
+  ensureValidWorkflowNode,
+  prepareNodesForApi,
+  prepareEdgesForApi,
+} from "@zyra/types";
 import { ArrowLeft, Loader2, Play, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -210,21 +214,28 @@ export default function BuilderPage() {
   ]);
 
   // Prepare nodes for API calls - ensures all required fields are present
-  const prepareNodesForApi = useCallback((nodes: Node[]): UnifiedWorkflowNode[] => {
-    return prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node as UnifiedWorkflowNode)));
-  }, []);
+  const prepareWorkflowNodesForApi = useCallback(
+    (nodes: Node[]): UnifiedWorkflowNode[] => {
+      return prepareNodesForApi(
+        nodes.map((node) =>
+          ensureValidWorkflowNode(node as UnifiedWorkflowNode)
+        )
+      );
+    },
+    []
+  );
 
   // Background auto-save for existing workflows only
   useEffect(() => {
     if (workflowId && initialId && hasUnsavedChanges && workflowName) {
       const autoSaveTimeoutId = setTimeout(async () => {
         try {
-          const apiNodes = prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node)));
-            await workflowService.updateWorkflow(workflowId, {
+          const apiNodes = prepareWorkflowNodesForApi(nodes);
+          await workflowService.updateWorkflow(workflowId, {
             name: workflowName,
             description: workflowDescription,
             nodes: apiNodes,
-            edges: apiEdges,
+            edges: edges, // Use edges directly as they are already prepared
             is_public: false,
           });
           setHasUnsavedChanges(false);
@@ -244,12 +255,12 @@ export default function BuilderPage() {
     workflowId,
     initialId,
     hasUnsavedChanges,
-    nodes,
-    edges,
     workflowName,
     workflowDescription,
+    nodes,
+    edges,
+    prepareWorkflowNodesForApi,
     toast,
-    prepareNodesForApi,
   ]);
 
   // Handlers using store actions
@@ -310,7 +321,7 @@ export default function BuilderPage() {
   useExecutionWebSocket({
     executionId: executionId || undefined,
     onExecutionLog: (log) => {
-      setExecutionLogs(prev => [...prev.slice(-49), log]); // Keep last 50 logs
+      setExecutionLogs((prev) => [...prev.slice(-49), log]); // Keep last 50 logs
     },
   });
 
@@ -354,7 +365,7 @@ export default function BuilderPage() {
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const apiNodes = prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node)));
+        const apiNodes = prepareWorkflowNodesForApi(nodes);
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
@@ -393,7 +404,7 @@ export default function BuilderPage() {
       setWorkflowId,
       setHasUnsavedChanges,
       setLoading,
-      prepareNodesForApi,
+      prepareWorkflowNodesForApi,
     ]
   );
 
@@ -401,13 +412,13 @@ export default function BuilderPage() {
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const apiNodes = prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node)));
+        const apiNodes = prepareWorkflowNodesForApi(nodes);
         if (workflowId && initialId) {
           await workflowService.updateWorkflow(workflowId, {
             name,
             description,
             nodes: apiNodes,
-            edges: apiEdges,
+            edges: edges, // Use edges directly as they are already prepared
             is_public: false,
             tags,
           });
@@ -439,7 +450,7 @@ export default function BuilderPage() {
       toast,
       setHasUnsavedChanges,
       setLoading,
-      prepareNodesForApi,
+      prepareWorkflowNodesForApi,
     ]
   );
 
@@ -447,7 +458,7 @@ export default function BuilderPage() {
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const apiNodes = prepareNodesForApi(nodes.map(node => ensureValidWorkflowNode(node)));
+        const apiNodes = prepareWorkflowNodesForApi(nodes);
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
@@ -487,7 +498,7 @@ export default function BuilderPage() {
       setWorkflowId,
       setHasUnsavedChanges,
       setLoading,
-      prepareNodesForApi,
+      prepareWorkflowNodesForApi,
       resetFlow,
     ]
   );
@@ -948,12 +959,12 @@ export default function BuilderPage() {
                   <div className='h-full flex flex-col gap-4 p-4'>
                     {/* Real-time Execution Metrics */}
                     <div className='flex-1'>
-                      <ExecutionMetricsPanel 
+                      <ExecutionMetricsPanel
                         metrics={executionMetrics}
                         isConnected={isRealTimeConnected}
                       />
                     </div>
-                    
+
                     {/* Execution History and Logs */}
                     <div className='flex-1'>
                       <ExecutionHistoryPanel
