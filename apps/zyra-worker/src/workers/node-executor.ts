@@ -12,7 +12,6 @@ import {
 import { BlockHandlerRegistry } from './handlers/BlockHandlerRegistry';
 import { CircuitBreakerDbService } from '../lib/blockchain/CircuitBreakerDbService';
 
-
 @Injectable()
 export class NodeExecutor {
   private readonly logger = new Logger(NodeExecutor.name);
@@ -43,11 +42,14 @@ export class NodeExecutor {
     private readonly executionLogger: ExecutionLogger,
     private readonly magicAdminService: MagicAdminService,
   ) {
-    this.circuitBreakerService = new CircuitBreakerDbService(this.databaseService);
+    this.circuitBreakerService = new CircuitBreakerDbService(
+      this.databaseService,
+    );
     // Initialize BlockHandlerRegistry with class-level logger and database service
     this.blockHandlerRegistry = new BlockHandlerRegistry(
       this.logger,
       this.databaseService,
+      this.executionLogger,
     );
     this.handlers = this.blockHandlerRegistry.getAllHandlers();
   }
@@ -195,10 +197,14 @@ export class NodeExecutor {
         node.data = blockData;
 
         // Generate circuit ID for this node type
-        const circuitId = this.circuitBreakerService.generateCircuitId('node-executor', blockType);
-        
+        const circuitId = this.circuitBreakerService.generateCircuitId(
+          'node-executor',
+          blockType,
+        );
+
         // Check if circuit breaker allows operation
-        const isAllowed = await this.circuitBreakerService.isOperationAllowed(circuitId);
+        const isAllowed =
+          await this.circuitBreakerService.isOperationAllowed(circuitId);
         if (!isAllowed) {
           throw new Error(`Circuit breaker is OPEN for ${blockType}`);
         }
@@ -208,7 +214,7 @@ export class NodeExecutor {
           handler.execute(node, ctx),
           timeoutPromise,
         ]);
-        
+
         // Record success
         await this.circuitBreakerService.recordSuccess(circuitId);
 
@@ -267,10 +273,15 @@ export class NodeExecutor {
         const blockType = node.data?.blockType || node.data?.type || node.type;
         if (blockType) {
           try {
-            const circuitId = this.circuitBreakerService.generateCircuitId('node-executor', blockType);
+            const circuitId = this.circuitBreakerService.generateCircuitId(
+              'node-executor',
+              blockType,
+            );
             await this.circuitBreakerService.recordFailure(circuitId);
           } catch (cbError) {
-            this.logger.warn(`Failed to record circuit breaker failure: ${cbError instanceof Error ? cbError.message : String(cbError)}`);
+            this.logger.warn(
+              `Failed to record circuit breaker failure: ${cbError instanceof Error ? cbError.message : String(cbError)}`,
+            );
           }
         }
 

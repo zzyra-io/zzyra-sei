@@ -21,6 +21,7 @@ import { DataTransformHandler } from './DataTransformHandler';
 // Import enhanced block system
 import { EnhancedBlockRegistry } from './enhanced/EnhancedBlockRegistry';
 import { ZyraTemplateProcessor } from '../../utils/template-processor';
+import { ExecutionLogger } from '../execution-logger';
 
 /**
  * Central registry for all block handlers.
@@ -37,12 +38,14 @@ export class BlockHandlerRegistry {
   constructor(
     private readonly logger: Logger,
     private readonly databaseService: DatabaseService,
+    private readonly executionLogger: ExecutionLogger,
   ) {
     // Initialize enhanced block system
     const templateProcessor = new ZyraTemplateProcessor();
     this.enhancedRegistry = new EnhancedBlockRegistry(
       templateProcessor,
       this.databaseService,
+      this.executionLogger,
     );
 
     this.handlers = {

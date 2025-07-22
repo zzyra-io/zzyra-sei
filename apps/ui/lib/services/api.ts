@@ -22,15 +22,15 @@ export interface WorkflowExecution {
 }
 
 export interface NodeExecution {
+  id: string;
+  execution_id: string;
   node_id: string;
-  node_type: string;
-  config: Record<string, unknown>;
   status: string;
   started_at: string | null;
   completed_at: string | null;
-  output_data: Record<string, unknown>;
   error: string | null;
-  logs: NodeLog[];
+  input_data: Record<string, unknown>;
+  output_data: Record<string, unknown>;
 }
 
 export interface NodeLog {
@@ -205,7 +205,13 @@ export const executionsApi = {
     });
 
     const response = await api.get(`/executions?${params.toString()}`);
-    return response.data;
+    // Transform the response to match PaginatedResponse interface
+    return {
+      data: response.data.executions || [],
+      total: response.data.total || 0,
+      page: Math.floor(offset / limit) + 1,
+      limit: limit,
+    };
   },
 
   /**
@@ -226,6 +232,19 @@ export const executionsApi = {
       `/executions/node-logs?nodeExecutionId=${nodeExecutionId}`
     );
     return response.data.logs;
+  },
+
+  /**
+   * Get logs for a node by executionId and nodeId
+   */
+  async getNodeLogsByNode(
+    executionId: string,
+    nodeId: string
+  ): Promise<NodeLog[]> {
+    const response = await api.get(
+      `/executions/node-logs-by-node?executionId=${executionId}&nodeId=${nodeId}`
+    );
+    return response.data.logs as NodeLog[];
   },
 
   /**
@@ -254,6 +273,14 @@ export const executionsApi = {
    */
   async resumeExecution(executionId: string, nodeId?: string): Promise<void> {
     await api.post(`/executions/${executionId}/resume`, { nodeId });
+  },
+
+  /**
+   * Get complete execution data with logs and nodes
+   */
+  async getCompleteExecution(executionId: string): Promise<any> {
+    const response = await api.get(`/executions/${executionId}/complete`);
+    return response.data;
   },
 };
 
@@ -314,12 +341,12 @@ export const authApi = {
 };
 
 export const usageApi = {
-  async getUsage(): Promise<any> {
+  async getUsage(): Promise<Record<string, unknown>> {
     const response = await api.get("/usage");
     return response.data;
   },
 
-  async getUserUsage(): Promise<any> {
+  async getUserUsage(): Promise<Record<string, unknown>> {
     const response = await api.get("/user/usage");
     return response.data;
   },

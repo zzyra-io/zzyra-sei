@@ -53,14 +53,12 @@ export class ExecutionLogger {
     data?: any,
   ): Promise<void> {
     try {
-      await this.databaseService.executions.addLog(
+      await this.databaseService.executions.addNodeLog(
         executionId,
+        nodeId,
         level,
         message,
-        {
-          node_id: nodeId,
-          ...data,
-        },
+        data,
       );
     } catch (err) {
       this.logger.warn(
@@ -83,6 +81,7 @@ export class ExecutionLogger {
         this.logNodeEvent(executionId, nodeId, 'warn', message, data),
       debug: (message: string, data?: any) => {
         this.logger.debug(message);
+        // Map debug to info since LogLevel enum doesn't support debug
         return this.logNodeEvent(executionId, nodeId, 'info', message, data);
       },
     };

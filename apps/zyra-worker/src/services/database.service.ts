@@ -13,6 +13,7 @@ import {
   createExtendedPrismaClient,
   DatabaseCacheProvider,
   DatabaseRateLimitStore,
+  WorkflowStatus,
 } from '@zyra/database';
 
 interface WorkerMetrics {
@@ -186,8 +187,33 @@ export class DatabaseService {
     output?: any,
   ): Promise<any> {
     return this.executeWithRetry('updateExecutionStatus', async () => {
+      // Validate and convert status to WorkflowStatus enum
+      let workflowStatus: WorkflowStatus;
+      switch (status) {
+        case 'pending':
+          workflowStatus = WorkflowStatus.pending;
+          break;
+        case 'running':
+          workflowStatus = WorkflowStatus.running;
+          break;
+        case 'completed':
+          workflowStatus = WorkflowStatus.completed;
+          break;
+        case 'failed':
+          workflowStatus = WorkflowStatus.failed;
+          break;
+        case 'paused':
+          workflowStatus = WorkflowStatus.paused;
+          break;
+        default:
+          this.logger.warn(
+            `Invalid status "${status}", defaulting to "pending"`,
+          );
+          workflowStatus = WorkflowStatus.pending;
+      }
+
       const updateData: any = {
-        status,
+        status: workflowStatus,
         updatedAt: new Date(),
       };
 

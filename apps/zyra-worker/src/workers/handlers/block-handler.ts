@@ -75,12 +75,12 @@ export abstract class BaseBlockHandler implements BlockHandler {
     metadata?: any,
   ): Promise<void> {
     try {
-      await this.databaseService.executions.addLog(
+      await this.databaseService.executions.addNodeLog(
         executionId,
+        nodeId,
         level,
         message,
         {
-          nodeId,
           timestamp: new Date().toISOString(),
           ...(metadata && { metadata }),
         },

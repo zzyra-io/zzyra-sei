@@ -49,6 +49,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import type { Node, Edge } from "@xyflow/react";
+import { logsService } from "@/lib/services/logs-service";
 
 // Simplified save state interface
 interface SaveState {
@@ -324,6 +325,40 @@ export default function BuilderPage() {
       setExecutionLogs((prev) => [...prev.slice(-49), log]); // Keep last 50 logs
     },
   });
+
+  // Fallback: Fetch logs from API when WebSocket fails or execution is completed
+  useEffect(() => {
+    const fetchLogsFromAPI = async () => {
+      if (!executionId) return;
+
+      try {
+        // Use the unified logs service
+        const executionLogs =
+          await logsService.getExecutionLevelLogs(executionId);
+
+        // Transform execution logs to ExecutionLog format
+        const logs = executionLogs.map((log) => ({
+          id: log.id,
+          timestamp: new Date(log.timestamp),
+          level: log.level as "info" | "warn" | "error" | "debug",
+          message: log.message,
+          nodeId: log.node_id,
+          metadata: log.data,
+        }));
+
+        // Only update if we have logs and current logs are empty (WebSocket failed)
+        if (logs.length > 0 && executionLogs.length === 0) {
+          setExecutionLogs(logs);
+        }
+      } catch (error) {
+        console.error("Failed to fetch logs from API:", error);
+      }
+    };
+
+    // Fetch logs after a delay to allow WebSocket to connect first
+    const timer = setTimeout(fetchLogsFromAPI, 2000);
+    return () => clearTimeout(timer);
+  }, [executionId]);
 
   // Reset logs when starting a new execution
   useEffect(() => {

@@ -11,6 +11,7 @@ import {
   NodeExecution,
   ExecutionLog,
   WorkflowStatus,
+  NodeLog,
 } from "@prisma/client";
 import { BaseRepository } from "./base.repository";
 
@@ -182,6 +183,85 @@ export class ExecutionRepository extends BaseRepository<
         message,
         metadata: metadata || {},
         timestamp: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Add a log to a specific node execution
+   * @param executionId The execution ID
+   * @param nodeId The node ID
+   * @param level The log level
+   * @param message The log message
+   * @param metadata Optional metadata
+   * @returns The created node log
+   */
+  async addNodeLog(
+    executionId: string,
+    nodeId: string,
+    level: "info" | "error" | "warn",
+    message: string,
+    metadata?: any
+  ): Promise<NodeLog> {
+    // First, find the node execution
+    let nodeExecution = await this.prisma.nodeExecution.findUnique({
+      where: {
+        executionId_nodeId: {
+          executionId,
+          nodeId,
+        },
+      },
+    });
+
+    if (!nodeExecution) {
+      // CRITICAL FIX: Create node execution record if it doesn't exist
+      // This can happen when logs are created before the node execution record
+      try {
+        nodeExecution = await this.prisma.nodeExecution.create({
+          data: {
+            execution: {
+              connect: { id: executionId },
+            },
+            nodeId,
+            status: "pending",
+            startedAt: new Date(),
+          },
+        });
+      } catch (createError) {
+        throw new Error(
+          `Failed to create node execution for execution ${executionId} and node ${nodeId}: ${createError instanceof Error ? createError.message : String(createError)}`
+        );
+      }
+    }
+
+    return this.prisma.nodeLog.create({
+      data: {
+        nodeExecution: {
+          connect: { id: nodeExecution.id },
+        },
+        level,
+        message,
+        metadata: metadata || {},
+      },
+    });
+  }
+
+  /**
+   * Find node execution by execution ID and node ID
+   * @param executionId The execution ID
+   * @param nodeId The node ID
+   * @returns The node execution or null if not found
+   */
+  async findNodeExecutionByExecutionAndNode(
+    executionId: string,
+    nodeId: string
+  ): Promise<NodeExecution | null> {
+    return this.prisma.nodeExecution.findUnique({
+      where: {
+        executionId_nodeId: {
+          executionId,
+          nodeId,
+        },
       },
     });
   }

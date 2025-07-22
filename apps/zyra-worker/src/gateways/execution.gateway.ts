@@ -12,6 +12,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Server, Socket } from 'socket.io';
 import { DatabaseService } from '../services/database.service';
+import { ExecutionMonitorService } from '../services/execution-monitor.service';
 
 @WebSocketGateway({
   cors: {
@@ -24,7 +25,6 @@ import { DatabaseService } from '../services/database.service';
   namespace: '/execution',
   pingTimeout: 20000,
   pingInterval: 10000,
-  port: process.env.WS_PORT || 3007,
 })
 export class ExecutionGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -36,6 +36,7 @@ export class ExecutionGateway
   constructor(
     private readonly configService: ConfigService,
     private readonly databaseService: DatabaseService,
+    private readonly executionMonitorService: ExecutionMonitorService,
   ) {
     this.logger = new Logger('ExecutionGateway');
     this.executionSubscriptions = new Map();
@@ -51,9 +52,12 @@ export class ExecutionGateway
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Execution client disconnected: ${client.id}`);
-    
+
     // Remove client from all execution subscriptions
-    for (const [executionId, socketIds] of this.executionSubscriptions.entries()) {
+    for (const [
+      executionId,
+      socketIds,
+    ] of this.executionSubscriptions.entries()) {
       socketIds.delete(client.id);
       if (socketIds.size === 0) {
         this.executionSubscriptions.delete(executionId);
@@ -62,12 +66,14 @@ export class ExecutionGateway
   }
 
   @SubscribeMessage('subscribe_execution')
-  handleSubscribeExecution(
+  async handleSubscribeExecution(
     @MessageBody() data: { executionId: string },
     @ConnectedSocket() client: Socket,
   ) {
     const { executionId } = data;
-    this.logger.log(`Client ${client.id} subscribing to execution ${executionId}`);
+    this.logger.log(
+      `Client ${client.id} subscribing to execution ${executionId}`,
+    );
 
     if (!this.executionSubscriptions.has(executionId)) {
       this.executionSubscriptions.set(executionId, new Set());
@@ -76,6 +82,23 @@ export class ExecutionGateway
 
     // Join execution-specific room
     client.join(`execution:${executionId}`);
+
+    // Get current execution status and send to client
+    try {
+      const status =
+        await this.executionMonitorService.getExecutionStatus(executionId);
+      if (status) {
+        client.emit('execution_status', status);
+      } else {
+        client.emit('error', { message: `Execution ${executionId} not found` });
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to get execution status for ${executionId}:`,
+        error,
+      );
+      client.emit('error', { message: 'Failed to get execution status' });
+    }
   }
 
   @SubscribeMessage('unsubscribe_execution')
@@ -84,7 +107,9 @@ export class ExecutionGateway
     @ConnectedSocket() client: Socket,
   ) {
     const { executionId } = data;
-    this.logger.log(`Client ${client.id} unsubscribing from execution ${executionId}`);
+    this.logger.log(
+      `Client ${client.id} unsubscribing from execution ${executionId}`,
+    );
 
     if (this.executionSubscriptions.has(executionId)) {
       this.executionSubscriptions.get(executionId).delete(client.id);
@@ -97,17 +122,23 @@ export class ExecutionGateway
     client.leave(`execution:${executionId}`);
   }
 
-  // Methods to emit execution events
-  emitNodeUpdate(executionId: string, nodeUpdate: any) {
-    this.server.to(`execution:${executionId}`).emit('node_update', nodeUpdate);
+  // Methods to emit execution events from ExecutionMonitorService
+  emitExecutionStarted(executionId: string, status: any) {
+    this.server
+      .to(`execution:${executionId}`)
+      .emit('execution_started', status);
   }
 
-  emitEdgeFlow(executionId: string, edgeFlow: any) {
-    this.server.to(`execution:${executionId}`).emit('edge_flow', edgeFlow);
+  emitNodeExecutionUpdate(executionId: string, update: any) {
+    this.server
+      .to(`execution:${executionId}`)
+      .emit('node_execution_update', update);
   }
 
-  emitExecutionComplete(executionId: string, result: any) {
-    this.server.to(`execution:${executionId}`).emit('execution_complete', result);
+  emitExecutionCompleted(executionId: string, result: any) {
+    this.server
+      .to(`execution:${executionId}`)
+      .emit('execution_completed', result);
   }
 
   emitExecutionFailed(executionId: string, error: any) {
@@ -118,7 +149,13 @@ export class ExecutionGateway
     this.server.to(`execution:${executionId}`).emit('execution_log', log);
   }
 
-  emitMetricsUpdate(executionId: string, metrics: any) {
-    this.server.to(`execution:${executionId}`).emit('metrics_update', metrics);
+  emitExecutionMetrics(executionId: string, metrics: any) {
+    this.server
+      .to(`execution:${executionId}`)
+      .emit('execution_metrics', metrics);
+  }
+
+  emitEdgeFlow(executionId: string, edgeFlow: any) {
+    this.server.to(`execution:${executionId}`).emit('edge_flow', edgeFlow);
   }
 }

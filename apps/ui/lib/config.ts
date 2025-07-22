@@ -12,6 +12,9 @@ interface EnvVars {
   // Blockchain Network
   blockchainNetwork: string;
 
+  // Worker URL for WebSocket connections
+  workerUrl: string;
+
   // Concurrency settings
   concurrency: {
     prefetch: number;
@@ -25,6 +28,9 @@ export const config: EnvVars = {
 
   // Blockchain Network
   blockchainNetwork: process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || "84532",
+
+  // Worker URL for WebSocket connections
+  workerUrl: process.env.NEXT_PUBLIC_WORKER_URL || "ws://localhost:3005",
 
   // Concurrency settings
   concurrency: {

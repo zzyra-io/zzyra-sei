@@ -95,6 +95,21 @@ export class ExecutionRepository {
     });
   }
 
+  async findNodeLogsByExecutionAndNode(
+    executionId: string,
+    nodeId: string
+  ): Promise<NodeLog[]> {
+    return this.prisma.client.nodeLog.findMany({
+      where: {
+        nodeExecution: {
+          executionId,
+          nodeId,
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
   async updateExecutionStatus(
     id: string,
     status: WorkflowStatus,
@@ -156,6 +171,9 @@ export class ExecutionRepository {
             nodeInputs: true,
             nodeOutputs: true,
           },
+        },
+        executionLogs: {
+          orderBy: { timestamp: "asc" },
         },
         workflow: {
           select: {

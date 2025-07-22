@@ -260,6 +260,43 @@ export class ExecutionsController {
     }
   }
 
+  @Get("node-logs-by-node")
+  @ApiOperation({ summary: "Get logs for a node by executionId and nodeId" })
+  @ApiQuery({
+    name: "executionId",
+    required: true,
+    description: "ID of the workflow execution",
+  })
+  @ApiQuery({
+    name: "nodeId",
+    required: true,
+    description: "ID of the node",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Returns node logs",
+    type: [NodeLogDto],
+  })
+  async getNodeLogsByNode(
+    @Query("executionId") executionId: string,
+    @Query("nodeId") nodeId: string
+  ): Promise<{ logs: any[] }> {
+    try {
+      const logs = await this.nodeLogsService.findByExecutionAndNode(
+        executionId,
+        nodeId
+      );
+      return { logs };
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new HttpException(
+        `Failed to get node logs: ${errorMessage}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   @Get(":id")
   @ApiOperation({ summary: "Get execution by ID" })
   @ApiParam({ name: "id", description: "ID of the execution" })
@@ -275,6 +312,53 @@ export class ExecutionsController {
   ): Promise<any> {
     try {
       return await this.executionsService.findOne(id, req.user.id);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new HttpException(
+        `Failed to get execution: ${errorMessage}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get(":id/complete")
+  @ApiOperation({ summary: "Get complete execution data with logs and nodes" })
+  @ApiParam({ name: "id", description: "ID of the execution" })
+  @ApiResponse({
+    status: 200,
+    description: "Returns complete execution data",
+  })
+  @ApiResponse({ status: 404, description: "Execution not found" })
+  async getCompleteExecution(
+    @Request() req: { user: { id: string } },
+    @Param("id") id: string
+  ): Promise<any> {
+    try {
+      return await this.executionsService.findOneComplete(id, req.user.id);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new HttpException(
+        `Failed to get execution: ${errorMessage}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get("public/:id")
+  @ApiOperation({ summary: "Get execution by ID (public)" })
+  @ApiParam({ name: "id", description: "ID of the execution" })
+  @ApiResponse({
+    status: 200,
+    description: "Returns execution details",
+    type: WorkflowExecutionDto,
+  })
+  @ApiResponse({ status: 404, description: "Execution not found" })
+  async getExecutionPublic(@Param("id") id: string): Promise<any> {
+    try {
+      // For development, allow public access to execution data
+      return await this.executionsService.findOnePublic(id);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";

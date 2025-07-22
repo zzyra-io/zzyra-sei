@@ -419,6 +419,36 @@ export class WorkflowExecutor {
         )}`,
       );
 
+      // Ensure node_executions row exists for every node before execution
+      await Promise.all(
+        sortedNodes.map(async (node) => {
+          try {
+            await this.databaseService.prisma.nodeExecution.upsert({
+              where: {
+                executionId_nodeId: {
+                  executionId,
+                  nodeId: node.id,
+                },
+              },
+              create: {
+                executionId,
+                nodeId: node.id,
+                status: 'pending',
+                startedAt: new Date(),
+                completedAt: new Date(),
+              },
+              update: {
+                // No-op update, just ensure it exists
+              },
+            });
+          } catch (error) {
+            this.logger.error(
+              `Error upserting node_execution for node ${node.id}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        }),
+      );
+
       // Build dependency map for nodes
       const dependencyMap = this.buildNodeDependencyMap(nodes, edges);
 
@@ -475,6 +505,10 @@ export class WorkflowExecutor {
 
       // Execute each node in order
       for (const node of sortedNodes) {
+        this.logger.log(
+          `Processing node ${node.id} (shouldExecute: ${shouldExecute})`,
+        );
+
         // Check if we need to start executing from this node
         if (!shouldExecute) {
           if (node.id === resumeFromNodeId) {
@@ -494,6 +528,8 @@ export class WorkflowExecutor {
             continue;
           }
         }
+
+        this.logger.log(`Starting execution of node ${node.id}`);
 
         // Add to active executions set for tracking
         activeNodeExecutions.add(node.id);
@@ -515,7 +551,7 @@ export class WorkflowExecutor {
         // Save intermediate data state
         await this.dataStateService.saveDataState(
           executionId,
-          `${node.id}_input`,
+          node.id,
           transformedOutputs,
           { tags: ['input', 'intermediate'] },
         );
@@ -550,6 +586,20 @@ export class WorkflowExecutor {
             },
           });
 
+          // Update node_executions status to running
+          await this.databaseService.prisma.nodeExecution.update({
+            where: {
+              executionId_nodeId: {
+                executionId,
+                nodeId: node.id,
+              },
+            },
+            data: {
+              status: 'running',
+              startedAt: startTime,
+            },
+          });
+
           // Send real-time update: node execution started
           await this.executionMonitorService.updateNodeExecution({
             executionId,
@@ -562,6 +612,10 @@ export class WorkflowExecutor {
 
           // Execute the node with enhanced data validation
           try {
+            this.logger.log(
+              `About to execute node ${node.id} with NodeExecutor`,
+            );
+
             // Validate input data before execution
             const inputValidationResult = await this.validateNodeInputData(
               node,
@@ -575,12 +629,21 @@ export class WorkflowExecutor {
               );
             }
 
+            this.logger.log(
+              `Input validation passed for node ${node.id}, executing...`,
+            );
+
             // Execute the node
             const nodeOutput = await this.nodeExecutor.executeNode(
               node,
               executionId,
               userId,
               transformedOutputs,
+            );
+
+            this.logger.log(
+              `Node ${node.id} executed successfully, output:`,
+              nodeOutput,
             );
 
             // Validate output data after execution
@@ -591,21 +654,26 @@ export class WorkflowExecutor {
             );
 
             if (!outputValidationResult.isValid) {
-              this.logger.warn(
-                `Output validation warnings for node ${node.id}: ${outputValidationResult.errors.join(', ')}`,
+              this.logger.error(
+                `Output validation failed for node ${node.id}: ${outputValidationResult.errors.join(', ')}`,
                 { executionId, nodeId: node.id },
               );
 
-              // Log validation warnings but don't fail execution
+              // Log validation errors and FAIL the execution
               await this.executionLogger.logExecutionEvent(executionId, {
-                level: 'warn',
-                message: `Output validation warnings for node ${node.id}`,
+                level: 'error',
+                message: `Output validation failed for node ${node.id}`,
                 node_id: node.id,
                 data: {
                   validation_errors: outputValidationResult.errors,
                   output_data: nodeOutput,
                 },
               });
+
+              // CRITICAL FIX: Fail the workflow when output validation fails
+              throw new Error(
+                `Output validation failed for node ${node.id}: ${outputValidationResult.errors.join(', ')}`,
+              );
             }
 
             outputs[node.id] = nodeOutput;
@@ -629,6 +697,24 @@ export class WorkflowExecutor {
                 status: 'failed',
                 endTime: endTime,
                 output: null,
+              },
+            });
+
+            // Update node_executions status to failed
+            await this.databaseService.prisma.nodeExecution.update({
+              where: {
+                executionId_nodeId: {
+                  executionId,
+                  nodeId: node.id,
+                },
+              },
+              data: {
+                status: 'failed',
+                completedAt: endTime,
+                error:
+                  nodeError instanceof Error
+                    ? nodeError.message
+                    : String(nodeError),
               },
             });
 
@@ -664,6 +750,21 @@ export class WorkflowExecutor {
             },
           });
 
+          // Update node_executions status to completed
+          await this.databaseService.prisma.nodeExecution.update({
+            where: {
+              executionId_nodeId: {
+                executionId,
+                nodeId: node.id,
+              },
+            },
+            data: {
+              status: 'completed',
+              completedAt: endTime,
+              outputData: outputs[node.id],
+            },
+          });
+
           // Send real-time update: node execution completed
           await this.executionMonitorService.updateNodeExecution({
             executionId,
@@ -691,6 +792,11 @@ export class WorkflowExecutor {
             `[executionId=${executionId}] Error executing node ${node.id}: ${nodeError.message || 'Unknown error'}`,
           );
 
+          this.logger.error(
+            `[executionId=${executionId}] Node ${node.id} execution failed with error:`,
+            nodeError,
+          );
+
           // Clean up any active node executions
           await this.cleanupActiveNodeExecutions(
             executionId,
@@ -698,7 +804,9 @@ export class WorkflowExecutor {
             nodeError.message,
           );
 
-          throw nodeError;
+          // CRITICAL FIX: Stop workflow execution immediately when a node fails
+          // Don't continue to next nodes - halt the entire workflow
+          throw nodeError; // This will be caught by the outer try-catch and fail the workflow
         }
       }
 
@@ -881,6 +989,11 @@ export class WorkflowExecutor {
       const enhancedSchema = getEnhancedBlockSchema(blockType as BlockType);
 
       if (enhancedSchema) {
+        // Get execution details to get userId
+        const execution =
+          await this.databaseService.executions.findById(executionId);
+        const userId = execution?.userId || 'unknown';
+
         // Validate input data against schema
         try {
           enhancedSchema.inputSchema.parse({
@@ -888,7 +1001,7 @@ export class WorkflowExecutor {
             context: {
               workflowId: executionId,
               executionId,
-              nodeId,
+              userId,
               timestamp: new Date().toISOString(),
             },
           });

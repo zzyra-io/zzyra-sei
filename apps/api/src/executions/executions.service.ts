@@ -7,22 +7,254 @@ export class ExecutionsService {
   constructor(private readonly executionRepository: ExecutionRepository) {}
 
   async findAll(userId: string, limit = 10): Promise<any[]> {
-    return this.executionRepository.findByUserId(userId, limit);
+    const executions = await this.executionRepository.findByUserId(
+      userId,
+      limit
+    );
+
+    // For each execution, fetch complete data including logs and nodes
+    const executionsWithData = await Promise.all(
+      executions.map(async (execution: any) => {
+        try {
+          const completeExecution =
+            await this.executionRepository.findWithNodesAndLogs(execution.id);
+          if (completeExecution) {
+            return {
+              ...execution,
+              logs: completeExecution.executionLogs || [],
+              nodeExecutions: completeExecution.nodeExecutions || [],
+              executionLogs: completeExecution.executionLogs || [],
+              nodeInputs:
+                completeExecution.nodeExecutions?.reduce(
+                  (acc: any, nodeExec: any) => {
+                    if (nodeExec.nodeInputs && nodeExec.nodeInputs.length > 0) {
+                      acc[nodeExec.nodeId] = nodeExec.nodeInputs.map(
+                        (input: any) => ({
+                          id: input.id,
+                          input_data: input.inputData,
+                          created_at: input.createdAt,
+                        })
+                      );
+                    }
+                    return acc;
+                  },
+                  {}
+                ) || {},
+              nodeOutputs:
+                completeExecution.nodeExecutions?.reduce(
+                  (acc: any, nodeExec: any) => {
+                    if (
+                      nodeExec.nodeOutputs &&
+                      nodeExec.nodeOutputs.length > 0
+                    ) {
+                      acc[nodeExec.nodeId] = nodeExec.nodeOutputs.map(
+                        (output: any) => ({
+                          id: output.id,
+                          output_data: output.outputData,
+                          created_at: output.createdAt,
+                        })
+                      );
+                    }
+                    return acc;
+                  },
+                  {}
+                ) || {},
+            };
+          }
+          return execution;
+        } catch (error) {
+          console.error(
+            `Failed to fetch complete data for execution ${execution.id}:`,
+            error
+          );
+          return execution;
+        }
+      })
+    );
+
+    return executionsWithData;
   }
 
-  async findOne(id: string, userId?: string) {
-    const execution = await this.executionRepository.findWithNodesAndLogs(id);
+  async findOne(id: string, userId?: string): Promise<any> {
+    try {
+      const execution = await this.executionRepository.findWithNodesAndLogs(id);
 
-    if (!execution) {
-      throw new NotFoundException(`Execution with ID ${id} not found`);
+      if (!execution) {
+        throw new Error("Execution not found");
+      }
+
+      // Check if user has access to this execution (if userId provided)
+      if (userId && execution.userId !== userId) {
+        throw new Error("Access denied");
+      }
+
+      return execution;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new Error(`Failed to get execution: ${errorMessage}`);
     }
+  }
 
-    // Check access permissions - if userId is provided, verify ownership
-    if (userId && execution.userId !== userId) {
-      throw new NotFoundException(`Execution with ID ${id} not found`);
+  async findOnePublic(id: string): Promise<any> {
+    try {
+      const execution = await this.executionRepository.findWithNodesAndLogs(id);
+
+      if (!execution) {
+        throw new Error("Execution not found");
+      }
+
+      // The findWithNodesAndLogs method already includes all the data we need
+      // Transform the data to match the expected format
+      const transformedExecution = {
+        ...execution,
+        nodeExecutions:
+          execution.nodeExecutions?.map((nodeExec: any) => ({
+            id: nodeExec.id,
+            execution_id: nodeExec.executionId,
+            node_id: nodeExec.nodeId,
+            status: nodeExec.status,
+            started_at: nodeExec.startedAt,
+            completed_at: nodeExec.completedAt,
+            finished_at: nodeExec.finishedAt,
+            error: nodeExec.error,
+            output_data: nodeExec.outputData,
+            duration_ms: nodeExec.durationMs,
+            retry_count: nodeExec.retryCount,
+            logs:
+              nodeExec.logs?.map((log: any) => ({
+                id: log.id,
+                nodeExecutionId: log.nodeExecutionId,
+                level: log.level,
+                message: log.message,
+                metadata: log.metadata,
+                timestamp: log.createdAt,
+              })) || [],
+          })) || [],
+        executionLogs:
+          execution.executionLogs?.map((log: any) => ({
+            id: log.id,
+            execution_id: log.executionId,
+            level: log.level,
+            message: log.message,
+            timestamp: log.timestamp,
+            metadata: log.metadata,
+          })) || [],
+        nodeInputs:
+          execution.nodeExecutions?.reduce((acc: any, nodeExec: any) => {
+            if (nodeExec.nodeInputs && nodeExec.nodeInputs.length > 0) {
+              acc[nodeExec.nodeId] = nodeExec.nodeInputs.map((input: any) => ({
+                id: input.id,
+                input_data: input.inputData,
+                created_at: input.createdAt,
+              }));
+            }
+            return acc;
+          }, {}) || {},
+        nodeOutputs:
+          execution.nodeExecutions?.reduce((acc: any, nodeExec: any) => {
+            if (nodeExec.nodeOutputs && nodeExec.nodeOutputs.length > 0) {
+              acc[nodeExec.nodeId] = nodeExec.nodeOutputs.map(
+                (output: any) => ({
+                  id: output.id,
+                  output_data: output.outputData,
+                  created_at: output.createdAt,
+                })
+              );
+            }
+            return acc;
+          }, {}) || {},
+      };
+
+      return transformedExecution;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new Error(`Failed to get execution: ${errorMessage}`);
     }
+  }
 
-    return execution;
+  async findOneComplete(id: string, userId?: string): Promise<any> {
+    try {
+      const execution = await this.executionRepository.findWithNodesAndLogs(id);
+
+      if (!execution) {
+        throw new Error("Execution not found");
+      }
+
+      // Check if user has access to this execution (if userId provided)
+      if (userId && execution.userId !== userId) {
+        throw new Error("Access denied");
+      }
+
+      // The findWithNodesAndLogs method already includes all the data we need
+      // Transform the data to match the expected format
+      const transformedExecution = {
+        ...execution,
+        nodeExecutions:
+          execution.nodeExecutions?.map((nodeExec: any) => ({
+            id: nodeExec.id,
+            execution_id: nodeExec.executionId,
+            node_id: nodeExec.nodeId,
+            status: nodeExec.status,
+            started_at: nodeExec.startedAt,
+            completed_at: nodeExec.completedAt,
+            finished_at: nodeExec.finishedAt,
+            error: nodeExec.error,
+            output_data: nodeExec.outputData,
+            duration_ms: nodeExec.durationMs,
+            retry_count: nodeExec.retryCount,
+            logs:
+              nodeExec.logs?.map((log: any) => ({
+                id: log.id,
+                nodeExecutionId: log.nodeExecutionId,
+                level: log.level,
+                message: log.message,
+                metadata: log.metadata,
+                timestamp: log.createdAt,
+              })) || [],
+          })) || [],
+        executionLogs:
+          execution.executionLogs?.map((log: any) => ({
+            id: log.id,
+            execution_id: log.executionId,
+            level: log.level,
+            message: log.message,
+            timestamp: log.timestamp,
+            metadata: log.metadata,
+          })) || [],
+        nodeInputs:
+          execution.nodeExecutions?.reduce((acc: any, nodeExec: any) => {
+            if (nodeExec.nodeInputs && nodeExec.nodeInputs.length > 0) {
+              acc[nodeExec.nodeId] = nodeExec.nodeInputs.map((input: any) => ({
+                id: input.id,
+                input_data: input.inputData,
+                created_at: input.createdAt,
+              }));
+            }
+            return acc;
+          }, {}) || {},
+        nodeOutputs:
+          execution.nodeExecutions?.reduce((acc: any, nodeExec: any) => {
+            if (nodeExec.nodeOutputs && nodeExec.nodeOutputs.length > 0) {
+              acc[nodeExec.nodeId] = nodeExec.nodeOutputs.map(
+                (output: any) => ({
+                  id: output.id,
+                  output_data: output.outputData,
+                  created_at: output.createdAt,
+                })
+              );
+            }
+            return acc;
+          }, {}) || {},
+      };
+
+      return transformedExecution;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      throw new Error(`Failed to get execution: ${errorMessage}`);
+    }
   }
 
   async create(

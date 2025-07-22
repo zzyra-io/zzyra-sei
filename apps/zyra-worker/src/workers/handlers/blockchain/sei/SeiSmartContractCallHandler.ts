@@ -27,11 +27,15 @@ export class SeiSmartContractCallHandler {
 
   async execute(node: any, ctx: BlockExecutionContext): Promise<any> {
     const startTime = Date.now();
-    
+
     try {
       const config = this.validateAndExtractConfig(node, ctx);
-      const inputs = this.validateInputs(ctx.inputs || {}, ctx.previousOutputs || {});
-      
+      const inputs = this.validateInputs(
+        ctx.inputs || {},
+        ctx.previousOutputs || {},
+        ctx,
+      );
+
       if (!ctx.userId) {
         throw new Error('User ID is required for contract execution');
       }
@@ -40,15 +44,21 @@ export class SeiSmartContractCallHandler {
       const walletService = this.getWalletService(config.network);
 
       // Build transaction object
-      const transaction = await this.buildContractTransaction(config, inputs, client, ctx.userId);
-      
+      const transaction = await this.buildContractTransaction(
+        config,
+        inputs,
+        client,
+        ctx.userId,
+      );
+
       // Validate transaction
       walletService.validateTransaction(transaction);
 
       // Check user balance
       const hasBalance = await walletService.checkSufficientBalance(
         ctx.userId,
-        BigInt(transaction.value || 0) + BigInt(transaction.gasLimit || 0) * BigInt(transaction.gasPrice || 0)
+        BigInt(transaction.value || 0) +
+          BigInt(transaction.gasLimit || 0) * BigInt(transaction.gasPrice || 0),
       );
 
       if (!hasBalance) {
@@ -59,7 +69,7 @@ export class SeiSmartContractCallHandler {
       const result = await walletService.delegateTransaction(
         ctx.userId,
         transaction,
-        config.network
+        config.network,
       );
 
       // Wait for confirmation if configured
@@ -67,12 +77,16 @@ export class SeiSmartContractCallHandler {
       if (config.waitForConfirmation && result.txHash) {
         receipt = await walletService.waitForTransactionConfirmation(
           result.txHash,
-          config.confirmationTimeout
+          config.confirmationTimeout,
         );
       }
 
       // Log successful execution
-      await walletService.logTransactionAttempt(ctx.userId, transaction, 'success');
+      await walletService.logTransactionAttempt(
+        ctx.userId,
+        transaction,
+        'success',
+      );
 
       const executionTime = Date.now() - startTime;
 
@@ -83,12 +97,16 @@ export class SeiSmartContractCallHandler {
           status: result.status,
           blockNumber: receipt?.blockNumber,
           gasUsed: receipt?.gasUsed?.toString(),
-          fees: receipt?.gasUsed && receipt?.gasPrice ? 
-            (BigInt(receipt.gasUsed) * BigInt(receipt.gasPrice)).toString() : undefined,
+          fees:
+            receipt?.gasUsed && receipt?.gasPrice
+              ? (BigInt(receipt.gasUsed) * BigInt(receipt.gasPrice)).toString()
+              : undefined,
         },
         contractAddress: config.contractAddress,
         functionName: config.functionName,
-        returnData: receipt?.logs?.length ? 'Contract execution completed' : undefined,
+        returnData: receipt?.logs?.length
+          ? 'Contract execution completed'
+          : undefined,
         events: this.parseContractEvents(receipt?.logs || []),
         executionTime,
         timestamp: new Date().toISOString(),
@@ -96,8 +114,15 @@ export class SeiSmartContractCallHandler {
     } catch (error: any) {
       // Log failed execution
       if (ctx.userId) {
-        const walletService = this.getWalletService(node.config?.network || 'sei-testnet');
-        await walletService.logTransactionAttempt(ctx.userId, {}, 'failure', error.message);
+        const walletService = this.getWalletService(
+          node.config?.network || 'sei-testnet',
+        );
+        await walletService.logTransactionAttempt(
+          ctx.userId,
+          {},
+          'failure',
+          error.message,
+        );
       }
 
       return {
@@ -115,7 +140,10 @@ export class SeiSmartContractCallHandler {
     }
   }
 
-  private validateAndExtractConfig(node: any, ctx: BlockExecutionContext): z.infer<typeof seiSmartContractCallSchema.configSchema> {
+  private validateAndExtractConfig(
+    node: any,
+    ctx: BlockExecutionContext,
+  ): z.infer<typeof seiSmartContractCallSchema.configSchema> {
     if (!node.config) {
       throw new Error('Block configuration is missing');
     }
@@ -127,15 +155,27 @@ export class SeiSmartContractCallHandler {
     }
   }
 
-  private validateInputs(inputs: Record<string, any>, previousOutputs: Record<string, any>): any {
+  private validateInputs(
+    inputs: Record<string, any>,
+    previousOutputs: Record<string, any>,
+    ctx: BlockExecutionContext,
+  ): any {
     try {
-      return seiSmartContractCallSchema.inputSchema.parse({
-        data: inputs.data,
-        context: inputs.context,
-        variables: inputs.variables,
+      // Structure the data according to the schema
+      const structuredInputs = {
+        data: { ...previousOutputs, ...inputs },
+        context: {
+          workflowId: ctx.workflowId || 'unknown',
+          executionId: ctx.executionId || 'unknown',
+          userId: ctx.userId || 'unknown',
+          timestamp: new Date().toISOString(),
+        },
+        variables: {}, // Add any workflow variables if available
         dynamicParams: inputs.dynamicParams,
         gasOverride: inputs.gasOverride,
-      });
+      };
+
+      return seiSmartContractCallSchema.inputSchema.parse(structuredInputs);
     } catch (error) {
       console.warn('Input validation warning:', error);
       return inputs;
@@ -144,26 +184,33 @@ export class SeiSmartContractCallHandler {
 
   private getRpcClient(network: string): SeiRpcClient {
     if (!this.rpcClients.has(network)) {
-      const rpcUrl = network === 'sei-mainnet' 
-        ? process.env.SEI_MAINNET_RPC_URL || 'https://evm-rpc.sei-apis.com'
-        : process.env.SEI_TESTNET_RPC_URL || 'https://evm-rpc-testnet.sei-apis.com';
-      
-      const restUrl = network === 'sei-mainnet'
-        ? process.env.SEI_MAINNET_REST_URL || 'https://rest.sei-apis.com'
-        : process.env.SEI_TESTNET_REST_URL || 'https://rest-testnet.sei-apis.com';
+      const rpcUrl =
+        network === 'sei-mainnet'
+          ? process.env.SEI_MAINNET_RPC_URL || 'https://evm-rpc.sei-apis.com'
+          : process.env.SEI_TESTNET_RPC_URL ||
+            'https://evm-rpc-testnet.sei-apis.com';
+
+      const restUrl =
+        network === 'sei-mainnet'
+          ? process.env.SEI_MAINNET_REST_URL || 'https://rest.sei-apis.com'
+          : process.env.SEI_TESTNET_REST_URL ||
+            'https://rest-testnet.sei-apis.com';
 
       this.rpcClients.set(network, new SeiRpcClient(rpcUrl, restUrl));
     }
-    
+
     return this.rpcClients.get(network)!;
   }
 
   private getWalletService(network: string): SeiWalletService {
     if (!this.walletServices.has(network)) {
       const client = this.getRpcClient(network);
-      this.walletServices.set(network, new SeiWalletService(client.getProvider()));
+      this.walletServices.set(
+        network,
+        new SeiWalletService(client.getProvider()),
+      );
     }
-    
+
     return this.walletServices.get(network)!;
   }
 
@@ -171,7 +218,7 @@ export class SeiSmartContractCallHandler {
     config: any,
     inputs: any,
     client: SeiRpcClient,
-    userId: string
+    userId: string,
   ): Promise<any> {
     try {
       // Get user's wallet address
@@ -214,11 +261,16 @@ export class SeiSmartContractCallHandler {
         // Use ABI to encode function call
         const contractInterface = new ethers.Interface(JSON.parse(config.abi));
         const params = this.extractFunctionParams(config, inputs);
-        return contractInterface.encodeFunctionData(config.functionName, params);
+        return contractInterface.encodeFunctionData(
+          config.functionName,
+          params,
+        );
       } else if (config.functionSignature) {
         // Use function signature to encode call
         const params = this.extractFunctionParams(config, inputs);
-        const functionFragment = ethers.FunctionFragment.from(config.functionSignature);
+        const functionFragment = ethers.FunctionFragment.from(
+          config.functionSignature,
+        );
         const contractInterface = new ethers.Interface([functionFragment]);
         return contractInterface.encodeFunctionData(functionFragment, params);
       } else {
@@ -231,7 +283,7 @@ export class SeiSmartContractCallHandler {
 
   private extractFunctionParams(config: any, inputs: any): any[] {
     const params: any[] = [];
-    
+
     // Add configured parameters
     if (config.functionParams) {
       for (const param of config.functionParams) {
@@ -270,7 +322,7 @@ export class SeiSmartContractCallHandler {
 
   private parseContractEvents(logs: any[]): any[] {
     const events: any[] = [];
-    
+
     for (const log of logs) {
       try {
         // Basic event parsing - in production, you'd use the ABI to decode properly
@@ -286,7 +338,7 @@ export class SeiSmartContractCallHandler {
         console.warn('Failed to parse contract event:', error);
       }
     }
-    
+
     return events;
   }
 

@@ -30,11 +30,15 @@ export class SeiWalletListenerHandler {
   async execute(node: any, ctx: BlockExecutionContext): Promise<any> {
     try {
       const config = this.validateAndExtractConfig(node, ctx);
-      const inputs = this.validateInputs(ctx.inputs || {}, ctx.previousOutputs || {});
-      
+      const inputs = this.validateInputs(
+        ctx.inputs || {},
+        ctx.previousOutputs || {},
+        ctx,
+      );
+
       const client = this.getRpcClient(config.network);
       const events = await this.pollForEvents(config, client);
-      
+
       return {
         success: true,
         events,
@@ -42,7 +46,9 @@ export class SeiWalletListenerHandler {
         lastProcessedBlock: this.lastProcessedBlock[config.network],
         network: config.network,
         pollingTimestamp: new Date().toISOString(),
-        nextPollTime: new Date(Date.now() + config.pollingInterval).toISOString(),
+        nextPollTime: new Date(
+          Date.now() + config.pollingInterval,
+        ).toISOString(),
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
@@ -61,7 +67,10 @@ export class SeiWalletListenerHandler {
   /**
    * Validate and extract configuration
    */
-  private validateAndExtractConfig(node: any, ctx: BlockExecutionContext): z.infer<typeof seiWalletListenerSchema.configSchema> {
+  private validateAndExtractConfig(
+    node: any,
+    ctx: BlockExecutionContext,
+  ): z.infer<typeof seiWalletListenerSchema.configSchema> {
     if (!node.config) {
       throw new Error('Block configuration is missing');
     }
@@ -76,13 +85,25 @@ export class SeiWalletListenerHandler {
   /**
    * Validate inputs from previous blocks
    */
-  private validateInputs(inputs: Record<string, any>, previousOutputs: Record<string, any>): any {
+  private validateInputs(
+    inputs: Record<string, any>,
+    previousOutputs: Record<string, any>,
+    ctx: BlockExecutionContext,
+  ): any {
     try {
-      return seiWalletListenerSchema.inputSchema.parse({
-        data: inputs.data,
-        context: inputs.context,
-        variables: inputs.variables,
-      });
+      // Structure the data according to the schema
+      const structuredInputs = {
+        data: { ...previousOutputs, ...inputs },
+        context: {
+          workflowId: ctx.workflowId || 'unknown',
+          executionId: ctx.executionId || 'unknown',
+          userId: ctx.userId || 'unknown',
+          timestamp: new Date().toISOString(),
+        },
+        variables: {}, // Add any workflow variables if available
+      };
+
+      return seiWalletListenerSchema.inputSchema.parse(structuredInputs);
     } catch (error) {
       // Log validation error but don't fail execution for inputs
       console.warn('Input validation warning:', error);
@@ -95,29 +116,37 @@ export class SeiWalletListenerHandler {
    */
   private getRpcClient(network: string): SeiRpcClient {
     if (!this.rpcClients.has(network)) {
-      const rpcUrl = network === 'sei-mainnet' 
-        ? process.env.SEI_MAINNET_RPC_URL || 'https://evm-rpc.sei-apis.com'
-        : process.env.SEI_TESTNET_RPC_URL || 'https://evm-rpc-testnet.sei-apis.com';
-      
-      const restUrl = network === 'sei-mainnet'
-        ? process.env.SEI_MAINNET_REST_URL || 'https://rest.sei-apis.com'
-        : process.env.SEI_TESTNET_REST_URL || 'https://rest-testnet.sei-apis.com';
+      const rpcUrl =
+        network === 'sei-mainnet'
+          ? process.env.SEI_MAINNET_RPC_URL || 'https://evm-rpc.sei-apis.com'
+          : process.env.SEI_TESTNET_RPC_URL ||
+            'https://evm-rpc-testnet.sei-apis.com';
+
+      const restUrl =
+        network === 'sei-mainnet'
+          ? process.env.SEI_MAINNET_REST_URL || 'https://rest.sei-apis.com'
+          : process.env.SEI_TESTNET_REST_URL ||
+            'https://rest-testnet.sei-apis.com';
 
       this.rpcClients.set(network, new SeiRpcClient(rpcUrl, restUrl));
     }
-    
+
     return this.rpcClients.get(network)!;
   }
 
   /**
    * Poll blockchain for new events
    */
-  private async pollForEvents(config: any, client: SeiRpcClient): Promise<any[]> {
+  private async pollForEvents(
+    config: any,
+    client: SeiRpcClient,
+  ): Promise<any[]> {
     const events: any[] = [];
-    
+
     try {
       const currentBlock = await client.getLatestBlockNumber();
-      const fromBlock = this.lastProcessedBlock[config.network] || (currentBlock - 100);
+      const fromBlock =
+        this.lastProcessedBlock[config.network] || currentBlock - 100;
       const toBlock = currentBlock;
 
       if (fromBlock >= currentBlock) {
@@ -132,7 +161,7 @@ export class SeiWalletListenerHandler {
           config.eventTypes,
           fromBlock,
           toBlock,
-          config.filters
+          config.filters,
         );
         events.push(...walletEvents);
       }
@@ -160,7 +189,7 @@ export class SeiWalletListenerHandler {
     eventTypes: string[],
     fromBlock: number,
     toBlock: number,
-    filters?: any
+    filters?: any,
   ): Promise<any[]> {
     const events: any[] = [];
 
@@ -172,11 +201,14 @@ export class SeiWalletListenerHandler {
           eventType,
           fromBlock,
           toBlock,
-          filters
+          filters,
         );
         events.push(...eventData);
       } catch (error: any) {
-        console.warn(`Failed to get ${eventType} events for ${address}:`, error.message);
+        console.warn(
+          `Failed to get ${eventType} events for ${address}:`,
+          error.message,
+        );
       }
     }
 
@@ -192,23 +224,47 @@ export class SeiWalletListenerHandler {
     eventType: string,
     fromBlock: number,
     toBlock: number,
-    filters?: any
+    filters?: any,
   ): Promise<any[]> {
     const events: any[] = [];
 
     switch (eventType) {
       case 'transfer':
-        return await this.getTransferEvents(client, address, fromBlock, toBlock, filters);
-      
+        return await this.getTransferEvents(
+          client,
+          address,
+          fromBlock,
+          toBlock,
+          filters,
+        );
+
       case 'contract_call':
-        return await this.getContractCallEvents(client, address, fromBlock, toBlock, filters);
-        
+        return await this.getContractCallEvents(
+          client,
+          address,
+          fromBlock,
+          toBlock,
+          filters,
+        );
+
       case 'nft_transfer':
-        return await this.getNftTransferEvents(client, address, fromBlock, toBlock, filters);
-        
+        return await this.getNftTransferEvents(
+          client,
+          address,
+          fromBlock,
+          toBlock,
+          filters,
+        );
+
       case 'swap':
-        return await this.getSwapEvents(client, address, fromBlock, toBlock, filters);
-        
+        return await this.getSwapEvents(
+          client,
+          address,
+          fromBlock,
+          toBlock,
+          filters,
+        );
+
       default:
         console.warn(`Unsupported event type: ${eventType}`);
         return [];
@@ -223,14 +279,14 @@ export class SeiWalletListenerHandler {
     address: string,
     fromBlock: number,
     toBlock: number,
-    filters?: any
+    filters?: any,
   ): Promise<any[]> {
     const events: any[] = [];
 
     try {
       // ERC20 Transfer events
       const transferEventTopic = ethers.id('Transfer(address,address,uint256)');
-      
+
       // Listen for transfers TO this address
       const toFilter = {
         fromBlock: ethers.toBeHex(fromBlock),
@@ -269,7 +325,6 @@ export class SeiWalletListenerHandler {
         const event = await this.parseTransferEvent(log, 'outgoing', filters);
         if (event) events.push(event);
       }
-
     } catch (error: any) {
       console.error('Failed to get transfer events:', error);
     }
@@ -280,7 +335,11 @@ export class SeiWalletListenerHandler {
   /**
    * Parse transfer event log
    */
-  private async parseTransferEvent(log: any, direction: 'incoming' | 'outgoing', filters?: any): Promise<any | null> {
+  private async parseTransferEvent(
+    log: any,
+    direction: 'incoming' | 'outgoing',
+    filters?: any,
+  ): Promise<any | null> {
     try {
       const fromAddress = ethers.getAddress('0x' + log.topics[1].slice(26));
       const toAddress = ethers.getAddress('0x' + log.topics[2].slice(26));
@@ -293,7 +352,10 @@ export class SeiWalletListenerHandler {
       if (filters?.maxAmount && amount > filters.maxAmount) {
         return null;
       }
-      if (filters?.contractAddress && log.address.toLowerCase() !== filters.contractAddress.toLowerCase()) {
+      if (
+        filters?.contractAddress &&
+        log.address.toLowerCase() !== filters.contractAddress.toLowerCase()
+      ) {
         return null;
       }
 
@@ -328,7 +390,7 @@ export class SeiWalletListenerHandler {
     address: string,
     fromBlock: number,
     toBlock: number,
-    filters?: any
+    filters?: any,
   ): Promise<any[]> {
     // Implementation would depend on specific contract interaction patterns
     // For now, return empty array with TODO
@@ -344,7 +406,7 @@ export class SeiWalletListenerHandler {
     address: string,
     fromBlock: number,
     toBlock: number,
-    filters?: any
+    filters?: any,
   ): Promise<any[]> {
     // Similar to ERC20 transfers but for ERC721/ERC1155
     console.warn('NFT transfer event monitoring not yet implemented');
@@ -359,7 +421,7 @@ export class SeiWalletListenerHandler {
     address: string,
     fromBlock: number,
     toBlock: number,
-    filters?: any
+    filters?: any,
   ): Promise<any[]> {
     // Would monitor DEX swap events
     console.warn('Swap event monitoring not yet implemented');

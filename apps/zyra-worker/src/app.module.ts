@@ -13,6 +13,8 @@ import { BlockchainModule } from './lib/blockchain/BlockchainModule';
 import { DatabaseModule } from './services/database.module';
 import { RabbitMQService } from './services/rabbitmq.service';
 import { MagicModule } from './services/magic.module';
+import { ExecutionGateway } from './gateways/execution.gateway';
+import { ExecutionMonitorService } from './services/execution-monitor.service';
 
 // Exception Filters
 import { DatabaseExceptionFilter } from './filters/database-exception.filter';
@@ -95,6 +97,8 @@ const configValidationSchema = {
       provide: 'CONFIG',
       useValue: configValidationSchema,
     },
+    ExecutionGateway,
+    ExecutionMonitorService,
   ],
   exports: [RabbitMQService, 'CONFIG'],
 })

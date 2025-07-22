@@ -260,6 +260,7 @@ export class HttpBlockHandler implements EnhancedBlockHandler {
   async execute(
     context: EnhancedBlockExecutionContext,
   ): Promise<ZyraNodeData[]> {
+    context.logger.info('HttpBlockHandler started');
     const inputData = context.getInputData();
     const returnData: ZyraNodeData[] = [];
 
@@ -270,6 +271,11 @@ export class HttpBlockHandler implements EnhancedBlockHandler {
       const item = items[itemIndex];
 
       try {
+        // Log the start of execution
+        context.logger.info(
+          `Starting HTTP request execution for item ${itemIndex}`,
+        );
+
         // Get node parameters
         const method = context.getNodeParameter('method', itemIndex) as string;
         const url = context.getNodeParameter('url', itemIndex) as string;
@@ -312,6 +318,9 @@ export class HttpBlockHandler implements EnhancedBlockHandler {
           'responseFormat',
           itemIndex,
         ) as string;
+
+        // Log configuration
+        context.logger.info(`HTTP request configuration: ${method} ${url}`);
 
         // Process URL template variables
         const processedUrl = context.helpers.processTemplate(url, item.json);
@@ -412,7 +421,7 @@ export class HttpBlockHandler implements EnhancedBlockHandler {
 
         returnData.push(outputData);
 
-        this.logger.debug(`HTTP request successful for item ${itemIndex}`, {
+        context.logger.info(`HTTP request successful for item ${itemIndex}`, {
           url: processedUrl,
           method,
           statusCode: response.status,
@@ -423,12 +432,12 @@ export class HttpBlockHandler implements EnhancedBlockHandler {
           error instanceof Error ? error.message : String(error);
         const errorName = error instanceof Error ? error.name : 'UnknownError';
 
-        this.logger.error(`HTTP request failed for item ${itemIndex}`, {
+        context.logger.error(`HTTP request failed for item ${itemIndex}`, {
           error: errorMessage,
           executionId: context.executionId,
         });
 
-        // Create error output
+        // Create error output for debugging and UI display
         const errorOutput: ZyraNodeData = {
           json: {
             error: errorMessage,
@@ -444,6 +453,10 @@ export class HttpBlockHandler implements EnhancedBlockHandler {
         };
 
         returnData.push(errorOutput);
+
+        // CRITICAL: Also throw the error to fail the workflow
+        // This ensures the workflow stops while preserving error information
+        throw new Error(`HTTP request failed: ${errorMessage}`);
       }
     }
 
@@ -512,11 +525,14 @@ export class HttpBlockHandler implements EnhancedBlockHandler {
         });
 
         if (attempt > 0) {
-          this.logger.log(`HTTP request succeeded on attempt ${attempt + 1}`, {
-            url: options.url,
-            statusCode: response.status,
-            executionId: context.executionId,
-          });
+          context.logger.log(
+            `HTTP request succeeded on attempt ${attempt + 1}`,
+            {
+              url: options.url,
+              statusCode: response.status,
+              executionId: context.executionId,
+            },
+          );
         }
 
         return response;
@@ -527,7 +543,7 @@ export class HttpBlockHandler implements EnhancedBlockHandler {
           const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          this.logger.warn(
+          context.logger.warn(
             `HTTP request failed (attempt ${attempt + 1}), retrying in ${delay}ms`,
             {
               url: options.url,

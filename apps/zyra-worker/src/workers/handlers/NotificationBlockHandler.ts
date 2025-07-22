@@ -298,6 +298,7 @@ export class NotificationBlockHandler implements EnhancedBlockHandler {
   async execute(
     context: EnhancedBlockExecutionContext,
   ): Promise<ZyraNodeData[]> {
+    context.logger.info('NotificationBlockHandler started');
     const inputData = context.getInputData();
     const returnData: ZyraNodeData[] = [];
 
@@ -314,7 +315,7 @@ export class NotificationBlockHandler implements EnhancedBlockHandler {
           itemIndex,
         ) as string;
 
-        this.logger.log(`Executing ${notificationType} notification`);
+        context.logger.info(`Executing ${notificationType} notification`);
 
         let result: any;
 
@@ -352,7 +353,7 @@ export class NotificationBlockHandler implements EnhancedBlockHandler {
 
         returnData.push(outputData);
 
-        this.logger.debug(
+        context.logger.info(
           `${notificationType} notification sent successfully`,
           {
             executionId: context.executionId,
@@ -363,12 +364,12 @@ export class NotificationBlockHandler implements EnhancedBlockHandler {
           error instanceof Error ? error.message : String(error);
         const errorName = error instanceof Error ? error.name : 'UnknownError';
 
-        this.logger.error(`Notification failed for item ${itemIndex}`, {
+        context.logger.error(`Notification failed for item ${itemIndex}`, {
           error: errorMessage,
           executionId: context.executionId,
         });
 
-        // Create error output
+        // Create error output for debugging and UI display
         const errorOutput: ZyraNodeData = {
           json: {
             success: false,
@@ -385,6 +386,10 @@ export class NotificationBlockHandler implements EnhancedBlockHandler {
         };
 
         returnData.push(errorOutput);
+
+        // CRITICAL: Also throw the error to fail the workflow
+        // This ensures the workflow stops while preserving error information
+        throw new Error(`Notification failed: ${errorMessage}`);
       }
     }
 

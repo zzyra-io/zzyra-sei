@@ -1,31 +1,5 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo, JSX } from "react";
-import { formatDistance } from "date-fns";
-import {
-  CheckCircle2,
-  Clock,
-  Loader2,
-  Pause,
-  Play,
-  RefreshCw,
-  RotateCcw,
-  XCircle,
-  FileText,
-  ArrowDownAZ,
-  ArrowUpZA,
-  Filter,
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Accordion,
   AccordionContent,
@@ -33,157 +7,149 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { debounce } from "lodash";
-import { CheckCircle } from "lucide-react";
-import {
-  useWorkflowExecutions,
-  type WorkflowExecution,
-  type NodeExecution,
-  type NodeLog,
-} from "@/hooks/useExecutionLogs";
+import { useToast } from "@/hooks/use-toast";
 import { executionsApi } from "@/lib/services/api";
-import { Workflow } from "@/hooks/use-workflows";
+import { type NodeLog, type UnifiedLog } from "@/lib/services/logs-service";
+import { formatDistance } from "date-fns";
+import {
+  AlertCircle,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  FileText,
+  Loader2,
+  Pause,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  XCircle,
+} from "lucide-react";
+import React, {
+  JSX,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 interface ExecutionLogsListProps {
   workflowId: string;
-  workflow?: Workflow;
+  workflow?: any;
 }
 
-export function ExecutionLogsList({
+interface WorkflowExecution {
+  id: string;
+  workflow_id: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+  input_data?: Record<string, unknown>;
+  output_data?: Record<string, unknown>;
+  nodeExecutions?: NodeExecution[];
+  executionLogs?: UnifiedLog[];
+  nodeInputs?: Record<string, any[]>;
+  nodeOutputs?: Record<string, any[]>;
+}
+
+interface NodeExecution {
+  id: string;
+  execution_id: string;
+  node_id: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+  input_data: Record<string, unknown> | null;
+  output_data: Record<string, unknown> | null;
+  logs?: NodeLog[];
+}
+
+export const ExecutionLogsList = React.memo(function ExecutionLogsList({
   workflowId,
   workflow,
 }: ExecutionLogsListProps) {
   const { toast } = useToast();
 
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | WorkflowExecution["status"]
-  >("all");
-  const [sortKey, setSortKey] = useState<"started_at" | "duration">(
-    "started_at"
+  const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedLogs, setExpandedLogs] = useState<Record<string, boolean>>(
+    () => {
+      // Load expanded state from localStorage
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem(`execution-expanded-${workflowId}`);
+        return saved ? JSON.parse(saved) : {};
+      }
+      return {};
+    }
   );
-  const [sortAsc, setSortAsc] = useState(false);
-  const [expandedLogs, setExpandedLogs] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<
-    "all" | WorkflowExecution["status"]
-  >("all");
-  const [jsonViewerData, setJsonViewerData] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
-  const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
-  const [limit] = useState(10);
-  const [offset] = useState(0);
-
-  const {
-    data: executionsData,
-    isLoading,
-    refetch: refetchExecutions,
-  } = useWorkflowExecutions(
-    workflowId,
-    limit,
-    offset,
-    statusFilter,
-    sortKey,
-    sortAsc ? "asc" : "desc"
-  );
-
-  // Memoize executions to prevent dependency issues in hooks
-  const executions = useMemo(
-    () => executionsData?.executions || [],
-    [executionsData]
-  );
-  // Total count for pagination (will be implemented in future pagination feature)
-  // const totalCount = executionsData?.total || 0;
-
-  const debouncedRefetch = useCallback(() => {
-    debounce(() => {
-      refetchExecutions();
-    }, 1000)();
-  }, [refetchExecutions]);
-
+  const [detailedData, setDetailedData] = useState<Record<string, any>>({});
   const [loadingExecutionIds, setLoadingExecutionIds] = useState<Set<string>>(
     new Set()
   );
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const executionsRef = useRef<WorkflowExecution[]>([]);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadingRef = useRef<HTMLDivElement>(null);
 
-  const [nodeExecutionsCache, setNodeExecutionsCache] = useState<
-    Record<string, NodeExecution[]>
-  >({});
-  // Caches for node data
-  const [nodeInputsCache] = useState<Record<string, Record<string, unknown>>>(
-    {}
-  );
-  const [nodeOutputsCache] = useState<Record<string, Record<string, unknown>>>(
-    {}
-  );
-  const [nodeLogsCache, setNodeLogsCache] = useState<Record<string, NodeLog[]>>(
-    {}
+  const ITEMS_PER_PAGE = 5; // Reduced for better performance
+
+  // Persist expanded state to localStorage
+  const persistExpandedState = useCallback(
+    (newExpandedState: Record<string, boolean>) => {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          `execution-expanded-${workflowId}`,
+          JSON.stringify(newExpandedState)
+        );
+      }
+    },
+    [workflowId]
   );
 
-  const loadNodeData = useCallback(
+  // Update expanded logs with persistence
+  const updateExpandedLogs = useCallback(
+    (newState: Record<string, boolean>) => {
+      setExpandedLogs(newState);
+      persistExpandedState(newState);
+    },
+    [persistExpandedState]
+  );
+
+  // Memoized polling condition
+  const shouldPoll = useMemo(() => {
+    return executions.some(
+      (exec) => exec.status === "running" || exec.status === "pending"
+    );
+  }, [executions]);
+
+  // Lazy load detailed data when tab is expanded
+  const loadDetailedData = useCallback(
     async (executionId: string) => {
-      // Check if already loading or loaded using current state
-      if (loadingExecutionIds.has(executionId)) {
-        return;
-      }
-
-      // Check cache without including it in dependencies
-      const currentCache = nodeExecutionsCache[executionId];
-      if (currentCache !== undefined) {
-        return; // Already cached (including empty arrays)
-      }
+      if (detailedData[executionId]) return; // Already loaded
 
       setLoadingExecutionIds((prev) => new Set(prev).add(executionId));
 
       try {
-        const nodeExecutions = await executionsApi.getNodeExecutions(executionId);
-
-        if (nodeExecutions) {
-          setNodeExecutionsCache((prev) => ({
-            ...prev,
-            [executionId]: nodeExecutions,
-          }));
-
-          for (const nodeExecution of nodeExecutions) {
-            try {
-              const logs = await executionsApi.getNodeLogs(nodeExecution.id);
-              setNodeLogsCache((prev) => ({
-                ...prev,
-                [nodeExecution.id]: logs,
-              }));
-            } catch (error) {
-              console.error("Error loading node logs:", error);
-            }
-          }
-        }
+        const detailedExecution =
+          await executionsApi.getCompleteExecution(executionId);
+        setDetailedData((prev) => ({
+          ...prev,
+          [executionId]: detailedExecution,
+        }));
       } catch (error) {
-        console.error("Error loading node data:", error);
-        toast({
-          variant: "destructive",
-          title: "Failed to load node data",
-          description: error instanceof Error ? error.message : String(error),
-        });
+        console.error(
+          `Failed to load detailed data for execution ${executionId}:`,
+          error
+        );
       } finally {
         setLoadingExecutionIds((prev) => {
           const newSet = new Set(prev);
@@ -192,29 +158,171 @@ export function ExecutionLogsList({
         });
       }
     },
-    [toast] // Removed nodeExecutionsCache and loadingExecutionIds from dependencies
+    [detailedData]
   );
 
-  // Load node data when executions are expanded
+  // Update ref when executions change
   useEffect(() => {
-    executions.forEach((log) => {
-      if (expandedLogs[log.id] && 
-          nodeExecutionsCache[log.id] === undefined && // Only load if not cached (including empty arrays)
-          !loadingExecutionIds.has(log.id)) {
-        loadNodeData(log.id);
+    executionsRef.current = executions;
+  }, [executions]);
+
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | WorkflowExecution["status"]
+  >("all");
+  const [sortKey, setSortKey] = useState<"started_at" | "duration">(
+    "started_at"
+  );
+  const [sortAsc, setSortAsc] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    "all" | WorkflowExecution["status"]
+  >("all");
+  const [jsonViewerData, setJsonViewerData] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [isJsonDialogOpen, setIsJsonDialogOpen] = useState(false);
+  const [offset] = useState(0);
+
+  const fetchExecutions = useCallback(
+    async (page = 1, append = false) => {
+      try {
+        setLoading(page === 1);
+        setError(null);
+
+        // Only fetch basic execution data initially
+        const response = await executionsApi.getWorkflowExecutions(
+          workflowId,
+          ITEMS_PER_PAGE,
+          (page - 1) * ITEMS_PER_PAGE
+        );
+
+        const transformedExecutions = response.data.map((execution: any) => ({
+          id: execution.id,
+          workflow_id: execution.workflowId,
+          status: execution.status,
+          started_at: execution.startedAt,
+          completed_at: execution.completedAt,
+          error: execution.error,
+          // Don't load detailed data initially
+          input_data: {},
+          output_data: {},
+          nodeExecutions: [],
+          executionLogs: [],
+          nodeInputs: {},
+          nodeOutputs: {},
+        }));
+
+        if (append) {
+          setExecutions((prev) => [...prev, ...transformedExecutions]);
+        } else {
+          setExecutions(transformedExecutions);
+        }
+
+        setHasMore(response.data.length === ITEMS_PER_PAGE);
+        setCurrentPage(page);
+      } catch (error) {
+        console.error("Failed to fetch executions:", error);
+        setError(
+          error instanceof Error ? error.message : "Failed to fetch executions"
+        );
+      } finally {
+        setLoading(false);
+        setIsLoadingMore(false);
       }
-    });
-  }, [executions, expandedLogs, loadNodeData, nodeExecutionsCache, loadingExecutionIds]);
+    },
+    [workflowId]
+  ); // Keep workflowId dependency but memoize the function properly
 
+  // Memoize the function to prevent unnecessary re-renders
+  const memoizedFetchExecutions = useMemo(
+    () => fetchExecutions,
+    [fetchExecutions]
+  );
+
+  // Intersection Observer for infinite scroll
   useEffect(() => {
-    refetchExecutions();
+    if (!loadingRef.current) return;
 
-    const intervalId = setInterval(() => {
-      refetchExecutions();
-    }, 10000);
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          setIsLoadingMore(true);
+          memoizedFetchExecutions(currentPage + 1, true);
+        }
+      },
+      { threshold: 0.1 }
+    );
 
-    return () => clearInterval(intervalId);
-  }, [workflowId, statusFilter, sortKey, sortAsc, offset, refetchExecutions]);
+    observerRef.current.observe(loadingRef.current);
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasMore, isLoadingMore, currentPage, memoizedFetchExecutions]);
+
+  // Initial load - only run once
+  useEffect(() => {
+    memoizedFetchExecutions(1);
+  }, []); // Empty dependency array - only run on mount
+
+  // Polling for real-time updates - optimized to not reset state
+  useEffect(() => {
+    if (!shouldPoll) return;
+
+    const interval = setInterval(() => {
+      // Only update running executions, don't reset the entire list
+      const runningExecutions = executions.filter(
+        (exec) => exec.status === "running" || exec.status === "pending"
+      );
+
+      if (runningExecutions.length > 0) {
+        // Update only the running executions instead of fetching all
+        Promise.all(
+          runningExecutions.map(async (exec) => {
+            try {
+              const updatedExecution = await executionsApi.getCompleteExecution(
+                exec.id
+              );
+              setExecutions((prev) =>
+                prev.map((e) =>
+                  e.id === exec.id
+                    ? {
+                        ...e,
+                        status: updatedExecution.status,
+                        completed_at: updatedExecution.completed_at,
+                        error: updatedExecution.error,
+                      }
+                    : e
+                )
+              );
+            } catch (error) {
+              console.error(`Failed to update execution ${exec.id}:`, error);
+            }
+          })
+        );
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [shouldPoll, executions]); // Only depend on shouldPoll and executions
+
+  const toggleExpanded = useCallback(
+    (executionId: string) => {
+      const newExpandedState = {
+        ...expandedLogs,
+        [executionId]: !expandedLogs[executionId],
+      };
+      updateExpandedLogs(newExpandedState);
+
+      // Load detailed data when expanding
+      if (!expandedLogs[executionId] && !detailedData[executionId]) {
+        loadDetailedData(executionId);
+      }
+    },
+    [expandedLogs, detailedData, loadDetailedData, updateExpandedLogs]
+  );
 
   const statusCounts = useMemo(() => {
     const counts = {
@@ -227,8 +335,9 @@ export function ExecutionLogsList({
     };
 
     executions.forEach((log) => {
-      if (counts[log.status] !== undefined) {
-        counts[log.status]++;
+      const status = log.status as keyof typeof counts;
+      if (counts[status] !== undefined) {
+        counts[status]++;
       }
     });
 
@@ -249,14 +358,14 @@ export function ExecutionLogsList({
   }, [activeTab]);
 
   const formatDate = useCallback((date: string | null | undefined) => {
-    if (!date) return 'Unknown time';
-    
+    if (!date) return "Unknown time";
+
     try {
       const dateObject = new Date(date);
       if (isNaN(dateObject.getTime())) {
-        return 'Invalid date';
+        return "Invalid date";
       }
-      
+
       return new Intl.DateTimeFormat("en-US", {
         month: "short",
         day: "numeric",
@@ -266,8 +375,8 @@ export function ExecutionLogsList({
         hour12: true,
       }).format(dateObject);
     } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Invalid date';
+      console.error("Error formatting date:", error);
+      return "Invalid date";
     }
   }, []);
 
@@ -326,8 +435,8 @@ export function ExecutionLogsList({
   const handleAction = useCallback(
     async (action: string, logId: string, nodeId?: string) => {
       try {
-        let result;
-        
+        let result: any;
+
         if (action === "retry") {
           result = await executionsApi.retryExecution(logId, nodeId);
         } else if (action === "cancel") {
@@ -339,9 +448,11 @@ export function ExecutionLogsList({
         } else {
           throw new Error(`Unknown action: ${action}`);
         }
-        
-        if (!result.success) {
-          throw new Error(`Failed to ${action} execution: ${result.message || 'Unknown error'}`);
+
+        if (result && !result.success) {
+          throw new Error(
+            `Failed to ${action} execution: ${result.message || "Unknown error"}`
+          );
         }
 
         toast({
@@ -349,7 +460,7 @@ export function ExecutionLogsList({
           description: `The workflow execution has been ${action}ed successfully.`,
         });
 
-        refetchExecutions();
+        memoizedFetchExecutions(); // Refetch executions to update status
       } catch (error) {
         console.error(`Error ${action}ing execution:`, error);
         toast({
@@ -359,7 +470,7 @@ export function ExecutionLogsList({
         });
       }
     },
-    [toast, refetchExecutions]
+    [toast, memoizedFetchExecutions]
   );
 
   const viewJsonData = (data: Record<string, unknown> | null) => {
@@ -367,201 +478,141 @@ export function ExecutionLogsList({
     setIsJsonDialogOpen(true);
   };
 
+  if (loading && executions.length === 0) {
+    return (
+      <div className='flex items-center justify-center p-8'>
+        <Loader2 className='h-8 w-8 animate-spin' />
+        <span className='ml-2'>Loading executions...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className='flex items-center justify-center p-8'>
+        <AlertCircle className='h-8 w-8 text-red-500' />
+        <span className='ml-2 text-red-600'>{error}</span>
+      </div>
+    );
+  }
+
   return (
-    <div className='space-y-6'>
-      {/* Header */}
-      <div className='flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0'>
-        <CardHeader className='-mx-4'>
-          <CardTitle>Execution Logs</CardTitle>
-          <CardDescription>
-            Monitor and manage your workflow executions
-          </CardDescription>
-        </CardHeader>
-        <div className='flex items-center gap-2'>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant='outline'
-                  size='icon'
-                  onClick={debouncedRefetch}
-                  disabled={isLoading}
-                  aria-label='Refresh logs'
-                  className='h-9 w-9'>
-                  <RefreshCw
-                    className={isLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"}
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Refresh logs</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant='outline' size='sm' className='gap-1'>
-                <Filter className='h-4 w-4' />
-                <span>Filter</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end' className='w-56'>
-              <DropdownMenuItem onClick={() => setStatusFilter("all")}>
-                All Statuses
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("completed")}>
-                <CheckCircle2 className='mr-2 h-4 w-4 text-green-500' />
-                Completed
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("failed")}>
-                <XCircle className='mr-2 h-4 w-4 text-red-500' />
-                Failed
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("running")}>
-                <Loader2 className='mr-2 h-4 w-4 text-blue-500' />
-                Running
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter("paused")}>
-                <Pause className='mr-2 h-4 w-4 text-amber-500' />
-                Paused
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  setSortKey("started_at");
-                  setSortAsc(false);
-                }}>
-                <Clock className='mr-2 h-4 w-4' />
-                Sort by Start Time
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setSortKey("duration");
-                  setSortAsc(false);
-                }}>
-                <FileText className='mr-2 h-4 w-4' />
-                Sort by Duration
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setSortAsc(!sortAsc)}>
-                {sortAsc ? (
-                  <>
-                    <ArrowUpZA className='mr-2 h-4 w-4' />
-                    Sort Ascending
-                  </>
-                ) : (
-                  <>
-                    <ArrowDownAZ className='mr-2 h-4 w-4' />
-                    Sort Descending
-                  </>
-                )}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+    <div className='space-y-4'>
+      {/* Header with refresh */}
+      <div className='flex items-center justify-between'>
+        <h3 className='text-lg font-semibold'>Execution History</h3>
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={() => memoizedFetchExecutions(1)}
+          disabled={loading}>
+          <RefreshCw
+            className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+          />
+          Refresh
+        </Button>
       </div>
 
-      {/* Status Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
-        <TabsList className='grid grid-cols-5'>
-          <TabsTrigger value='all'>
-            All{" "}
-            <Badge variant='secondary' className='ml-1 text-xs'>
-              {statusCounts.all}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value='running'>
-            Running{" "}
-            <Badge variant='secondary' className='ml-1 text-xs'>
-              {statusCounts.running}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value='paused'>
-            Paused{" "}
-            <Badge variant='secondary' className='ml-1 text-xs'>
-              {statusCounts.paused}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value='completed'>
-            Completed{" "}
-            <Badge variant='secondary' className='ml-1 text-xs'>
-              {statusCounts.completed}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value='failed'>
-            Failed{" "}
-            <Badge variant='secondary' className='ml-1 text-xs'>
-              {statusCounts.failed}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value={activeTab} className='mt-4'>
-          {isLoading ? (
-            <div className='flex items-center justify-center p-12'>
-              <Loader2 className='h-8 w-8 animate-spin text-primary' />
-              <p className='text-sm text-muted-foreground'>
-                Loading execution logs...
-              </p>
-            </div>
-          ) : filteredLogs.length === 0 ? (
-            <div className='flex flex-col items-center justify-center rounded-lg border border-dashed p-12'>
-              <FileText className='h-10 w-10 text-muted-foreground' />
-              <h3 className='mt-4 text-lg font-semibold'>
-                No execution logs found
-              </h3>
-            </div>
+      {/* Executions List */}
+      <div className='space-y-3'>
+        {executions.map((log) => {
+          const isExpanded = expandedLogs[log.id];
+          const isLoadingDetails = loadingExecutionIds.has(log.id);
+          const detailedExecution = detailedData[log.id] || log;
+
+          return (
+            <ExecutionLogCard
+              key={log.id}
+              log={detailedExecution}
+              expandedLogs={expandedLogs}
+              setExpandedLogs={updateExpandedLogs}
+              formatDate={formatDate}
+              formatDuration={formatDuration}
+              getStatusBadge={getStatusBadge}
+              handleAction={handleAction}
+              viewJsonData={viewJsonData}
+              nodeExecutions={detailedExecution.nodeExecutions}
+              nodeInputs={detailedExecution.nodeInputs}
+              nodeOutputs={detailedExecution.nodeOutputs}
+              nodeLogs={{}}
+              isLoading={isLoadingDetails}
+              workflow={workflow}
+              isExpanded={isExpanded}
+              onToggleExpanded={() => toggleExpanded(log.id)}
+            />
+          );
+        })}
+      </div>
+
+      {/* Infinite scroll loading indicator */}
+      {hasMore && (
+        <div ref={loadingRef} className='flex items-center justify-center p-4'>
+          {isLoadingMore ? (
+            <Loader2 className='h-6 w-6 animate-spin' />
           ) : (
-            <div className='space-y-4'>
-              {filteredLogs.map((log) => (
-                <ExecutionLogCard
-                  key={log.id}
-                  log={log}
-                  expandedLogs={expandedLogs}
-                  setExpandedLogs={setExpandedLogs}
-                  formatDate={formatDate}
-                  formatDuration={formatDuration}
-                  getStatusBadge={getStatusBadge}
-                  handleAction={handleAction}
-                  viewJsonData={viewJsonData}
-                  nodeExecutions={nodeExecutionsCache[log.id]}
-                  nodeInputs={nodeInputsCache}
-                  nodeOutputs={nodeOutputsCache}
-                  nodeLogs={nodeLogsCache}
-                  isLoading={loadingExecutionIds.has(log.id)}
-                  workflow={workflow}
-                />
-              ))}
+            <div className='text-sm text-muted-foreground'>
+              Scroll to load more
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
 
-      {/* JSON Viewer Dialog */}
-      <Dialog open={isJsonDialogOpen} onOpenChange={setIsJsonDialogOpen}>
-        <DialogContent className='max-w-3xl'>
-          <DialogHeader>
-            <DialogTitle>JSON Data</DialogTitle>
-            <DialogDescription>
-              Detailed view of the execution data
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className='max-h-[60vh]'>
-            <pre className='bg-muted p-4 rounded-md text-xs font-mono overflow-auto'>
-              {jsonViewerData
-                ? JSON.stringify(jsonViewerData, null, 2)
-                : "No data available"}
-            </pre>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+      {/* Empty state */}
+      {executions.length === 0 && !loading && (
+        <div className='text-center py-12 text-muted-foreground'>
+          <div className='flex flex-col items-center gap-4'>
+            <div className='w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center'>
+              <FileText className='h-8 w-8 opacity-50' />
+            </div>
+            <div className='max-w-md'>
+              <h3 className='text-lg font-medium mb-2'>No executions yet</h3>
+              <p className='text-sm text-muted-foreground mb-4'>
+                This workflow hasn't been executed yet. Once you run this
+                workflow, execution history will appear here.
+              </p>
+              <div className='space-y-2 text-xs'>
+                <div className='flex items-center gap-2'>
+                  <div className='w-2 h-2 bg-blue-500 rounded-full'></div>
+                  <span>Execution status and timing</span>
+                </div>
+                <div className='flex items-center gap-2'>
+                  <div className='w-2 h-2 bg-green-500 rounded-full'></div>
+                  <span>Node-by-node progress</span>
+                </div>
+                <div className='flex items-center gap-2'>
+                  <div className='w-2 h-2 bg-purple-500 rounded-full'></div>
+                  <span>Input and output data</span>
+                </div>
+                <div className='flex items-center gap-2'>
+                  <div className='w-2 h-2 bg-orange-500 rounded-full'></div>
+                  <span>Detailed logs and errors</span>
+                </div>
+              </div>
+            </div>
+            <div className='mt-6'>
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => {
+                  // You could add a link to execute the workflow here
+                  console.log("Navigate to execute workflow");
+                }}>
+                <Play className='h-4 w-4 mr-2' />
+                Execute Workflow
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+});
+ExecutionLogsList.displayName = "ExecutionLogsList";
 
 interface ExecutionLogCardProps {
   log: WorkflowExecution;
   expandedLogs: Record<string, boolean>;
-  setExpandedLogs: React.Dispatch<
-    React.SetStateAction<Record<string, boolean>>
-  >;
+  setExpandedLogs: (newState: Record<string, boolean>) => void;
   formatDate: (date: string | null | undefined) => string;
   formatDuration: (start: string, end?: string | null) => string;
   getStatusBadge: (status: string) => JSX.Element;
@@ -576,7 +627,9 @@ interface ExecutionLogCardProps {
   nodeOutputs: Record<string, Record<string, unknown>>;
   nodeLogs: Record<string, NodeLog[]>;
   isLoading: boolean;
-  workflow?: Workflow;
+  workflow?: any;
+  isExpanded: boolean;
+  onToggleExpanded: () => void;
 }
 
 export const ExecutionLogCard = React.memo(
@@ -585,6 +638,7 @@ export const ExecutionLogCard = React.memo(
     expandedLogs,
     setExpandedLogs,
     formatDate,
+    formatDuration,
     getStatusBadge,
     handleAction,
     viewJsonData,
@@ -593,178 +647,804 @@ export const ExecutionLogCard = React.memo(
     nodeOutputs,
     nodeLogs,
     isLoading,
-    // Removed unused workflow parameter
+    workflow,
+    isExpanded,
+    onToggleExpanded,
   }: ExecutionLogCardProps) => {
-      const duration = useMemo(() => {
-    const startTime = log.startedAt || log.started_at;
-    const endTime = log.finishedAt || log.completed_at;
-    
-    if (!startTime) return "Unknown";
-    if (!endTime) return "In progress";
-    
-    try {
-      return formatDistance(new Date(startTime), new Date(endTime));
-    } catch (error) {
-      console.error('Error calculating duration:', error);
-      return "Invalid duration";
-    }
-  }, [log.finishedAt, log.completed_at, log.startedAt, log.started_at]);
+    const duration = useMemo(() => {
+      if (!log.started_at) return "N/A";
+      return formatDuration(log.started_at, log.completed_at);
+    }, [log.started_at, log.completed_at, formatDuration]);
+
+    const allLogs = useMemo(() => {
+      const logs: UnifiedLog[] = [];
+
+      // Add execution logs
+      if (log.executionLogs) {
+        logs.push(...log.executionLogs);
+      }
+
+      // Add node logs
+      if (nodeExecutions) {
+        nodeExecutions.forEach((nodeExec: any) => {
+          if (nodeExec.logs) {
+            logs.push(
+              ...nodeExec.logs.map((logEntry: any) => ({
+                ...logEntry,
+                source: "node",
+                node_id: nodeExec.node_id,
+              }))
+            );
+          }
+        });
+      }
+
+      // Sort by timestamp
+      return logs.sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+    }, [log.executionLogs, nodeExecutions]);
 
     return (
-      <Card
-        className={`overflow-hidden transition-all duration-200 ${
-          log.status === "failed" ? "border-red-200" : ""
-        }`}>
-        <CardHeader className='pb-2'>
-          <div className='flex justify-between items-start'>
-            <div className='flex items-center gap-2'>
-              {log.status === "running" ? (
-                <Loader2 className='h-4 w-4 animate-spin text-blue-500' />
-              ) : log.status === "completed" ? (
-                <CheckCircle className='h-4 w-4 text-green-500' />
-              ) : log.status === "failed" ? (
-                <XCircle className='h-4 w-4 text-red-500' />
-              ) : log.status === "paused" ? (
-                <Pause className='h-4 w-4 text-yellow-500' />
-              ) : (
-                <Clock className='h-4 w-4 text-gray-500' />
-              )}
-              <div>
-                <CardTitle className='text-base'>
-                  Execution {log.id.substring(0, 8)}
-                </CardTitle>
-                <CardDescription>
-                  Started: {formatDate(log.startedAt || log.started_at)}
-                </CardDescription>
+      <Card className='overflow-hidden'>
+        <CardHeader className='pb-3'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-3'>
+              <div className='flex items-center gap-2'>
+                {log.status === "running" ? (
+                  <Loader2 className='h-4 w-4 animate-spin text-blue-500' />
+                ) : log.status === "completed" ? (
+                  <CheckCircle className='h-4 w-4 text-green-500' />
+                ) : log.status === "failed" ? (
+                  <XCircle className='h-4 w-4 text-red-500' />
+                ) : (
+                  <Clock className='h-4 w-4 text-gray-500' />
+                )}
+                <div>
+                  <p className='text-sm font-medium'>
+                    Execution {log.id.slice(0, 8)}...
+                  </p>
+                  <p className='text-xs text-muted-foreground'>
+                    Started {formatDate(log.started_at)} • Duration: {duration}
+                  </p>
+                </div>
               </div>
             </div>
             <div className='flex items-center gap-2'>
               {getStatusBadge(log.status)}
-              {/* Action Buttons */}
-              {log.status === "running" && (
-                <Button
-                  size='sm'
-                  variant='outline'
-                  onClick={() => handleAction("pause", log.id)}
-                  className='h-7 text-xs px-2'>
-                  <Pause className='w-3 h-3 mr-1' />
-                  Pause
-                </Button>
-              )}
-              {log.status === "paused" && (
-                <Button
-                  size='sm'
-                  variant='default'
-                  onClick={() => handleAction("resume", log.id)}
-                  className='h-7 text-xs px-2'>
-                  <Play className='w-3 h-3 mr-1' />
-                  Resume
-                </Button>
-              )}
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={onToggleExpanded}
+                className='h-8 w-8 p-0'>
+                {isExpanded ? (
+                  <ChevronDown className='h-4 w-4' />
+                ) : (
+                  <ChevronRight className='h-4 w-4' />
+                )}
+              </Button>
             </div>
           </div>
         </CardHeader>
 
-        <Accordion
-          type='single'
-          collapsible
-          value={expandedLogs[log.id] ? log.id : ""}
-          onValueChange={(val) =>
-            setExpandedLogs((prev) => ({ ...prev, [log.id]: val === log.id }))
-          }>
-          <AccordionItem value={log.id} className='border-0'>
-            <AccordionTrigger className='py-2 px-6 hover:no-underline'>
-              <span className='text-sm font-medium'>View Details</span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <CardContent className='pt-0'>
-                <div className='space-y-4'>
-                  <div className='grid grid-cols-2 sm:grid-cols-4 gap-4 p-3 bg-muted/30 rounded-lg'>
-                    <div>
-                      <p className='text-xs font-medium text-muted-foreground'>
-                        Started
-                      </p>
-                      <p className='text-sm'>{formatDate(log.startedAt || log.started_at)}</p>
-                    </div>
-                    {(log.finishedAt || log.completed_at) && (
-                      <div>
-                        <p className='text-xs font-medium text-muted-foreground'>
-                          Completed
-                        </p>
-                        <p className='text-sm'>
-                          {formatDate(log.finishedAt || log.completed_at)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+        {isExpanded && (
+          <CardContent className='pt-0'>
+            {isLoading ? (
+              <div className='flex items-center justify-center p-8'>
+                <Loader2 className='h-6 w-6 animate-spin' />
+                <span className='ml-2'>Loading detailed data...</span>
+              </div>
+            ) : (
+              <Tabs defaultValue='logs' className='w-full'>
+                <TabsList className='grid w-full grid-cols-4'>
+                  <TabsTrigger value='logs'>
+                    Logs ({allLogs.length})
+                  </TabsTrigger>
+                  <TabsTrigger value='nodes'>
+                    Nodes ({nodeExecutions?.length || 0})
+                  </TabsTrigger>
+                  <TabsTrigger value='input'>Input</TabsTrigger>
+                  <TabsTrigger value='output'>Output</TabsTrigger>
+                </TabsList>
 
-                  {log.error && (
-                    <div className='bg-red-50 border border-red-200 rounded-md p-3'>
-                      <p className='text-sm text-red-700'>{log.error}</p>
+                <TabsContent value='logs' className='space-y-4'>
+                  {allLogs.length > 0 ? (
+                    <div className='space-y-3'>
+                      {/* Log Summary */}
+                      <div className='flex items-center justify-between p-3 bg-muted/30 rounded-lg'>
+                        <div className='flex items-center gap-4'>
+                          <div className='text-center'>
+                            <p className='text-sm font-medium'>
+                              {allLogs.length}
+                            </p>
+                            <p className='text-xs text-muted-foreground'>
+                              Total Logs
+                            </p>
+                          </div>
+                          <div className='text-center'>
+                            <p className='text-sm font-medium text-red-600'>
+                              {
+                                allLogs.filter((log) => log.level === "error")
+                                  .length
+                              }
+                            </p>
+                            <p className='text-xs text-muted-foreground'>
+                              Errors
+                            </p>
+                          </div>
+                          <div className='text-center'>
+                            <p className='text-sm font-medium text-yellow-600'>
+                              {
+                                allLogs.filter((log) => log.level === "warn")
+                                  .length
+                              }
+                            </p>
+                            <p className='text-xs text-muted-foreground'>
+                              Warnings
+                            </p>
+                          </div>
+                          <div className='text-center'>
+                            <p className='text-sm font-medium text-blue-600'>
+                              {
+                                allLogs.filter((log) => log.level === "info")
+                                  .length
+                              }
+                            </p>
+                            <p className='text-xs text-muted-foreground'>
+                              Info
+                            </p>
+                          </div>
+                        </div>
+                        <div className='text-xs text-muted-foreground'>
+                          {allLogs.length > 0 && (
+                            <span>
+                              {new Date(
+                                allLogs[0].timestamp
+                              ).toLocaleDateString()}{" "}
+                              -{" "}
+                              {new Date(
+                                allLogs[allLogs.length - 1].timestamp
+                              ).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Logs List */}
+                      <div className='space-y-2 max-h-96 overflow-y-auto'>
+                        {allLogs.map((logEntry: any, idx: number) => {
+                          const levelClass =
+                            logEntry.level === "error"
+                              ? "text-red-700 bg-red-50 border-red-100"
+                              : logEntry.level === "warn"
+                                ? "text-yellow-700 bg-yellow-50 border-yellow-100"
+                                : "text-gray-700 bg-gray-50 border-gray-100";
+
+                          return (
+                            <div
+                              key={idx}
+                              className={`p-3 rounded border ${levelClass}`}>
+                              <div className='flex items-center justify-between mb-2'>
+                                <div className='flex items-center gap-2'>
+                                  <Badge variant='outline' className='text-xs'>
+                                    {logEntry.source === "node"
+                                      ? `Node: ${logEntry.node_id}`
+                                      : "System"}
+                                  </Badge>
+                                  <Badge
+                                    variant={
+                                      logEntry.level === "error"
+                                        ? "destructive"
+                                        : "secondary"
+                                    }
+                                    className='text-xs'>
+                                    {logEntry.level}
+                                  </Badge>
+                                  <span className='text-xs opacity-80'>
+                                    {new Date(
+                                      logEntry.timestamp
+                                    ).toLocaleTimeString()}
+                                  </span>
+                                </div>
+                                <div className='flex items-center gap-1'>
+                                  {logEntry.metadata &&
+                                    Object.keys(logEntry.metadata).length >
+                                      0 && (
+                                      <Button
+                                        variant='ghost'
+                                        size='sm'
+                                        className='text-xs p-0 h-5 px-1.5'
+                                        onClick={() =>
+                                          viewJsonData(logEntry.metadata)
+                                        }>
+                                        Metadata
+                                      </Button>
+                                    )}
+                                </div>
+                              </div>
+                              <div className='text-sm mb-2'>
+                                {logEntry.message}
+                              </div>
+
+                              {/* Metadata Preview */}
+                              {logEntry.metadata &&
+                                Object.keys(logEntry.metadata).length > 0 && (
+                                  <div className='text-xs bg-black/5 p-2 rounded'>
+                                    <p className='font-medium mb-1'>
+                                      Metadata Preview:
+                                    </p>
+                                    <div className='space-y-1'>
+                                      {Object.entries(logEntry.metadata)
+                                        .slice(0, 3)
+                                        .map(([key, value]) => (
+                                          <div
+                                            key={key}
+                                            className='flex justify-between'>
+                                            <span className='text-muted-foreground'>
+                                              {key}:
+                                            </span>
+                                            <span className='truncate max-w-32'>
+                                              {typeof value === "object"
+                                                ? JSON.stringify(value).slice(
+                                                    0,
+                                                    30
+                                                  ) + "..."
+                                                : String(value)}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      {Object.keys(logEntry.metadata).length >
+                                        3 && (
+                                        <div className='text-muted-foreground text-xs'>
+                                          +
+                                          {Object.keys(logEntry.metadata)
+                                            .length - 3}{" "}
+                                          more fields
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className='text-center py-8 text-muted-foreground'>
+                      <div className='flex flex-col items-center gap-2'>
+                        <div className='w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center'>
+                          <FileText className='h-6 w-6 opacity-50' />
+                        </div>
+                        <div>
+                          <p className='font-medium'>No logs available</p>
+                          <p className='text-xs mt-1'>
+                            {log.status === "running"
+                              ? "Logs will appear as the execution progresses"
+                              : log.status === "pending"
+                                ? "Execution is queued and waiting to start"
+                                : "No logs were generated for this execution"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
+                </TabsContent>
 
-                  <div>
-                    <div className='flex items-center justify-between mb-3'>
-                      <p className='text-sm font-medium'>Node Executions</p>
-                      <Badge variant='outline' className='text-xs'>
-                        {nodeExecutions?.length || 0} nodes
-                      </Badge>
+                <TabsContent value='nodes' className='space-y-4'>
+                  {nodeExecutions && nodeExecutions.length > 0 ? (
+                    <div className='space-y-4'>
+                      {nodeExecutions.map((nodeExec: any) => {
+                        const nodeInputs =
+                          log.nodeInputs?.[nodeExec.node_id] || [];
+                        const nodeOutputs =
+                          log.nodeOutputs?.[nodeExec.node_id] || [];
+                        const duration =
+                          nodeExec.duration_ms ||
+                          (nodeExec.started_at && nodeExec.completed_at
+                            ? new Date(nodeExec.completed_at).getTime() -
+                              new Date(nodeExec.started_at).getTime()
+                            : 0);
+
+                        return (
+                          <div
+                            key={nodeExec.id}
+                            className='border rounded-lg overflow-hidden'>
+                            {/* Node Header */}
+                            <div className='bg-muted/50 p-3 border-b'>
+                              <div className='flex items-center justify-between'>
+                                <div className='flex items-center gap-3'>
+                                  <div className='flex items-center gap-2'>
+                                    {nodeExec.status === "running" ? (
+                                      <Loader2 className='h-4 w-4 animate-spin text-blue-500' />
+                                    ) : nodeExec.status === "completed" ? (
+                                      <CheckCircle className='h-4 w-4 text-green-500' />
+                                    ) : nodeExec.status === "failed" ? (
+                                      <XCircle className='h-4 w-4 text-red-500' />
+                                    ) : (
+                                      <Clock className='h-4 w-4 text-gray-500' />
+                                    )}
+                                    <div>
+                                      <p className='font-medium text-sm'>
+                                        {nodeExec.node_id}
+                                      </p>
+                                      <p className='text-xs text-muted-foreground'>
+                                        {nodeExec.status} • {duration}ms
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className='flex items-center gap-2'>
+                                  <Badge
+                                    variant={
+                                      nodeExec.status === "completed"
+                                        ? "default"
+                                        : nodeExec.status === "failed"
+                                          ? "destructive"
+                                          : nodeExec.status === "running"
+                                            ? "secondary"
+                                            : "outline"
+                                    }>
+                                    {nodeExec.status}
+                                  </Badge>
+                                  {nodeExec.retry_count > 0 && (
+                                    <Badge
+                                      variant='outline'
+                                      className='text-xs'>
+                                      Retries: {nodeExec.retry_count}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Node Details */}
+                            <div className='p-3 space-y-3'>
+                              {/* Error Display */}
+                              {nodeExec.error && (
+                                <div className='bg-red-50 border border-red-200 rounded-lg p-3'>
+                                  <div className='flex items-center gap-2 mb-2'>
+                                    <XCircle className='h-4 w-4 text-red-500' />
+                                    <p className='text-sm font-medium text-red-800'>
+                                      Error
+                                    </p>
+                                  </div>
+                                  <pre className='text-xs text-red-700 bg-red-100 p-2 rounded overflow-auto'>
+                                    {nodeExec.error}
+                                  </pre>
+                                </div>
+                              )}
+
+                              {/* Input/Output Data */}
+                              <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+                                {/* Input Data */}
+                                <div className='space-y-2'>
+                                  <div className='flex items-center justify-between'>
+                                    <p className='text-sm font-medium'>
+                                      Input Data
+                                    </p>
+                                    <Badge
+                                      variant='outline'
+                                      className='text-xs'>
+                                      {nodeInputs.length} items
+                                    </Badge>
+                                  </div>
+                                  {nodeInputs.length > 0 ? (
+                                    <div className='space-y-2'>
+                                      {nodeInputs.map(
+                                        (input: any, idx: number) => (
+                                          <div
+                                            key={idx}
+                                            className='bg-muted/30 p-2 rounded text-xs'>
+                                            <div className='flex items-center justify-between mb-1'>
+                                              <span className='text-muted-foreground'>
+                                                Input {idx + 1}
+                                              </span>
+                                              <Button
+                                                variant='ghost'
+                                                size='sm'
+                                                className='text-xs p-0 h-4 px-1'
+                                                onClick={() =>
+                                                  viewJsonData(input.input_data)
+                                                }>
+                                                View
+                                              </Button>
+                                            </div>
+                                            <pre className='text-xs overflow-auto max-h-20'>
+                                              {JSON.stringify(
+                                                input.input_data,
+                                                null,
+                                                2
+                                              )}
+                                            </pre>
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className='text-xs text-muted-foreground bg-muted/30 p-2 rounded'>
+                                      No input data
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Output Data */}
+                                <div className='space-y-2'>
+                                  <div className='flex items-center justify-between'>
+                                    <p className='text-sm font-medium'>
+                                      Output Data
+                                    </p>
+                                    <Badge
+                                      variant='outline'
+                                      className='text-xs'>
+                                      {nodeOutputs.length} items
+                                    </Badge>
+                                  </div>
+                                  {nodeOutputs.length > 0 ? (
+                                    <div className='space-y-2'>
+                                      {nodeOutputs.map(
+                                        (output: any, idx: number) => (
+                                          <div
+                                            key={idx}
+                                            className='bg-muted/30 p-2 rounded text-xs'>
+                                            <div className='flex items-center justify-between mb-1'>
+                                              <span className='text-muted-foreground'>
+                                                Output {idx + 1}
+                                              </span>
+                                              <Button
+                                                variant='ghost'
+                                                size='sm'
+                                                className='text-xs p-0 h-4 px-1'
+                                                onClick={() =>
+                                                  viewJsonData(
+                                                    output.output_data
+                                                  )
+                                                }>
+                                                View
+                                              </Button>
+                                            </div>
+                                            <pre className='text-xs overflow-auto max-h-20'>
+                                              {JSON.stringify(
+                                                output.output_data,
+                                                null,
+                                                2
+                                              )}
+                                            </pre>
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className='text-xs text-muted-foreground bg-muted/30 p-2 rounded'>
+                                      No output data
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Node Logs */}
+                              {nodeExec.logs && nodeExec.logs.length > 0 && (
+                                <div className='space-y-2'>
+                                  <div className='flex items-center justify-between'>
+                                    <p className='text-sm font-medium'>
+                                      Node Logs
+                                    </p>
+                                    <Badge
+                                      variant='outline'
+                                      className='text-xs'>
+                                      {nodeExec.logs.length} logs
+                                    </Badge>
+                                  </div>
+                                  <div className='space-y-1 max-h-40 overflow-y-auto'>
+                                    {nodeExec.logs.map(
+                                      (logEntry: any, idx: number) => {
+                                        const levelClass =
+                                          logEntry.level === "error"
+                                            ? "text-red-700 bg-red-50 border-red-100"
+                                            : logEntry.level === "warn"
+                                              ? "text-yellow-700 bg-yellow-50 border-yellow-100"
+                                              : "text-gray-700 bg-gray-50 border-gray-100";
+
+                                        return (
+                                          <div
+                                            key={idx}
+                                            className={`p-2 rounded border text-xs ${levelClass}`}>
+                                            <div className='flex items-center justify-between mb-1'>
+                                              <div className='flex items-center gap-2'>
+                                                <Badge
+                                                  variant={
+                                                    logEntry.level === "error"
+                                                      ? "destructive"
+                                                      : "secondary"
+                                                  }
+                                                  className='text-xs'>
+                                                  {logEntry.level}
+                                                </Badge>
+                                                <span className='text-xs opacity-80'>
+                                                  {new Date(
+                                                    logEntry.timestamp
+                                                  ).toLocaleTimeString()}
+                                                </span>
+                                              </div>
+                                              {logEntry.metadata && (
+                                                <Button
+                                                  variant='ghost'
+                                                  size='sm'
+                                                  className='text-xs p-0 h-4 px-1'
+                                                  onClick={() =>
+                                                    viewJsonData(
+                                                      logEntry.metadata
+                                                    )
+                                                  }>
+                                                  JSON
+                                                </Button>
+                                              )}
+                                            </div>
+                                            <div className='text-xs'>
+                                              {logEntry.message}
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className='text-center py-8 text-muted-foreground'>
+                      <div className='flex flex-col items-center gap-2'>
+                        <div className='w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center'>
+                          <FileText className='h-6 w-6 opacity-50' />
+                        </div>
+                        <div>
+                          <p className='font-medium'>
+                            No node executions found
+                          </p>
+                          <p className='text-xs mt-1'>
+                            {log.status === "failed"
+                              ? "Execution failed before nodes could start"
+                              : log.status === "running"
+                                ? "Nodes are starting up..."
+                                : log.status === "pending"
+                                  ? "Execution is queued and waiting to start"
+                                  : "Nodes have not started yet"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value='input' className='space-y-4'>
+                  <div className='space-y-3'>
+                    {/* Input Summary */}
+                    <div className='flex items-center justify-between p-3 bg-muted/30 rounded-lg'>
+                      <div className='flex items-center gap-4'>
+                        <div className='text-center'>
+                          <p className='text-sm font-medium'>
+                            {Object.keys(log.input_data || {}).length}
+                          </p>
+                          <p className='text-xs text-muted-foreground'>
+                            Input Fields
+                          </p>
+                        </div>
+                        <div className='text-center'>
+                          <p className='text-sm font-medium'>
+                            {JSON.stringify(log.input_data || {}).length}
+                          </p>
+                          <p className='text-xs text-muted-foreground'>Bytes</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='text-xs'
+                        onClick={() => viewJsonData(log.input_data)}>
+                        View Full JSON
+                      </Button>
                     </div>
 
-                    {expandedLogs[log.id] && (
-                      <>
-                        {isLoading ? (
-                          <div className='flex items-center justify-center p-8'>
-                            <Loader2 className='h-4 w-4 animate-spin mr-2' />
-                            <span className='text-sm text-muted-foreground'>
-                              Loading node executions...
-                            </span>
-                          </div>
-                        ) : nodeExecutions ? (
-                          <div>
-                            {nodeExecutions.map((nodeExec) => (
-                              <NodeExecutionItem
-                                key={nodeExec.id}
-                                nodeExec={nodeExec}
-                                log={log}
-                                expandedLogs={expandedLogs}
-                                setExpandedLogs={setExpandedLogs}
-                                getStatusBadge={getStatusBadge}
-                                formatDate={formatDate}
-                                handleAction={handleAction}
-                                viewJsonData={viewJsonData}
-                                nodeInputs={nodeInputs}
-                                nodeOutputs={nodeOutputs}
-                                nodeLogs={nodeLogs}
-                              />
-                            ))}
-                          </div>
-                        ) : (
-                          <div className='text-sm text-muted-foreground'>
-                            No node executions available
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+                    {/* Input Data Display */}
+                    <div className='relative'>
+                      <div className='bg-muted/20 p-3 rounded-lg border'>
+                        <div className='flex items-center justify-between mb-2'>
+                          <p className='text-sm font-medium'>Input Data</p>
+                          <p className='text-xs text-muted-foreground'>
+                            {log.input_data ? "Available" : "No input data"}
+                          </p>
+                        </div>
+                        <pre className='text-xs bg-background p-3 rounded border overflow-auto max-h-60'>
+                          {JSON.stringify(log.input_data || {}, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
 
-        <CardFooter className='py-3 bg-muted/10'>
-          <div className='w-full flex justify-between text-xs text-muted-foreground'>
-            <span>Duration: {duration}</span>
-            <span className='font-mono'>ID: {log.id}</span>
-          </div>
-        </CardFooter>
+                    {/* Node Inputs */}
+                    {log.nodeInputs &&
+                      Object.keys(log.nodeInputs).length > 0 && (
+                        <div className='space-y-3'>
+                          <div className='flex items-center justify-between'>
+                            <p className='text-sm font-medium'>Node Inputs</p>
+                            <Badge variant='outline' className='text-xs'>
+                              {Object.keys(log.nodeInputs).length} nodes
+                            </Badge>
+                          </div>
+                          <div className='space-y-2'>
+                            {Object.entries(log.nodeInputs).map(
+                              ([nodeId, inputs]) => (
+                                <div
+                                  key={nodeId}
+                                  className='border rounded-lg p-3'>
+                                  <div className='flex items-center justify-between mb-2'>
+                                    <p className='text-sm font-medium'>
+                                      Node: {nodeId}
+                                    </p>
+                                    <Badge
+                                      variant='outline'
+                                      className='text-xs'>
+                                      {inputs.length} inputs
+                                    </Badge>
+                                  </div>
+                                  <div className='space-y-2'>
+                                    {inputs.map((input: any, idx: number) => (
+                                      <div
+                                        key={idx}
+                                        className='bg-muted/30 p-2 rounded text-xs'>
+                                        <div className='flex items-center justify-between mb-1'>
+                                          <span className='text-muted-foreground'>
+                                            Input {idx + 1}
+                                          </span>
+                                          <Button
+                                            variant='ghost'
+                                            size='sm'
+                                            className='text-xs p-0 h-4 px-1'
+                                            onClick={() =>
+                                              viewJsonData(input.input_data)
+                                            }>
+                                            View
+                                          </Button>
+                                        </div>
+                                        <pre className='text-xs overflow-auto max-h-20'>
+                                          {JSON.stringify(
+                                            input.input_data,
+                                            null,
+                                            2
+                                          )}
+                                        </pre>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value='output' className='space-y-4'>
+                  <div className='space-y-3'>
+                    {/* Output Summary */}
+                    <div className='flex items-center justify-between p-3 bg-muted/30 rounded-lg'>
+                      <div className='flex items-center gap-4'>
+                        <div className='text-center'>
+                          <p className='text-sm font-medium'>
+                            {Object.keys(log.output_data || {}).length}
+                          </p>
+                          <p className='text-xs text-muted-foreground'>
+                            Output Fields
+                          </p>
+                        </div>
+                        <div className='text-center'>
+                          <p className='text-sm font-medium'>
+                            {JSON.stringify(log.output_data || {}).length}
+                          </p>
+                          <p className='text-xs text-muted-foreground'>Bytes</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='text-xs'
+                        onClick={() => viewJsonData(log.output_data)}>
+                        View Full JSON
+                      </Button>
+                    </div>
+
+                    {/* Output Data Display */}
+                    <div className='relative'>
+                      <div className='bg-muted/20 p-3 rounded-lg border'>
+                        <div className='flex items-center justify-between mb-2'>
+                          <p className='text-sm font-medium'>Output Data</p>
+                          <p className='text-xs text-muted-foreground'>
+                            {log.output_data ? "Available" : "No output data"}
+                          </p>
+                        </div>
+                        <pre className='text-xs bg-background p-3 rounded border overflow-auto max-h-60'>
+                          {JSON.stringify(log.output_data || {}, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+
+                    {/* Node Outputs */}
+                    {log.nodeOutputs &&
+                      Object.keys(log.nodeOutputs).length > 0 && (
+                        <div className='space-y-3'>
+                          <div className='flex items-center justify-between'>
+                            <p className='text-sm font-medium'>Node Outputs</p>
+                            <Badge variant='outline' className='text-xs'>
+                              {Object.keys(log.nodeOutputs).length} nodes
+                            </Badge>
+                          </div>
+                          <div className='space-y-2'>
+                            {Object.entries(log.nodeOutputs).map(
+                              ([nodeId, outputs]) => (
+                                <div
+                                  key={nodeId}
+                                  className='border rounded-lg p-3'>
+                                  <div className='flex items-center justify-between mb-2'>
+                                    <p className='text-sm font-medium'>
+                                      Node: {nodeId}
+                                    </p>
+                                    <Badge
+                                      variant='outline'
+                                      className='text-xs'>
+                                      {outputs.length} outputs
+                                    </Badge>
+                                  </div>
+                                  <div className='space-y-2'>
+                                    {outputs.map((output: any, idx: number) => (
+                                      <div
+                                        key={idx}
+                                        className='bg-muted/30 p-2 rounded text-xs'>
+                                        <div className='flex items-center justify-between mb-1'>
+                                          <span className='text-muted-foreground'>
+                                            Output {idx + 1}
+                                          </span>
+                                          <Button
+                                            variant='ghost'
+                                            size='sm'
+                                            className='text-xs p-0 h-4 px-1'
+                                            onClick={() =>
+                                              viewJsonData(output.output_data)
+                                            }>
+                                            View
+                                          </Button>
+                                        </div>
+                                        <pre className='text-xs overflow-auto max-h-20'>
+                                          {JSON.stringify(
+                                            output.output_data,
+                                            null,
+                                            2
+                                          )}
+                                        </pre>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            )}
+          </CardContent>
+        )}
       </Card>
     );
   }
 );
-// ### Node Execution Item Component
+
 const NodeExecutionItem = React.memo(
   ({
     nodeExec,
@@ -893,7 +1573,9 @@ const NodeExecutionItem = React.memo(
               <AccordionContent>
                 <div className='mb-3 flex items-center justify-between'>
                   <div className='flex items-center gap-2'>
-                    <span className='text-xs font-medium'>Filter:</span>
+                    <span className='text-xs font-medium text-muted-foreground'>
+                      Filter:
+                    </span>
                     <select
                       className='text-xs bg-transparent border-none focus:outline-none focus:ring-0'
                       value={logLevel}
@@ -938,22 +1620,14 @@ const NodeExecutionItem = React.memo(
                             Expand
                           </Button>
                         </div>
-                      ) : nodeExec?.input_data || nodeExec?.input ? (
+                      ) : nodeExec?.input_data ? (
                         <div className='relative'>
-                          {JSON.stringify(
-                            nodeExec?.input_data || nodeExec?.input,
-                            null,
-                            2
-                          )}
+                          {JSON.stringify(nodeExec.input_data, null, 2)}
                           <Button
                             variant='outline'
                             size='sm'
                             className='absolute top-2 right-2 h-6 text-xs'
-                            onClick={() =>
-                              viewJsonData(
-                                nodeExec?.input_data || nodeExec?.input
-                              )
-                            }>
+                            onClick={() => viewJsonData(nodeExec.input_data)}>
                             Expand
                           </Button>
                         </div>
@@ -986,22 +1660,14 @@ const NodeExecutionItem = React.memo(
                             Expand
                           </Button>
                         </div>
-                      ) : nodeExec?.output_data || nodeExec?.output ? (
+                      ) : nodeExec?.output_data ? (
                         <div className='relative'>
-                          {JSON.stringify(
-                            nodeExec?.output_data || nodeExec?.output,
-                            null,
-                            2
-                          )}
+                          {JSON.stringify(nodeExec.output_data, null, 2)}
                           <Button
                             variant='outline'
                             size='sm'
                             className='absolute top-2 right-2 h-6 text-xs'
-                            onClick={() =>
-                              viewJsonData(
-                                nodeExec?.output_data || nodeExec?.output
-                              )
-                            }>
+                            onClick={() => viewJsonData(nodeExec.output_data)}>
                             Expand
                           </Button>
                         </div>
@@ -1052,12 +1718,12 @@ const NodeExecutionItem = React.memo(
                                 ).toLocaleTimeString()}
                               </span>
                             </div>
-                            {logEntry.data && (
+                            {logEntry.metadata && (
                               <Button
                                 variant='ghost'
                                 size='sm'
                                 className='text-[10px] p-0 h-5 px-1.5'
-                                onClick={() => viewJsonData(logEntry.data)}>
+                                onClick={() => viewJsonData(logEntry.metadata)}>
                                 View JSON
                               </Button>
                             )}
@@ -1158,7 +1824,7 @@ const NodeExecutionItem = React.memo(
     );
   }
 );
-NodeExecutionItem.displayName = "Node ExectuionItem";
+NodeExecutionItem.displayName = "Node ExecutionItem";
 
 // Add display names to components
 ExecutionLogsList.displayName = "ExecutionLogsList";

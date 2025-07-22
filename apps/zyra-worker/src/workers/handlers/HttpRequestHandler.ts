@@ -72,6 +72,7 @@ export class HttpRequestHandler implements BlockHandler {
       const inputs = this.validateInputs(
         ctx.inputs || {},
         ctx.previousOutputs || {},
+        ctx,
       );
 
       // Check if this is a legacy price monitor configuration
@@ -126,12 +127,25 @@ export class HttpRequestHandler implements BlockHandler {
   private validateInputs(
     inputs: Record<string, any>,
     previousOutputs: Record<string, any>,
+    ctx: BlockExecutionContext,
   ): any {
     // Merge inputs and previousOutputs for template processing
     const allInputs = { ...previousOutputs, ...inputs };
 
+    // Structure the data according to the schema
+    const structuredInputs = {
+      data: allInputs,
+      context: {
+        workflowId: ctx.workflowId,
+        executionId: ctx.executionId,
+        userId: ctx.userId,
+        timestamp: new Date().toISOString(),
+      },
+      variables: {}, // Add any workflow variables if available
+    };
+
     // Validate against input schema (non-strict for flexibility)
-    const result = HttpRequestHandler.inputSchema.safeParse(allInputs);
+    const result = HttpRequestHandler.inputSchema.safeParse(structuredInputs);
 
     if (!result.success) {
       // Log warning but don't fail - inputs are optional overrides

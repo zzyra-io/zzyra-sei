@@ -3,7 +3,7 @@ import { ExecutionsController } from "./executions.controller";
 import { ExecutionsService } from "./executions.service";
 import { NodeExecutionsService } from "./node-executions.service";
 import { NodeLogsService } from "./node-logs.service";
-import { ExecutionRepository } from "@zyra/database";
+import { ExecutionRepository } from "../database/repositories/execution.repository";
 import { DatabaseModule } from "../database/database.module";
 
 @Module({

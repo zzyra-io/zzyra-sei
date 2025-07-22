@@ -8,9 +8,11 @@ import {
   BlockType,
   getBlockType,
   getBlockMetadata,
+  HttpRequestOptions,
 } from '@zyra/types';
 import { ZyraTemplateProcessor } from '../../../utils/template-processor';
 import { DatabaseService } from '../../../services/database.service';
+import { ExecutionLogger } from '../../execution-logger';
 
 // Import enhanced blocks
 import { HttpBlockHandler } from '../HttpBlockHandler';
@@ -32,6 +34,7 @@ export class EnhancedBlockRegistry {
   constructor(
     private templateProcessor: ZyraTemplateProcessor,
     private databaseService: DatabaseService,
+    private executionLogger: ExecutionLogger,
   ) {
     this.initializeBlocks();
   }
@@ -206,7 +209,18 @@ export class EnhancedBlockRegistry {
     );
 
     try {
+      this.logger.debug(`Executing enhanced block: ${node.type}`, {
+        nodeId: node.id,
+        executionId: context.executionId,
+      });
+
       const result = await handler.execute(enhancedContext);
+
+      this.logger.debug(`Enhanced block execution completed: ${node.type}`, {
+        nodeId: node.id,
+        executionId: context.executionId,
+        hasResult: !!result,
+      });
 
       // Convert enhanced result back to legacy format
       return this.convertEnhancedResultToLegacy(result);
@@ -266,8 +280,31 @@ export class EnhancedBlockRegistry {
       inputData.push({ json: {} });
     }
 
+    // Create the node logger
+    let nodeLogger;
+    if (context.executionId && context.nodeId) {
+      nodeLogger = this.executionLogger.createNodeLogger(
+        context.executionId,
+        context.nodeId,
+      );
+    } else {
+      this.logger.error('Missing executionId or nodeId for logger creation', {
+        executionId: context.executionId,
+        nodeId: context.nodeId,
+      });
+      // No-op logger to avoid crashes
+      nodeLogger = {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        debug: () => {},
+        log: () => {},
+      };
+    }
+    // Contract: context.logger must always be safe to call and log to node_logs if possible.
     return {
       ...context,
+      logger: nodeLogger,
 
       getInputData: (inputIndex = 0) => {
         return inputData;
@@ -275,43 +312,41 @@ export class EnhancedBlockRegistry {
 
       getNodeParameter: (parameterName: string, itemIndex = 0) => {
         const nodeData = node.data || {};
-        return nodeData[parameterName] !== undefined
-          ? nodeData[parameterName]
-          : node[parameterName];
+        const config = nodeData.config || {};
+        return config[parameterName];
       },
 
       getCredentials: async (type: string) => {
-        // TODO: Implement credential retrieval
-        return null;
+        // For now, return empty credentials
+        // This can be enhanced later to fetch from a credentials service
+        return {};
       },
 
       getWorkflowStaticData: (type: string) => {
-        // TODO: Implement workflow static data retrieval
+        // For now, return empty static data
+        // This can be enhanced later to fetch from a static data service
         return {};
       },
 
       helpers: {
-        httpRequest: async (options: any) => {
-          // TODO: Implement HTTP request helper
-          throw new Error('HTTP request helper not implemented');
+        httpRequest: async (options: HttpRequestOptions) => {
+          // This can be enhanced to use a proper HTTP client
+          const response = await fetch(options.url, {
+            method: options.method || 'GET',
+            headers: options.headers,
+            body: options.body ? JSON.stringify(options.body) : undefined,
+          });
+          return response.json();
         },
 
         processTemplate: (template: string, data: any) => {
-          return this.templateProcessor.process(template, data, context);
+          return this.templateProcessor.process(template, data);
         },
 
         formatValue: (value: any, format?: string) => {
-          if (format === 'currency') {
-            return new Intl.NumberFormat('en-US', {
-              style: 'currency',
-              currency: 'USD',
-            }).format(Number(value));
+          if (format === 'json') {
+            return JSON.stringify(value);
           }
-
-          if (format === 'date') {
-            return new Date(value).toISOString();
-          }
-
           return String(value);
         },
 
@@ -319,24 +354,27 @@ export class EnhancedBlockRegistry {
           inputData: ZyraNodeData[],
           outputData: any[],
         ) => {
-          return outputData.map((data, index) => ({
-            json: data,
-            pairedItem: inputData[index]?.pairedItem || { item: index },
+          return outputData.map((item, index) => ({
+            json: item,
+            pairedItem: { item: index },
           }));
         },
 
         normalizeItems: (items: any) => {
-          if (!Array.isArray(items)) {
-            return [{ json: items }];
+          if (Array.isArray(items)) {
+            return items.map((item, index) => ({
+              json: item,
+              pairedItem: { item: index },
+            }));
           }
-
-          return items.map((item) => ({
-            json: item,
-          }));
+          return [{ json: items, pairedItem: { item: 0 } }];
         },
 
         returnJsonArray: (jsonData: any[]) => {
-          return jsonData.map((data) => ({ json: data }));
+          return jsonData.map((item, index) => ({
+            json: item,
+            pairedItem: { item: index },
+          }));
         },
       },
     };

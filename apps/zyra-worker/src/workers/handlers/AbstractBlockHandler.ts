@@ -85,12 +85,12 @@ export abstract class AbstractBlockHandler implements BlockHandler {
     data?: any,
   ): Promise<void> {
     try {
-      await this.databaseService.executions.addLog(
+      await this.databaseService.executions.addNodeLog(
         executionId,
+        nodeId,
         level,
         message,
         {
-          nodeId,
           timestamp: new Date().toISOString(),
           ...(data && { data }),
         },
