@@ -565,6 +565,8 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
           edge={selectedEdge}
           onUpdate={handleEdgeUpdate}
           onClose={handleCloseEdgeConfigPanel}
+          sourceBlock={nodes.find((n) => n.id === selectedEdge.source)}
+          targetBlock={nodes.find((n) => n.id === selectedEdge.target)}
         />
       )}
 

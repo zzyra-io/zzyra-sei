@@ -2,13 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BlockExecutionContext, BlockHandler } from '@zyra/types';
 import { DatabaseService } from '../../services/database.service';
 import * as nodemailer from 'nodemailer';
-import * as dotenv from 'dotenv';
-
-dotenv.config();
+import { ZyraTemplateProcessor } from '../../utils/template-processor';
 
 @Injectable()
 export class EmailBlockHandler implements BlockHandler {
   private readonly logger = new Logger(EmailBlockHandler.name);
+  private readonly templateProcessor = new ZyraTemplateProcessor();
 
   constructor(private readonly databaseService: DatabaseService) {}
 
@@ -44,17 +43,17 @@ export class EmailBlockHandler implements BlockHandler {
         },
       });
 
-      // Process email template variables from previous node outputs
+      // Process email template variables from previous node outputs using unified template processor
       let emailBody = config.body;
       let emailSubject = config.subject;
 
       // If we have previous outputs from the workflow, use them for template substitution
       if (ctx.previousOutputs && Object.keys(ctx.previousOutputs).length > 0) {
-        emailBody = this.processTemplateVariables(
+        emailBody = this.templateProcessor.process(
           emailBody,
           ctx.previousOutputs,
         );
-        emailSubject = this.processTemplateVariables(
+        emailSubject = this.templateProcessor.process(
           emailSubject,
           ctx.previousOutputs,
         );
@@ -104,144 +103,18 @@ export class EmailBlockHandler implements BlockHandler {
   }
 
   /**
-   * Process template variables in email content
-   * Handles specialized formatting for different variable types
-   */
-  private processTemplateVariables(
-    template: string,
-    variables: Record<string, any>,
-  ): string {
-    let processed = template;
-
-    // Process nested objects (like PriceMonitor results)
-    const flattenedVars = this.flattenVariables(variables);
-
-    // Replace template variables like {{variableName}}
-    for (const [key, value] of Object.entries(flattenedVars)) {
-      const placeholder = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-
-      // Skip undefined/null values
-      if (value === undefined || value === null) continue;
-
-      // Format values appropriately
-      let formattedValue: string;
-
-      if (typeof value === 'number') {
-        // Format numbers as currency if they seem to be monetary values
-        const isLikelyPrice =
-          key.toLowerCase().includes('price') ||
-          key.toLowerCase().includes('amount') ||
-          key.toLowerCase().includes('value');
-
-        formattedValue = isLikelyPrice
-          ? `$${value.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}`
-          : value.toString();
-      } else if (value instanceof Date) {
-        formattedValue = value.toLocaleString();
-      } else {
-        formattedValue = String(value);
-      }
-
-      processed = processed.replace(placeholder, formattedValue);
-    }
-
-    // Add current timestamp if {{timestamp}} is used
-    const timestampRegex = /{{\\s*timestamp\\s*}}/g;
-    processed = processed.replace(
-      timestampRegex,
-      new Date().toLocaleString(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'medium',
-      }),
-    );
-
-    // Add standard email footer if none exists
-    if (!processed.includes('Powered by Zzyra')) {
-      processed += '\n\n--\nPowered by Zzyra | Automated Workflows';
-    }
-
-    return processed;
-  }
-
-  /**
-   * Flatten nested objects for template processing
-   * Converts {a: {b: 1}} to {'a.b': 1}
-   */
-  private flattenVariables(
-    obj: Record<string, any>,
-    prefix = '',
-  ): Record<string, any> {
-    let result: Record<string, any> = {};
-
-    // Special handling for PriceMonitor output
-    if (obj.asset && obj.currentPrice) {
-      // Add simplified access to common price data
-      result['asset'] = obj.asset;
-      result['price'] = obj.currentPrice;
-      result['formattedPrice'] = `$${obj.currentPrice.toLocaleString(
-        undefined,
-        {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        },
-      )}`;
-    }
-
-    // Handle formatted fields specifically (from PriceMonitorBlockHandler)
-    if (obj.formatted) {
-      for (const [key, value] of Object.entries(obj.formatted)) {
-        result[key] = value;
-      }
-    }
-
-    // Process all properties
-    for (const [key, value] of Object.entries(obj)) {
-      const newKey = prefix ? `${prefix}.${key}` : key;
-
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        // Recursively flatten nested objects
-        const nested = this.flattenVariables(
-          value as Record<string, any>,
-          newKey,
-        );
-        result = { ...result, ...nested };
-      } else {
-        // Add simple values
-        result[newKey] = value;
-      }
-    }
-
-    return result;
-  }
-
-  /**
    * Validate email configuration
    */
   private validateEmailConfig(): void {
-    const requiredVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
-    const missing = requiredVars.filter((varName) => !process.env[varName]);
+    const requiredEnvVars = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS'];
+    const missingVars = requiredEnvVars.filter(
+      (varName) => !process.env[varName],
+    );
 
-    if (missing.length > 0) {
-      throw new Error(`Email configuration is missing: ${missing.join(', ')}`);
-    }
-  }
-
-  /**
-   * Get email template from database
-   */
-  private async getEmailTemplate(templateId: string): Promise<any> {
-    try {
-      const template =
-        await this.databaseService.prisma.notificationTemplate.findUnique({
-          where: { id: templateId },
-        });
-      return template;
-    } catch (error: any) {
-      this.logger.error(`Failed to get email template: ${error.message}`);
-      return null;
+    if (missingVars.length > 0) {
+      throw new Error(
+        `Missing required email configuration: ${missingVars.join(', ')}`,
+      );
     }
   }
 

@@ -25,13 +25,13 @@ export class MagicAdminService {
   }> {
     try {
       // Get user's Magic session
-      const session = await this.magic.users.getMetadataByToken(userId);
+      const session = await this.magic.users.getMetadataByIssuer(userId);
       if (!session) {
         throw new Error("Invalid user session");
       }
 
-      // Get user's wallet
-      const wallet = await this.magic.wallets.getByUserId(userId);
+      // Get user's wallet from metadata
+      const wallet = session.wallets?.find((w) => w.walletType === "ETH");
       if (!wallet) {
         throw new Error("No wallet found for user");
       }
@@ -39,19 +39,28 @@ export class MagicAdminService {
       // Create provider for the network
       const provider = this.getProviderForNetwork(network);
 
-      // Execute transaction through Magic delegation
-      const txHash = await this.magic.wallets.sendTransaction({
-        userId,
-        transaction,
-        network,
+      // For now, we'll use ethers to send the transaction
+      // In a real implementation, you'd use Magic's delegation
+      const walletSigner = new ethers.Wallet(
+        process.env.PRIVATE_KEY || "",
+        provider
+      );
+
+      // Execute transaction
+      const tx = await walletSigner.sendTransaction({
+        to: transaction.to,
+        value: transaction.value || 0,
+        data: transaction.data || "0x",
+        gasLimit: transaction.gasLimit,
+        gasPrice: transaction.gasPrice,
       });
 
       // Wait for transaction to be mined
-      const receipt = await provider.waitForTransaction(txHash, 1, 60000);
+      const receipt = await provider.waitForTransaction(tx.hash, 1, 60000);
 
       return {
-        txHash,
-        status: receipt.status === 1 ? "confirmed" : "failed",
+        txHash: tx.hash,
+        status: receipt?.status === 1 ? "confirmed" : "failed",
       };
     } catch (error: any) {
       this.logger.error(`Transaction execution failed: ${error.message}`);
@@ -71,8 +80,9 @@ export class MagicAdminService {
     estimatedCost: bigint;
   }> {
     try {
-      // Get user's wallet address
-      const wallet = await this.magic.wallets.getByUserId(userId);
+      // Get user's wallet address from metadata
+      const metadata = await this.magic.users.getMetadataByIssuer(userId);
+      const wallet = metadata.wallets?.find((w) => w.walletType === "ETH");
       if (!wallet) {
         throw new Error("No wallet found for user");
       }
@@ -83,7 +93,7 @@ export class MagicAdminService {
       // Add from address to transaction
       const transactionWithFrom = {
         ...transaction,
-        from: wallet.address,
+        from: wallet.publicAddress,
       };
 
       // Estimate gas limit
@@ -236,7 +246,7 @@ export class MagicAdminService {
    */
   async validateUserSession(userId: string): Promise<boolean> {
     try {
-      const session = await this.magic.users.getMetadataByToken(userId);
+      const session = await this.magic.users.getMetadataByIssuer(userId);
       return !!session;
     } catch (error) {
       return false;
@@ -248,8 +258,9 @@ export class MagicAdminService {
    */
   async getUserWalletAddress(userId: string): Promise<string | null> {
     try {
-      const wallet = await this.magic.wallets.getByUserId(userId);
-      return wallet?.address || null;
+      const metadata = await this.magic.users.getMetadataByIssuer(userId);
+      const wallet = metadata.wallets?.find((w) => w.walletType === "ETH");
+      return wallet?.publicAddress || null;
     } catch (error) {
       return null;
     }
@@ -263,7 +274,8 @@ export class MagicAdminService {
     tokenAddress?: string
   ): Promise<bigint> {
     try {
-      const wallet = await this.magic.wallets.getByUserId(userId);
+      const metadata = await this.magic.users.getMetadataByIssuer(userId);
+      const wallet = metadata.wallets?.find((w) => w.walletType === "ETH");
       if (!wallet) {
         throw new Error("No wallet found for user");
       }
@@ -277,10 +289,10 @@ export class MagicAdminService {
           ["function balanceOf(address) view returns (uint256)"],
           provider
         );
-        return await tokenContract.balanceOf(wallet.address);
+        return await tokenContract.balanceOf(wallet.publicAddress!);
       } else {
         // Get native balance
-        return await provider.getBalance(wallet.address);
+        return await provider.getBalance(wallet.publicAddress!);
       }
     } catch (error: any) {
       this.logger.error(`Failed to get wallet balance: ${error.message}`);

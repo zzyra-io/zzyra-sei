@@ -81,12 +81,14 @@ export class WorkflowExecutor {
    * @param nodeId Node ID to get relevant outputs for
    * @param dependencyMap Map of node dependencies
    * @param allOutputs All outputs collected so far
+   * @param edges Workflow edges for data mapping
    * @returns Object containing only the outputs relevant to this node
    */
   private getRelevantOutputs(
     nodeId: string,
     dependencyMap: Map<string, string[]>,
     allOutputs: Record<string, any>,
+    edges: any[] = [],
   ): Record<string, any> {
     const relevantOutputs: Record<string, any> = {};
     const dependencies = dependencyMap.get(nodeId) || [];
@@ -94,11 +96,43 @@ export class WorkflowExecutor {
     // Include outputs from direct dependencies
     dependencies.forEach((depId) => {
       if (allOutputs[depId] !== undefined) {
-        relevantOutputs[depId] = allOutputs[depId];
+        // Find edge connecting this dependency to the current node
+        const edge = edges.find(
+          (e) => e.source === depId && e.target === nodeId,
+        );
+
+        if (edge && edge.data?.mapping) {
+          // Apply field mapping from edge configuration
+          const mappedData: Record<string, any> = {};
+          for (const [targetField, sourceField] of Object.entries(
+            edge.data.mapping as Record<string, string>,
+          )) {
+            const value = this.getNestedValue(allOutputs[depId], sourceField);
+            if (value !== undefined) {
+              mappedData[targetField] = value;
+            }
+          }
+          relevantOutputs[depId] = mappedData;
+        } else {
+          // No specific mapping, pass through all data
+          relevantOutputs[depId] = allOutputs[depId];
+        }
       }
     });
 
     return relevantOutputs;
+  }
+
+  /**
+   * Get nested value from object using dot notation
+   */
+  private getNestedValue(obj: any, path: string): any {
+    return path.split('.').reduce((current, key) => {
+      if (current && typeof current === 'object' && key in current) {
+        return current[key];
+      }
+      return undefined;
+    }, obj);
   }
 
   /**
@@ -539,6 +573,7 @@ export class WorkflowExecutor {
           node.id,
           dependencyMap,
           outputs,
+          edges,
         );
 
         // Apply data transformations if needed
@@ -548,11 +583,20 @@ export class WorkflowExecutor {
           executionId,
         );
 
+        // Apply edge-specific transformations and conditions
+        const edgeProcessedOutputs = await this.applyEdgeProcessing(
+          node,
+          transformedOutputs,
+          edges,
+          executionId,
+          nodes,
+        );
+
         // Save intermediate data state
         await this.dataStateService.saveDataState(
           executionId,
           node.id,
-          transformedOutputs,
+          edgeProcessedOutputs,
           { tags: ['input', 'intermediate'] },
         );
 
@@ -619,7 +663,7 @@ export class WorkflowExecutor {
             // Validate input data before execution
             const inputValidationResult = await this.validateNodeInputData(
               node,
-              relevantOutputs,
+              edgeProcessedOutputs,
               executionId,
             );
 
@@ -637,14 +681,14 @@ export class WorkflowExecutor {
             const nodeStartTime = Date.now();
 
             // Log input data summary
-            const inputSummary = this.summarizeData(transformedOutputs);
+            const inputSummary = this.summarizeData(edgeProcessedOutputs);
             await this.executionLogger.logExecutionEvent(executionId, {
               level: 'info',
               message: `Node ${node.id} starting execution with ${inputSummary}`,
               node_id: node.id,
               data: {
-                inputSize: JSON.stringify(transformedOutputs).length,
-                inputFields: Object.keys(transformedOutputs).length,
+                inputSize: JSON.stringify(edgeProcessedOutputs).length,
+                inputFields: Object.keys(edgeProcessedOutputs).length,
                 inputSummary,
               },
             });
@@ -653,7 +697,7 @@ export class WorkflowExecutor {
               node,
               executionId,
               userId,
-              transformedOutputs,
+              edgeProcessedOutputs,
             );
 
             const nodeDuration = Date.now() - nodeStartTime;
@@ -1304,6 +1348,167 @@ export class WorkflowExecutor {
     }
 
     return inputData;
+  }
+
+  /**
+   * Apply edge-specific transformations and conditions
+   */
+  private async applyEdgeProcessing(
+    node: any,
+    inputData: Record<string, any>,
+    edges: any[],
+    executionId: string,
+    nodes: any[] = [],
+  ): Promise<Record<string, any>> {
+    const processedOutputs: Record<string, any> = {};
+    const nodeId = node.id;
+
+    // Get execution details to get userId
+    let userId = 'unknown';
+    try {
+      const execution =
+        await this.databaseService.executions.findById(executionId);
+      if (execution) {
+        userId = execution.userId || 'unknown';
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to get execution details: ${error}`);
+    }
+
+    // Process edges that connect to this node
+    const edgePromises = edges
+      .filter((edge) => edge.target === nodeId)
+      .map(async (edge) => {
+        const sourceId = edge.source;
+        const sourceNode = nodes.find((n) => n.id === sourceId);
+        if (!sourceNode) return;
+
+        const sourceBlockType =
+          sourceNode.data?.blockType ||
+          sourceNode.data?.type ||
+          sourceNode.type;
+        const targetBlockType =
+          node.data?.blockType || node.data?.type || node.type;
+
+        const sourceSchema = getEnhancedBlockSchema(
+          sourceBlockType as BlockType,
+        );
+        const targetSchema = getEnhancedBlockSchema(
+          targetBlockType as BlockType,
+        );
+
+        if (sourceSchema && targetSchema) {
+          // Check if this edge has a transformation configuration
+          if (edge.data?.transformation) {
+            try {
+              const pipeline = {
+                id: `edge-transform-${sourceId}-${nodeId}`,
+                transformations: edge.data.transformation,
+                metadata: {
+                  name: `Edge transformation for ${sourceId}->${nodeId}`,
+                  description: 'Edge-specific data transformation',
+                  version: '1.0.0',
+                },
+              };
+
+              const result = await this.dataTransformationService.applyPipeline(
+                inputData,
+                pipeline,
+              );
+
+              if (result.success) {
+                this.logger.debug(
+                  `Applied edge transformation for ${sourceId}->${nodeId}: ${result.metadata.transformationsApplied} transformations`,
+                );
+                processedOutputs[sourceId] = result.data;
+              } else {
+                this.logger.warn(
+                  `Edge transformation failed for ${sourceId}->${nodeId}: ${result.errors.join(', ')}`,
+                );
+                processedOutputs[sourceId] = inputData; // Fallback to original data
+              }
+            } catch (error) {
+              this.logger.error(
+                `Error applying edge transformation for ${sourceId}->${nodeId}:`,
+                error,
+              );
+              processedOutputs[sourceId] = inputData; // Fallback to original data
+            }
+          }
+
+          // Check if this edge has a conditional execution configuration
+          if (edge.data?.condition) {
+            try {
+              const condition = edge.data.condition;
+              const context = {
+                workflowId: executionId,
+                executionId,
+                userId,
+                timestamp: new Date().toISOString(),
+              };
+
+              // Simple condition evaluation (can be enhanced later)
+              const conditionResult = this.evaluateCondition(
+                condition,
+                inputData,
+              );
+
+              if (!conditionResult.isValid) {
+                this.logger.warn(
+                  `Edge condition failed for ${sourceId}->${nodeId}: ${conditionResult.error}`,
+                );
+                // If condition fails, the edge is effectively skipped.
+                // The output for this edge will be the inputData.
+                processedOutputs[sourceId] = inputData;
+              } else {
+                this.logger.debug(
+                  `Edge condition passed for ${sourceId}->${nodeId}: ${conditionResult.outcome}`,
+                );
+                // If condition passes, the output for this edge is the transformed data
+                // from the source node.
+                processedOutputs[sourceId] = inputData;
+              }
+            } catch (error) {
+              this.logger.error(
+                `Error evaluating edge condition for ${sourceId}->${nodeId}:`,
+                error,
+              );
+              processedOutputs[sourceId] = inputData; // Fallback to original data
+            }
+          }
+        }
+      });
+
+    // Wait for all edge processing to complete
+    await Promise.all(edgePromises);
+
+    return processedOutputs;
+  }
+
+  /**
+   * Evaluate a condition expression
+   */
+  private evaluateCondition(
+    condition: string,
+    data: any,
+  ): { isValid: boolean; outcome: boolean; error?: string } {
+    try {
+      // Simple condition evaluation using Function constructor
+      // This is a basic implementation - can be enhanced with a proper expression parser
+      const conditionFunction = new Function('data', `return ${condition}`);
+      const result = conditionFunction(data);
+
+      return {
+        isValid: true,
+        outcome: Boolean(result),
+      };
+    } catch (error) {
+      return {
+        isValid: false,
+        outcome: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   }
 
   /**
