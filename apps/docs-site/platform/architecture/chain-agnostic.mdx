@@ -1,16 +1,19 @@
 ---
 title: "Chain-Agnostic Architecture"
-description: "How Zzyra operates seamlessly across multiple blockchain networks through unified abstraction layers"
+description: "Planned multi-chain architecture for seamless blockchain integration - Development Roadmap"
 ---
 
-## Universal Blockchain Integration
+## Planned Universal Blockchain Integration
 
-Zzyra's chain-agnostic architecture enables seamless operation across multiple blockchain networks without requiring users or developers to understand the underlying complexities of each chain. This unified approach eliminates vendor lock-in and enables workflows that span multiple ecosystems.
+<Alert type="warning">
+  **Development Status**: Multi-chain support is planned for Phase 2-3 development. Current focus is on Sei Network integration.
+</Alert>
+
+Zzyra's planned chain-agnostic architecture will enable seamless operation across multiple blockchain networks without requiring users or developers to understand the underlying complexities of each chain. This unified approach will eliminate vendor lock-in and enable workflows that span multiple ecosystems.
 
 <Info>
-  Chain-agnostic design means write once, run anywhere. A workflow created for
-  Ethereum can be easily adapted to work on Polygon, Arbitrum, or any supported
-  blockchain with minimal configuration changes.
+  **Current Status**: Basic Web3 integration with focus on Sei Network
+  **Vision**: Write once, run anywhere - workflows adaptable across any supported blockchain
 </Info>
 
 ## Architecture Overview
@@ -41,11 +44,15 @@ graph TD
     style AA fill:#fec,stroke:#333,stroke-width:2px
 ```
 
-## Core Principles
+## Planned Core Principles
 
-### 1. Unified Interface
+### 1. Unified Interface (Development Roadmap)
 
-All blockchain interactions go through a standardized interface:
+<Alert type="info">
+  **Development Focus**: Designing standardized blockchain interface for multi-chain support.
+</Alert>
+
+All blockchain interactions will go through a standardized interface:
 
 ```typescript
 interface IBlockchainProvider {
@@ -80,9 +87,9 @@ interface IBlockchainProvider {
 }
 ```
 
-### 2. Network Configuration
+### 2. Network Configuration (Planned)
 
-Chain-specific configurations are abstracted away:
+Chain-specific configurations will be abstracted away:
 
 <Tabs>
   <Tab title="Ethereum">
