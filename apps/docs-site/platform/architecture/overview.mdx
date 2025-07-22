@@ -5,11 +5,11 @@ description: "Zzyra's hybrid automation platform architecture - monorepo with Ne
 
 ## Architecture Overview
 
-Zzyra is built as a modern, scalable monorepo with three core components working together to deliver seamless hybrid automation. Our architecture prioritizes performance, reliability, and developer experience while supporting both Web3 and traditional enterprise integrations.
+Zzyra is built as a modern, scalable monorepo with two active services and one in development, designed to deliver hybrid Web2/Web3 automation. Our architecture prioritizes developer experience and rapid iteration while building towards production scalability.
 
-<Alert type='info'>
-  **Technology Stack**: Next.js 15 + NestJS 10 + PostgreSQL + Prisma + RabbitMQ
-  | **Deployment**: Netlify + Cloud Infrastructure
+<Alert type='warning'>
+  **Current Status**: Frontend and Worker services are active. API service is in development. 
+  **Technology Stack**: Next.js 15 + NestJS 10 + PostgreSQL + Prisma
 </Alert>
 
 ## System Architecture
@@ -39,22 +39,22 @@ Zzyra is built as a modern, scalable monorepo with three core components working
 {" "}
 
 <div className='arch-layer'>
-  <h4>API Layer</h4>
+  <h4>Backend Layer</h4>
   <div className='layer-components'>
     <div className='component'>
-      <span className='component-icon'>🚀</span>
+      <span className='component-icon'>🚧</span>
       <span className='component-name'>NestJS API Server</span>
-      <span className='component-desc'>RESTful API + Authentication</span>
+      <span className='component-desc'>🚧 In Development</span>
     </div>
     <div className='component'>
       <span className='component-icon'>⚙️</span>
       <span className='component-name'>NestJS Worker</span>
-      <span className='component-desc'>Async Processing + AI</span>
+      <span className='component-desc'>✅ Active - Workflow Processing</span>
     </div>
     <div className='component'>
       <span className='component-icon'>📨</span>
-      <span className='component-name'>RabbitMQ</span>
-      <span className='component-desc'>Message Queue</span>
+      <span className='component-name'>Message Queue</span>
+      <span className='component-desc'>📋 Planned - RabbitMQ</span>
     </div>
   </div>
 </div>
@@ -70,12 +70,12 @@ Zzyra is built as a modern, scalable monorepo with three core components working
       <div className='component'>
         <span className='component-icon'>🔧</span>
         <span className='component-name'>Prisma ORM</span>
-        <span className='component-desc'>Database Client</span>
+        <span className='component-desc'>✅ Primary Database Client</span>
       </div>
       <div className='component'>
         <span className='component-icon'>📦</span>
         <span className='component-name'>Shared Packages</span>
-        <span className='component-desc'>Types + Database + Blocks</span>
+        <span className='component-desc'>✅ Types + Database + Blocks</span>
       </div>
     </div>
   </div>
@@ -108,7 +108,7 @@ Zzyra is built as a modern, scalable monorepo with three core components working
       <div className='branch-header'>
         <span className='branch-icon'>🚀</span>
         <span className='branch-name'>apps/api/</span>
-        <span className='branch-desc'>NestJS API Server</span>
+        <span className='branch-desc'>🚧 NestJS API Server (In Development)</span>
       </div>
       <div className='branch-items'>
         <div className='tree-item'>src/auth/ - Authentication</div>
@@ -121,8 +121,8 @@ Zzyra is built as a modern, scalable monorepo with three core components working
     <div className='tree-branch'>
       <div className='branch-header'>
         <span className='branch-icon'>⚙️</span>
-        <span className='branch-name'>apps/zzyra-worker/</span>
-        <span className='branch-desc'>NestJS Worker Service</span>
+        <span className='branch-name'>apps/zyra-worker/</span>
+        <span className='branch-desc'>✅ NestJS Worker Service</span>
       </div>
       <div className='branch-items'>
         <div className='tree-item'>src/workers/ - Worker Implementations</div>
@@ -138,9 +138,9 @@ Zzyra is built as a modern, scalable monorepo with three core components working
         <span className='branch-desc'>Shared Packages</span>
       </div>
       <div className='branch-items'>
-        <div className='tree-item'>@zzyra/database - Prisma Client</div>
-        <div className='tree-item'>@zzyra/types - TypeScript Types</div>
-        <div className='tree-item'>@zzyra/blocks - Block Library</div>
+        <div className='tree-item'>✅ @zyra/database - Prisma Client & Repositories</div>
+        <div className='tree-item'>✅ @zyra/types - Shared TypeScript Types</div>
+        <div className='tree-item'>📋 @zyra/blocks - Block Library (Planned)</div>
       </div>
     </div>
 

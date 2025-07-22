@@ -1,16 +1,19 @@
 ---
 title: "AI Workflow Engine"
-description: "Intelligent orchestration and optimization at the core of Zzyra"
+description: "AI integration roadmap and current capabilities for Zzyra's workflow automation - Development Status"
 ---
 
-## AI-Powered Intelligent Orchestration
+## AI Integration Overview
 
-The AI Workflow Engine is the intelligent heart of Zzyra, responsible for executing, managing, and optimizing workflows with embedded artificial intelligence. Unlike traditional automation engines that simply execute predefined rules, Zzyra's AI engine brings genuine intelligence to workflow orchestration.
+<Alert type="warning">
+  **Development Status**: Zzyra currently has basic AI integration through OpenRouter. Advanced AI capabilities described here represent our development roadmap and vision.
+</Alert>
+
+The AI Workflow Engine will be the intelligent heart of Zzyra, designed to execute, manage, and optimize workflows with embedded artificial intelligence. Unlike traditional automation engines that execute predefined rules, Zzyra's planned AI engine will bring genuine intelligence to workflow orchestration.
 
 <Info>
-  The AI engine doesn't just execute workflows—it understands them, optimizes
-  them, and continuously learns to improve performance across both Web2 and Web3
-  operations.
+  **Current Status**: Basic AI workflow generation available
+  **Vision**: Advanced AI engine that understands, optimizes, and continuously learns to improve performance
 </Info>
 
 ## Architecture Overview
@@ -47,43 +50,52 @@ graph TD
     style AA fill:#eee,stroke:#333,stroke-width:2px
 ```
 
-## Core AI Capabilities
+## AI Development Roadmap
 
 ### 1. Intelligent Workflow Generation
 
-Transform natural language into executable workflows:
+<Info>
+  **Current Status**: Basic natural language to workflow generation available through OpenRouter integration
+  **Development Focus**: Enhanced workflow generation capabilities
+</Info>
+
+Current and planned capabilities for transforming natural language into workflows:
 
 <AccordionGroup>
   <Accordion title='Natural Language Understanding' icon='comment'>
-    Advanced NLP models interpret user intent, extract parameters, and
-    understand context to generate appropriate workflow structures.
+    ✅ Current: Basic NLP through OpenRouter for workflow generation
+    📋 Planned: Advanced models for intent interpretation and parameter extraction
   </Accordion>
 
 {" "}
 
 <Accordion title='Domain Knowledge Integration' icon='brain'>
-  AI leverages deep knowledge of Web3 protocols, enterprise systems, and best
+  📋 Planned: AI leveraging deep knowledge of Web3 protocols, enterprise systems, and best
   practices to create optimal workflow designs.
 </Accordion>
 
 {" "}
 
 <Accordion title='Context-Aware Generation' icon='lightbulb'>
-  Considers user's existing workflows, preferences, and historical performance
+  📋 Planned: Consider user's existing workflows, preferences, and historical performance
   to generate personalized automation solutions.
 </Accordion>
 
   <Accordion title='Multi-Step Reasoning' icon='sitemap'>
-    Breaks down complex automation requirements into logical sequences of
+    🚧 In Development: Breaking down complex automation requirements into logical sequences of
     interconnected blocks and decision points.
   </Accordion>
 </AccordionGroup>
 
-### 2. Dynamic Optimization Engine
+### 2. Dynamic Optimization Engine (Development Vision)
 
-AI continuously optimizes workflow parameters in real-time:
+<Alert type="info">
+  **Development Roadmap**: Advanced optimization capabilities planned for future implementation.
+</Alert>
 
-#### Gas Fee Optimization
+Planned AI optimization of workflow parameters:
+
+#### Gas Fee Optimization (Planned)
 
 ```typescript
 interface GasOptimization {
@@ -116,36 +128,47 @@ class AIGasOptimizer implements GasOptimization {
 }
 ```
 
-#### Resource Allocation
+#### Resource Allocation (Planned)
+
+<Alert type="warning">
+  **Development Vision**: Advanced resource allocation planned for enterprise deployment.
+</Alert>
 
 <Tabs>
   <Tab title='Compute Resources'>
-    - **CPU Allocation**: Dynamic allocation based on workflow complexity -
-    **Memory Management**: Intelligent memory usage for large datasets -
-    **Concurrent Execution**: Optimal parallelization of independent tasks -
-    **Load Balancing**: Distribute execution across available resources
+    📋 Planned:
+    - Dynamic CPU allocation based on workflow complexity
+    - Intelligent memory management for large datasets
+    - Optimal parallelization of independent tasks
+    - Load balancing across available resources
   </Tab>
 
 {" "}
 
 <Tab title='API Rate Limits'>
-  - **Usage Prediction**: Forecast API usage patterns - **Intelligent Queuing**:
-  Optimize API call timing - **Fallback Strategies**: Alternative endpoints when
-  limits are reached - **Cost Optimization**: Balance speed vs. cost for API
-  services
+  📋 Planned:
+  - API usage pattern forecasting
+  - Intelligent queuing and timing optimization
+  - Fallback strategies for rate limit management
+  - Cost vs. speed optimization for API services
 </Tab>
 
   <Tab title='Network Resources'>
-    - **RPC Optimization**: Select optimal RPC endpoints - **Connection
-    Pooling**: Efficient network connection management - **Retry Strategies**:
-    Intelligent retry with exponential backoff - **Failover Logic**: Automatic
-    failover to backup services
+    📋 Planned:
+    - Optimal RPC endpoint selection
+    - Efficient network connection management
+    - Intelligent retry with exponential backoff
+    - Automatic failover to backup services
   </Tab>
 </Tabs>
 
-### 3. Predictive Analytics & Decision Support
+### 3. Predictive Analytics & Decision Support (Future Development)
 
-#### Market Prediction Models
+<Alert type="info">
+  **Long-term Vision**: Advanced predictive analytics planned for advanced users and enterprise customers.
+</Alert>
+
+#### Market Prediction Models (Planned)
 
 ```typescript
 interface MarketPredictor {
@@ -174,31 +197,32 @@ interface PriceFactor {
 }
 ```
 
-#### Risk Assessment
+#### Risk Assessment (Planned)
 
 <CardGroup cols={2}>
   <Card title='Protocol Risk Analysis' icon='shield-exclamation'>
-    Evaluate smart contract risks, audit status, and protocol health before
-    execution
+    📋 Planned: Evaluate smart contract risks, audit status, and protocol health before execution
   </Card>
   <Card title='Market Risk Assessment' icon='chart-line'>
-    Analyze market conditions, liquidity, and potential slippage for DeFi
-    operations
+    📋 Planned: Analyze market conditions, liquidity, and potential slippage for DeFi operations
   </Card>
   <Card title='Operational Risk Management' icon='triangle-exclamation'>
-    Monitor system health, external dependencies, and execution environment
-    risks
+    📋 Planned: Monitor system health, external dependencies, and execution environment risks
   </Card>
   <Card title='Compliance Risk Evaluation' icon='balance-scale'>
-    Assess regulatory compliance and potential legal implications of actions
+    📋 Planned: Assess regulatory compliance and potential legal implications of actions
   </Card>
 </CardGroup>
 
-## AI-Enhanced Execution
+## AI-Enhanced Execution (Development Focus)
 
-### Intelligent State Management
+<Alert type="info">
+  **Current Status**: Basic workflow execution engine implemented. AI enhancements in development.
+</Alert>
 
-The AI engine maintains sophisticated state management:
+### Intelligent State Management (Planned)
+
+The planned AI engine will maintain sophisticated state management:
 
 ```typescript
 interface WorkflowState {
@@ -235,39 +259,47 @@ class AIStateManager {
 }
 ```
 
-### Adaptive Error Handling
+### Adaptive Error Handling (Future Development)
 
-AI-powered error recovery and learning:
+<Alert type="warning">
+  **Development Vision**: AI-powered error recovery planned for advanced automation reliability.
+</Alert>
+
+Planned AI-powered error recovery capabilities:
 
 <AccordionGroup>
   <Accordion title='Error Pattern Recognition' icon='pattern'>
-    AI identifies recurring error patterns and develops preventive strategies to
+    📋 Planned: AI will identify recurring error patterns and develop preventive strategies to
     avoid similar issues in future executions.
   </Accordion>
 
 {" "}
 
 <Accordion title='Intelligent Recovery' icon='rotate'>
-  AI analyzes error context and automatically selects the most appropriate
+  📋 Planned: AI will analyze error context and automatically select the most appropriate
   recovery strategy based on success probability.
 </Accordion>
 
 {" "}
 
 <Accordion title='Learning from Failures' icon='graduation-cap'>
-  Each failure provides training data to improve future error prediction and
+  📋 Planned: Each failure will provide training data to improve future error prediction and
   prevention capabilities.
 </Accordion>
 
   <Accordion title='Proactive Intervention' icon='bell'>
-    AI predicts potential failures before they occur and takes preventive action
-    or alerts users.
+    📋 Planned: AI will predict potential failures before they occur and take preventive action
+    or alert users.
   </Accordion>
 </AccordionGroup>
 
-## Machine Learning Pipeline
+## Machine Learning Pipeline (Development Roadmap)
 
-### Data Collection & Processing
+<Alert type="info">
+  **Development Focus**: ML pipeline architecture planned for Phase 3 implementation.
+</Alert>
+
+### Planned Data Collection & Processing
 
 ```mermaid
 graph LR
@@ -288,7 +320,7 @@ graph LR
     style I fill:#cdf,stroke:#333,stroke-width:2px
 ```
 
-### Model Types & Applications
+### Planned Model Types & Applications
 
 <Tabs>
   <Tab title='Time Series Models'>
@@ -322,9 +354,13 @@ graph LR
   </Tab>
 </Tabs>
 
-## AI Model Infrastructure
+## AI Model Infrastructure (Future Development)
 
-### Model Serving Architecture
+<Alert type="warning">
+  **Development Vision**: Advanced AI infrastructure planned for enterprise-scale deployment.
+</Alert>
+
+### Planned Model Serving Architecture
 
 ```typescript
 interface AIModelService {
@@ -347,37 +383,44 @@ class DistributedModelService implements AIModelService {
 }
 ```
 
-### Model Performance Monitoring
+### Planned Model Performance Monitoring
 
+📋 Future capabilities:
 - **Accuracy Tracking**: Continuous monitoring of prediction accuracy
 - **Drift Detection**: Identify when models need retraining
 - **A/B Testing**: Compare model versions for optimal performance
 - **Feedback Loops**: Incorporate user feedback for model improvement
 
-## Privacy & Security
+## Privacy & Security (Current Priority)
 
 ### AI Data Protection
 
+<Info>
+  **Current Status**: Basic privacy protections in place with external AI services (OpenRouter)
+  **Development Focus**: Enhanced data protection and local processing capabilities
+</Info>
+
 <Warning>
-  Zzyra's AI processes user data with strict privacy controls. Sensitive
-  information like private keys and personal data is never used for model
-  training or shared with external AI services.
+  Zzyra's AI integration follows strict privacy controls. Sensitive information like private keys and personal data is never used for model training or shared with external AI services.
 </Warning>
 
 #### Data Handling Principles
 
 <CardGroup cols={2}>
   <Card title='Data Minimization' icon='shield-check'>
-    Only necessary data is used for AI processing, with automatic data pruning
+    ✅ Current: Only workflow descriptions sent to AI services
+    📋 Planned: Automatic data pruning and enhanced filtering
   </Card>
   <Card title='Local Processing' icon='server'>
-    Sensitive computations performed on secure local infrastructure
+    🚧 In Development: Ollama integration for local AI processing
+    📋 Planned: Sensitive computations on secure infrastructure
   </Card>
   <Card title='Encrypted Communication' icon='lock'>
-    All AI model interactions use end-to-end encryption
+    ✅ Current: HTTPS for all AI service communications
+    📋 Planned: End-to-end encryption for enhanced security
   </Card>
   <Card title='Audit Trails' icon='file-lines'>
-    Complete logging of AI decisions and data usage for compliance
+    📋 Planned: Complete logging of AI decisions and data usage for compliance
   </Card>
 </CardGroup>
 
@@ -401,9 +444,13 @@ class HomomorphicAIProcessor implements SecureAIProcessor {
 }
 ```
 
-## Performance Optimization
+## Performance Optimization (Development Focus)
 
-### AI Efficiency Measures
+<Alert type="info">
+  **Development Priority**: AI performance optimization planned for scalability and user experience.
+</Alert>
+
+### Planned AI Efficiency Measures
 
 <AccordionGroup>
   <Accordion title='Model Optimization' icon='gauge'>
@@ -430,26 +477,35 @@ class HomomorphicAIProcessor implements SecureAIProcessor {
   </Accordion>
 </AccordionGroup>
 
-## Future AI Developments
+## AI Development Roadmap
 
-### Roadmap Highlights
+### Implementation Phases
 
 <Tabs>
-  <Tab title='Q1-Q2 2025'>
-    - Advanced market prediction models - Multi-modal AI (text, voice, visual) -
-    Improved gas optimization algorithms - Enhanced error prediction
+  <Tab title='Phase 1: Foundation (Q1-Q2 2025)'>
+    🚧 In Development:
+    - Enhanced workflow generation
+    - Improved natural language processing
+    - Basic optimization suggestions
+    - Error pattern recognition
   </Tab>
 
 {" "}
 
-<Tab title='Q3-Q4 2025'>
-  - Reinforcement learning for strategy optimization - Collaborative AI agents -
-  Cross-chain optimization models - Advanced risk assessment
+<Tab title='Phase 2: Intelligence (Q3-Q4 2025)'>
+  📋 Planned:
+  - Predictive analytics foundation
+  - Basic risk assessment
+  - Resource optimization
+  - Performance learning
 </Tab>
 
-  <Tab title='2026+'>
-    - Autonomous strategy evolution - Predictive market making - AI-powered
-    protocol interaction - Self-improving automation
+  <Tab title='Phase 3: Advanced AI (2026+)'>
+    📋 Long-term Vision:
+    - Autonomous strategy evolution
+    - Advanced market prediction
+    - Multi-modal AI capabilities
+    - Self-improving automation
   </Tab>
 </Tabs>
 
@@ -460,11 +516,9 @@ class HomomorphicAIProcessor implements SecureAIProcessor {
 - **Explainable AI**: Better interpretability of AI decisions
 - **Quantum ML**: Preparing for quantum computing advantages
 
-<Info>
-  Zzyra's AI engine represents the cutting edge of intelligent automation,
-  continuously evolving to provide users with increasingly sophisticated and
-  effective automation capabilities.
-</Info>
+<Note>
+  **Development Note**: Zzyra's AI engine is in active development. While we currently provide basic AI-assisted workflow generation, we're building towards the cutting edge of intelligent automation with increasingly sophisticated capabilities.
+</Note>
 
 ## Learn More
 
@@ -472,15 +526,15 @@ Explore how AI enhances different aspects of Zzyra:
 
 <CardGroup cols={3}>
   <Card
-    title='AI-Native Workflows'
+    title='AI-Assisted Workflows'
     icon='brain'
     href='/concepts/ai-native-workflows'>
-    Understanding AI integration
+    Current AI capabilities and roadmap
+  </Card>
+  <Card title='Development Status' icon='info' href='/development-status'>
+    Current AI implementation status
   </Card>
   <Card title='Use Cases' icon='lightbulb' href='/platform/use-cases/overview'>
-    AI in real-world scenarios
-  </Card>
-  <Card title='Developer Guide' icon='code' href='/developers/blocks/ai-blocks'>
-    Building AI-powered blocks
+    Planned AI applications
   </Card>
 </CardGroup>{" "}

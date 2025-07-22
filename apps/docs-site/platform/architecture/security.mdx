@@ -1,17 +1,20 @@
 ---
 title: "Security Framework"
-description: "Enterprise-grade security protecting sensitive operations across Web2 and Web3 domains"
+description: "Security architecture and planned enterprise-grade protections for Zzyra - Development Roadmap"
 ---
 
-## Enterprise-Grade Security Foundation
+## Security Framework Overview
 
-Zzyra's security framework is designed with a defense-in-depth approach, protecting sensitive operations across both traditional enterprise systems and blockchain networks. Security considerations are embedded at every architectural layer, ensuring comprehensive protection for mission-critical automation workflows.
+<Alert type="warning">
+  **Development Status**: Zzyra's security framework is in active development. While basic security measures are in place, many advanced enterprise features described here represent our development roadmap.
+</Alert>
 
-<Warning>
-  Security is paramount in hybrid automation. Zzyra implements multiple security
-  layers to protect private keys, sensitive credentials, and business-critical
-  operations without compromising functionality or user experience.
-</Warning>
+Zzyra's planned security framework will implement a defense-in-depth approach, designed to protect sensitive operations across both traditional enterprise systems and blockchain networks. Security considerations are being embedded at every architectural layer.
+
+<Info>
+  **Current Security**: Basic authentication via Magic SDK and secure database storage are implemented.
+  **Planned Security**: Comprehensive enterprise-grade security layers for protecting private keys, credentials, and business-critical operations.
+</Info>
 
 ## Security Architecture Overview
 
@@ -44,28 +47,36 @@ graph TD
 
 ## Core Security Principles
 
-### 1. Defense in Depth
+### 1. Defense in Depth (Planned)
 
-Multiple security layers protect against various threat vectors:
+<Alert type="info">
+  **Development Roadmap**: Multi-layer security architecture planned for enterprise deployment.
+</Alert>
+
+Planned security layers to protect against various threat vectors:
 
 <CardGroup cols={2}>
   <Card title='Perimeter Security' icon='shield'>
-    API gateways, firewalls, and DDoS protection at the network edge
+    📋 Planned: API gateways, firewalls, and DDoS protection at the network edge
   </Card>
   <Card title='Application Security' icon='code'>
-    Secure coding practices, input validation, and output encoding
+    🚧 In Development: Secure coding practices, input validation, and output encoding
   </Card>
   <Card title='Data Security' icon='database'>
-    Encryption at rest and in transit, secure data handling
+    ✅ Current: Basic encryption | 📋 Planned: Advanced encryption at rest and in transit
   </Card>
   <Card title='Infrastructure Security' icon='server'>
-    Hardened systems, network segmentation, monitoring
+    📋 Planned: Hardened systems, network segmentation, monitoring
   </Card>
 </CardGroup>
 
-### 2. Principle of Least Privilege
+### 2. Principle of Least Privilege (Development Vision)
 
-Every component has minimal necessary access rights:
+<Alert type="info">
+  **Current Status**: Basic role-based access planned. Advanced least privilege controls in development.
+</Alert>
+
+Planned access control approach:
 
 <AccordionGroup>
   <Accordion title='User Access Control' icon='user-check'>
@@ -91,18 +102,26 @@ Every component has minimal necessary access rights:
   </Accordion>
 </AccordionGroup>
 
-### 3. Zero Trust Security Model
+### 3. Zero Trust Security Model (Future Implementation)
 
-No implicit trust is granted based on network location or previous authentication:
+<Alert type="warning">
+  **Development Roadmap**: Zero Trust architecture planned for future enterprise deployment.
+</Alert>
 
-- **Continuous Verification**: All requests are authenticated and authorized
-- **Contextual Access**: Access decisions based on user, device, location, and behavior
-- **Micro-Segmentation**: Network traffic is isolated and monitored
-- **Behavioral Analysis**: Anomalous behavior triggers additional verification
+Planned zero trust implementation:
+
+- **Continuous Verification**: 📋 Planned - All requests will be authenticated and authorized
+- **Contextual Access**: 📋 Planned - Access decisions based on user, device, location, and behavior
+- **Micro-Segmentation**: 📋 Planned - Network traffic isolation and monitoring
+- **Behavioral Analysis**: 📋 Planned - Anomalous behavior triggers additional verification
 
 ## Credential Management
 
-### Secure Storage Architecture
+<Alert type="info">
+  **Current Status**: Basic credential storage via Magic SDK. Advanced credential management system in development.
+</Alert>
+
+### Planned Secure Storage Architecture
 
 ```typescript
 interface CredentialManager {
@@ -129,9 +148,13 @@ enum CredentialType {
 }
 ```
 
-### Hardware Security Modules (HSMs)
+### Hardware Security Modules (HSMs) - Future Implementation
 
-For the highest security requirements:
+<Alert type="warning">
+  **Development Vision**: HSM integration planned for enterprise security requirements.
+</Alert>
+
+Planned HSM capabilities:
 
 <Tabs>
   <Tab title='HSM Integration'>
@@ -157,9 +180,13 @@ For the highest security requirements:
   </Tab>
 </Tabs>
 
-### Credential Isolation
+### Credential Isolation (Planned)
 
-Different credential types are isolated with specific protections:
+<Alert type="info">
+  **Development Roadmap**: Advanced credential isolation system planned for production deployment.
+</Alert>
+
+Planned credential type isolation:
 
 #### Blockchain Private Keys
 
@@ -213,11 +240,15 @@ class EnterpriseCredentialVault {
 }
 ```
 
-## Role-Based Access Control (RBAC)
+## Role-Based Access Control (RBAC) - In Development
 
-### Permission Model
+<Alert type="warning">
+  **Current Status**: Basic authentication implemented. Advanced RBAC system in development.
+</Alert>
 
-Granular permissions govern all platform operations:
+### Planned Permission Model
+
+Granular permissions will govern all platform operations:
 
 ```typescript
 interface Permission {
@@ -303,9 +334,13 @@ class PermissionEngine {
 }
 ```
 
-## Network Security
+## Network Security (Development Roadmap)
 
-### Virtual Private Cloud (VPC) Architecture
+<Alert type="info">
+  **Development Status**: Network security architecture planned for production deployment.
+</Alert>
+
+### Planned Virtual Private Cloud (VPC) Architecture
 
 <AccordionGroup>
   <Accordion title='Network Segmentation' icon='sitemap'>
@@ -372,7 +407,11 @@ class IntrusionDetectionSystem {
 
 ## Data Protection
 
-### Encryption Standards
+<Info>
+  **Current Status**: Database encryption in place via PostgreSQL. Advanced encryption features in development.
+</Info>
+
+### Planned Encryption Standards
 
 <Tabs>
   <Tab title='Encryption at Rest'>
@@ -434,11 +473,15 @@ class DataLossPreventionEngine {
 }
 ```
 
-## Audit and Compliance
+## Audit and Compliance (Development Vision)
 
-### Comprehensive Audit Trails
+<Alert type="warning">
+  **Current Status**: Basic logging implemented. Comprehensive audit system in development.
+</Alert>
 
-All system activities are logged for security and compliance:
+### Planned Comprehensive Audit Trails
+
+All system activities will be logged for security and compliance:
 
 ```typescript
 interface AuditEvent {
@@ -480,9 +523,13 @@ class AuditLogger {
 }
 ```
 
-### Compliance Frameworks
+### Planned Compliance Frameworks
 
-Zzyra supports various compliance requirements:
+<Alert type="info">
+  **Development Roadmap**: Compliance framework support planned for enterprise deployment.
+</Alert>
+
+Zzyra will support various compliance requirements:
 
 <AccordionGroup>
   <Accordion title='SOC 2 Type II' icon='certificate'>
@@ -508,11 +555,15 @@ Zzyra supports various compliance requirements:
   </Accordion>
 </AccordionGroup>
 
-## Transaction Safety
+## Transaction Safety (Development Priority)
 
-### Blockchain Transaction Security
+<Alert type="info">
+  **Current Status**: Basic transaction execution. Advanced safety features in development.
+</Alert>
 
-Special protections for blockchain operations:
+### Planned Blockchain Transaction Security
+
+Planned protections for blockchain operations:
 
 <CardGroup cols={2}>
   <Card title='Simulation Mode' icon='flask'>
@@ -564,9 +615,13 @@ class SmartContractValidator {
 }
 ```
 
-## Incident Response
+## Incident Response (Future Implementation)
 
-### Security Incident Management
+<Alert type="warning">
+  **Development Vision**: Comprehensive incident response system planned for production.
+</Alert>
+
+### Planned Security Incident Management
 
 Structured approach to security incidents:
 
@@ -624,9 +679,13 @@ class IncidentResponseSystem {
 }
 ```
 
-## Security Monitoring
+## Security Monitoring (Development Roadmap)
 
-### Real-Time Threat Detection
+<Alert type="info">
+  **Current Status**: Basic application monitoring. Advanced threat detection in development.
+</Alert>
+
+### Planned Real-Time Threat Detection
 
 <AccordionGroup>
   <Accordion title='Behavioral Analytics' icon='chart-line'>
@@ -659,33 +718,39 @@ class IncidentResponseSystem {
 - **Vulnerability Metrics**: Number and severity of identified vulnerabilities
 - **Compliance Score**: Adherence to regulatory requirements
 
-## Future Security Enhancements
+## Security Development Roadmap
 
-### Roadmap Highlights
+### Implementation Phases
 
 <Tabs>
-  <Tab title='2025 Q1-Q2'>
-    - Zero Trust Network Access (ZTNA) - Advanced threat hunting capabilities -
-    Enhanced blockchain security scanning - Quantum-resistant cryptography
-    preparation
+  <Tab title='Phase 1: Foundation (Q1-Q2 2025)'>
+    📋 Planned:
+    - Enhanced authentication & authorization
+    - Basic audit logging system
+    - Secure credential storage
+    - Input validation & sanitization
   </Tab>
 
 {" "}
-<Tab title='2025 Q3-Q4'>
-  - AI-powered security operations center - Automated penetration testing -
-  Homomorphic encryption for privacy - Decentralized identity integration
+<Tab title='Phase 2: Enterprise (Q3-Q4 2025)'>
+  📋 Planned:
+  - Role-based access control (RBAC)
+  - Advanced encryption capabilities
+  - Security monitoring dashboard
+  - Compliance framework foundations
 </Tab>
 
-  <Tab title='2026+'>
-    - Quantum-safe cryptography implementation - Self-healing security
-    architecture - Predictive threat modeling - Blockchain-based audit trails
+  <Tab title='Phase 3: Advanced (2026+)'>
+    📋 Long-term Vision:
+    - Zero Trust architecture
+    - HSM integration
+    - AI-powered threat detection
+    - Quantum-resistant cryptography preparation
   </Tab>
 </Tabs>
 
 <Note>
-  Security is an ongoing process at Zzyra. We continuously evaluate and improve
-  our security posture to protect against emerging threats while maintaining the
-  flexibility and functionality that makes hybrid automation possible.
+  **Development Note**: Security is a top priority in Zzyra's development roadmap. While we're building towards enterprise-grade security, current implementation focuses on foundational security measures with plans for comprehensive security frameworks.
 </Note>
 
 ## Learn More

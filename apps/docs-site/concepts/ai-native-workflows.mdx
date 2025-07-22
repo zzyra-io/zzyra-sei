@@ -1,16 +1,19 @@
 ---
-title: "AI-Native Workflows"
-description: "How Zzyra embeds artificial intelligence throughout the automation platform for intelligent orchestration"
+title: "AI-Assisted Workflows"
+description: "How Zzyra integrates AI capabilities to enhance workflow automation - Current Status & Roadmap"
 ---
 
-## What Makes Zzyra AI-Native?
+<Alert type="warning">
+  **Current Status**: Zzyra currently provides basic AI-assisted workflow generation through OpenRouter integration. Many advanced capabilities described here are part of our development roadmap.
+</Alert>
 
-Unlike traditional automation platforms where AI is an add-on feature, Zzyra is architected with artificial intelligence as a core foundational component. AI permeates every aspect of the platform, from workflow generation and optimization to predictive analytics and natural language interaction.
+## What Makes Zzyra AI-Assisted?
+
+Zzyra integrates artificial intelligence capabilities to enhance workflow creation and automation. Rather than traditional rule-based automation, AI assists users in generating workflows from natural language and provides intelligent suggestions.
 
 <Info>
-  AI-native design means intelligence is embedded at the architectural level,
-  not bolted on as an afterthought. This fundamental approach enables
-  capabilities impossible with traditional automation tools.
+  **Current Reality**: Zzyra uses AI to help generate workflow structures from natural language prompts. 
+  **Future Vision**: Expanding to include optimization, predictive analytics, and advanced decision-making.
 </Info>
 
 ## AI Throughout the Platform
@@ -42,38 +45,45 @@ Transform natural language descriptions into functional, executable workflows:
 
 ### 2. Dynamic Optimization Engine
 
-AI continuously optimizes workflow parameters based on real-time conditions and historical data:
+<Alert type="warning">
+  **Development Roadmap**: These advanced optimization features are planned for future implementation.
+</Alert>
+
+Planned AI optimization capabilities for workflow parameters:
 
 <AccordionGroup>
   <Accordion title='Gas Fee Optimization' icon='fuel-pump'>
-    AI analyzes network congestion patterns, transaction urgency, and cost
-    trade-offs to automatically optimize gas prices for blockchain transactions,
-    potentially saving hundreds of dollars monthly for active users.
+    📋 Planned: AI will analyze network congestion patterns, transaction urgency, and cost
+    trade-offs to automatically optimize gas prices for blockchain transactions.
   </Accordion>
 
 {" "}
 
 <Accordion title='Resource Allocation' icon='chart-line'>
-  Intelligently manages compute resources, API rate limits, and execution timing
+  📋 Planned: Intelligent management of compute resources, API rate limits, and execution timing
   to maximize efficiency while minimizing costs across all connected systems.
 </Accordion>
 
 {" "}
 
 <Accordion title='Risk Assessment' icon='triangle-exclamation'>
-  Continuously evaluates workflow risks, market conditions, and external factors
+  📋 Planned: Continuous evaluation of workflow risks, market conditions, and external factors
   to automatically adjust parameters or pause operations when necessary.
 </Accordion>
 
   <Accordion title='Performance Learning' icon='brain'>
-    Learns from past executions to improve future performance, identifying
+    📋 Planned: Learning from past executions to improve future performance, identifying
     patterns and optimizing workflows based on successful outcomes.
   </Accordion>
 </AccordionGroup>
 
 ### 3. Predictive Analytics & Insights
 
-Leverage AI for process optimization and decision support:
+<Alert type="info">
+  **Development Vision**: Advanced analytics capabilities planned for future implementation.
+</Alert>
+
+Planned AI capabilities for process optimization and decision support:
 
 ```mermaid
 graph LR
@@ -86,30 +96,33 @@ graph LR
     E --> H[Performance Forecasts]
 ```
 
-**Key Capabilities:**
+**Planned Key Capabilities:**
 
-- **Anomaly Detection**: Identify unusual patterns that may indicate issues or opportunities
-- **Trend Prediction**: Forecast market movements, protocol changes, or system performance
-- **Cost Optimization**: Predict optimal timing for expensive operations
-- **Failure Prevention**: Identify potential workflow failures before they occur
+- **Anomaly Detection**: 📋 Planned - Identify unusual patterns that may indicate issues or opportunities
+- **Trend Prediction**: 📋 Planned - Forecast market movements, protocol changes, or system performance
+- **Cost Optimization**: 📋 Planned - Predict optimal timing for expensive operations
+- **Failure Prevention**: 📋 Planned - Identify potential workflow failures before they occur
 
 ### 4. Natural Language Interface
 
-Interact with complex automations using plain English:
+<Info>
+  **Current Status**: Basic natural language workflow generation available. Advanced conversational features planned.
+</Info>
+
+Interact with automations using plain English:
 
 <CardGroup cols={2}>
   <Card title='Workflow Creation' icon='wand-magic-sparkles'>
-    "Create a workflow that buys ETH when it drops 5% and sells when it gains
-    10%"
+    ✅ Current: "Create a workflow that buys ETH when it drops 5% and sells when it gains 10%"
   </Card>
   <Card title='Workflow Modification' icon='edit'>
-    "Change the sell threshold from 10% to 15% and add a stop-loss at 3%"
+    📋 Planned: "Change the sell threshold from 10% to 15% and add a stop-loss at 3%"
   </Card>
   <Card title='Troubleshooting' icon='bug'>
-    "Why did my DeFi workflow fail last night?"
+    📋 Planned: "Why did my DeFi workflow fail last night?"
   </Card>
   <Card title='Optimization Suggestions' icon='lightbulb'>
-    "How can I improve the performance of my yield farming automation?"
+    📋 Planned: "How can I improve the performance of my yield farming automation?"
   </Card>
 </CardGroup>
 
@@ -117,84 +130,97 @@ Interact with complex automations using plain English:
 
 ### Intelligent Block Recommendations
 
-As you build workflows, AI suggests relevant blocks and connections:
+<Alert type="info">
+  **Development Status**: Basic AI suggestions available. Advanced recommendation engine in development.
+</Alert>
 
-- **Context-Aware Suggestions**: Recommends blocks based on your workflow's purpose
-- **Best Practice Integration**: Suggests error handling, logging, and optimization blocks
-- **Missing Logic Detection**: Identifies gaps in workflow logic and suggests solutions
-- **Performance Optimization**: Recommends more efficient block combinations
+Planned AI-powered workflow assistance:
+
+- **Context-Aware Suggestions**: 🚧 In Development - Recommend blocks based on workflow purpose
+- **Best Practice Integration**: 📋 Planned - Suggest error handling, logging, and optimization blocks
+- **Missing Logic Detection**: 📋 Planned - Identify gaps in workflow logic and suggest solutions
+- **Performance Optimization**: 📋 Planned - Recommend more efficient block combinations
 
 ### Custom Block Generation
 
-AI can generate custom blocks from natural language descriptions:
+<Info>
+  **Current Status**: Basic AI-assisted block creation available with OpenRouter integration.
+</Info>
+
+AI-powered custom block creation process:
 
 <Steps>
   <Step title='Describe Functionality'>
-    "I need a block that monitors Compound lending rates and alerts me when APY
-    goes above 8%"
+    ✅ Current: "I need a block that monitors Compound lending rates and alerts me when APY goes above 8%"
   </Step>
   <Step title='AI Analysis'>
-    AI understands requirements: data source (Compound), condition (APY > 8%),
-    action (alert)
+    ✅ Current: AI understands requirements: data source (Compound), condition (APY > 8%), action (alert)
   </Step>
   <Step title='Code Generation'>
-    AI generates TypeScript/JavaScript code with proper inputs, outputs, and
-    error handling
+    🚧 In Development: AI generates TypeScript/JavaScript code with proper inputs, outputs, and error handling
   </Step>
   <Step title='Testing & Validation'>
-    AI creates test cases and validates the block's functionality
+    📋 Planned: AI creates test cases and validates the block's functionality
   </Step>
 </Steps>
 
 ## Advanced AI Capabilities
 
+<Alert type="warning">
+  **Future Development**: These advanced capabilities represent our long-term AI vision.
+</Alert>
+
 ### Multi-Modal Intelligence
 
-Zzyra's AI can process different types of data and inputs:
+Planned AI capabilities for processing different data types:
 
 <Tabs>
   <Tab title='Text Processing'>
-    - Document analysis and extraction - Sentiment analysis of social media -
-    Natural language workflow descriptions - Error message interpretation
+    ✅ Current: Natural language workflow descriptions
+    📋 Planned: Document analysis, sentiment analysis, error message interpretation
   </Tab>
 
 {" "}
 
 <Tab title='Data Analysis'>
-  - Time series analysis for trading strategies - Pattern recognition in
-  blockchain data - Statistical modeling for risk assessment - Correlation
+  📋 Planned: Time series analysis for trading strategies, pattern recognition in
+  blockchain data, statistical modeling for risk assessment, correlation
   analysis across markets
 </Tab>
 
 {" "}
 
 <Tab title='Visual Processing'>
-  - Chart pattern recognition - Document OCR and data extraction - Image-based
-  NFT analysis - Technical indicator interpretation
+  📋 Planned: Chart pattern recognition, document OCR and data extraction, image-based
+  NFT analysis, technical indicator interpretation
 </Tab>
 
   <Tab title='Voice Commands'>
-    - Spoken workflow creation - Voice-activated trading commands - Audio
-    notification preferences - Hands-free portfolio management
+    📋 Planned: Spoken workflow creation, voice-activated trading commands, audio
+    notification preferences, hands-free portfolio management
   </Tab>
 </Tabs>
 
 ### Contextual Decision Making
 
-AI doesn't just execute rules—it makes intelligent decisions based on context:
+<Alert type="info">
+  **Development Vision**: Advanced contextual AI decision-making planned for future implementation.
+</Alert>
 
-**Example: Smart DeFi Position Management**
+Planned AI enhancement beyond rule execution:
+
+**Example: Smart DeFi Position Management (Planned)**
 
 Traditional Rule: "Sell when price drops 5%"
 
-AI-Enhanced Decision:
+Planned AI-Enhanced Decision:
 
-- Considers current market volatility
-- Analyzes correlation with broader market movements
-- Evaluates gas costs vs. position size
-- Factors in upcoming events (protocol upgrades, governance votes)
-- Assesses liquidity conditions
-- **Result**: May hold position during temporary market dip but sell during sustained downtrend
+- 📋 Planned: Consider current market volatility
+- 📋 Planned: Analyze correlation with broader market movements
+- 📋 Planned: Evaluate gas costs vs. position size
+- 📋 Planned: Factor in upcoming events (protocol upgrades, governance votes)
+- 📋 Planned: Assess liquidity conditions
+- **Future Result**: May hold position during temporary market dip but sell during sustained downtrend
 
 ## Privacy & Security
 
@@ -297,19 +323,19 @@ Understand why AI makes specific recommendations:
 
 ## Learn More
 
-Ready to explore AI-native automation?
+Ready to explore AI-assisted automation?
 
 <CardGroup cols={3}>
   <Card title='Quick Start' icon='rocket' href='/quickstart'>
-    Try AI workflow generation
+    Try current AI workflow generation
   </Card>
   <Card
-    title='AI Engine Details'
-    icon='gear'
-    href='/platform/architecture/ai-engine'>
-    Technical deep dive
+    title='Development Status'
+    icon='info'
+    href='/development-status'>
+    See current AI capabilities and roadmap
   </Card>
   <Card title='Use Cases' icon='lightbulb' href='/platform/use-cases/overview'>
-    See AI in action
+    Explore planned AI applications
   </Card>
 </CardGroup>{" "}

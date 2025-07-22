@@ -7,6 +7,10 @@ description: "Get up and running with Zzyra development in minutes"
 
 Get your Zzyra development environment up and running in minutes. This guide covers the essential steps to start developing with our monorepo architecture.
 
+<Alert type="info">
+  **Current Status**: Frontend (UI) and Worker services are active. API service is in development.
+</Alert>
+
 <Alert type='info'>
   **Time to Complete**: ~10 minutes | **Prerequisites**: Node.js 20.3.0+, pnpm
   9.15.2+, Docker
@@ -17,8 +21,8 @@ Get your Zzyra development environment up and running in minutes. This guide cov
 <Steps>
   <Step title="Clone Repository">
 ```bash
-git clone <repository-url>
-cd zzyra
+git clone https://github.com/your-org/zyra.git
+cd zyra
 ```
   </Step>
   
@@ -73,14 +77,14 @@ pnpm dev
       </div>
       <div className='check-item'>
         <span className='check-label'>Status:</span>
-        <span className='check-value'>✅ Running</span>
+        <span className='check-value'>🚧 In Development</span>
       </div>
     </Card>
 
     <Card title='Worker Service' icon='cog'>
       <div className='check-item'>
         <span className='check-label'>URL:</span>
-        <span className='check-value'>http://localhost:3002</span>
+        <span className='check-value'>http://localhost:3005</span>
       </div>
       <div className='check-item'>
         <span className='check-label'>Status:</span>
@@ -196,7 +200,7 @@ NEXT_PUBLIC_INFURA_API_KEY=...
     <Tab title="API Server (.env)">
 ```bash
 # Database
-DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zzyra?schema=public"
+DATABASE_URL="postgresql://zyra:zyra@localhost:5433/zyra?schema=public"
 
 # JWT
 JWT_SECRET="your-super-secret-jwt-key-here"
@@ -214,7 +218,7 @@ RABBIT_MQ_URL="amqp://guest:guest@localhost:5672"
 
 ```bash
 # Database
-DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zzyra?schema=public"
+DATABASE_URL="postgresql://zyra:zyra@localhost:5433/zyra?schema=public"
 
 # RabbitMQ
 RABBIT_MQ_URL="amqp://guest:guest@localhost:5672"

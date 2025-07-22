@@ -1,0 +1,243 @@
+---
+title: "Development Status & Roadmap"
+description: "Current implementation status and development roadmap for Zzyra"
+---
+
+# Development Status & Roadmap
+
+<Alert type="info">
+  **Last Updated**: January 2025 | **Current Phase**: Active Development
+</Alert>
+
+## Current Implementation Status
+
+### ✅ Completed Features
+
+<CardGroup cols={2}>
+  <Card title="Core Architecture" icon="building">
+    - Monorepo setup with Turbo
+    - TypeScript throughout
+    - Next.js 15 frontend foundation
+    - NestJS worker service
+    - PostgreSQL + Prisma ORM
+  </Card>
+  <Card title="Basic Workflow System" icon="workflow">
+    - Visual workflow builder (React Flow)
+    - Basic block execution engine
+    - Workflow execution tracking
+    - Real-time monitoring foundation
+  </Card>
+  <Card title="AI Integration" icon="brain">
+    - OpenRouter API integration
+    - Basic natural language workflow generation
+    - Ollama local AI support
+    - AI-assisted block creation
+  </Card>
+  <Card title="Web3 Infrastructure" icon="link">
+    - Magic SDK authentication
+    - Wagmi + Viem integration
+    - Basic wallet connectivity
+    - Sei Network support foundation
+  </Card>
+</CardGroup>
+
+### 🚧 In Active Development
+
+<CardGroup cols={2}>
+  <Card title="API Service" icon="server">
+    - NestJS API server structure exists
+    - Authentication endpoints
+    - Workflow management APIs
+    - Database integration
+  </Card>
+  <Card title="Block System" icon="puzzle-piece">
+    - Enhanced block library
+    - Custom block creation UI
+    - Block validation system
+    - Marketplace foundation
+  </Card>
+  <Card title="Enhanced AI Features" icon="magic-wand">
+    - Advanced workflow generation
+    - Better natural language processing
+    - Context-aware suggestions
+    - AI optimization engine
+  </Card>
+  <Card title="User Interface" icon="monitor">
+    - Dashboard enhancements
+    - Workflow builder improvements
+    - Real-time updates
+    - Mobile responsiveness
+  </Card>
+</CardGroup>
+
+### 📋 Planned Features
+
+<CardGroup cols={2}>
+  <Card title="Enterprise Features" icon="building">
+    - Team collaboration
+    - Role-based access control
+    - Advanced analytics
+    - Compliance tools
+  </Card>
+  <Card title="Advanced Web3" icon="coins">
+    - Multi-chain workflows
+    - DeFi protocol integrations
+    - Cross-chain operations
+    - Gas optimization
+  </Card>
+  <Card title="Marketplace" icon="store">
+    - Block marketplace
+    - Workflow templates
+    - Community sharing
+    - Monetization features
+  </Card>
+  <Card title="Production Features" icon="shield">
+    - Advanced security
+    - Performance optimization
+    - Monitoring & alerting
+    - Backup & recovery
+  </Card>
+</CardGroup>
+
+## Development Roadmap
+
+### Phase 1: Foundation Completion (Q1 2025)
+**Focus**: Core functionality and API service completion
+
+<Steps>
+  <Step title="API Service Launch">
+    Complete NestJS API server with full authentication and workflow management
+  </Step>
+  <Step title="Enhanced UI">
+    Improve workflow builder with better UX and real-time collaboration
+  </Step>
+  <Step title="Basic AI Features">
+    Enhance AI workflow generation with better prompts and validation
+  </Step>
+  <Step title="Core Block Library">
+    Implement essential blocks for HTTP, data transformation, and basic Web3 operations
+  </Step>
+</Steps>
+
+### Phase 2: Web3 Integration (Q2 2025)
+**Focus**: Advanced blockchain and DeFi capabilities
+
+<Steps>
+  <Step title="Multi-Chain Support">
+    Extend beyond Sei to Ethereum, Polygon, and other major networks
+  </Step>
+  <Step title="DeFi Integrations">
+    Connect with major DeFi protocols (Uniswap, Aave, Compound)
+  </Step>
+  <Step title="Smart Contract Interactions">
+    Advanced smart contract deployment and interaction capabilities
+  </Step>
+  <Step title="Web3 Templates">
+    Pre-built workflows for common DeFi and Web3 use cases
+  </Step>
+</Steps>
+
+### Phase 3: AI & Automation (Q3 2025)
+**Focus**: Advanced AI capabilities and intelligent automation
+
+<Steps>
+  <Step title="AI Brain Block">
+    Implement the intelligent coordination system for complex workflows
+  </Step>
+  <Step title="Predictive Analytics">
+    AI-powered performance optimization and failure prediction
+  </Step>
+  <Step title="Natural Language Interface">
+    Advanced NLP for complex workflow creation and modification
+  </Step>
+  <Step title="Learning Systems">
+    AI that learns from execution patterns and user behavior
+  </Step>
+</Steps>
+
+### Phase 4: Enterprise & Scale (Q4 2025)
+**Focus**: Production readiness and enterprise features
+
+<Steps>
+  <Step title="Enterprise Security">
+    Advanced security features, compliance tools, and audit capabilities
+  </Step>
+  <Step title="Team Collaboration">
+    Full team features with role-based access and workflow sharing
+  </Step>
+  <Step title="Marketplace Launch">
+    Community marketplace for blocks, templates, and workflows
+  </Step>
+  <Step title="Performance & Scale">
+    Optimization for high-volume usage and enterprise deployment
+  </Step>
+</Steps>
+
+## Technical Debt & Architecture Decisions
+
+### Current Architecture Decisions
+- **Monorepo**: Enables shared code and coordinated development
+- **TypeScript**: Type safety across frontend and backend
+- **Prisma**: Provides type-safe database access and migrations
+- **React Flow**: Powers the visual workflow builder
+- **NestJS**: Scalable backend framework for APIs and workers
+
+### Known Technical Debt
+- API service needs completion and integration
+- Message queue system (RabbitMQ) implementation pending
+- Database schema needs optimization for scale
+- Frontend state management could be improved
+- Test coverage needs significant expansion
+
+### Architecture Improvements Planned
+- Implement proper microservices communication
+- Add comprehensive error handling and recovery
+- Introduce proper caching layers
+- Implement robust monitoring and logging
+- Add automated testing and CI/CD pipeline
+
+## How to Contribute
+
+### For Developers
+1. **Check Current Issues**: See GitHub issues for active development tasks
+2. **Development Setup**: Follow the developer quickstart guide
+3. **Architecture Review**: Understand the current monorepo structure
+4. **Testing**: Help improve test coverage for critical components
+
+### For Users (Beta Testing)
+1. **Feedback**: Report bugs and usability issues
+2. **Feature Requests**: Suggest improvements and new capabilities
+3. **Use Cases**: Share your automation needs and workflows
+4. **Documentation**: Help improve documentation accuracy
+
+## Current Limitations
+
+<Alert type="warning">
+  **Important**: These are current limitations that will be addressed in upcoming releases
+</Alert>
+
+- **API Service**: Not fully functional - some operations go directly to database
+- **Real-time Updates**: Limited WebSocket implementation
+- **Multi-chain**: Currently focused primarily on Sei Network
+- **Enterprise Features**: Team collaboration and advanced analytics are planned
+- **Scale**: Not yet optimized for high-volume production usage
+- **Security**: Development-grade security; production hardening planned
+
+## Getting Involved
+
+Zzyra is actively seeking contributors and beta users. Whether you're interested in:
+- **Development**: Contributing code to core features
+- **Testing**: Helping validate functionality and find issues
+- **Feedback**: Providing insights on user experience and features
+- **Documentation**: Improving guides and technical documentation
+
+We welcome your involvement in building the future of Web3 automation.
+
+<CardGroup cols={2}>
+  <Card title="Join Development" icon="code" href="/developers/quickstart">
+    Set up your development environment
+  </Card>
+  <Card title="Report Issues" icon="bug" href="https://github.com/your-org/zyra/issues">
+    Help us identify and fix problems
+  </Card>
+</CardGroup>

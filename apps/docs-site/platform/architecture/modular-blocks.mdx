@@ -1,16 +1,19 @@
 ---
 title: "Modular Block System"
-description: "The foundation of Zzyra's extensible automation platform"
+description: "Current implementation and planned expansion of Zzyra's block architecture - Development Status"
 ---
 
 ## The Functional Core
 
-At the heart of Zzyra lies its extensible modular block system, encapsulating discrete functionalities into standardized, reusable components. This architecture enables powerful workflow composition while maintaining simplicity and reliability.
+<Alert type="warning">
+  **Development Status**: Zzyra's modular block system has foundational architecture in place. Many advanced features and block categories described here are planned developments.
+</Alert>
+
+At the heart of Zzyra's planned architecture lies an extensible modular block system, designed to encapsulate discrete functionalities into standardized, reusable components. This architecture will enable powerful workflow composition while maintaining simplicity and reliability.
 
 <Info>
-  Each "Block" represents a specific, well-defined function with clearly defined
-  inputs, outputs, configuration parameters, and validation logic, enabling
-  unlimited workflow possibilities through composition.
+  **Current Status**: Basic block execution system implemented
+  **Vision**: Each "Block" will represent a specific function with defined inputs, outputs, and validation logic
 </Info>
 
 ## Block Architecture
@@ -46,102 +49,121 @@ SendSlackNotification();
 ApplySentimentAnalysis();
 ```
 
-## Block Categories
+## Block Categories (Development Roadmap)
 
-Zzyra's block library encompasses a rich ecosystem of functionalities across multiple domains:
+<Alert type="info">
+  **Development Priority**: Building comprehensive block library across multiple domains. Current focus on basic HTTP, AI, and Web3 blocks.
+</Alert>
 
-### Web3 Operations
+Zzyra's planned block library will encompass a rich ecosystem of functionalities:
+
+### Web3 Operations (Planned)
 
 <AccordionGroup>
   <Accordion title='DeFi Protocol Blocks' icon='coins'>
-    - **DEX Interactions**: Uniswap, SushiSwap, PancakeSwap trading - **Lending
-    Protocols**: Compound, Aave, MakerDAO operations - **Yield Farming**:
-    Automated liquidity provision and harvesting - **Price Monitoring**:
-    Real-time token price tracking and alerts
+    📋 Planned:
+    - DEX Interactions (Uniswap, SushiSwap, PancakeSwap trading)
+    - Lending Protocols (Compound, Aave, MakerDAO operations)
+    - Yield Farming (Automated liquidity provision and harvesting)
+    - Price Monitoring (Real-time token price tracking and alerts)
   </Accordion>
 
 {" "}
 
 <Accordion title='NFT Management Blocks' icon='image'>
-  - **Marketplace Integration**: OpenSea, LooksRare, Foundation - **Minting
-  Operations**: Automated mint participation - **Collection Monitoring**: Floor
-  price tracking, rarity analysis - **Batch Operations**: Bulk listing,
-  transfer, and metadata updates
+  📋 Planned:
+  - Marketplace Integration (OpenSea, LooksRare, Foundation)
+  - Minting Operations (Automated mint participation)
+  - Collection Monitoring (Floor price tracking, rarity analysis)
+  - Batch Operations (Bulk listing, transfer, and metadata updates)
 </Accordion>
 
 {" "}
 
 <Accordion title='DAO Governance Blocks' icon='users'>
-  - **Proposal Monitoring**: Track new governance proposals - **Voting
-  Automation**: Execute votes based on predefined criteria - **Treasury
-  Management**: Multi-signature transaction coordination - **Delegation
-  Management**: Automated delegation strategies
+  📋 Planned:
+  - Proposal Monitoring (Track new governance proposals)
+  - Voting Automation (Execute votes based on predefined criteria)
+  - Treasury Management (Multi-signature transaction coordination)
+  - Delegation Management (Automated delegation strategies)
 </Accordion>
 
   <Accordion title='Multi-Chain Operations' icon='link'>
-    - **Bridge Interactions**: Cross-chain asset transfers - **Chain
-    Monitoring**: Multi-chain balance and activity tracking - **Gas
-    Optimization**: Cross-chain gas price analysis - **Asset Migration**:
-    Automated cross-chain portfolio management
+    📋 Planned:
+    - Bridge Interactions (Cross-chain asset transfers)
+    - Chain Monitoring (Multi-chain balance and activity tracking)
+    - Gas Optimization (Cross-chain gas price analysis)
+    - Asset Migration (Automated cross-chain portfolio management)
   </Accordion>
 </AccordionGroup>
 
-### AI Functions
+### AI Functions (In Development)
 
 <AccordionGroup>
   <Accordion title='Natural Language Processing' icon='comment'>
-    - **Text Analysis**: Sentiment analysis, entity extraction - **Content
-    Generation**: Automated content creation - **Translation Services**:
-    Multi-language support - **Summarization**: Document and data summarization
+    ✅ Current: Basic workflow generation from natural language
+    📋 Planned: Text analysis, content generation, translation services, summarization
   </Accordion>
 
 {" "}
 
 <Accordion title='Predictive Analytics' icon='crystal-ball'>
-  - **Market Prediction**: Price and trend forecasting - **Risk Assessment**:
-  Portfolio and strategy risk analysis - **Performance Optimization**: AI-driven
-  parameter tuning - **Anomaly Detection**: Unusual pattern identification
+  📋 Planned:
+  - Market Prediction (Price and trend forecasting)
+  - Risk Assessment (Portfolio and strategy risk analysis)
+  - Performance Optimization (AI-driven parameter tuning)
+  - Anomaly Detection (Unusual pattern identification)
 </Accordion>
 
   <Accordion title='Computer Vision' icon='eye'>
-    - **Image Analysis**: NFT rarity and authenticity verification - **Chart
-    Recognition**: Technical analysis automation - **Document Processing**: OCR
-    and data extraction - **Pattern Recognition**: Visual pattern matching
+    📋 Planned:
+    - Image Analysis (NFT rarity and authenticity verification)
+    - Chart Recognition (Technical analysis automation)
+    - Document Processing (OCR and data extraction)
+    - Pattern Recognition (Visual pattern matching)
   </Accordion>
 </AccordionGroup>
 
-### Enterprise Integrations
+### Enterprise Integrations (Development Vision)
 
 <AccordionGroup>
   <Accordion title='CRM Systems' icon='address-book'>
-    - **Salesforce Integration**: Lead management, opportunity tracking -
-    **HubSpot Connectivity**: Contact synchronization, pipeline updates -
-    **Customer Data**: Profile enrichment and segmentation - **Sales
-    Automation**: Lead scoring and follow-up sequences
+    📋 Planned:
+    - Salesforce Integration (Lead management, opportunity tracking)
+    - HubSpot Connectivity (Contact synchronization, pipeline updates)
+    - Customer Data (Profile enrichment and segmentation)
+    - Sales Automation (Lead scoring and follow-up sequences)
   </Accordion>
 
 {" "}
 
 <Accordion title='ERP Systems' icon='building'>
-  - **SAP Integration**: Financial data and process automation - **Oracle
-  Connectivity**: Inventory and supply chain management - **NetSuite
-  Operations**: Order processing and fulfillment - **Financial Reporting**:
-  Automated accounting and reconciliation
+  📋 Planned:
+  - SAP Integration (Financial data and process automation)
+  - Oracle Connectivity (Inventory and supply chain management)
+  - NetSuite Operations (Order processing and fulfillment)
+  - Financial Reporting (Automated accounting and reconciliation)
 </Accordion>
 
   <Accordion title='Communication Platforms' icon='comments'>
-    - **Slack Integration**: Team notifications and bot interactions -
-    **Microsoft Teams**: Workflow status and collaboration - **Discord
-    Connectivity**: Community management and alerts - **Email Automation**: SMTP
-    integration and template management
+    📋 Planned:
+    - Slack Integration (Team notifications and bot interactions)
+    - Microsoft Teams (Workflow status and collaboration)
+    - Discord Connectivity (Community management and alerts)
+    - Email Automation (SMTP integration and template management)
   </Accordion>
 </AccordionGroup>
 
 ## Block Interface Standardization
 
+<Info>
+  **Current Status**: Basic block interface implemented in TypeScript
+  **Development Focus**: Expanding interface standardization and validation
+</Info>
+
 ### Core Interface Definition
 
-All blocks adhere to common interfaces ensuring consistency and interoperability:
+Blocks will adhere to common interfaces ensuring consistency and interoperability:
 
 ```typescript
 interface IBlockHandler {
@@ -207,11 +229,15 @@ Each block defines precise input and output specifications:
   </Tab>
 </Tabs>
 
-## Dynamic Block Discovery
+## Dynamic Block Discovery (Development Focus)
+
+<Alert type="info">
+  **Development Status**: Basic block loading implemented. Advanced discovery and plugin system in development.
+</Alert>
 
 ### Runtime Block Loading
 
-Zzyra's architecture enables dynamic block discovery and loading:
+Zzyra's planned architecture will enable dynamic block discovery and loading:
 
 ```typescript
 class DynamicBlockRegistry {
@@ -251,9 +277,14 @@ class DynamicBlockRegistry {
 
 ## Custom Block Creation
 
+<Info>
+  **Current Status**: Basic AI-assisted block creation available
+  **Development Focus**: Enhanced generation capabilities and testing automation
+</Info>
+
 ### AI-Assisted Block Generation
 
-Users can create custom blocks using natural language descriptions:
+Users can currently create custom blocks using natural language descriptions:
 
 <Steps>
   <Step title='Describe Functionality'>
@@ -261,23 +292,27 @@ Users can create custom blocks using natural language descriptions:
     drop below 50 gwei"
   </Step>
   <Step title='AI Analysis & Code Generation'>
-    AI understands requirements and generates TypeScript implementation with
-    proper error handling
+    ✅ Current: AI generates basic TypeScript implementation
+    🚧 In Development: Enhanced error handling and validation
   </Step>
   <Step title='Interface Definition'>
-    AI creates input/output specifications and configuration options
+    🚧 In Development: AI creates input/output specifications and configuration options
   </Step>
   <Step title='Testing & Validation'>
-    Automated test generation and validation of block functionality
+    📋 Planned: Automated test generation and validation of block functionality
   </Step>
   <Step title='Documentation Generation'>
-    AI creates comprehensive documentation and usage examples
+    📋 Planned: AI creates comprehensive documentation and usage examples
   </Step>
 </Steps>
 
-### Manual Block Development
+### Manual Block Development (In Development)
 
-For advanced users, blocks can be developed using the Zzyra SDK:
+<Alert type="warning">
+  **Development Status**: Block development SDK in active development. Example shows planned interface.
+</Alert>
+
+For advanced users, blocks will be developed using the Zzyra SDK:
 
 ```typescript
 import { BlockHandler, BlockMetadata } from "@zzyra/sdk";
@@ -338,9 +373,13 @@ export class CustomGasMonitorBlock extends BlockHandler {
 }
 ```
 
-## Block Ecosystem & Marketplace
+## Block Ecosystem & Marketplace (Future Development)
 
-### Community Contributions
+<Alert type="info">
+  **Development Vision**: Block marketplace and community ecosystem planned for Phase 4 implementation.
+</Alert>
+
+### Planned Community Contributions
 
 <Tabs>
   <Tab title='Open Source Blocks'>
@@ -361,19 +400,24 @@ export class CustomGasMonitorBlock extends BlockHandler {
   </Tab>
 </Tabs>
 
-### Quality Assurance
+### Planned Quality Assurance
 
-All blocks undergo rigorous quality assurance:
+Blocks will undergo rigorous quality assurance:
 
+📋 Planned processes:
 - **Code Review**: Expert review of block implementation
 - **Security Audit**: Vulnerability assessment and penetration testing
 - **Performance Testing**: Load testing and optimization
 - **Documentation Review**: Comprehensive usage documentation
 - **Community Feedback**: User ratings and improvement suggestions
 
-## Block Performance & Optimization
+## Block Performance & Optimization (Development Focus)
 
-### Execution Optimization
+<Alert type="info">
+  **Current Status**: Basic block execution implemented. Performance optimization features in development.
+</Alert>
+
+### Planned Execution Optimization
 
 <AccordionGroup>
   <Accordion title='Caching Strategies' icon='database'>
@@ -401,28 +445,25 @@ All blocks undergo rigorous quality assurance:
   </Accordion>
 </AccordionGroup>
 
-### Monitoring & Analytics
+### Planned Monitoring & Analytics
 
+📋 Future capabilities:
 - **Execution Metrics**: Performance tracking for individual blocks
 - **Usage Analytics**: Popular blocks and usage patterns
 - **Error Tracking**: Comprehensive error logging and analysis
 - **Cost Analysis**: Resource consumption and optimization opportunities
 
-## Future Block Development
+## Block Development Roadmap
 
-### Roadmap Highlights
+### Implementation Phases
 
-- **AI Block Evolution**: Increasingly sophisticated AI-powered blocks
-- **Industry-Specific Blocks**: Specialized blocks for healthcare, finance, gaming
-- **IoT Integration**: Blocks for Internet of Things device interactions
-- **Advanced Security**: Enhanced security and privacy-preserving blocks
+- **Phase 1 (Q1-Q2 2025)**: Core block library (HTTP, basic Web3, AI assistance)
+- **Phase 2 (Q3-Q4 2025)**: Advanced Web3 blocks, enterprise integrations
+- **Phase 3 (2026+)**: Industry-specific blocks, IoT integration, advanced security
 
-<Info>
-  The modular block system is the foundation that makes Zzyra infinitely
-  extensible. As new protocols, APIs, and technologies emerge, they can be
-  quickly integrated through new blocks without affecting existing
-  functionality.
-</Info>
+<Note>
+  **Development Vision**: The modular block system will be the foundation that makes Zzyra infinitely extensible. As we develop new protocols, APIs, and technology integrations, they will be quickly integrated through new blocks without affecting existing functionality.
+</Note>
 
 ## Getting Started with Blocks
 
