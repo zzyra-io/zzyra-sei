@@ -136,6 +136,13 @@ export class CircuitBreakerDbService {
    */
   async recordSuccess(circuitId: string): Promise<void> {
     try {
+      // Check if circuit breaker is enabled via environment
+      const isEnabled = process.env.CIRCUIT_BREAKER_ENABLED !== 'false';
+      if (!isEnabled) {
+        // If circuit breaker is disabled, do nothing
+        return;
+      }
+
       const currentState = await this.getState(circuitId);
 
       if (currentState) {
@@ -165,6 +172,13 @@ export class CircuitBreakerDbService {
    */
   async recordFailure(circuitId: string, threshold: number = 5): Promise<void> {
     try {
+      // Check if circuit breaker is enabled via environment
+      const isEnabled = process.env.CIRCUIT_BREAKER_ENABLED !== 'false';
+      if (!isEnabled) {
+        // If circuit breaker is disabled, do nothing
+        return;
+      }
+
       const currentState = await this.getState(circuitId);
       const newFailureCount = (currentState?.failureCount || 0) + 1;
 
@@ -211,6 +225,13 @@ export class CircuitBreakerDbService {
    */
   async isOperationAllowed(circuitId: string): Promise<boolean> {
     try {
+      // Check if circuit breaker is enabled via environment
+      const isEnabled = process.env.CIRCUIT_BREAKER_ENABLED !== 'false';
+      if (!isEnabled) {
+        // If circuit breaker is disabled, always allow operations
+        return true;
+      }
+
       const state = await this.getState(circuitId);
 
       if (!state) {
@@ -263,10 +284,11 @@ export class CircuitBreakerDbService {
    */
   async getCircuitState(circuitId: string): Promise<string> {
     try {
-      const circuit = await this.databaseService.prisma.circuitBreakerState.findFirst({
-        where: { circuitId },
-        select: { state: true },
-      });
+      const circuit =
+        await this.databaseService.prisma.circuitBreakerState.findFirst({
+          where: { circuitId },
+          select: { state: true },
+        });
 
       return circuit?.state || 'CLOSED';
     } catch (error) {
@@ -287,9 +309,10 @@ export class CircuitBreakerDbService {
     lastSuccessTime?: Date;
   } | null> {
     try {
-      const circuit = await this.databaseService.prisma.circuitBreakerState.findFirst({
-        where: { circuitId },
-      });
+      const circuit =
+        await this.databaseService.prisma.circuitBreakerState.findFirst({
+          where: { circuitId },
+        });
 
       if (!circuit) {
         return null;
@@ -304,7 +327,10 @@ export class CircuitBreakerDbService {
         lastSuccessTime: circuit.lastSuccessTime,
       };
     } catch (error) {
-      this.logger.error(`Failed to get circuit details for ${circuitId}:`, error);
+      this.logger.error(
+        `Failed to get circuit details for ${circuitId}:`,
+        error,
+      );
       throw error;
     }
   }

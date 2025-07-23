@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CircuitBreaker, DEFAULT_CIRCUIT_CONFIG } from './CircuitBreaker';
 import { CircuitBreakerDbService } from './CircuitBreakerDbService';
+import { CIRCUIT_BREAKER } from '../../config';
 
 /**
  * Module that registers blockchain-related services
@@ -10,13 +11,18 @@ import { CircuitBreakerDbService } from './CircuitBreakerDbService';
   providers: [
     {
       provide: CircuitBreaker,
-      useFactory: () => new CircuitBreaker(DEFAULT_CIRCUIT_CONFIG)
+      useFactory: () =>
+        new CircuitBreaker({
+          ...DEFAULT_CIRCUIT_CONFIG,
+          enabled: CIRCUIT_BREAKER.enabled,
+          failureThreshold: CIRCUIT_BREAKER.failureThreshold,
+          successThreshold: CIRCUIT_BREAKER.successThreshold,
+          halfOpenSuccessThreshold: CIRCUIT_BREAKER.successThreshold, // Map to the correct property
+          resetTimeout: CIRCUIT_BREAKER.resetTimeout,
+        }),
     },
-    CircuitBreakerDbService
+    CircuitBreakerDbService,
   ],
-  exports: [
-    CircuitBreaker,
-    CircuitBreakerDbService
-  ]
+  exports: [CircuitBreaker, CircuitBreakerDbService],
 })
 export class BlockchainModule {}

@@ -19,7 +19,9 @@ import { BaseRepository } from "./base.repository";
 export type ExecutionCreateInput = Prisma.WorkflowExecutionCreateInput;
 export type ExecutionUpdateInput = Prisma.WorkflowExecutionUpdateInput;
 export type ExecutionWithNodes = WorkflowExecution & {
-  nodeExecutions: NodeExecution[];
+  nodeExecutions: (NodeExecution & {
+    logs: NodeLog[];
+  })[];
   executionLogs: ExecutionLog[];
 };
 
@@ -85,6 +87,13 @@ export class ExecutionRepository extends BaseRepository<
         nodeExecutions: {
           orderBy: {
             startedAt: "asc",
+          },
+          include: {
+            logs: {
+              orderBy: {
+                createdAt: "asc",
+              },
+            },
           },
         },
         executionLogs: {

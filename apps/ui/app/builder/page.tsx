@@ -1091,24 +1091,65 @@ export default function BuilderPage() {
 
                     {/* Connection Status Indicator */}
                     {connectionError && (
-                      <div className='flex-shrink-0 p-3 bg-red-50 border border-red-200 rounded-lg'>
-                        <div className='flex items-center gap-2 text-red-700'>
+                      <div className='flex-shrink-0 p-3 bg-amber-50 border border-amber-200 rounded-lg'>
+                        <div className='flex items-center gap-2 text-amber-700'>
                           <AlertCircle className='w-4 h-4' />
                           <div className='text-sm'>
-                            <p className='font-medium'>Connection Issue</p>
+                            <p className='font-medium'>Development Mode</p>
                             <p className='text-xs'>{connectionError}</p>
                             <p className='text-xs mt-1'>
-                              The worker service may not be running. Check if
-                              the worker is available at ws://localhost:3005
+                              Worker service not running. Real-time updates
+                              disabled.
                             </p>
-                            <Button
-                              variant='outline'
-                              size='sm'
-                              className='mt-2 text-xs'
-                              onClick={() => window.location.reload()}>
-                              <RefreshCw className='w-3 h-3 mr-1' />
-                              Retry Connection
-                            </Button>
+                            <div className='flex gap-2 mt-2'>
+                              <Button
+                                size='sm'
+                                className='text-xs'
+                                onClick={() => {
+                                  // Create test logs for development
+                                  const mockLogs = [
+                                    {
+                                      id: "dev-1",
+                                      timestamp: new Date(),
+                                      level: "info" as const,
+                                      message:
+                                        "Development mode - worker service not running",
+                                      nodeId: "system",
+                                      metadata: { mode: "development" },
+                                    },
+                                    {
+                                      id: "dev-2",
+                                      timestamp: new Date(Date.now() - 1000),
+                                      level: "info" as const,
+                                      message:
+                                        "Using fallback API for execution data",
+                                      nodeId: "system",
+                                      metadata: { mode: "development" },
+                                    },
+                                    {
+                                      id: "dev-3",
+                                      timestamp: new Date(Date.now() - 2000),
+                                      level: "warn" as const,
+                                      message:
+                                        "Real-time updates disabled - using API fallback",
+                                      nodeId: "system",
+                                      metadata: { mode: "development" },
+                                    },
+                                  ];
+                                  setExecutionLogs(mockLogs);
+                                }}>
+                                <Play className='w-3 h-3 mr-1' />
+                                Create Test Logs
+                              </Button>
+                              <Button
+                                variant='outline'
+                                size='sm'
+                                className='text-xs'
+                                onClick={() => window.location.reload()}>
+                                <RefreshCw className='w-3 h-3 mr-1' />
+                                Retry
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>

@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useExecutionWebSocket, NodeExecutionUpdate } from './use-execution-websocket';
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  useExecutionWebSocket,
+  NodeExecutionUpdate,
+} from "./use-execution-websocket";
 
 export interface RealTimeExecutionNode {
   id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: "pending" | "running" | "completed" | "failed";
   progress?: number;
   duration?: number;
   error?: string;
@@ -22,7 +25,13 @@ export interface RealTimeExecutionNode {
 export interface RealTimeExecutionState {
   executionId: string;
   workflowId: string;
-  status: 'idle' | 'starting' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status:
+    | "idle"
+    | "starting"
+    | "running"
+    | "completed"
+    | "failed"
+    | "cancelled";
   nodes: Map<string, RealTimeExecutionNode>;
   currentNode?: string;
   totalProgress: number;
@@ -30,7 +39,7 @@ export interface RealTimeExecutionState {
   endTime?: Date;
   duration?: number;
   isLive: boolean;
-  connectionStatus: 'connected' | 'disconnected' | 'connecting' | 'error';
+  connectionStatus: "connected" | "disconnected" | "connecting" | "error";
 }
 
 export interface UseRealTimeExecutionProps {
@@ -42,17 +51,16 @@ export interface UseRealTimeExecutionProps {
 export function useRealTimeExecution({
   executionId,
   workflowId,
-  autoConnect = true
+  autoConnect = true,
 }: UseRealTimeExecutionProps = {}) {
-  
   const [executionState, setExecutionState] = useState<RealTimeExecutionState>({
-    executionId: executionId || '',
-    workflowId: workflowId || '',
-    status: 'idle',
+    executionId: executionId || "",
+    workflowId: workflowId || "",
+    status: "idle",
     nodes: new Map(),
     totalProgress: 0,
     isLive: false,
-    connectionStatus: 'disconnected'
+    connectionStatus: "disconnected",
   });
 
   const executionRef = useRef(executionState);
@@ -60,13 +68,13 @@ export function useRealTimeExecution({
 
   // Handle node updates from WebSocket
   const handleNodeUpdate = useCallback((update: NodeExecutionUpdate) => {
-    setExecutionState(prev => {
+    setExecutionState((prev) => {
       const newNodes = new Map(prev.nodes);
-      
+
       // Get or create node state
       const existingNode = newNodes.get(update.nodeId) || {
         id: update.nodeId,
-        status: 'pending',
+        status: "pending",
         logs: [],
       };
 
@@ -83,37 +91,39 @@ export function useRealTimeExecution({
         logs: [
           ...existingNode.logs,
           {
-            level: update.status === 'failed' ? 'error' : 'info',
-            message: `Node ${update.status}${update.error ? `: ${update.error}` : ''}`,
-            timestamp: new Date().toISOString()
-          }
-        ]
+            level: update.status === "failed" ? "error" : "info",
+            message: `Node ${update.status}${update.error ? `: ${update.error}` : ""}`,
+            timestamp: new Date().toISOString(),
+          },
+        ],
       };
 
       newNodes.set(update.nodeId, updatedNode);
 
       // Calculate overall progress
       const nodeArray = Array.from(newNodes.values());
-      const completedNodes = nodeArray.filter(node => 
-        node.status === 'completed' || node.status === 'failed'
+      const completedNodes = nodeArray.filter(
+        (node) => node.status === "completed" || node.status === "failed"
       ).length;
-      const totalProgress = nodeArray.length > 0 
-        ? (completedNodes / nodeArray.length) * 100 
-        : 0;
+      const totalProgress =
+        nodeArray.length > 0 ? (completedNodes / nodeArray.length) * 100 : 0;
 
       // Update execution status
       let newStatus = prev.status;
       let currentNode = prev.currentNode;
       let endTime = prev.endTime;
 
-      if (update.status === 'running') {
-        newStatus = 'running';
+      if (update.status === "running") {
+        newStatus = "running";
         currentNode = update.nodeId;
-      } else if (update.status === 'failed') {
-        newStatus = 'failed';
+      } else if (update.status === "failed") {
+        newStatus = "failed";
         endTime = new Date();
-      } else if (update.status === 'completed' && completedNodes === nodeArray.length) {
-        newStatus = 'completed';
+      } else if (
+        update.status === "completed" &&
+        completedNodes === nodeArray.length
+      ) {
+        newStatus = "completed";
         endTime = new Date();
       }
 
@@ -124,40 +134,41 @@ export function useRealTimeExecution({
         currentNode,
         totalProgress,
         endTime,
-        duration: prev.startTime && endTime 
-          ? endTime.getTime() - prev.startTime.getTime() 
-          : prev.duration,
-        isLive: true
+        duration:
+          prev.startTime && endTime
+            ? endTime.getTime() - prev.startTime.getTime()
+            : prev.duration,
+        isLive: true,
       };
     });
   }, []);
 
   // Handle execution events
   const handleExecutionComplete = useCallback((data: any) => {
-    setExecutionState(prev => ({
+    setExecutionState((prev) => ({
       ...prev,
-      status: 'completed',
+      status: "completed",
       endTime: new Date(),
       duration: data.duration,
-      totalProgress: 100
+      totalProgress: 100,
     }));
   }, []);
 
   const handleExecutionFailed = useCallback((data: any) => {
-    setExecutionState(prev => ({
+    setExecutionState((prev) => ({
       ...prev,
-      status: 'failed',
+      status: "failed",
       endTime: new Date(),
-      duration: data.duration
+      duration: data.duration,
     }));
   }, []);
 
   const handleExecutionLog = useCallback((log: any) => {
     if (log.nodeId) {
-      setExecutionState(prev => {
+      setExecutionState((prev) => {
         const newNodes = new Map(prev.nodes);
         const node = newNodes.get(log.nodeId);
-        
+
         if (node) {
           const updatedNode = {
             ...node,
@@ -166,18 +177,18 @@ export function useRealTimeExecution({
               {
                 level: log.level,
                 message: log.message,
-                timestamp: log.timestamp.toISOString()
-              }
-            ]
+                timestamp: log.timestamp.toISOString(),
+              },
+            ],
           };
           newNodes.set(log.nodeId, updatedNode);
-          
+
           return {
             ...prev,
-            nodes: newNodes
+            nodes: newNodes,
           };
         }
-        
+
         return prev;
       });
     }
@@ -194,114 +205,125 @@ export function useRealTimeExecution({
 
   // Update connection status
   useEffect(() => {
-    setExecutionState(prev => ({
+    setExecutionState((prev) => ({
       ...prev,
-      connectionStatus: connectionError 
-        ? 'error' 
-        : isConnected 
-          ? 'connected' 
-          : 'disconnected'
+      connectionStatus: connectionError
+        ? "error"
+        : isConnected
+          ? "connected"
+          : "disconnected",
     }));
   }, [isConnected, connectionError]);
 
   // Start execution tracking
-  const startExecution = useCallback((newExecutionId: string, newWorkflowId?: string) => {
-    setExecutionState(prev => ({
-      ...prev,
-      executionId: newExecutionId,
-      workflowId: newWorkflowId || prev.workflowId,
-      status: 'starting',
-      nodes: new Map(),
-      currentNode: undefined,
-      totalProgress: 0,
-      startTime: new Date(),
-      endTime: undefined,
-      duration: undefined,
-      isLive: true
-    }));
-  }, []);
+  const startExecution = useCallback(
+    (newExecutionId: string, newWorkflowId?: string) => {
+      setExecutionState((prev) => ({
+        ...prev,
+        executionId: newExecutionId,
+        workflowId: newWorkflowId || prev.workflowId,
+        status: "starting",
+        nodes: new Map(),
+        currentNode: undefined,
+        totalProgress: 0,
+        startTime: new Date(),
+        endTime: undefined,
+        duration: undefined,
+        isLive: true,
+      }));
+    },
+    []
+  );
 
   // Stop execution tracking
   const stopExecution = useCallback(() => {
-    setExecutionState(prev => ({
+    setExecutionState((prev) => ({
       ...prev,
-      status: 'cancelled',
+      status: "failed",
       endTime: new Date(),
       isLive: false,
-      duration: prev.startTime 
-        ? new Date().getTime() - prev.startTime.getTime() 
-        : prev.duration
+      duration: prev.startTime
+        ? new Date().getTime() - prev.startTime.getTime()
+        : prev.duration,
     }));
   }, []);
 
   // Reset execution state
   const resetExecution = useCallback(() => {
-    setExecutionState(prev => ({
+    setExecutionState((prev) => ({
       ...prev,
-      status: 'idle',
+      status: "idle",
       nodes: new Map(),
       currentNode: undefined,
       totalProgress: 0,
       startTime: undefined,
       endTime: undefined,
       duration: undefined,
-      isLive: false
+      isLive: false,
     }));
   }, []);
 
   // Get node state
-  const getNodeState = useCallback((nodeId: string): RealTimeExecutionNode | undefined => {
-    return executionRef.current.nodes.get(nodeId);
-  }, []);
+  const getNodeState = useCallback(
+    (nodeId: string): RealTimeExecutionNode | undefined => {
+      return executionRef.current.nodes.get(nodeId);
+    },
+    []
+  );
 
   // Update node data (for manual updates when not using WebSocket)
-  const updateNodeState = useCallback((nodeId: string, update: Partial<RealTimeExecutionNode>) => {
-    setExecutionState(prev => {
-      const newNodes = new Map(prev.nodes);
-      const existingNode = newNodes.get(nodeId) || {
-        id: nodeId,
-        status: 'pending' as const,
-        logs: []
-      };
+  const updateNodeState = useCallback(
+    (nodeId: string, update: Partial<RealTimeExecutionNode>) => {
+      setExecutionState((prev) => {
+        const newNodes = new Map(prev.nodes);
+        const existingNode = newNodes.get(nodeId) || {
+          id: nodeId,
+          status: "pending" as const,
+          logs: [],
+        };
 
-      const updatedNode = {
-        ...existingNode,
-        ...update
-      };
+        const updatedNode = {
+          ...existingNode,
+          ...update,
+        };
 
-      newNodes.set(nodeId, updatedNode);
+        newNodes.set(nodeId, updatedNode);
 
-      return {
-        ...prev,
-        nodes: newNodes
-      };
-    });
-  }, []);
+        return {
+          ...prev,
+          nodes: newNodes,
+        };
+      });
+    },
+    []
+  );
 
   return {
     // State
     executionState,
-    
+
     // Node operations
     getNodeState,
     updateNodeState,
-    
+
     // Execution operations
     startExecution,
     stopExecution,
     resetExecution,
-    
+
     // Connection
     isConnected,
     connectionError,
     reconnect,
-    
+
     // Computed values
-    isExecuting: executionState.status === 'running' || executionState.status === 'starting',
-    isCompleted: executionState.status === 'completed',
-    isFailed: executionState.status === 'failed',
+    isExecuting:
+      executionState.status === "running" ||
+      executionState.status === "starting",
+    isCompleted: executionState.status === "completed",
+    isFailed: executionState.status === "failed",
     progress: executionState.totalProgress,
-    
+
     // Helper functions
     getExecutionDuration: () => {
       if (executionState.duration) return executionState.duration;
@@ -311,21 +333,21 @@ export function useRealTimeExecution({
       }
       return 0;
     },
-    
+
     getCompletedNodes: () => {
       return Array.from(executionState.nodes.values()).filter(
-        node => node.status === 'completed'
+        (node) => node.status === "completed"
       ).length;
     },
-    
+
     getFailedNodes: () => {
       return Array.from(executionState.nodes.values()).filter(
-        node => node.status === 'failed'
+        (node) => node.status === "failed"
       ).length;
     },
-    
+
     getTotalNodes: () => {
       return executionState.nodes.size;
-    }
+    },
   };
 }

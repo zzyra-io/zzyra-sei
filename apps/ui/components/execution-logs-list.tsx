@@ -311,6 +311,7 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
       completed: 0,
       failed: 0,
       paused: 0,
+      cancelled: 0,
     };
     executions.forEach((log) => {
       const status = log.status as keyof typeof counts;
@@ -390,6 +391,13 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
           <Badge className='bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:text-amber-800'>
             <Pause className='w-3 h-3 mr-1' />
             Paused
+          </Badge>
+        );
+      case "cancelled":
+        return (
+          <Badge className='bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:text-gray-800'>
+            <XCircle className='w-3 h-3 mr-1' />
+            Cancelled
           </Badge>
         );
       default:

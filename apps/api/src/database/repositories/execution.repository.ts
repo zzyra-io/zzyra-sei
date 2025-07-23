@@ -73,6 +73,9 @@ export class ExecutionRepository {
       include: {
         nodeInputs: true,
         nodeOutputs: true,
+        logs: {
+          orderBy: { createdAt: "asc" },
+        },
       },
       orderBy: { startedAt: "asc" },
     });

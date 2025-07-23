@@ -295,7 +295,7 @@ export class ExecutionsService {
 
   async cancel(id: string, userId?: string): Promise<any> {
     await this.findOne(id, userId); // Verify access
-    return this.executionRepository.updateStatus(id, "cancelled" as any);
+    return this.executionRepository.updateStatus(id, "cancelled");
   }
 
   async pause(id: string, userId?: string): Promise<any> {

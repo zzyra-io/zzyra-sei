@@ -5,28 +5,32 @@ import { Injectable, Logger } from '@nestjs/common';
  */
 export enum CircuitState {
   CLOSED = 'CLOSED', // Normal operation, transactions allowed
-  OPEN = 'OPEN',     // Circuit is open, transactions blocked
-  HALF_OPEN = 'HALF_OPEN' // Testing if the system has recovered
+  OPEN = 'OPEN', // Circuit is open, transactions blocked
+  HALF_OPEN = 'HALF_OPEN', // Testing if the system has recovered
 }
 
 /**
  * Configuration for circuit breaker behavior
  */
 export interface CircuitBreakerConfig {
-  failureThreshold: number;       // Number of failures before opening circuit
-  resetTimeout: number;           // Time in ms before attempting reset (half-open)
+  enabled: boolean; // Whether circuit breaker is enabled
+  failureThreshold: number; // Number of failures before opening circuit
+  resetTimeout: number; // Time in ms before attempting reset (half-open)
+  successThreshold: number; // Number of successful ops needed to close circuit (alias for halfOpenSuccessThreshold)
   halfOpenSuccessThreshold: number; // Successful ops needed to close circuit
-  monitorWindow: number;          // Time window in ms to track failures
-  maxRetries: number;             // Max number of retries per operation
-  retryBackoffMs: number;         // Base backoff time between retries
+  monitorWindow: number; // Time window in ms to track failures
+  maxRetries: number; // Max number of retries per operation
+  retryBackoffMs: number; // Base backoff time between retries
 }
 
 /**
  * Default configuration values
  */
 export const DEFAULT_CIRCUIT_CONFIG: CircuitBreakerConfig = {
+  enabled: true, // Can be overridden via environment
   failureThreshold: 5,
   resetTimeout: 30000, // 30 seconds
+  successThreshold: 2, // Alias for halfOpenSuccessThreshold
   halfOpenSuccessThreshold: 2,
   monitorWindow: 120000, // 2 minutes
   maxRetries: 3,
@@ -35,7 +39,7 @@ export const DEFAULT_CIRCUIT_CONFIG: CircuitBreakerConfig = {
 
 /**
  * CircuitBreaker implementation for blockchain transactions
- * 
+ *
  * Prevents cascading failures by tracking errors and stopping further
  * operations when a predefined threshold is reached.
  */
@@ -51,10 +55,12 @@ export class CircuitBreaker {
   private readonly successCounts: Map<string, number> = new Map();
   private readonly lastFailureTimes: Map<string, number> = new Map();
   private readonly resetTimers: Map<string, NodeJS.Timeout> = new Map();
-  
+
   private readonly logger = new Logger(CircuitBreaker.name);
-  
-  constructor(private readonly config: CircuitBreakerConfig = DEFAULT_CIRCUIT_CONFIG) {}
+
+  constructor(
+    private readonly config: CircuitBreakerConfig = DEFAULT_CIRCUIT_CONFIG,
+  ) {}
 
   /**
    * Get the current state of a specific circuit
@@ -67,26 +73,31 @@ export class CircuitBreaker {
    * Checks if operations are allowed for a specific circuit
    */
   isAllowed(circuitId: string): boolean {
+    // If circuit breaker is disabled, always allow operations
+    if (!this.config.enabled) {
+      return true;
+    }
+
     const state = this.getState(circuitId);
-    
+
     if (state === CircuitState.CLOSED) {
       return true;
     }
-    
+
     if (state === CircuitState.HALF_OPEN) {
       // In half-open state, allow limited transactions to test recovery
       return true;
     }
-    
+
     // Open state - check if it's time to try half-open
     const lastFailure = this.lastFailureTimes.get(circuitId) || 0;
     const timeSinceFailure = Date.now() - lastFailure;
-    
+
     if (timeSinceFailure >= this.config.resetTimeout) {
       this.transitionToHalfOpen(circuitId);
       return true;
     }
-    
+
     return false;
   }
 
@@ -94,18 +105,23 @@ export class CircuitBreaker {
    * Record a successful operation
    */
   recordSuccess(circuitId: string): void {
+    // If circuit breaker is disabled, do nothing
+    if (!this.config.enabled) {
+      return;
+    }
+
     const state = this.getState(circuitId);
-    
+
     if (state === CircuitState.HALF_OPEN) {
       // Increment success counter in half-open state
       const successes = (this.successCounts.get(circuitId) || 0) + 1;
       this.successCounts.set(circuitId, successes);
-      
+
       if (successes >= this.config.halfOpenSuccessThreshold) {
         this.closeCircuit(circuitId);
       }
     }
-    
+
     // In CLOSED state, reset failure count
     if (state === CircuitState.CLOSED) {
       this.failureCounts.set(circuitId, 0);
@@ -116,23 +132,28 @@ export class CircuitBreaker {
    * Record a failed operation
    */
   recordFailure(circuitId: string): void {
+    // If circuit breaker is disabled, do nothing
+    if (!this.config.enabled) {
+      return;
+    }
+
     const state = this.getState(circuitId);
     const now = Date.now();
-    
+
     // Update last failure time
     this.lastFailureTimes.set(circuitId, now);
-    
+
     if (state === CircuitState.HALF_OPEN) {
       // Any failure in half-open immediately opens the circuit
       this.openCircuit(circuitId);
       return;
     }
-    
+
     if (state === CircuitState.CLOSED) {
       // Check if old failures should be reset based on monitor window
       const lastFailureTime = this.lastFailureTimes.get(circuitId) || 0;
       const timeSinceLastFailure = now - lastFailureTime;
-      
+
       if (timeSinceLastFailure > this.config.monitorWindow) {
         // Reset counter if we're outside the monitoring window
         this.failureCounts.set(circuitId, 1);
@@ -140,7 +161,7 @@ export class CircuitBreaker {
         // Increment failure counter
         const failures = (this.failureCounts.get(circuitId) || 0) + 1;
         this.failureCounts.set(circuitId, failures);
-        
+
         // Check threshold
         if (failures >= this.config.failureThreshold) {
           this.openCircuit(circuitId);
@@ -155,7 +176,7 @@ export class CircuitBreaker {
   getRetryBackoff(attempt: number): number {
     return Math.min(
       this.config.retryBackoffMs * Math.pow(2, attempt),
-      30000 // Max 30 seconds
+      30000, // Max 30 seconds
     );
   }
 
@@ -166,18 +187,18 @@ export class CircuitBreaker {
     this.logger.warn(`Opening circuit breaker for ${circuitId}`);
     this.circuitBreakers.set(circuitId, CircuitState.OPEN);
     this.successCounts.set(circuitId, 0);
-    
+
     // Clear any existing reset timer
     const existingTimer = this.resetTimers.get(circuitId);
     if (existingTimer) {
       clearTimeout(existingTimer);
     }
-    
+
     // Set timer to transition to half-open
     const timer = setTimeout(() => {
       this.transitionToHalfOpen(circuitId);
     }, this.config.resetTimeout);
-    
+
     this.resetTimers.set(circuitId, timer);
   }
 
@@ -185,7 +206,9 @@ export class CircuitBreaker {
    * Transition circuit to HALF_OPEN state
    */
   private transitionToHalfOpen(circuitId: string): void {
-    this.logger.log(`Moving circuit breaker to half-open state for ${circuitId}`);
+    this.logger.log(
+      `Moving circuit breaker to half-open state for ${circuitId}`,
+    );
     this.circuitBreakers.set(circuitId, CircuitState.HALF_OPEN);
     this.successCounts.set(circuitId, 0);
   }
@@ -206,7 +229,7 @@ export class CircuitBreaker {
   reset(circuitId: string): void {
     this.logger.log(`Manually resetting circuit breaker for ${circuitId}`);
     this.closeCircuit(circuitId);
-    
+
     // Clear any scheduled timer
     const existingTimer = this.resetTimers.get(circuitId);
     if (existingTimer) {

@@ -31,6 +31,7 @@ import {
   Minimize2,
 } from "lucide-react";
 import { io, Socket } from "socket.io-client";
+import { config } from "@/lib/config";
 
 interface ExecutionStatus {
   executionId: string;
@@ -136,7 +137,7 @@ export function RealtimeExecutionMonitor({
     if (!executionId) return;
 
     const socket = io(
-      `${process.env.NEXT_PUBLIC_WORKER_URL || "ws://localhost:3005"}/execution`,
+      `${config.workerUrl || "http://localhost:3009"}/execution`,
       {
         transports: ["websocket"],
         forceNew: true,
@@ -347,7 +348,8 @@ export function RealtimeExecutionMonitor({
           </div>
           <p className='text-gray-600 mb-2'>Worker service unavailable</p>
           <p className='text-sm text-muted-foreground mb-4'>
-            Check if the worker service is running at ws://localhost:3005
+            Check if the worker service is running at{" "}
+            {config.workerUrl || "http://localhost:3009"}
           </p>
           <Button
             onClick={() => window.location.reload()}

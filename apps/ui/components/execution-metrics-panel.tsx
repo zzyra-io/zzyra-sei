@@ -11,6 +11,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { ExecutionMetrics } from "@/hooks/use-execution-websocket";
+import { config } from "@/lib/config";
 import { Activity, Clock, Database, Network, Zap } from "lucide-react";
 import { useMemo } from "react";
 
@@ -72,7 +73,7 @@ export function ExecutionMetricsPanel({
                   Check if the worker service is running
                 </p>
                 <div className='text-xs bg-muted p-2 rounded mt-2'>
-                  <p>Expected: ws://localhost:3005</p>
+                  <p>Expected: {config.workerUrl || "http://localhost:3009"}</p>
                   <p>Status: {isConnected ? "Connected" : "Disconnected"}</p>
                 </div>
               </div>

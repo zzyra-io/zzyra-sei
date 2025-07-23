@@ -14,6 +14,7 @@ export const EXECUTION_RETRY_QUEUE = 'ZYRA.EXECUTION_QUEUE.RETRY'; // Retry Queu
 
 // Circuit breaker settings
 export const CIRCUIT_BREAKER = {
+  enabled: process.env.CIRCUIT_BREAKER_ENABLED !== 'false', // Default to true, can be disabled with CIRCUIT_BREAKER_ENABLED=false
   failureThreshold: Number(process.env.CIRCUIT_BREAKER_FAILURE_THRESHOLD || 5),
   successThreshold: Number(process.env.CIRCUIT_BREAKER_SUCCESS_THRESHOLD || 2),
   resetTimeout: Number(process.env.CIRCUIT_BREAKER_RESET_TIMEOUT || 30000), // 30 seconds

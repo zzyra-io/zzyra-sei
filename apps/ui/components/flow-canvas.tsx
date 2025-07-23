@@ -88,6 +88,7 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
     setShowEdgeConfigPanel,
     setGridVisible,
     setReactFlowInstance,
+    setHasUnsavedChanges,
     reactFlowInstance,
     selectedEdge,
     selectedNode,
@@ -141,26 +142,33 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
     (updatedNode: Node) => {
       updateNode(updatedNode.id, updatedNode);
       setSelectedNode(updatedNode);
+      setHasUnsavedChanges(true);
     },
-    [updateNode, setSelectedNode]
+    [updateNode, setSelectedNode, setHasUnsavedChanges]
   );
 
   // Handle config updates from the config panel
   const handleConfigUpdate = useCallback(
-    (config: Record<string, unknown>) => {
+    (updatedData: Record<string, unknown>) => {
       if (selectedNode) {
+        // Extract the config from the updated data
+        const { config, ...otherData } = updatedData;
         const updatedNode = {
           ...selectedNode,
           data: {
             ...selectedNode.data,
-            ...config,
+            ...otherData,
+            config: config || selectedNode.data.config || {},
           },
         };
         updateNode(selectedNode.id, updatedNode);
         setSelectedNode(updatedNode);
+        
+        // Mark as having unsaved changes
+        setHasUnsavedChanges(true);
       }
     },
-    [selectedNode, updateNode, setSelectedNode]
+    [selectedNode, updateNode, setSelectedNode, setHasUnsavedChanges]
   );
 
   // Handle edge updates from the config panel
@@ -256,8 +264,9 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
 
       console.log("Created node with config:", newNode.data.config);
       addNode(newNode);
+      setHasUnsavedChanges(true);
     },
-    [addNode, reactFlowInstance]
+    [addNode, reactFlowInstance, setHasUnsavedChanges]
   );
 
   // Allow dropping on the canvas
@@ -284,7 +293,10 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
         {
           label: "Delete Node",
           onClick: () => {
-            if (selectedNode) removeNode(selectedNode.id);
+            if (selectedNode) {
+              removeNode(selectedNode.id);
+              setHasUnsavedChanges(true);
+            }
           },
         },
       ];
@@ -299,7 +311,10 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
         {
           label: "Delete Edge",
           onClick: () => {
-            if (selectedEdge) removeEdge(selectedEdge.id);
+            if (selectedEdge) {
+              removeEdge(selectedEdge.id);
+              setHasUnsavedChanges(true);
+            }
           },
         },
       ];
@@ -338,8 +353,9 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
         style: { stroke: themeColors.edge },
       };
       addEdge(newEdge);
+      setHasUnsavedChanges(true);
     },
-    [nodes, edges, addEdge, toast, themeColors.edge]
+    [nodes, edges, addEdge, toast, themeColors.edge, setHasUnsavedChanges]
   );
 
   // Update toolbar actions using store state and actions
@@ -354,8 +370,14 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
       toolbarRef.current.fitView = () => reactFlowInstance?.fitView();
       toolbarRef.current.toggleGrid = () => setGridVisible(!isGridVisible);
       toolbarRef.current.deleteSelected = () => {
-        if (selectedNode) removeNode(selectedNode.id);
-        if (selectedEdge) removeEdge(selectedEdge.id);
+        if (selectedNode) {
+          removeNode(selectedNode.id);
+          setHasUnsavedChanges(true);
+        }
+        if (selectedEdge) {
+          removeEdge(selectedEdge.id);
+          setHasUnsavedChanges(true);
+        }
       };
       toolbarRef.current.duplicateSelected = () => {
         if (selectedNode) {
@@ -368,6 +390,7 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
             },
           };
           addNode(newNode);
+          setHasUnsavedChanges(true);
         }
       };
       // Additional toolbar actions (e.g., alignHorizontal, alignVertical) can be added here
@@ -385,6 +408,7 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
     removeNode,
     removeEdge,
     addNode,
+    setHasUnsavedChanges,
     toolbarRef,
   ]);
 

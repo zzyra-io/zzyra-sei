@@ -96,16 +96,15 @@ export function useExecutionWebSocket({
       return;
     }
 
-    // Create socket connection to execution namespace with fallback
-    const socketUrl = workerUrl || "ws://localhost:3005";
+    // Create socket connection to execution namespace
+    const socketUrl = workerUrl;
     const socket = io(`${socketUrl}/execution`, {
       transports: ["websocket", "polling"],
-      timeout: 10000, // Increased timeout for better reliability
-      retries: 3, // Increased retries
+      timeout: 5000, // Reduced timeout for faster failure detection
+      retries: 2, // Reduced retries for faster fallback
       forceNew: true, // Force new connection for each execution
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
+      reconnection: false, // Disable reconnection to fail fast
+      reconnectionAttempts: 0,
     });
 
     socketRef.current = socket;
@@ -131,16 +130,19 @@ export function useExecutionWebSocket({
 
     socket.on("connect_error", (error) => {
       console.error("WebSocket connection error:", error);
-      setConnectionError(`Connection failed: ${error.message}`);
-      setIsConnected(false);
 
-      // Try to reconnect after a delay
-      setTimeout(() => {
-        if (socketRef.current && !socketRef.current.connected) {
-          console.log("Attempting to reconnect...");
-          socketRef.current.connect();
-        }
-      }, 3000);
+      // In development, don't show error if worker isn't running
+      if (
+        process.env.NODE_ENV === "development" &&
+        error.message.includes("ECONNREFUSED")
+      ) {
+        console.warn("Worker service not running in development mode");
+        setConnectionError("Worker service not running in development mode");
+      } else {
+        setConnectionError(`Connection failed: ${error.message}`);
+      }
+
+      setIsConnected(false);
     });
 
     socket.on("connect_timeout", () => {
