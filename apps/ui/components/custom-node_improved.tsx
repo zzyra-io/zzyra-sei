@@ -5,13 +5,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
 import {
   NodeExecutionUpdate,
   useExecutionWebSocket,
 } from "@/hooks/use-execution-websocket";
 import { useBlockExecution } from "@/hooks/useBlockExecution";
 import { cn } from "@/lib/utils";
-import { Handle, Position, useConnection } from "@xyflow/react";
+import { useWorkflowValidation } from "@/lib/contexts/workflow-validation-context";
+import { Handle, Position, useConnection, useNodeConnections, useNodesData } from "@xyflow/react";
 import {
   Activity,
   AlertCircle,
@@ -25,6 +27,8 @@ import {
   X,
   XCircle,
   Zap,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import React, { useCallback, useEffect, useState } from "react";
@@ -95,10 +99,32 @@ export default function CustomNode({
   data: NodeData;
 }) {
   const { theme } = useTheme();
-  const connection = useConnection() as ReturnType<typeof useConnection>;
-  const isConnecting = connection.inProgress;
-  const isTarget = isConnecting && connection.fromNode?.id !== id;
+  const connection = useConnection();
+  const isConnecting = connection?.inProgress || false;
+  const isTarget = isConnecting && connection?.fromNode?.id !== id;
   const [showLogs, setShowLogs] = useState(false);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
+
+  // Get validation errors for this specific node
+  const { getNodeErrors, getNodeFieldError } = useWorkflowValidation();
+
+  // Get validation errors for this node
+  const nodeValidationErrors = getNodeErrors(id).map(error => ({
+    field: error.field,
+    message: error.message,
+  }));
+
+  // Get source node data for validation context
+  const connections = useNodeConnections({
+    handleType: 'target',
+  });
+  const sourceNodesData = useNodesData(
+    connections.map((connection) => connection.source),
+  );
+
+  // Check if node has validation errors
+  const hasValidationErrors = nodeValidationErrors.length > 0;
+  const errorCount = nodeValidationErrors.length;
 
   // Destructure config and other fields from data at the top
   const {
@@ -134,7 +160,7 @@ export default function CustomNode({
     blockName: data.label,
   });
 
-  // Use the new live node system for real-time updates
+    // Use the new live node system for real-time updates
   const liveNode = useLiveNode(id);
 
   // Handle real-time node updates from WebSocket (legacy)
@@ -675,6 +701,8 @@ export default function CustomNode({
           ? "border-2 border-primary shadow-lg shadow-primary/20"
           : "border-border/30",
         theme === "dark" && !isTarget && "shadow-black/20",
+        // Validation error styling
+        hasValidationErrors && "border-red-300 shadow-red-500/10",
         // Enhanced status-based styling with live execution feedback
         status === "running" &&
           (isUsingLiveNode || isLiveExecution
@@ -724,6 +752,45 @@ export default function CustomNode({
         {schemaIndicator && (
           <div className='flex items-center gap-1'>{schemaIndicator}</div>
         )}
+
+        {/* Simple validation status with tooltip */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              {hasValidationErrors ? (
+                <div className='flex items-center gap-1 cursor-help'>
+                  <AlertCircle className='w-3 h-3 text-red-500' />
+                  <span className='text-xs text-red-600'>
+                    {errorCount}
+                  </span>
+                </div>
+              ) : (
+                <div className='flex items-center gap-1'>
+                  <CheckCircle2 className='w-3 h-3 text-green-500' />
+                </div>
+              )}
+            </TooltipTrigger>
+            <TooltipContent>
+              {hasValidationErrors ? (
+                <div className='text-xs max-w-48'>
+                  <div className='font-medium mb-1'>Configuration Issues:</div>
+                  {nodeValidationErrors.slice(0, 3).map((error, idx) => (
+                    <div key={idx} className='mb-1 text-red-300'>
+                      {error.message}
+                    </div>
+                  ))}
+                  {nodeValidationErrors.length > 3 && (
+                    <div className='text-gray-400'>
+                      +{nodeValidationErrors.length - 3} more
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className='text-xs'>Configuration is valid</div>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         {/* Schema info toggle */}
         {nodeSchema && (
@@ -830,6 +897,8 @@ export default function CustomNode({
             </div>
           </div>
         )}
+
+ 
       </div>
 
       {/* Handles - styled to cover the entire node */}
@@ -969,6 +1038,48 @@ export default function CustomNode({
           </div>
         </div>
       )}
+             {/* Validation errors expandable section */}
+        {hasValidationErrors && (
+          <div className='mt-2 border-t border-red-200'>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowValidationErrors(!showValidationErrors);
+              }}
+              className='flex items-center justify-between w-full p-2 text-xs text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer'
+            >
+              <div className='flex items-center gap-2'>
+                <AlertCircle className='w-3 h-3' />
+                <span className='font-medium'>
+                  {errorCount} validation error{errorCount > 1 ? 's' : ''}
+                </span>
+              </div>
+              {showValidationErrors ? (
+                <ChevronUp className='w-3 h-3' />
+              ) : (
+                <ChevronDown className='w-3 h-3' />
+              )}
+            </button>
+            {showValidationErrors && (
+              <div className='px-2 pb-2'>
+                <div className='space-y-1'>
+                  {nodeValidationErrors.map((error, idx) => (
+                    <div key={idx} className='text-xs p-2 bg-red-50 border border-red-200 rounded'>
+                      <div className='font-medium text-red-700 mb-1'>
+                        {error.field}
+                      </div>
+                      <div className='text-red-600'>
+                        {error.message}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
     </div>
   );
 }

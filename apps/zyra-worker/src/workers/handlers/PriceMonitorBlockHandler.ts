@@ -36,7 +36,8 @@ export class PriceMonitorBlockHandler implements EnhancedBlockHandler {
         name: 'asset',
         type: PropertyType.STRING,
         required: true,
-        description: 'The cryptocurrency asset to monitor (e.g., ETH, BTC, SOL)',
+        description:
+          'The cryptocurrency asset to monitor (e.g., ETH, BTC, SOL)',
         default: 'ETH',
       },
       {
@@ -97,7 +98,7 @@ export class PriceMonitorBlockHandler implements EnhancedBlockHandler {
       // Get configuration parameters
       const asset = getNodeParameter('asset') || 'ETH';
       const condition = getNodeParameter('condition') || 'above';
-      const targetPrice = getNodeParameter('targetPrice') || 0;
+      const targetPrice = Number(getNodeParameter('targetPrice')) || 0;
       const dataSource = getNodeParameter('dataSource') || 'coingecko';
 
       // Validate required fields
@@ -134,7 +135,7 @@ export class PriceMonitorBlockHandler implements EnhancedBlockHandler {
         triggered: conditionMet,
         timestamp: new Date().toISOString(),
         dataSource: dataSource,
-        
+
         // Legacy format for backward compatibility
         currency: asset,
         formattedPrice: `$${priceData.price.toLocaleString(undefined, {
@@ -153,7 +154,9 @@ export class PriceMonitorBlockHandler implements EnhancedBlockHandler {
         },
       };
 
-      logger.log(`Price monitor execution completed: ${asset} = $${priceData.price}, condition met: ${conditionMet}`);
+      logger.log(
+        `Price monitor execution completed: ${asset} = $${priceData.price}, condition met: ${conditionMet}`,
+      );
 
       return [
         {
@@ -175,7 +178,10 @@ export class PriceMonitorBlockHandler implements EnhancedBlockHandler {
     }
   }
 
-  private async getCurrentPrice(currency: string, dataSource: string): Promise<{ price: number }> {
+  private async getCurrentPrice(
+    currency: string,
+    dataSource: string,
+  ): Promise<{ price: number }> {
     try {
       // Map UI asset symbols to CoinGecko IDs
       const coinGeckoId = this.mapAssetToCoinGeckoId(currency);
@@ -292,21 +298,25 @@ export class PriceMonitorBlockHandler implements EnhancedBlockHandler {
     // Validate condition values
     const validConditions = ['above', 'below', 'equals', 'change'];
     if (config.condition && !validConditions.includes(config.condition)) {
-      errors.push(`Invalid condition: ${config.condition}. Must be one of: ${validConditions.join(', ')}`);
+      errors.push(
+        `Invalid condition: ${config.condition}. Must be one of: ${validConditions.join(', ')}`,
+      );
     }
 
     // Validate data source
     const validDataSources = ['coingecko', 'coinmarketcap', 'binance'];
     if (config.dataSource && !validDataSources.includes(config.dataSource)) {
-      errors.push(`Invalid data source: ${config.dataSource}. Must be one of: ${validDataSources.join(', ')}`);
+      errors.push(
+        `Invalid data source: ${config.dataSource}. Must be one of: ${validDataSources.join(', ')}`,
+      );
     }
 
     // Warnings
-    if (config.targetPrice && config.targetPrice <= 0) {
+    if (config.targetPrice && Number(config.targetPrice) <= 0) {
       warnings.push('Target price should be greater than 0');
     }
 
-    if (config.checkInterval && config.checkInterval < 1) {
+    if (config.checkInterval && Number(config.checkInterval) < 1) {
       warnings.push('Check interval should be at least 1 minute');
     }
 

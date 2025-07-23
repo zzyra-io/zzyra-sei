@@ -21,6 +21,7 @@ import { NodeCategory } from "@zyra/types";
 // Removed debounce import since we're using direct node updates
 import { useNodeConfigurations } from "@/app/builder/node-configurations";
 import { useWorkflowStore } from "@/lib/store/workflow-store";
+import { useWorkflowValidation } from "@/lib/contexts/workflow-validation-context";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { BlockConfigPanel } from "./block-config-panel";
 import { ContextMenu } from "./context-menu";
@@ -101,6 +102,12 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
     showConfigPanel,
     showEdgeConfigPanel,
   } = useWorkflowStore();
+
+  // Update validation context with current nodes and edges
+  const { updateValidation } = useWorkflowValidation();
+  useEffect(() => {
+    updateValidation(nodes, edges);
+  }, [nodes, edges, updateValidation]);
 
   const { toast } = useToast();
   const { theme } = useTheme();
@@ -461,6 +468,13 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
           }}
           onConnect={onConnect}
           onNodeClick={(event, node) => {
+            console.log("node", node);
+            console.log("event", event);
+            setSelectedNode(node);
+            setShowConfigPanel(true);
+            setShowEdgeConfigPanel(false);
+          }}
+          onNodeDoubleClick={(event, node) => {
             setSelectedNode(node);
             setShowConfigPanel(true);
           }}

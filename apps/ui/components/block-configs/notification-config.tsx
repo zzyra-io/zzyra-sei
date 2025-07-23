@@ -29,7 +29,8 @@ import {
   EyeOff,
   Settings,
 } from "lucide-react";
-import { enhancedNotificationSchema } from "@zyra/types";
+import { enhancedNotificationSchema, BlockType } from "@zyra/types";
+import { useBlockValidation } from "@/lib/hooks/use-block-validation";
 import {
   Collapsible,
   CollapsibleContent,
@@ -93,8 +94,12 @@ export function NotificationConfig({
   const [newHeaderKey, setNewHeaderKey] = useState("");
   const [newHeaderValue, setNewHeaderValue] = useState("");
 
-  // Use the enhanced schema from @zyra/types
-  const notificationSchema = enhancedNotificationSchema;
+  // Use dynamic validation hook
+  const {
+    validateConfig: validateConfigSchema,
+    getFieldError: getSchemaFieldError,
+    isFieldRequired,
+  } = useBlockValidation(BlockType.NOTIFICATION);
 
   // Template variables available from previous blocks
   const templateVariables: TemplateVariable[] = useMemo(
@@ -138,41 +143,60 @@ export function NotificationConfig({
     []
   );
 
-  // Schema-driven validation
+  // Dynamic validation using schema
   const validateConfig = useMemo(() => {
-    return (configData: unknown) => {
-      try {
-        notificationSchema.parse(configData);
-        setValidationErrors([]);
-        setIsValid(true);
-        return true;
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          const errors: ValidationError[] = error.errors.map((err) => ({
-            path: err.path.map(String),
-            message: err.message,
-          }));
-          setValidationErrors(errors);
-          setIsValid(false);
-        }
-        return false;
-      }
+    return (configData: Record<string, unknown>) => {
+      const result = validateConfigSchema(configData);
+      setValidationErrors(result.errors);
+      setIsValid(result.isValid);
+      return result.isValid;
     };
-  }, [notificationSchema]);
+  }, [validateConfigSchema]);
+
+  // Get field validation error using schema validation
+  const getFieldError = (fieldName: string): string | undefined => {
+    // Use schema validation directly
+    return getSchemaFieldError(fieldName, config);
+  };
 
   // Validate on config changes
   useEffect(() => {
     validateConfig(config);
   }, [config, validateConfig]);
 
-  // Get field validation error
-  const getFieldError = (fieldName: string): string | undefined => {
-    const error = validationErrors.find((err) => err.path.includes(fieldName));
-    return error?.message;
-  };
+  // Initialize with defaults if values are missing
+  useEffect(() => {
+    const defaults = {
+      notificationType: config.notificationType || "email",
+      to: config.to || "",
+      subject: config.subject || "",
+      body: config.body || "",
+      emailProvider: config.emailProvider || "smtp",
+      htmlFormat: config.htmlFormat !== false,
+      webhookUrl: config.webhookUrl || "",
+      webhookMethod: config.webhookMethod || "POST",
+      discordWebhookUrl: config.discordWebhookUrl || "",
+      slackWebhookUrl: config.slackWebhookUrl || "",
+      telegramBotToken: config.telegramBotToken || "",
+      telegramChatId: config.telegramChatId || "",
+      cc: config.cc || "",
+      bcc: config.bcc || "",
+      webhookHeaders: config.webhookHeaders || {},
+    };
+
+    // Only update if there are missing values
+    if (Object.keys(defaults).some((key) => config[key] === undefined)) {
+      onChange({ ...config, ...defaults });
+    }
+  }, []);
 
   const handleChange = (field: string, value: unknown) => {
-    onChange({ ...config, [field]: value });
+    const newConfig = { ...config, [field]: value };
+    onChange(newConfig);
+    
+    // Log the change for debugging
+    console.log(`NotificationConfig: Updated ${field} to`, value);
+    console.log(`NotificationConfig: New config:`, newConfig);
   };
 
   const addWebhookHeader = () => {
@@ -379,7 +403,7 @@ export function NotificationConfig({
 
                   <div className='space-y-3'>
                     <Label htmlFor='to' className='text-sm font-medium'>
-                      To <span className='text-red-500'>*</span>
+                      To {isFieldRequired('to') && <span className='text-red-500'>*</span>}
                     </Label>
                     <Input
                       id='to'
@@ -387,6 +411,7 @@ export function NotificationConfig({
                       value={(config.to as string) || ""}
                       onChange={(e) => handleChange("to", e.target.value)}
                       className='h-11'
+                                              required={isFieldRequired('to')}
                     />
                     {getFieldError("to") && (
                       <div className='flex items-center space-x-2 text-sm text-red-500'>
@@ -398,7 +423,7 @@ export function NotificationConfig({
 
                   <div className='space-y-3'>
                     <Label htmlFor='subject' className='text-sm font-medium'>
-                      Subject <span className='text-red-500'>*</span>
+                      Subject {isFieldRequired('subject') && <span className='text-red-500'>*</span>}
                     </Label>
                     <Input
                       id='subject'
@@ -406,6 +431,7 @@ export function NotificationConfig({
                       value={(config.subject as string) || ""}
                       onChange={(e) => handleChange("subject", e.target.value)}
                       className='h-11'
+                                              required={isFieldRequired('subject')}
                     />
                     {getFieldError("subject") && (
                       <div className='flex items-center space-x-2 text-sm text-red-500'>
@@ -426,11 +452,18 @@ export function NotificationConfig({
                       onChange={(e) => handleChange("body", e.target.value)}
                       rows={6}
                       className='resize-none'
+                      required
                     />
                     {getFieldError("body") && (
                       <div className='flex items-center space-x-2 text-sm text-red-500'>
                         <AlertCircle className='h-4 w-4' />
                         <span>{getFieldError("body")}</span>
+                      </div>
+                    )}
+                    {!config.body && (
+                      <div className='flex items-center space-x-2 text-sm text-amber-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>Email body is required for execution</span>
                       </div>
                     )}
                   </div>
@@ -717,6 +750,24 @@ export function NotificationConfig({
                   </div>
                 </div>
               )}
+
+              {/* Save Configuration Button */}
+              <div className='pt-4 border-t border-border/50'>
+                <Button
+                  onClick={() => {
+                    console.log('Saving notification config:', config);
+                    onChange(config);
+                  }}
+                  className='w-full'
+                  disabled={!isValid}>
+                  {isValid ? 'Configuration Saved' : 'Fix Validation Errors'}
+                </Button>
+                {!isValid && (
+                  <div className='mt-2 text-sm text-red-500'>
+                    Please fix the validation errors above before saving.
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

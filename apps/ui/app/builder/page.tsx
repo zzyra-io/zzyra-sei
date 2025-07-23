@@ -35,6 +35,8 @@ import { ExecutionHistoryPanel } from "@/components/execution-history-panel";
 import { generateFlow } from "@/lib/api";
 import { refineWorkflow } from "@/lib/api/workflow-generation";
 import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
+import { useWorkflowExecutionValidation } from "@/lib/hooks/use-workflow-execution-validation";
+import { WorkflowValidationProvider } from "@/lib/contexts/workflow-validation-context";
 import { workflowService } from "@/lib/services/workflow-service";
 import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
 import { BlockType, CustomBlockDefinition } from "@zyra/types";
@@ -99,6 +101,8 @@ export default function BuilderPage() {
 
   const toolbar = useFlowToolbar();
   const { validateWorkflow } = useWorkflowValidation();
+  const { validateWorkflow: validateWorkflowExecution, canExecuteWorkflow } =
+    useWorkflowExecutionValidation();
   useSaveAndExecute();
   const { mutateAsync: createCustomBlock } = useCreateCustomBlock();
   // Other hooks
@@ -635,23 +639,38 @@ export default function BuilderPage() {
     ]
   );
 
-  // Update handleExecuteWorkflow - non-blocking execution
+  // Update handleExecuteWorkflow - non-blocking execution with schema validation
   const handleExecuteWorkflow = useCallback(async () => {
     try {
-      // 1. Validate workflow
-      const validationResult = validateWorkflow(nodes, edges);
-      if (!validationResult.valid) {
+      // 1. Validate workflow structure
+      const structureValidation = validateWorkflow(nodes, edges);
+      if (!structureValidation.valid) {
         toast({
-          title: "Workflow Validation Failed",
+          title: "Workflow Structure Validation Failed",
           description:
-            validationResult.message ||
-            "Please fix the workflow issues before executing.",
+            structureValidation.message ||
+            "Please fix the workflow structure issues before executing.",
           variant: "destructive",
         });
         return;
       }
 
-      // 2. Check if workflow is saved
+      // 2. Validate workflow execution (schema-based validation)
+      const executionValidation = validateWorkflowExecution(nodes, edges);
+      if (!executionValidation.isValid) {
+        const errorMessages = executionValidation.errors
+          .map((error) => `${error.nodeId}: ${error.message}`)
+          .join(", ");
+
+        toast({
+          title: "Workflow Configuration Validation Failed",
+          description: `Please fix the following issues: ${errorMessages}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 3. Check if workflow is saved
       if (!workflowId || !initialId) {
         toast({
           title: "Unsaved Workflow",
@@ -662,7 +681,7 @@ export default function BuilderPage() {
         return;
       }
 
-      // 3. Execute workflow
+      // 4. Execute workflow
       setShowExecutionPanel(true);
       await executeWorkflow();
     } catch (error: unknown) {
@@ -676,6 +695,7 @@ export default function BuilderPage() {
     }
   }, [
     validateWorkflow,
+    validateWorkflowExecution,
     nodes,
     edges,
     workflowId,
@@ -961,7 +981,9 @@ export default function BuilderPage() {
             </ResizablePanel>
             <ResizableHandle />
             <ResizablePanel defaultSize={75} className='h-full relative'>
-              <FlowCanvas />
+              <WorkflowValidationProvider>
+                <FlowCanvas />
+              </WorkflowValidationProvider>
 
               {/* Empty State Overlay */}
               {nodes.length === 0 && (
