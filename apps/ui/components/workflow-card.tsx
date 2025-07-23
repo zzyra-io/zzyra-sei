@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,8 +36,13 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  Activity,
+  Zap,
+  Timer,
+  GitBranch,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { motion } from "framer-motion"
 
 interface WorkflowCardProps {
   workflow: any
@@ -162,13 +168,31 @@ export function WorkflowCard({ workflow, viewMode = "grid", onDelete, onFavorite
     )
   }
 
+  const stats = workflow.statistics || {};
+
   return (
-    <Card className="overflow-hidden transition-all hover:shadow-md">
-      <CardHeader className="pb-2">
+    <motion.div 
+      className="group relative overflow-hidden transition-all hover:shadow-lg border bg-background/50 backdrop-blur-sm rounded-lg"
+      whileHover={{ y: -5 }}
+      transition={{ type: "spring", stiffness: 400, damping: 10 }}
+    >
+      <Card className="border-0 bg-transparent shadow-none">
+      {/* Gradient overlay on hover */}
+      <motion.div
+        className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 to-purple-500/5 opacity-0 group-hover:opacity-100"
+        initial={{ opacity: 0 }}
+        whileHover={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      />
+
+      <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="line-clamp-1">{workflow.name}</CardTitle>
-            <CardDescription className="line-clamp-1">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="line-clamp-1 text-lg bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground group-hover:from-primary group-hover:to-purple-600 transition-all duration-300">
+              {workflow.name}
+            </CardTitle>
+            <CardDescription className="line-clamp-1 flex items-center mt-1">
+              <Clock className="mr-1 h-3 w-3 text-primary opacity-60" />
               {(() => {
                 if (!workflow.updated_at) return 'Unknown';
                 const date = new Date(workflow.updated_at);
@@ -213,41 +237,114 @@ export function WorkflowCard({ workflow, viewMode = "grid", onDelete, onFavorite
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pb-2">
+
+      <CardContent className="pb-3 space-y-4">
         <p className="line-clamp-2 text-sm text-muted-foreground">
           {workflow.description || "No description provided."}
         </p>
+
+        {/* Statistics Summary */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Executions */}
+          <div className="flex items-center gap-2 p-2 rounded-md bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-200/20">
+            <div className="p-1 rounded-full bg-blue-500/20">
+              <Activity className="h-3 w-3 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-blue-600">{stats.totalExecutions || 0}</p>
+              <p className="text-[10px] text-muted-foreground">Executions</p>
+            </div>
+          </div>
+
+          {/* Success Rate */}
+          <div className="flex items-center gap-2 p-2 rounded-md bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-200/20">
+            <div className="p-1 rounded-full bg-green-500/20">
+              <CheckCircle2 className="h-3 w-3 text-green-600" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-green-600">{stats.successRate || 0}%</p>
+              <p className="text-[10px] text-muted-foreground">Success</p>
+            </div>
+          </div>
+
+          {/* Avg Time */}
+          <div className="flex items-center gap-2 p-2 rounded-md bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-200/20">
+            <div className="p-1 rounded-full bg-purple-500/20">
+              <Timer className="h-3 w-3 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-purple-600">{stats.avgExecutionTime || 0}s</p>
+              <p className="text-[10px] text-muted-foreground">Avg Time</p>
+            </div>
+          </div>
+
+          {/* Complexity */}
+          <div className="flex items-center gap-2 p-2 rounded-md bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-200/20">
+            <div className="p-1 rounded-full bg-orange-500/20">
+              <GitBranch className="h-3 w-3 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-orange-600">{stats.nodeCount || 0}</p>
+              <p className="text-[10px] text-muted-foreground">Nodes</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Status and Last Execution */}
+        {stats.lastStatus && stats.lastStatus !== 'none' && (
+          <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+            <div className="flex items-center gap-2">
+              {getStatusIcon()}
+              <span className="text-xs font-medium capitalize">{stats.lastStatus}</span>
+            </div>
+            {stats.lastExecutedAt && (
+              <span className="text-[10px] text-muted-foreground">
+                {formatDistanceToNow(new Date(stats.lastExecutedAt), { addSuffix: true })}
+              </span>
+            )}
+          </div>
+        )}
       </CardContent>
-      <CardFooter className="flex flex-col items-start gap-2 pt-2">
+
+      <CardFooter className="flex flex-col items-start gap-3 pt-2">
         {workflow.tags && workflow.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {workflow.tags.slice(0, 3).map((tag: string) => (
-              <Badge key={tag} variant="secondary" className="text-xs">
+              <Badge key={tag} variant="secondary" className="text-xs bg-gradient-to-r from-primary/10 to-purple-500/10">
                 {tag}
               </Badge>
             ))}
             {workflow.tags.length > 3 && (
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs bg-gradient-to-r from-primary/10 to-purple-500/10">
                 +{workflow.tags.length - 3}
               </Badge>
             )}
           </div>
         )}
+        
         <div className="flex w-full justify-between items-center">
-          <div className="flex items-center text-sm text-muted-foreground">
-            {workflow.last_status && (
-              <div className="flex items-center">
-                {getStatusIcon()}
-                <span className="ml-1 capitalize">{workflow.last_status}</span>
-              </div>
-            )}
-          </div>
-          <Link href={`/workflow/${workflow.id}`}>
-            <Button size="sm" variant="ghost" className="gap-1">
-              View
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          </Link>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Link href={`/builder/${workflow.id}`}>
+              <Button size="sm" variant="outline" className="gap-1 hover:bg-gradient-to-r hover:from-primary/10 hover:to-purple-500/10">
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </Button>
+            </Link>
+          </motion.div>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Link href={`/workflow/${workflow.id}`}>
+              <Button size="sm" className="gap-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90">
+                View
+                <motion.div
+                  initial={{ x: 0 }}
+                  whileHover={{ x: 3 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                >
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </motion.div>
+              </Button>
+            </Link>
+          </motion.div>
         </div>
       </CardFooter>
 
@@ -267,6 +364,7 @@ export function WorkflowCard({ workflow, viewMode = "grid", onDelete, onFavorite
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+      </Card>
+    </motion.div>
   );
 }

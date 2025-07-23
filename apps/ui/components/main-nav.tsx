@@ -54,16 +54,21 @@ export function MainNav({ className }: { className?: string }) {
                 <Link
                   href={route.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-all duration-200 group",
                     route.active
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-accent hover:text-accent-foreground"
+                      ? "bg-gradient-to-r from-primary to-purple-600 text-primary-foreground shadow-md"
+                      : "hover:bg-gradient-to-r hover:from-primary/10 hover:to-purple-500/10 hover:text-accent-foreground"
                   )}
                 >
                   <route.icon className="h-4 w-4" />
                   <span>{route.name}</span>
                   {route.badge && (
-                    <Badge variant="outline" className="ml-auto border-primary-foreground text-xs py-0 px-1.5">
+                    <Badge variant="outline" className={cn(
+                      "ml-auto text-xs py-0 px-1.5 transition-all",
+                      route.active 
+                        ? "border-primary-foreground bg-white/20 text-primary-foreground" 
+                        : "bg-gradient-to-r from-primary/20 to-purple-500/20 border-primary text-primary group-hover:from-primary/30 group-hover:to-purple-500/30"
+                    )}>
                       {route.badge}
                     </Badge>
                   )}

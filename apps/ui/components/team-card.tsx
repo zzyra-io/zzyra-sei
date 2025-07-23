@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Settings, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface TeamCardProps {
   id: string;
@@ -43,16 +44,33 @@ export function TeamCard({
   }
 
   return (
-    <Card className='overflow-hidden'>
-      <CardHeader className='bg-muted/50'>
-        <CardTitle className='flex items-center gap-2'>
-          <Users className='h-5 w-5' />
-          {name}
-        </CardTitle>
-        <CardDescription>
-          {description || "No description provided"}
-        </CardDescription>
-      </CardHeader>
+    <motion.div
+      className="group"
+      whileHover={{ y: -5 }}
+      transition={{ type: "spring", stiffness: 400, damping: 10 }}
+    >
+      <Card className='relative overflow-hidden bg-background/50 backdrop-blur-sm border hover:shadow-lg transition-all'>
+        {/* Gradient overlay on hover */}
+        <motion.div
+          className="absolute inset-0 -z-10 bg-gradient-to-br from-primary/5 to-purple-500/5 opacity-0 group-hover:opacity-100"
+          initial={{ opacity: 0 }}
+          whileHover={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        />
+        
+        <CardHeader className='bg-gradient-to-r from-muted/50 to-muted/30'>
+          <CardTitle className='flex items-center gap-2'>
+            <div className="p-2 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20">
+              <Users className='h-5 w-5 text-primary' />
+            </div>
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground group-hover:from-primary group-hover:to-purple-600 transition-all duration-300">
+              {name}
+            </span>
+          </CardTitle>
+          <CardDescription>
+            {description || "No description provided"}
+          </CardDescription>
+        </CardHeader>
       <CardContent className='p-6'>
         <div className='flex items-center justify-between text-sm text-muted-foreground'>
           <div>
@@ -62,30 +80,37 @@ export function TeamCard({
           <div>Created on {formattedDate}</div>
         </div>
       </CardContent>
-      <CardFooter className='flex justify-between bg-muted/20 p-4'>
+      <CardFooter className='flex justify-between bg-gradient-to-r from-muted/20 to-muted/10 p-4'>
         <div className='text-xs font-medium'>
-          Your role: <span className='capitalize'>{role}</span>
+          Your role: <span className='capitalize text-primary'>{role}</span>
         </div>
         <div className='flex gap-2'>
-          <Button variant='outline' size='sm' asChild>
-            <Link href={`/teams/${id}`}>View</Link>
-          </Button>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button variant='outline' size='sm' asChild className="hover:bg-gradient-to-r hover:from-primary/10 hover:to-purple-500/10">
+              <Link href={`/teams/${id}`}>View</Link>
+            </Button>
+          </motion.div>
           {isOwner && (
             <>
-              <Button variant='outline' size='sm' asChild>
-                <Link href={`/teams/${id}/settings`}>
-                  <Settings className='mr-1 h-4 w-4' />
-                  Settings
-                </Link>
-              </Button>
-              <Button variant='destructive' size='sm' onClick={handleDelete}>
-                <Trash2 className='h-4 w-4' />
-                <span className='sr-only'>Delete</span>
-              </Button>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button variant='outline' size='sm' asChild className="hover:bg-gradient-to-r hover:from-primary/10 hover:to-purple-500/10">
+                  <Link href={`/teams/${id}/settings`}>
+                    <Settings className='mr-1 h-4 w-4' />
+                    Settings
+                  </Link>
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button variant='destructive' size='sm' onClick={handleDelete} className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700">
+                  <Trash2 className='h-4 w-4' />
+                  <span className='sr-only'>Delete</span>
+                </Button>
+              </motion.div>
             </>
           )}
         </div>
       </CardFooter>
-    </Card>
+      </Card>
+    </motion.div>
   );
 }

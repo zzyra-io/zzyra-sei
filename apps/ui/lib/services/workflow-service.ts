@@ -17,6 +17,25 @@ export interface Workflow {
   updated_at?: string; // For backward compatibility
   version?: number; // Added to match Prisma schema
   definition?: any; // Added to match Prisma schema
+  // Enhanced fields from repository
+  statistics?: {
+    totalExecutions: number;
+    successRate: number;
+    avgExecutionTime: number;
+    nodeCount: number;
+    lastStatus: string;
+    lastExecutedAt?: string;
+    recentActivity: {
+      successful: number;
+      failed: number;
+      running: number;
+    };
+  };
+  recentExecutions?: any[];
+  isFavorite?: boolean;
+  is_favorite?: boolean; // For backward compatibility
+  last_status?: string;
+  last_run?: string; // Derived from statistics.lastExecutedAt
 }
 
 // Utility: detect cycles in workflow graph
@@ -92,7 +111,41 @@ class WorkflowService {
       }
 
       // The backend returns paginated data, so extract the data array
-      return response.data.data || response.data;
+      const workflows = response.data.data || response.data;
+
+      // Map enhanced workflow data to match frontend interface
+      return workflows.map((workflow: any) => {
+        return {
+          ...workflow,
+          // Ensure camelCase compatibility for frontend
+          created_at: workflow.createdAt || workflow.created_at,
+          updated_at: workflow.updatedAt || workflow.updated_at,
+          isFavorite: workflow.isFavorite || workflow.is_favorite || false,
+          is_favorite: workflow.isFavorite || workflow.is_favorite || false,
+          last_run:
+            workflow.lastRun ||
+            workflow.statistics?.lastExecutedAt ||
+            workflow.last_run,
+          last_status: workflow.statistics?.lastStatus || workflow.last_status,
+          tags: workflow.tags || [],
+          isPublic: workflow.isPublic || workflow.is_public || false,
+          is_public: workflow.isPublic || workflow.is_public || false,
+          // Ensure statistics are properly mapped
+          statistics: workflow.statistics || {
+            totalExecutions: 0,
+            successRate: 0,
+            avgExecutionTime: 0,
+            nodeCount: workflow.nodes?.length || 0,
+            lastStatus: "never",
+            lastExecutedAt: undefined,
+            recentActivity: {
+              successful: 0,
+              failed: 0,
+              running: 0,
+            },
+          },
+        };
+      });
     } catch (error: any) {
       console.error("Error fetching workflows:", error);
       throw new Error(`Failed to fetch workflows: ${error.message}`);

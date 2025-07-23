@@ -2,7 +2,10 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/use-toast";
-import { workflowService, type Workflow } from "@/lib/services/workflow-service";
+import {
+  workflowService,
+  type Workflow,
+} from "@/lib/services/workflow-service";
 import api from "@/lib/services/api";
 
 /**
@@ -10,7 +13,7 @@ import api from "@/lib/services/api";
  */
 export function useWorkflows() {
   return useQuery({
-    queryKey: ['workflows'],
+    queryKey: ["workflows"],
     queryFn: async (): Promise<Workflow[]> => {
       return await workflowService.getWorkflows();
     },
@@ -22,7 +25,7 @@ export function useWorkflows() {
  */
 export function useWorkflow(id: string) {
   return useQuery({
-    queryKey: ['workflow', id],
+    queryKey: ["workflow", id],
     queryFn: async (): Promise<Workflow> => {
       return await workflowService.getWorkflow(id);
     },
@@ -35,16 +38,16 @@ export function useWorkflow(id: string) {
  */
 export function useCreateWorkflow() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (workflowData: Partial<Workflow>) => {
-      const response = await api.post('/workflows', workflowData);
-      
+      const response = await api.post("/workflows", workflowData);
+
       return response.data;
     },
     onSuccess: () => {
       // Invalidate workflows query to refresh the list
-      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
       toast({
         title: "Workflow created",
         description: "Your workflow has been created successfully.",
@@ -65,17 +68,23 @@ export function useCreateWorkflow() {
  */
 export function useUpdateWorkflow() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string, data: Partial<Workflow> }) => {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Partial<Workflow>;
+    }) => {
       const response = await api.put(`/workflows/${id}`, data);
-      
+
       return response.data;
     },
     onSuccess: (data) => {
       // Invalidate specific workflow query and all workflows query
-      queryClient.invalidateQueries({ queryKey: ['workflow', data.id] });
-      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+      queryClient.invalidateQueries({ queryKey: ["workflow", data.id] });
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
       toast({
         title: "Workflow updated",
         description: "Your workflow has been updated successfully.",
@@ -96,17 +105,17 @@ export function useUpdateWorkflow() {
  */
 export function useDeleteWorkflow() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (id: string) => {
-        await api.delete(`/workflows/${id}`);
-      
+      await api.delete(`/workflows/${id}`);
+
       return { id };
     },
     onSuccess: (id) => {
       // Invalidate specific workflow query and all workflows query
-      queryClient.invalidateQueries({ queryKey: ['workflow', id] });
-      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+      queryClient.invalidateQueries({ queryKey: ["workflow", id] });
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
       toast({
         title: "Workflow deleted",
         description: "Your workflow has been deleted successfully.",
@@ -127,17 +136,26 @@ export function useDeleteWorkflow() {
  */
 export function useToggleFavorite() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async ({ id, isFavorite }: { id: string, isFavorite: boolean }) => {
-          const response = await api.put(`/workflows/${id}/favorite`, { isFavorite });
-      
+    mutationFn: async ({
+      id,
+      isFavorite,
+    }: {
+      id: string;
+      isFavorite: boolean;
+    }) => {
+      const response = await api.post(`/workflows/toggle-favorite`, {
+        id,
+        isFavorite,
+      });
+
       return response.data;
     },
-    onSuccess: ({ id }) => {
+    onSuccess: (data, variables) => {
       // Invalidate specific workflow query and all workflows query
-      queryClient.invalidateQueries({ queryKey: ['workflow', id] });
-      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+      queryClient.invalidateQueries({ queryKey: ["workflow", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
     },
     onError: (error: Error) => {
       toast({

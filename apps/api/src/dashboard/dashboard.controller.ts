@@ -19,8 +19,7 @@ export class DashboardController {
     status: 200,
     description: "Returns dashboard metrics",
   })
-  async getMetrics(@Request() req: { user?: { id: string } }) {
-    const userId = req.user?.id || "user1";
-    return this.dashboardService.getMetrics(userId);
+  async getMetrics(@Request() req: { user: { id: string } }) {
+    return this.dashboardService.getMetrics(req.user.id);
   }
 }

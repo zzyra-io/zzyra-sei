@@ -47,6 +47,7 @@ export class DashboardService {
       executionsLastWeek.map((e: WorkflowExecution) => e.workflowId)
     );
     const activeWorkflows = workflowIdsWithExecutions.size;
+    const totalWorkflows = workflows.length;
 
     // Success rate and totals for last week
     const successfulExecutions = executionsLastWeek.filter(
@@ -135,7 +136,7 @@ export class DashboardService {
       totalExecutions,
       averageDuration: formatDuration(avgDurationMs),
       rawAverageDurationMs: avgDurationMs,
-      activeWorkflows,
+      activeWorkflows: totalWorkflows, // Use total workflows instead of just active ones
       changeFromLastWeek: {
         successRate: successRateChange,
         totalExecutions: executionChange,

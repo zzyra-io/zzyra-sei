@@ -23,6 +23,7 @@ import {
   UpdateWorkflowDto,
   WorkflowDto,
   PaginatedWorkflowsResponseDto,
+  ToggleFavoriteDto,
 } from "./dto/workflow.dto";
 import {
   ExecuteWorkflowDto,
@@ -39,19 +40,19 @@ export class WorkflowsController {
 
   @Get()
   @ApiOperation({ summary: "Get all workflows" })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: "Return all workflows",
-    type: PaginatedWorkflowsResponseDto,
-  })
   @ApiQuery({ name: "page", required: false, type: Number })
   @ApiQuery({ name: "limit", required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: "Returns paginated workflows",
+    type: PaginatedWorkflowsResponseDto,
+  })
   async findAll(
     @Request() req: { user: { id: string } },
     @Query("page") page = 1,
     @Query("limit") limit = 10
   ): Promise<PaginatedWorkflowsResponseDto> {
-    return this.workflowsService.findAll(req.user.id, +page, +limit);
+    return this.workflowsService.findAll(req.user.id, page, limit);
   }
 
   @Get(":id")
@@ -108,7 +109,7 @@ export class WorkflowsController {
   @Delete(":id")
   @ApiOperation({ summary: "Delete a workflow" })
   @ApiResponse({
-    status: HttpStatus.NO_CONTENT,
+    status: HttpStatus.OK,
     description: "Workflow deleted successfully",
   })
   @ApiResponse({
@@ -123,12 +124,10 @@ export class WorkflowsController {
   }
 
   @Post(":id/execute")
-  @ApiOperation({
-    summary: "Execute a workflow immediately or schedule for later",
-  })
+  @ApiOperation({ summary: "Execute a workflow" })
   @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: "Workflow execution started or scheduled successfully",
+    status: HttpStatus.OK,
+    description: "Workflow execution started",
     type: ExecuteWorkflowResponseDto,
   })
   @ApiResponse({
@@ -156,5 +155,18 @@ export class WorkflowsController {
       status: scheduledTime ? "scheduled" : "immediate",
       scheduledTime: scheduledTime?.toISOString(),
     };
+  }
+
+  @Post("toggle-favorite")
+  @ApiOperation({ summary: "Toggle workflow favorite status" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Favorite status toggled successfully",
+  })
+  async toggleFavorite(
+    @Request() req: { user: { id: string } },
+    @Body() toggleFavoriteDto: ToggleFavoriteDto
+  ): Promise<{ isFavorite: boolean }> {
+    return this.workflowsService.toggleFavorite(toggleFavoriteDto, req.user.id);
   }
 }
