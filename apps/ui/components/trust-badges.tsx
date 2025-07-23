@@ -7,23 +7,23 @@ export function TrustBadges() {
   const badges = [
     {
       icon: Shield,
-      title: "Enterprise-Grade Security",
-      description: "SOC 2 Type II certified with end-to-end encryption",
+      title: "Security-First Development",
+      description: "Built with enterprise security principles from day one",
     },
     {
       icon: Lock,
-      title: "Private Key Protection",
-      description: "Your keys never leave your device",
+      title: "Local Key Management",
+      description: "Development focus on client-side key protection",
     },
     {
       icon: Award,
-      title: "Audited Smart Contracts",
-      description: "All contracts audited by leading security firms",
+      title: "Open Source Foundation",
+      description: "Transparent development with community review",
     },
     {
       icon: CheckCircle,
-      title: "99.99% Uptime",
-      description: "Reliable infrastructure you can count on",
+      title: "Beta Testing Program",
+      description: "Rigorous testing with early development partners",
     },
   ]
 

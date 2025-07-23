@@ -66,10 +66,10 @@ export function StatsCounter({ label, value, icon: Icon, prefix = "", suffix = "
 export function StatsCounterGroup() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-      <StatsCounter label="Active Users" value={12458} icon={Users} />
-      <StatsCounter label="Workflows Created" value={87392} icon={Zap} />
-      <StatsCounter label="Automations/Day" value={1250000} icon={Clock} suffix="+" />
-      <StatsCounter label="Time Saved" value={42} icon={Clock} suffix=" hrs/week" />
+      <StatsCounter label="Target: Early Adopters" value={1000} icon={Users} />
+      <StatsCounter label="Goal: Workflows" value={10000} icon={Zap} />
+      <StatsCounter label="Vision: Daily Operations" value={100000} icon={Clock} suffix="+" />
+      <StatsCounter label="Projected: Time Savings" value={20} icon={Clock} suffix=" hrs/week" />
     </div>
   )
 }

@@ -41,33 +41,12 @@ import {
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-// Define motion component types with proper HTML attributes
-type MotionProps = {
-  className?: string;
-  children?: React.ReactNode;
-  initial?: any;
-  animate?: AnimationControls | any;
-  exit?: any;
-  transition?: any;
-  whileHover?: any;
-  variants?: Variants;
-};
-
-const MotionDiv = motion.div as React.ComponentType<
-  MotionProps & HTMLMotionProps<"div">
->;
-const MotionHeader = motion.header as React.ComponentType<
-  MotionProps & HTMLMotionProps<"header">
->;
-const MotionFooter = motion.footer as React.ComponentType<
-  MotionProps & HTMLMotionProps<"footer">
->;
-const MotionButton = motion.button as React.ComponentType<
-  MotionProps & HTMLMotionProps<"button">
->;
-const MotionA = motion.a as React.ComponentType<
-  MotionProps & HTMLMotionProps<"a">
->;
+// Define motion components with proper typing
+const MotionDiv = motion.div;
+const MotionHeader = motion.header;
+const MotionFooter = motion.footer;
+const MotionButton = motion.button;
+const MotionA = motion.a;
 
 export default function HomePage() {
   const { user } = useAuthStore();
@@ -178,37 +157,37 @@ export default function HomePage() {
       color: "from-purple-500 to-pink-500",
     },
     {
-      title: "Thousands of Pre-Built Money-Making Blocks",
+      title: "AI-Assisted Workflow Generation",
       description:
-        "Choose from our library of profitable blocks or create your own. Each block is tested and proven to generate consistent returns.",
+        "Describe your automation needs in natural language and watch our AI generate sophisticated Web3 workflows. Beta feature with expanding capabilities.",
       icon: Sparkles,
       color: "from-emerald-500 to-teal-400",
     },
     {
-      title: "Customize Any Block to Your Strategy",
+      title: "Visual Workflow Builder",
       description:
-        "Modify existing blocks or create completely new ones. Set your own risk levels, profit targets, and trading preferences instantly.",
+        "Drag-and-drop interface for creating complex automation workflows. Connect multiple blockchain networks and services with intuitive visual nodes.",
       icon: Settings,
       color: "from-blue-500 to-cyan-400",
     },
     {
-      title: "Blocks Work Across All Platforms",
+      title: "Multi-Chain Compatibility (Planned)",
       description:
-        "Your custom blocks connect to any exchange, wallet, or DeFi protocol. One automation that works everywhere you trade.",
+        "Designed for cross-chain automation across Ethereum, Polygon, Solana and more. Currently supporting basic single-chain operations with multi-chain roadmap.",
       icon: Workflow,
       color: "from-orange-500 to-amber-400",
     },
     {
-      title: "Real-Time Block Performance Tracking",
+      title: "Real-Time Execution Monitoring",
       description:
-        "See exactly how much each block is earning you. Track performance, optimize settings, and multiply your profits.",
+        "Track workflow execution status, view logs, and monitor automation performance. Current beta includes basic monitoring with advanced analytics planned.",
       icon: Cpu,
       color: "from-indigo-500 to-violet-400",
     },
     {
-      title: "Share & Sell Your Profitable Blocks",
+      title: "Template Marketplace (Planned)",
       description:
-        "Turn your best blocks into income streams. Sell them to other users or share with your team for passive revenue.",
+        "Share and discover automation templates with the community. Development roadmap includes monetization features for template creators.",
       icon: Layers,
       color: "from-red-500 to-rose-400",
     },
@@ -333,10 +312,10 @@ export default function HomePage() {
                       <span className='relative inline-flex rounded-full h-2 w-2 bg-primary'></span>
                     </span>
                     <span className='mr-2'>
-                      12,000+ Users Making $10K+ Monthly *
+                      🚀 Next-Gen Web3 Automation Platform
                     </span>
-                    <span className='rounded-full bg-green-500/10 px-2 py-0.5 text-xs font-semibold text-green-600'>
-                      PROVEN*
+                    <span className='rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-600'>
+                      IN DEVELOPMENT
                     </span>
                   </MotionDiv>
 
@@ -359,9 +338,10 @@ export default function HomePage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.5 }}>
-                    Automate your crypto trading, NFT collecting, and DeFi
-                    strategies. Our users save 20+ hours per week and increase
-                    profits by 300% on average.
+                    Experience the next evolution of Web3 automation with
+                    AI-powered workflow creation. Join early adopters building
+                    decentralized automation that will transform how we interact
+                    with blockchain technology.
                   </MotionDiv>
                 </div>
 
@@ -372,7 +352,7 @@ export default function HomePage() {
                   transition={{ duration: 0.5, delay: 0.6 }}>
                   <GradientButton asChild size='lg' className='group'>
                     <Link href='/login'>
-                      Start Making Money Today - Free
+                      Join Early Development - Free
                       <MotionDiv
                         initial={{ x: 0 }}
                         whileHover={{ x: 5 }}
@@ -443,7 +423,7 @@ export default function HomePage() {
         </section>
 
         {/* User Segments section */}
-        <section className='w-full py-16 md:py-20 bg-muted/30'>
+        <section className='w-full py-20 md:py-28 lg:py-32 bg-muted/30'>
           <div className='container px-4 md:px-6'>
             <div className='mx-auto flex max-w-[58rem] flex-col items-center justify-center gap-4 text-center mb-12'>
               <h2 className='text-3xl font-bold leading-[1.1] sm:text-3xl md:text-4xl'>
@@ -452,40 +432,40 @@ export default function HomePage() {
                 </span>
               </h2>
               <p className='max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7'>
-                See how Zzyra helps people just like you make more money with
-                less effort
+                Join early development and help shape the future of Web3
+                automation
               </p>
             </div>
 
             <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-4'>
               {[
                 {
-                  title: "DeFi Trader",
-                  description: "Managing $50K+ across multiple protocols",
-                  benefit: "Prevent liquidations, optimize yields",
-                  roi: "Average ROI: 7,750%",
-                  price: "$79/month",
+                  title: "Web3 Developer",
+                  description: "Building the future of decentralized apps",
+                  benefit: "AI-assisted workflow generation",
+                  roi: "Early Access - Development Preview",
+                  price: "Free during beta",
                 },
                 {
-                  title: "NFT Collector",
-                  description: "Active in drops and floor trading",
-                  benefit: "Never miss profitable opportunities",
-                  roi: "Average ROI: 1,670%",
-                  price: "$79/month",
+                  title: "DeFi Enthusiast",
+                  description: "Exploring automated trading strategies",
+                  benefit: "Test advanced automation concepts",
+                  roi: "Early Access - Development Preview",
+                  price: "Free during beta",
                 },
                 {
-                  title: "Crypto Beginner",
-                  description: "Want to automate basic crypto tasks",
-                  benefit: "Simple automation without complexity",
-                  roi: "Average ROI: 3,300%",
-                  price: "$19/month",
+                  title: "Automation Pioneer",
+                  description: "Want to explore Web3 automation",
+                  benefit: "Shape product development",
+                  roi: "Early Access - Development Preview",
+                  price: "Free during beta",
                 },
                 {
-                  title: "DAO/Protocol",
-                  description: "Managing treasury operations",
-                  benefit: "Automate governance and treasury",
-                  roi: "Average ROI: 14,000%",
-                  price: "$499/month",
+                  title: "Enterprise Innovator",
+                  description: "Evaluating Web3 integration",
+                  benefit: "Preview enterprise features",
+                  roi: "Early Access - Development Preview",
+                  price: "Contact for preview",
                 },
               ].map((segment, index) => (
                 <div
@@ -498,7 +478,7 @@ export default function HomePage() {
                     {segment.description}
                   </p>
                   <p className='text-sm font-medium mb-2'>{segment.benefit}</p>
-                  <p className='text-sm text-primary font-bold mb-3'>
+                  <p className='text-sm text-blue-600 font-bold mb-3'>
                     {segment.roi}
                   </p>
                   <p className='text-lg font-bold text-primary'>
@@ -511,7 +491,7 @@ export default function HomePage() {
         </section>
 
         {/* Stats section */}
-        <section ref={statsRef} className='w-full py-12 md:py-16'>
+        <section ref={statsRef} className='w-full py-20 md:py-28 lg:py-32'>
           <div className='container px-4 md:px-6'>
             <motion.div
               initial='hidden'
@@ -520,13 +500,36 @@ export default function HomePage() {
                 hidden: { opacity: 0 },
                 visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
               }}>
+              <div className='text-center mb-12'>
+                <div className='inline-flex items-center rounded-full border px-4 py-1.5 text-sm font-medium bg-background/50 backdrop-blur-sm mb-4'>
+                  <span className='relative flex h-2 w-2 mr-2'>
+                    <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75'></span>
+                    <span className='relative inline-flex rounded-full h-2 w-2 bg-blue-500'></span>
+                  </span>
+                  <span className='mr-2'>🎯 Development Roadmap</span>
+                  <span className='rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-600'>
+                    VISION 2025
+                  </span>
+                </div>
+                <h2 className='text-2xl font-bold leading-[1.1] sm:text-3xl md:text-4xl mb-2'>
+                  <span className='bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600'>
+                    Our Development Goals
+                  </span>
+                </h2>
+                <p className='text-muted-foreground max-w-2xl mx-auto'>
+                  Ambitious targets driving our development roadmap as we build
+                  the future of Web3 automation
+                </p>
+              </div>
               <StatsCounterGroup />
             </motion.div>
           </div>
         </section>
 
         {/* Trust badges */}
-        <section ref={trustRef} className='w-full py-12 md:py-16 bg-muted/20'>
+        <section
+          ref={trustRef}
+          className='w-full py-20 md:py-28 lg:py-32 bg-muted/20'>
           <div className='container px-4 md:px-6'>
             <motion.div
               initial='hidden'
@@ -568,13 +571,13 @@ export default function HomePage() {
 
               <h2 className='text-3xl font-bold leading-[1.1] sm:text-3xl md:text-5xl'>
                 <span className='bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600'>
-                  Why Our Users Make More Money
+                  Built for the Future of Web3
                 </span>
               </h2>
 
               <p className='max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7'>
-                The exact features that helped our users increase their crypto
-                profits by 300% on average
+                Advanced capabilities designed for next-generation Web3
+                automation and AI-assisted workflows
               </p>
             </motion.div>
 
@@ -614,18 +617,19 @@ export default function HomePage() {
                 transition={{ duration: 0.5 }}
                 className='inline-flex items-center rounded-full border px-4 py-1.5 text-sm font-medium mb-4'>
                 <Sparkles className='mr-2 h-3.5 w-3.5 text-primary animate-pulse' />
-                Real AI Blocks in Action
+                AI Workflow Examples
               </motion.div>
 
               <h2 className='text-3xl font-bold leading-[1.1] sm:text-3xl md:text-5xl'>
                 <span className='bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600'>
-                  Watch AI Create Profitable Blocks in Real-Time
+                  AI-Generated Workflow Examples
                 </span>
               </h2>
 
               <p className='max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7'>
-                These are actual blocks created by our AI for real users. Each
-                one is generating consistent profits right now.
+                Example workflows demonstrating AI-assisted generation
+                capabilities. These represent development concepts and beta
+                features.
               </p>
             </div>
 
@@ -642,8 +646,8 @@ export default function HomePage() {
                         Cross-Chain Arbitrage Hunter
                       </h3>
                       <p className='text-sm text-muted-foreground'>
-                        Created from: "Find price differences for USDC across
-                        chains and profit from them"
+                        Created from: "Monitor USDC price differences across
+                        chains and alert on arbitrage opportunities"
                       </p>
                     </div>
                   </div>
@@ -659,19 +663,21 @@ export default function HomePage() {
                   </div>
 
                   <div className='grid grid-cols-2 gap-4'>
-                    <div className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'>
-                      <p className='text-sm font-semibold text-green-600'>
-                        Monthly Profit
-                      </p>
-                      <p className='text-2xl font-bold text-green-600'>
-                        $4,280
-                      </p>
-                    </div>
                     <div className='bg-blue-500/10 border border-blue-500/20 rounded-lg p-3'>
                       <p className='text-sm font-semibold text-blue-600'>
-                        Success Rate
+                        Status
                       </p>
-                      <p className='text-2xl font-bold text-blue-600'>94.7%</p>
+                      <p className='text-lg font-bold text-blue-600'>
+                        Development Preview
+                      </p>
+                    </div>
+                    <div className='bg-purple-500/10 border border-purple-500/20 rounded-lg p-3'>
+                      <p className='text-sm font-semibold text-purple-600'>
+                        Complexity
+                      </p>
+                      <p className='text-lg font-bold text-purple-600'>
+                        Advanced
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -689,8 +695,8 @@ export default function HomePage() {
                         Smart NFT Floor Sniper
                       </h3>
                       <p className='text-sm text-muted-foreground'>
-                        Created from: "Buy NFTs when they drop 15% below average
-                        floor price"
+                        Created from: "Alert me when NFTs drop 15% below average
+                        floor price for potential opportunities"
                       </p>
                     </div>
                   </div>
@@ -706,19 +712,21 @@ export default function HomePage() {
                   </div>
 
                   <div className='grid grid-cols-2 gap-4'>
-                    <div className='bg-purple-500/10 border border-purple-500/20 rounded-lg p-3'>
-                      <p className='text-sm font-semibold text-purple-600'>
-                        Monthly Profit
+                    <div className='bg-blue-500/10 border border-blue-500/20 rounded-lg p-3'>
+                      <p className='text-sm font-semibold text-blue-600'>
+                        Status
                       </p>
-                      <p className='text-2xl font-bold text-purple-600'>
-                        $8,950
+                      <p className='text-lg font-bold text-blue-600'>
+                        Development Preview
                       </p>
                     </div>
-                    <div className='bg-orange-500/10 border border-orange-500/20 rounded-lg p-3'>
-                      <p className='text-sm font-semibold text-orange-600'>
-                        Profitable Flips
+                    <div className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'>
+                      <p className='text-sm font-semibold text-green-600'>
+                        Complexity
                       </p>
-                      <p className='text-2xl font-bold text-orange-600'>73%</p>
+                      <p className='text-lg font-bold text-green-600'>
+                        Intermediate
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -728,7 +736,7 @@ export default function HomePage() {
             {/* Block Creation Process */}
             <div className='bg-gradient-to-br from-primary/5 to-purple-500/5 border border-primary/20 rounded-2xl p-8 mb-12'>
               <h3 className='text-2xl font-bold mb-6 text-center'>
-                How AI Creates Your Custom Blocks
+                How AI-Assisted Workflow Generation Works
               </h3>
 
               <div className='grid gap-6 md:grid-cols-4'>
@@ -779,13 +787,13 @@ export default function HomePage() {
             <div className='text-center'>
               <GradientButton asChild size='lg' className='group'>
                 <Link href='/login'>
-                  Create Your AI Block in 60 Seconds
+                  Try AI Workflow Generation - Beta
                   <ArrowRight className='ml-2 h-4 w-4' />
                 </Link>
               </GradientButton>
               <p className='text-sm text-muted-foreground mt-3'>
-                Average user creates 3 profitable blocks in their first hour •
-                No coding required
+                Early beta testers create basic workflows quickly using natural
+                language • No coding required
               </p>
             </div>
           </div>
@@ -826,8 +834,8 @@ export default function HomePage() {
               </h2>
 
               <p className='max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7'>
-                Watch how our users set up profit-generating automations in
-                under 5 minutes. No coding required.
+                See how early adopters create Web3 automations using our visual
+                builder. Development preview - features expanding rapidly.
               </p>
             </motion.div>
 
@@ -1010,14 +1018,13 @@ export default function HomePage() {
 
                   <h2 className='text-3xl font-bold leading-[1.1] sm:text-3xl md:text-4xl'>
                     <span className='bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600'>
-                      Start Earning More Money This Week
+                      Join the Future of Web3 Automation
                     </span>
                   </h2>
 
                   <p className='text-muted-foreground sm:text-lg'>
-                    Join 12,000+ traders, collectors, and DeFi users who've
-                    increased their profits by 300% on average using Zzyra
-                    automation
+                    Join early development community and help shape the future
+                    of Web3 automation with AI-assisted workflows
                   </p>
 
                   <motion.div
@@ -1028,9 +1035,9 @@ export default function HomePage() {
                     <GradientButton asChild size='lg' className='group'>
                       <Link href='/login'>
                         <span className='hidden sm:inline'>
-                          Get Your First $1,000 This Week
+                          Join Development Preview
                         </span>
-                        <span className='sm:hidden'>Start Earning Now</span>
+                        <span className='sm:hidden'>Join Beta</span>
                         <MotionDiv
                           initial={{ x: 0 }}
                           whileHover={{ x: 5 }}
@@ -1050,7 +1057,7 @@ export default function HomePage() {
                       size='lg'
                       className='group'>
                       <Link href='/pricing'>
-                        See Pricing & ROI Calculator
+                        View Development Roadmap
                         <MotionDiv
                           initial={{ rotate: 0 }}
                           whileHover={{ rotate: 45 }}
@@ -1079,12 +1086,12 @@ export default function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}>
                 {[
-                  "Average user saves $8,200/month in prevented losses",
-                  "300% average increase in trading profits",
-                  "Save 20+ hours per week (worth $2,000+ for most users)",
-                  "Never miss profitable NFT drops or airdrops again",
-                  "Automatic gas optimization saves $500+ monthly",
-                  "95% reduction in costly human errors",
+                  "Join early development of next-generation Web3 automation",
+                  "AI-assisted workflow generation with natural language commands",
+                  "Visual drag-and-drop builder for complex blockchain operations",
+                  "Multi-chain automation capabilities (development roadmap)",
+                  "Real-time execution monitoring and workflow analytics",
+                  "Community-driven template marketplace (planned feature)",
                 ].map((benefit, index) => (
                   <motion.div
                     key={index}

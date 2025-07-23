@@ -1,16 +1,20 @@
 ---
 title: "Custom Blocks Development"
-description: "Build powerful custom automation blocks for Zzyra's hybrid platform"
+description: "Guide for building custom automation blocks for Zzyra - Development Status"
 ---
 
 ## Building Custom Blocks
 
-Extend Zzyra's automation capabilities with your own custom blocks. Create powerful integrations, specialized workflows, and unique automation logic tailored to your specific needs.
-
-<Alert type='info'>
-  **Developer Rewards**: Earn up to $5,000 per month by publishing popular
-  blocks to the Zzyra marketplace.
+<Alert type='warning'>
+  **Development Status**: Custom block creation system is in development. Basic AI-assisted block generation is available.
 </Alert>
+
+Extend Zzyra's planned automation capabilities with your own custom blocks. Create powerful integrations, specialized workflows, and unique automation logic tailored to your specific needs.
+
+<Info>
+  **Current Status**: Basic AI-assisted block creation available
+  **Planned**: Advanced SDK, marketplace, and developer rewards program
+</Info>
 
 ## Block Architecture
 
@@ -45,13 +49,18 @@ Extend Zzyra's automation capabilities with your own custom blocks. Create power
   </div>
 </div>
 
-## Your First Custom Block
+## Example Custom Block Development
 
-Let's create a simple "Price Alert" block that monitors cryptocurrency prices and sends notifications when thresholds are met.
+<Alert type='info'>
+  **Development Example**: This shows the planned approach for custom block creation.
+</Alert>
+
+Example: Creating a "Price Alert" block that monitors cryptocurrency prices and sends notifications when thresholds are met.
 
 <CardGroup cols={2}>
   <Card title="Block Definition" icon="code">
 ```typescript
+// Planned SDK structure (in development)
 import { Block, BlockConfig, BlockInput, BlockOutput } from '@zzyra/blocks';
 
 interface PriceAlertConfig {
@@ -61,6 +70,7 @@ condition: 'above' | 'below';
 notificationChannel: 'email' | 'discord' | 'slack';
 }
 
+// Planned decorator pattern (in development)
 @Block({
 name: 'Price Alert',
 description: 'Monitor cryptocurrency prices and send alerts',
