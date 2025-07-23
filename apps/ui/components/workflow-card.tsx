@@ -257,7 +257,7 @@ export function WorkflowCard({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align='end'>
                   <DropdownMenuItem asChild>
-                    <Link href={`/builder/${workflow.id}`}>
+                    <Link href={`/builder?id=${workflow.id}`}>
                       <Pencil className='mr-2 h-4 w-4' />
                       Edit
                     </Link>
@@ -382,7 +382,7 @@ export function WorkflowCard({
 
           <div className='flex w-full justify-between items-center'>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Link href={`/builder/${workflow.id}`}>
+              <Link href={`/builder?id=${workflow.id}`}>
                 <Button
                   size='sm'
                   variant='outline'
@@ -394,9 +394,7 @@ export function WorkflowCard({
             </motion.div>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Link href={`/workflow/${workflow.id}`}>
-                <Button
-                  size='sm'
-                  className='gap-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90'>
+                <Button size='sm' variant='default' className='gap-1'>
                   View
                   <motion.div
                     initial={{ x: 0 }}
