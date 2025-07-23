@@ -101,20 +101,24 @@ function detectCycle(nodes: any[], edges: any[]): boolean {
 }
 
 class WorkflowService {
-  async getWorkflows(): Promise<Workflow[]> {
+  async getWorkflows(
+    page = 1,
+    limit = 10
+  ): Promise<{ data: Workflow[]; total: number; page: number; limit: number }> {
     try {
-      const response = await api.get("/workflows");
+      const response = await api.get(`/workflows?page=${page}&limit=${limit}`);
 
       if (response.status !== 200) {
         const errorData = response.data;
         throw new Error(errorData.error || "Failed to fetch workflows");
       }
 
-      // The backend returns paginated data, so extract the data array
-      const workflows = response.data.data || response.data;
+      // The backend returns paginated data
+      const paginatedData = response.data;
+      const workflows = paginatedData.data || [];
 
       // Map enhanced workflow data to match frontend interface
-      return workflows.map((workflow: any) => {
+      const mappedWorkflows = workflows.map((workflow: any) => {
         return {
           ...workflow,
           // Ensure camelCase compatibility for frontend
@@ -146,6 +150,13 @@ class WorkflowService {
           },
         };
       });
+
+      return {
+        data: mappedWorkflows,
+        total: paginatedData.total || workflows.length,
+        page: paginatedData.page || page,
+        limit: paginatedData.limit || limit,
+      };
     } catch (error: any) {
       console.error("Error fetching workflows:", error);
       throw new Error(`Failed to fetch workflows: ${error.message}`);

@@ -21,10 +21,17 @@ const montserrat = Montserrat({
 });
 
 export const metadata = {
-  title: "Zzyra - Web3 Automation",
-  description: "Build powerful Web3 automation workflows",
+  title: "Zzyra - AI-Powered Workflow Automation with Blockchain",
+  description: "Build powerful AI-native workflows that seamlessly integrate with blockchain technology",
   metadataBase: new URL("https://zyra.vercel.app"),
   generator: "v0.dev",
+  icons: {
+    icon: [
+      { url: "/zyra-icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", type: "image/x-icon" }
+    ],
+    apple: "/zyra-icon.svg",
+  },
 };
 
 export default function RootLayout({

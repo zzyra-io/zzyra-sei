@@ -28,8 +28,7 @@ export default function LoginPage() {
     <div className='flex min-h-screen flex-col'>
       <header className='flex h-14 items-center px-4 lg:px-6 border-b'>
         <Link href='/' className='flex items-center'>
-          <Logo className='h-6 w-6' />
-          <span className='ml-2 text-xl font-bold'>Zzyra</span>
+          <Logo className='h-8 w-auto' variant='full' />
         </Link>
         <div className='ml-auto flex items-center'>
           <ModeToggle />

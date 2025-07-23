@@ -43,7 +43,7 @@ export class HealthController {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zyra System Health Dashboard</title>
+    <title>Zzyra System Health Dashboard</title>
     <style>
         * {
             margin: 0;
@@ -423,7 +423,7 @@ export class HealthController {
     <div class="container">
         <div class="header">
             <div>
-                <h1 class="title">Zyra System Health Dashboard</h1>
+                <h1 class="title">Zzyra System Health Dashboard</h1>
                 <p class="subtitle">Real-time monitoring of all services and infrastructure</p>
             </div>
             <div class="status-badges">

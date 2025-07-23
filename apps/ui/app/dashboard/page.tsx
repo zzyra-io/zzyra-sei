@@ -26,7 +26,8 @@ import { useDashboardMetrics } from "@/hooks/useDashboardMetricsData";
 import {
   useDeleteWorkflow,
   useToggleFavorite,
-  useWorkflows,
+  useWorkflowsInfinite,
+  useInfiniteScroll,
 } from "@/hooks/useWorkflowsData";
 import {
   ArrowUpDown,
@@ -50,16 +51,21 @@ export default function DashboardPage() {
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [activeTab, setActiveTab] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const workflowsPerPage = 9; // Pagination limit
 
   // Use TanStack Query hooks for data fetching
   const {
-    data: workflows = [],
+    data: workflowsInfinite,
     isLoading,
     refetch: refetchWorkflows,
-  } = useWorkflows();
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useWorkflowsInfinite(9);
+
+  // Flatten all pages of workflows
+  const allWorkflows =
+    workflowsInfinite?.pages.flatMap((page) => page.data) || [];
 
   const {
     data: dashboardMetrics = {
@@ -78,6 +84,13 @@ export default function DashboardPage() {
 
   const { toast } = useToast();
   const router = useRouter();
+
+  // Infinite scroll intersection observer
+  const lastElementRef = useInfiniteScroll(
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage
+  );
 
   // Refresh workflows and metrics
   const refreshWorkflows = async () => {
@@ -112,11 +125,11 @@ export default function DashboardPage() {
   };
 
   // Filter workflows based on search query and active tab
-  const filteredWorkflows = workflows.filter((workflow) => {
+  const filteredWorkflows = allWorkflows.filter((workflow) => {
     const matchesSearch =
       workflow.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       workflow.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      workflow.tags?.some((tag) =>
+      workflow.tags?.some((tag: string) =>
         tag.toLowerCase().includes(searchQuery.toLowerCase())
       );
     const matchesTab =
@@ -154,13 +167,6 @@ export default function DashboardPage() {
     }
   });
 
-  // Pagination logic
-  const totalPages = Math.ceil(sortedWorkflows.length / workflowsPerPage);
-  const paginatedWorkflows = sortedWorkflows.slice(
-    (currentPage - 1) * workflowsPerPage,
-    currentPage * workflowsPerPage
-  );
-
   // Navigate to workflow builder
   const handleCreateNew = () => router.push("/builder");
 
@@ -194,7 +200,7 @@ export default function DashboardPage() {
             <DashboardMetricsCards
               metrics={dashboardMetrics}
               isLoading={isLoadingMetrics}
-              workflowCount={workflows.length}
+              workflowCount={allWorkflows.length} // Changed to allWorkflows.length
             />
           </div>
 
@@ -331,32 +337,43 @@ export default function DashboardPage() {
                         <Skeleton key={i} className='h-[220px] rounded-lg' />
                       ))}
                     </div>
-                  ) : paginatedWorkflows.length > 0 ? (
+                  ) : filteredWorkflows.length > 0 ? (
                     <div
                       className={
                         viewMode === "grid"
                           ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
                           : "flex flex-col gap-4"
                       }>
-                      {paginatedWorkflows.map((workflow) => (
-                        <WorkflowCard
+                      {filteredWorkflows.map((workflow, index) => (
+                        <div
                           key={workflow.id}
-                          workflow={workflow as any}
-                          viewMode={viewMode}
-                          onFavoriteToggle={(isFavorite) =>
-                            toggleFavorite(workflow.id, isFavorite)
-                          }
-                          onDelete={async () => {
-                            try {
-                              await deleteWorkflow(workflow.id);
-                              // No need to manually update state - TanStack Query handles this
-                            } catch (err) {
-                              console.error("Error deleting workflow", err);
-                              // Error handling is done in the mutation hook
+                          ref={
+                            index === filteredWorkflows.length - 1
+                              ? lastElementRef
+                              : undefined
+                          }>
+                          <WorkflowCard
+                            workflow={workflow as any}
+                            viewMode={viewMode}
+                            onFavoriteToggle={(isFavorite) =>
+                              toggleFavorite(workflow.id, isFavorite)
                             }
-                          }}
-                        />
+                            onDelete={async () => {
+                              try {
+                                await deleteWorkflow(workflow.id);
+                                // No need to manually update state - TanStack Query handles this
+                              } catch (err) {
+                                console.error("Error deleting workflow", err);
+                                // Error handling is done in the mutation hook
+                              }
+                            }}
+                          />
+                        </div>
                       ))}
+                      {/* Infinite scroll trigger */}
+                      {hasNextPage && (
+                        <div ref={lastElementRef} className='h-4' />
+                      )}
                     </div>
                   ) : (
                     <EmptyState
@@ -386,26 +403,32 @@ export default function DashboardPage() {
               </CardContent>
               <CardFooter className='border-t py-3 px-6 flex justify-between items-center'>
                 <div className='text-xs text-muted-foreground'>
-                  Showing {paginatedWorkflows.length} of{" "}
-                  {sortedWorkflows.length} workflows
+                  {isLoading ? (
+                    "Loading workflows..."
+                  ) : (
+                    <>
+                      {allWorkflows.length} workflow
+                      {allWorkflows.length !== 1 ? "s" : ""} total
+                      {hasNextPage && " • Scroll to load more"}
+                    </>
+                  )}
                 </div>
                 <div className='flex gap-2'>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage((prev) => prev - 1)}
-                    aria-label='Previous page'>
-                    Previous
-                  </Button>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    disabled={currentPage === totalPages || totalPages === 0}
-                    onClick={() => setCurrentPage((prev) => prev + 1)}
-                    aria-label='Next page'>
-                    Next
-                  </Button>
+                  {isFetchingNextPage && (
+                    <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                      <RefreshCw className='h-4 w-4 animate-spin' />
+                      Loading more...
+                    </div>
+                  )}
+                  {hasNextPage && !isFetchingNextPage && (
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => fetchNextPage()}
+                      aria-label='Load more workflows'>
+                      Load More
+                    </Button>
+                  )}
                 </div>
               </CardFooter>
             </Card>
