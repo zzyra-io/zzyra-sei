@@ -33,7 +33,7 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
     category: NodeCategory.TRIGGER,
     icon: "trending-up",
     defaultConfig: {
-      asset: "ETHEREUM",
+      asset: "ETH",
       condition: "above",
       targetPrice: "2000",
       checkInterval: "5",

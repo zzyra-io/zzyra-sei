@@ -5,7 +5,6 @@ import { ExecutionLogger } from '../execution-logger';
 import { BlockExecutionContext, BlockHandler } from '@zyra/types';
 import { EnhancedBlockRegistry } from './enhanced/EnhancedBlockRegistry';
 import { MetricsBlockHandler } from './MetricsBlockHandler';
-import { PriceMonitorBlockHandler } from './PriceMonitorBlockHandler';
 import { DataTransformHandler } from './DataTransformHandler';
 import { CustomBlockHandler } from './CustomBlockHandler';
 import { ScheduleBlockHandler } from './ScheduleBlockHandler';
@@ -49,11 +48,8 @@ export class BlockHandlerRegistry {
       // Notifications are handled by the enhanced registry
       // [BlockType.EMAIL]: Handled by enhanced registry
 
-      // Trigger blocks
-      [BlockType.PRICE_MONITOR]: new MetricsBlockHandler(
-        BlockType.PRICE_MONITOR,
-        new PriceMonitorBlockHandler(this.databaseService),
-      ),
+      // Trigger blocks are handled by the enhanced registry
+      // [BlockType.PRICE_MONITOR]: Handled by enhanced registry
 
       // HTTP requests are handled by the enhanced registry
       // [BlockType.HTTP_REQUEST]: Handled by enhanced registry

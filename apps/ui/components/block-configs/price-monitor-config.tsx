@@ -24,10 +24,6 @@ import {
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// Remove the circular dependency - don't self-register
-// import blockConfigRegistry from "@/lib/block-config-registry";
-// blockConfigRegistry.register("PRICE_MONITOR", PriceMonitorConfig);
-
 interface PriceMonitorConfigProps {
   config: any;
   onChange: (config: any) => void;
@@ -53,7 +49,7 @@ export function PriceMonitorConfig({
       setPriceError(null);
       setCurrentPrice(null);
       try {
-        const asset = config.asset || "ETHEREUM";
+        const asset = config.asset || "ETH";
         const { price } = await fetchCryptoPrice(asset);
         if (!cancelled) setCurrentPrice(price);
       } catch (err: any) {
@@ -71,7 +67,7 @@ export function PriceMonitorConfig({
   // Initialize with defaults if values are missing
   useEffect(() => {
     const defaults = {
-      asset: config.asset || "ETHEREUM",
+      asset: config.asset || "ETH",
       condition: config.condition || "above",
       targetPrice: config.targetPrice || "0",
       checkInterval: config.checkInterval || "5",
@@ -135,20 +131,24 @@ export function PriceMonitorConfig({
           <div className='space-y-2'>
             <Label htmlFor='asset'>Asset</Label>
             <Select
-              value={config.asset || "ETHEREUM"}
+              value={config.asset || "ETH"}
               onValueChange={(value) => handleChange("asset", value)}>
               <SelectTrigger id='asset'>
                 <SelectValue placeholder='Select asset' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value='ETHEREUM'>Ethereum (ETH)</SelectItem>
-                <SelectItem value='BITCOIN'>Bitcoin (BTC)</SelectItem>
-                <SelectItem value='SOLANA'>Solana (SOL)</SelectItem>
+                <SelectItem value='ETH'>Ethereum (ETH)</SelectItem>
+                <SelectItem value='BTC'>Bitcoin (BTC)</SelectItem>
+                <SelectItem value='SOL'>Solana (SOL)</SelectItem>
                 <SelectItem value='USDC'>USD Coin (USDC)</SelectItem>
-                <SelectItem value='TETHER'>Tether (USDT)</SelectItem>
-                <SelectItem value='CARDANO'>Cardano (ADA)</SelectItem>
-                <SelectItem value='DOGECOIN'>Dogecoin (DOGE)</SelectItem>
-                <SelectItem value='POLYGON'>Polygon (MATIC)</SelectItem>
+                <SelectItem value='USDT'>Tether (USDT)</SelectItem>
+                <SelectItem value='ADA'>Cardano (ADA)</SelectItem>
+                <SelectItem value='DOGE'>Dogecoin (DOGE)</SelectItem>
+                <SelectItem value='MATIC'>Polygon (MATIC)</SelectItem>
+                <SelectItem value='LINK'>Chainlink (LINK)</SelectItem>
+                <SelectItem value='UNI'>Uniswap (UNI)</SelectItem>
+                <SelectItem value='AAVE'>Aave (AAVE)</SelectItem>
+                <SelectItem value='MKR'>Maker (MKR)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -164,7 +164,7 @@ export function PriceMonitorConfig({
               <SelectContent>
                 <SelectItem value='above'>Price Above</SelectItem>
                 <SelectItem value='below'>Price Below</SelectItem>
-                <SelectItem value='equal'>Price Equal</SelectItem>
+                <SelectItem value='equals'>Price Equal</SelectItem>
                 <SelectItem value='change'>Price Change %</SelectItem>
               </SelectContent>
             </Select>
@@ -217,7 +217,6 @@ export function PriceMonitorConfig({
                 <SelectItem value='coingecko'>CoinGecko</SelectItem>
                 <SelectItem value='coinmarketcap'>CoinMarketCap</SelectItem>
                 <SelectItem value='binance'>Binance</SelectItem>
-                <SelectItem value='uniswap'>Uniswap</SelectItem>
               </SelectContent>
             </Select>
           </div>

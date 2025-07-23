@@ -225,11 +225,14 @@ export default function BuilderPage() {
   // Prepare nodes for API calls - ensures all required fields are present
   const prepareWorkflowNodesForApi = useCallback(
     (nodes: Node[]): UnifiedWorkflowNode[] => {
-      return prepareNodesForApi(
+      console.log("Original nodes:", nodes);
+      const processedNodes = prepareNodesForApi(
         nodes.map((node) =>
           ensureValidWorkflowNode(node as UnifiedWorkflowNode)
         )
       );
+      console.log("Processed nodes:", processedNodes);
+      return processedNodes;
     },
     []
   );
@@ -239,7 +242,9 @@ export default function BuilderPage() {
     if (workflowId && initialId && hasUnsavedChanges && workflowName) {
       const autoSaveTimeoutId = setTimeout(async () => {
         try {
+          console.log("Auto-saving workflow with nodes:", nodes);
           const apiNodes = prepareWorkflowNodesForApi(nodes);
+          console.log("Prepared nodes for API:", apiNodes);
           await workflowService.updateWorkflow(workflowId, {
             name: workflowName,
             description: workflowDescription,
@@ -281,6 +286,7 @@ export default function BuilderPage() {
         data: {
           blockType: blockType,
           label: `${blockType} Node`,
+          // The ensureValidWorkflowNode function will add the missing required fields
         },
       });
       addNode(newNode as Node);
@@ -464,19 +470,36 @@ export default function BuilderPage() {
           is_public: false,
           tags,
         });
+
         if (savedWorkflow && savedWorkflow.id) {
+          // Update state first
           setWorkflowId(savedWorkflow.id);
           setHasUnsavedChanges(false);
           setSaveState((prev) => ({ ...prev, isOpen: false }));
-          router.replace(`/builder?id=${savedWorkflow.id}`, { scroll: false });
+
+          // Clear draft from localStorage
           localStorage.removeItem("workflow_draft");
+
+          // Show success message
           toast({
             title: "Workflow saved",
             description: "Your workflow has been saved successfully.",
           });
+
+          // Navigate to the saved workflow URL after a brief delay to ensure state is updated
+          setTimeout(() => {
+            router.replace(`/builder?id=${savedWorkflow.id}`, {
+              scroll: false,
+            });
+          }, 100);
+        } else {
+          throw new Error(
+            "Failed to save workflow: No ID returned from server"
+          );
         }
       } catch (error: unknown) {
         const err = error as Error;
+        console.error("Error saving workflow:", error);
         toast({
           title: "Error",
           description: err.message || "Failed to save workflow.",
@@ -557,20 +580,39 @@ export default function BuilderPage() {
           is_public: false,
           tags,
         });
+
         if (savedWorkflow && savedWorkflow.id) {
+          // Reset flow first to clear current state
           resetFlow();
+
+          // Update state with new workflow ID
           setWorkflowId(savedWorkflow.id);
-          router.replace(`/builder?id=${savedWorkflow.id}`, { scroll: false });
           setHasUnsavedChanges(false);
           setSaveState((prev) => ({ ...prev, isOpen: false }));
+
+          // Clear draft from localStorage
           localStorage.removeItem("workflow_draft");
+
+          // Show success message
           toast({
             title: "New workflow created",
             description: "Your workflow has been saved as a new workflow.",
           });
+
+          // Navigate to the new workflow URL after a brief delay to ensure state is updated
+          setTimeout(() => {
+            router.replace(`/builder?id=${savedWorkflow.id}`, {
+              scroll: false,
+            });
+          }, 100);
+        } else {
+          throw new Error(
+            "Failed to save as new workflow: No ID returned from server"
+          );
         }
       } catch (error: unknown) {
         const err = error as Error;
+        console.error("Error saving as new workflow:", error);
         toast({
           title: "Error",
           description: err.message || "Failed to save as new workflow.",

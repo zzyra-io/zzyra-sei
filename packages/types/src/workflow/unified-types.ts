@@ -51,7 +51,7 @@ export interface UnifiedWorkflowEdge {
  * Type guards to check if data is properly formatted for API calls
  */
 export function isValidWorkflowNode(node: UnifiedWorkflowNode): boolean {
-  return !!(
+  const isValid = !!(
     node.id &&
     node.data?.blockType &&
     node.data?.label &&
@@ -60,6 +60,21 @@ export function isValidWorkflowNode(node: UnifiedWorkflowNode): boolean {
     typeof node.data?.isEnabled === "boolean" &&
     node.position
   );
+
+  // Debug logging for invalid nodes
+  if (!isValid) {
+    console.warn("Invalid workflow node:", {
+      id: node.id,
+      blockType: node.data?.blockType,
+      label: node.data?.label,
+      nodeType: node.data?.nodeType,
+      iconName: node.data?.iconName,
+      isEnabled: node.data?.isEnabled,
+      position: node.position,
+    });
+  }
+
+  return isValid;
 }
 
 export function isValidWorkflowEdge(edge: UnifiedWorkflowEdge): boolean {
@@ -89,11 +104,13 @@ export function ensureValidWorkflowNode(
       config: node.data?.config || {},
       inputs: node.data?.inputs || [],
       outputs: node.data?.outputs || [],
-      ...node.data, // Preserve any additional React Flow data
+      // Don't spread node.data here as it might override the required fields
     },
     dragHandle: node.dragHandle || ".custom-drag-handle",
     connectable: node.connectable ?? true,
-    ...node, // Preserve any additional React Flow properties
+    // Preserve React Flow specific properties
+    selected: node.selected,
+    dragging: node.dragging,
   };
 }
 
@@ -146,7 +163,22 @@ function getBlockMetadata(blockType: BlockType): {
 export function prepareNodesForApi(
   nodes: UnifiedWorkflowNode[]
 ): UnifiedWorkflowNode[] {
-  return nodes.map(ensureValidWorkflowNode).filter(isValidWorkflowNode);
+  const processedNodes = nodes.map(ensureValidWorkflowNode);
+  const validNodes = processedNodes.filter(isValidWorkflowNode);
+
+  // Debug logging to see what's happening
+  if (processedNodes.length !== validNodes.length) {
+    console.warn(
+      `Node validation failed: ${processedNodes.length - validNodes.length} nodes were filtered out`
+    );
+    processedNodes.forEach((node, index) => {
+      if (!isValidWorkflowNode(node)) {
+        console.warn(`Invalid node at index ${index}:`, node);
+      }
+    });
+  }
+
+  return validNodes;
 }
 
 /**

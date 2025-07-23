@@ -18,12 +18,12 @@ import { ExecutionLogger } from '../../execution-logger';
 import { HttpBlockHandler } from '../HttpBlockHandler';
 import { EnhancedComparatorBlock } from './EnhancedComparatorBlock';
 import { NotificationBlockHandler } from '../NotificationBlockHandler';
+import { PriceMonitorBlockHandler } from '../PriceMonitorBlockHandler';
 
 // Import legacy blocks
 import { EmailBlockHandler } from '../EmailBlockHandler';
 import { HttpRequestHandler } from '../HttpRequestHandler';
 import { CustomBlockHandler } from '../CustomBlockHandler';
-import { PriceMonitorBlockHandler } from '../PriceMonitorBlockHandler';
 
 @Injectable()
 export class EnhancedBlockRegistry {
@@ -46,6 +46,9 @@ export class EnhancedBlockRegistry {
     this.registerEnhancedBlock(
       new NotificationBlockHandler(this.databaseService),
     );
+    this.registerEnhancedBlock(
+      new PriceMonitorBlockHandler(this.databaseService),
+    );
 
     // Register legacy blocks for backward compatibility
     this.registerLegacyBlock(
@@ -53,10 +56,6 @@ export class EnhancedBlockRegistry {
       new EmailBlockHandler(this.databaseService),
     );
     this.registerLegacyBlock('HTTP_REQUEST', new HttpRequestHandler());
-    this.registerLegacyBlock(
-      'PRICE_MONITOR',
-      new PriceMonitorBlockHandler(this.databaseService),
-    );
     this.registerLegacyBlock(
       'CUSTOM',
       new CustomBlockHandler(this.databaseService),

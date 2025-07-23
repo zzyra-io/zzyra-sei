@@ -1210,11 +1210,18 @@ export class WorkflowExecutor {
 
         case BlockType.PRICE_MONITOR:
           if (outputData) {
-            if (typeof outputData.price !== 'number') {
-              errors.push('Price monitor should output numeric price');
-            }
-            if (typeof outputData.conditionMet !== 'boolean') {
-              errors.push('Price monitor should output boolean conditionMet');
+            // Handle both legacy and enhanced formats
+            const hasLegacyFormat = typeof outputData.price === 'number' && typeof outputData.conditionMet === 'boolean';
+            const hasEnhancedFormat = typeof outputData.currentPrice === 'number' && typeof outputData.triggered === 'boolean';
+            
+            if (!hasLegacyFormat && !hasEnhancedFormat) {
+              // Check for legacy format
+              if (typeof outputData.price !== 'number') {
+                errors.push('Price monitor should output numeric price (legacy) or currentPrice (enhanced)');
+              }
+              if (typeof outputData.conditionMet !== 'boolean') {
+                errors.push('Price monitor should output boolean conditionMet (legacy) or triggered (enhanced)');
+              }
             }
           }
           break;

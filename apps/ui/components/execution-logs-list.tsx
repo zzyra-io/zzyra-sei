@@ -3,6 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { executionsApi } from "@/lib/services/api";
 import type { NodeLog, UnifiedLog } from "@/lib/services/logs-service";
@@ -14,6 +21,7 @@ import {
   ChevronRight,
   Clock,
   Code,
+  Copy,
   FileText,
   Loader2,
   Pause,
@@ -447,7 +455,7 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
     [toast, memoizedFetchExecutions]
   );
 
-  const viewJsonData = (data: Record<string, unknown> | null) => {
+  const viewJsonData = (data: Record<string, unknown> | null | undefined) => {
     setJsonViewerData(data || {});
     setIsJsonDialogOpen(true);
     // For demo purposes, just log the data
@@ -664,6 +672,52 @@ export const ExecutionLogsList = React.memo(function ExecutionLogsList({
           </div>
         </div>
       )}
+
+      {/* JSON Data Modal */}
+      <Dialog open={isJsonDialogOpen} onOpenChange={setIsJsonDialogOpen}>
+        <DialogContent className='max-w-4xl max-h-[80vh] overflow-hidden'>
+          <DialogHeader>
+            <DialogTitle className='flex items-center justify-between'>
+              <span>JSON Data</span>
+              <div className='flex items-center gap-2'>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => {
+                    if (jsonViewerData) {
+                      navigator.clipboard.writeText(
+                        JSON.stringify(jsonViewerData, null, 2)
+                      );
+                      toast({
+                        title: "Copied to clipboard",
+                        description:
+                          "JSON data has been copied to your clipboard.",
+                      });
+                    }
+                  }}
+                  className='h-8 px-3'>
+                  <Copy className='w-4 h-4 mr-2' />
+                  Copy
+                </Button>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => setIsJsonDialogOpen(false)}
+                  className='h-8 px-3'>
+                  <XCircle className='w-4 h-4' />
+                </Button>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className='flex-1 overflow-hidden'>
+            <ScrollArea className='h-full max-h-[60vh]'>
+              <pre className='text-sm bg-muted/20 p-4 rounded font-mono whitespace-pre-wrap overflow-auto'>
+                {JSON.stringify(jsonViewerData, null, 2)}
+              </pre>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });
@@ -682,7 +736,7 @@ interface ExecutionLogCardProps {
     logId: string,
     nodeId?: string
   ) => Promise<void>;
-  viewJsonData: (data: Record<string, unknown> | null) => void;
+  viewJsonData: (data: Record<string, unknown> | null | undefined) => void;
   nodeExecutions?: NodeExecution[];
   nodeInputs: Record<string, Record<string, unknown>>;
   nodeOutputs: Record<string, Record<string, unknown>>;
@@ -906,7 +960,7 @@ export const ExecutionLogCard = React.memo(
                           <div className='flex flex-col items-center justify-center p-4 bg-amber-50 rounded-lg'>
                             <p className='text-2xl font-semibold text-amber-700'>
                               {
-                                allLogs.filter((log) => log.level === "warn")
+                                allLogs.filter((log) => log.level === "warning")
                                   .length
                               }
                             </p>
@@ -929,7 +983,7 @@ export const ExecutionLogCard = React.memo(
                             const levelClass =
                               logEntry.level === "error"
                                 ? "border-l-4 border-l-rose-500 bg-rose-50"
-                                : logEntry.level === "warn"
+                                : logEntry.level === "warning"
                                   ? "border-l-4 border-l-amber-500 bg-amber-50"
                                   : "border-l-4 border-l-sky-500 bg-sky-50";
 
@@ -940,7 +994,7 @@ export const ExecutionLogCard = React.memo(
                                   className='h-5 px-1.5'>
                                   ERROR
                                 </Badge>
-                              ) : logEntry.level === "warn" ? (
+                              ) : logEntry.level === "warning" ? (
                                 <Badge className='bg-amber-100 text-amber-800 hover:bg-amber-200 h-5 px-1.5'>
                                   WARN
                                 </Badge>
@@ -1315,7 +1369,7 @@ export const ExecutionLogCard = React.memo(
                                           const levelClass =
                                             logEntry.level === "error"
                                               ? "border-l-4 border-l-rose-500 bg-rose-50"
-                                              : logEntry.level === "warn"
+                                              : logEntry.level === "warning"
                                                 ? "border-l-4 border-l-amber-500 bg-amber-50"
                                                 : "border-l-4 border-l-sky-500 bg-sky-50";
 
@@ -1326,7 +1380,7 @@ export const ExecutionLogCard = React.memo(
                                                 className='h-5 px-1.5'>
                                                 ERROR
                                               </Badge>
-                                            ) : logEntry.level === "warn" ? (
+                                            ) : logEntry.level === "warning" ? (
                                               <Badge className='bg-amber-100 text-amber-800 hover:bg-amber-200 h-5 px-1.5'>
                                                 WARN
                                               </Badge>
@@ -1428,7 +1482,9 @@ export const ExecutionLogCard = React.memo(
                               variant='outline'
                               size='sm'
                               className='h-8 text-xs bg-transparent'
-                              onClick={() => viewJsonData(log.input_data)}>
+                              onClick={() =>
+                                viewJsonData(log.input_data || null)
+                              }>
                               View Full JSON
                             </Button>
                           </div>
@@ -1539,7 +1595,9 @@ export const ExecutionLogCard = React.memo(
                               variant='outline'
                               size='sm'
                               className='h-8 text-xs bg-transparent'
-                              onClick={() => viewJsonData(log.output_data)}>
+                              onClick={() =>
+                                viewJsonData(log.output_data || null)
+                              }>
                               View Full JSON
                             </Button>
                           </div>

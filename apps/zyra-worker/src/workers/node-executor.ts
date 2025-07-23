@@ -1,16 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { trace } from '@opentelemetry/api';
+import { BlockHandler, BlockExecutionContext, BlockType } from '@zyra/types';
 import { DatabaseService } from '../services/database.service';
-import { MagicAdminService } from '../services/magic-admin.service';
 import { ExecutionLogger } from './execution-logger';
-import {
-  BlockExecutionContext,
-  BlockHandler,
-  BlockType,
-  getEnhancedBlockSchema,
-} from '@zyra/types';
-import { BlockHandlerRegistry } from './handlers/BlockHandlerRegistry';
+import { MagicAdminService } from '../services/magic-admin.service';
 import { CircuitBreakerDbService } from '../lib/blockchain/CircuitBreakerDbService';
+import { BlockHandlerRegistry } from './handlers/BlockHandlerRegistry';
+import { EnhancedBlockRegistry } from './handlers/enhanced/EnhancedBlockRegistry';
+import { getEnhancedBlockSchema } from '@zyra/types';
+import { ZyraTemplateProcessor } from '../utils/template-processor';
 
 @Injectable()
 export class NodeExecutor {
@@ -18,23 +16,20 @@ export class NodeExecutor {
   private tracer = trace.getTracer('workflow-execution');
   private handlers: Record<BlockType, BlockHandler>;
   private blockHandlerRegistry: BlockHandlerRegistry;
+  private enhancedBlockRegistry: EnhancedBlockRegistry;
   private circuitBreakerService: CircuitBreakerDbService;
 
   private static readonly MAX_RETRIES = parseInt(
-    process.env.NODE_MAX_RETRIES || '3',
-    10,
+    process.env.NODE_EXECUTION_MAX_RETRIES || '3',
   );
   private static readonly RETRY_BACKOFF_MS = parseInt(
-    process.env.NODE_RETRY_BACKOFF_MS || '1000',
-    10,
+    process.env.NODE_EXECUTION_RETRY_BACKOFF_MS || '1000',
   );
   private static readonly RETRY_JITTER_MS = parseInt(
-    process.env.NODE_RETRY_JITTER_MS || '500',
-    10,
+    process.env.NODE_EXECUTION_RETRY_JITTER_MS || '100',
   );
   private static readonly NODE_EXECUTION_TIMEOUT = parseInt(
-    process.env.NODE_EXECUTION_TIMEOUT || '300000',
-    10,
+    process.env.NODE_EXECUTION_TIMEOUT_MS || '30000',
   );
 
   constructor(
@@ -48,6 +43,13 @@ export class NodeExecutor {
     // Initialize BlockHandlerRegistry with class-level logger and database service
     this.blockHandlerRegistry = new BlockHandlerRegistry(
       this.logger,
+      this.databaseService,
+      this.executionLogger,
+    );
+    // Initialize EnhancedBlockRegistry with template processor
+    const templateProcessor = new ZyraTemplateProcessor();
+    this.enhancedBlockRegistry = new EnhancedBlockRegistry(
+      templateProcessor,
       this.databaseService,
       this.executionLogger,
     );
@@ -121,13 +123,23 @@ export class NodeExecutor {
           `  available handlers: ${Object.keys(this.handlers).join(', ')}`,
         );
 
-        // Get handler using the registry (case-insensitive)
-        const handler = this.blockHandlerRegistry.getHandler(
-          blockType as BlockType,
-        );
+        // Try to get handler from enhanced registry first, then fall back to legacy
+        let handler = this.enhancedBlockRegistry.getHandler(blockType);
+        let isEnhancedBlock = false;
+
+        if (handler) {
+          this.logger.debug(`Found enhanced handler for ${blockType}`);
+          isEnhancedBlock = true;
+        } else {
+          // Fall back to legacy registry
+          handler = this.blockHandlerRegistry.getHandler(
+            blockType as BlockType,
+          );
+          this.logger.debug(`Using legacy handler for ${blockType}`);
+        }
 
         this.logger.debug(
-          `Handler lookup result for ${blockType}: ${handler ? 'found' : 'not found'}`,
+          `Handler lookup result for ${blockType}: ${handler ? 'found' : 'not found'} (enhanced: ${isEnhancedBlock})`,
         );
 
         if (!handler) {
@@ -210,10 +222,19 @@ export class NodeExecutor {
         }
 
         // Execute with timeout protection
-        result = await Promise.race([
-          handler.execute(node, ctx),
-          timeoutPromise,
-        ]);
+        if (isEnhancedBlock) {
+          // Use enhanced block execution
+          result = await Promise.race([
+            this.enhancedBlockRegistry.executeBlock(node, ctx, previousOutputs),
+            timeoutPromise,
+          ]);
+        } else {
+          // Use legacy block execution
+          result = await Promise.race([
+            handler.execute(node, ctx),
+            timeoutPromise,
+          ]);
+        }
 
         // Record success
         await this.circuitBreakerService.recordSuccess(circuitId);

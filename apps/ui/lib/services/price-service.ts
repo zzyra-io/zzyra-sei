@@ -2,11 +2,39 @@
 export async function fetchCryptoPrice(
   asset: string
 ): Promise<{ price: number; timestamp: string }> {
+  // Map UI asset symbols to CoinGecko IDs
+  const mapAssetToCoinGeckoId = (asset: string): string => {
+    const mapping: Record<string, string> = {
+      ETH: "ethereum",
+      ETHEREUM: "ethereum",
+      BTC: "bitcoin",
+      BITCOIN: "bitcoin",
+      SOL: "solana",
+      SOLANA: "solana",
+      USDC: "usd-coin",
+      USDT: "tether",
+      TETHER: "tether",
+      ADA: "cardano",
+      CARDANO: "cardano",
+      DOGE: "dogecoin",
+      DOGECOIN: "dogecoin",
+      MATIC: "matic-network",
+      POLYGON: "matic-network",
+      LINK: "chainlink",
+      UNI: "uniswap",
+      AAVE: "aave",
+      MKR: "maker",
+    };
+
+    return mapping[asset.toUpperCase()] || asset.toLowerCase();
+  };
+
+  const coinGeckoId = mapAssetToCoinGeckoId(asset);
+
   // RPC failover: try multiple endpoints
-  const assetId = asset.toLowerCase();
   const defaultEndpoints = [
-    `https://api.coingecko.com/api/v3/simple/price?ids=${assetId}&vs_currencies=usd`,
-    `https://api.coincap.io/v2/assets/${assetId}`,
+    `https://api.coingecko.com/api/v3/simple/price?ids=${coinGeckoId}&vs_currencies=usd`,
+    `https://api.coincap.io/v2/assets/${coinGeckoId}`,
   ];
   const endpoints = (
     process.env.PRICE_RPC_ENDPOINTS?.split(",") || defaultEndpoints
@@ -19,8 +47,8 @@ export async function fetchCryptoPrice(
       const data = await resp.json();
       let price: number | undefined;
       // CoinGecko format
-      if (data[assetId]?.usd != null) {
-        price = data[assetId].usd;
+      if (data[coinGeckoId]?.usd != null) {
+        price = data[coinGeckoId].usd;
         // CoinCap format
       } else if (data.data?.priceUsd) {
         price = Number.parseFloat(data.data.priceUsd);
