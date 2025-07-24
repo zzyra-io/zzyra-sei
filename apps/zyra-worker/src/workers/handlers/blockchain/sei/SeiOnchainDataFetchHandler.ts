@@ -2,6 +2,56 @@ import { z } from 'zod';
 import { seiOnchainDataFetchSchema } from '@zyra/types';
 import { SeiRpcClient } from './services/SeiRpcClient';
 
+// Explicit type definitions to avoid Zod inference issues
+interface SeiOnchainDataFetchConfig {
+  network: string;
+  dataType: string;
+  targetAddress: string;
+  balanceConfig?: {
+    tokenDenom?: string;
+    includeStaked?: boolean;
+    includeRewards?: boolean;
+  };
+  nftConfig?: {
+    collectionAddress?: string;
+    includeMetadata?: boolean;
+    metadataFormat?: string;
+  };
+  txConfig?: {
+    txType?: string;
+    startTime?: string;
+    endTime?: string;
+    includeFailedTx?: boolean;
+    limit?: number;
+  };
+  contractConfig?: {
+    contractAddress: string;
+    queryMethod: string;
+    queryParams?: Record<string, any>;
+  };
+  defiConfig?: {
+    protocols?: string[];
+    includeRewards?: boolean;
+    includeHistory?: boolean;
+  };
+  filters?: any;
+  cacheResults?: boolean;
+  cacheTtl?: number;
+}
+
+interface SeiOnchainDataFetchInput {
+  data?: Record<string, any>;
+  context?: {
+    workflowId?: string;
+    executionId?: string;
+    userId?: string;
+    timestamp: string;
+  };
+  variables?: Record<string, any>;
+  dynamicAddress?: string;
+  dynamicParams?: Record<string, any>;
+}
+
 interface BlockExecutionContext {
   inputs?: Record<string, any>;
   previousOutputs?: Record<string, any>;
@@ -87,13 +137,21 @@ export class SeiOnchainDataFetchHandler {
   private validateAndExtractConfig(
     node: any,
     ctx: BlockExecutionContext,
-  ): z.infer<typeof seiOnchainDataFetchSchema.configSchema> {
+  ): SeiOnchainDataFetchConfig {
     if (!node.config) {
       throw new Error('Block configuration is missing');
     }
 
     try {
-      return seiOnchainDataFetchSchema.configSchema.parse(node.config);
+      const result = seiOnchainDataFetchSchema.configSchema.safeParse(
+        node.config,
+      );
+      if (!result.success) {
+        throw new Error(
+          `Configuration validation failed: ${result.error.message}`,
+        );
+      }
+      return result.data as SeiOnchainDataFetchConfig;
     } catch (error) {
       throw new Error(`Configuration validation failed: ${error}`);
     }
@@ -103,26 +161,24 @@ export class SeiOnchainDataFetchHandler {
     inputs: Record<string, any>,
     previousOutputs: Record<string, any>,
     ctx: BlockExecutionContext,
-  ): any {
+  ): SeiOnchainDataFetchInput {
     try {
-      // Structure the data according to the schema
-      const structuredInputs = {
-        data: { ...previousOutputs, ...inputs },
+      const result = seiOnchainDataFetchSchema.inputSchema.safeParse({
+        data: inputs,
         context: {
-          workflowId: ctx.workflowId || 'unknown',
-          executionId: ctx.executionId || 'unknown',
-          userId: ctx.userId || 'unknown',
+          workflowId: ctx.workflowId,
+          executionId: ctx.executionId,
+          userId: ctx.userId,
           timestamp: new Date().toISOString(),
         },
-        variables: {}, // Add any workflow variables if available
-        dynamicAddress: inputs.dynamicAddress,
-        dynamicParams: inputs.dynamicParams,
-      };
-
-      return seiOnchainDataFetchSchema.inputSchema.parse(structuredInputs);
+        variables: ctx.variables,
+      });
+      if (!result.success) {
+        throw new Error(`Input validation failed: ${result.error.message}`);
+      }
+      return result.data as SeiOnchainDataFetchInput;
     } catch (error) {
-      console.warn('Input validation warning:', error);
-      return inputs;
+      throw new Error(`Input validation failed: ${error}`);
     }
   }
 
@@ -142,19 +198,19 @@ export class SeiOnchainDataFetchHandler {
 
       this.rpcClients.set(network, new SeiRpcClient(rpcUrl, restUrl));
     }
-
     return this.rpcClients.get(network)!;
   }
 
   private async fetchDataByType(
-    config: any,
+    config: SeiOnchainDataFetchConfig,
     address: string,
     client: SeiRpcClient,
-    inputs: any,
+    inputs: SeiOnchainDataFetchInput,
   ): Promise<any> {
     const currentBlock = await client.getLatestBlockNumber();
     const fetchTime = new Date().toISOString();
 
+    // Determine data type to fetch
     switch (config.dataType) {
       case 'balance':
         return await this.fetchBalance(
@@ -202,6 +258,15 @@ export class SeiOnchainDataFetchHandler {
           inputs,
         );
 
+      case 'defi_positions':
+        return await this.fetchDeFiPositions(
+          config,
+          address,
+          client,
+          currentBlock,
+          fetchTime,
+        );
+
       case 'delegations':
         return await this.fetchDelegations(
           config,
@@ -220,13 +285,22 @@ export class SeiOnchainDataFetchHandler {
           fetchTime,
         );
 
+      case 'governance_votes':
+        return await this.fetchGovernanceVotes(
+          config,
+          address,
+          client,
+          currentBlock,
+          fetchTime,
+        );
+
       default:
         throw new Error(`Unsupported data type: ${config.dataType}`);
     }
   }
 
   private async fetchBalance(
-    config: any,
+    config: SeiOnchainDataFetchConfig,
     address: string,
     client: SeiRpcClient,
     blockHeight: number,
@@ -261,7 +335,7 @@ export class SeiOnchainDataFetchHandler {
   }
 
   private async fetchTokenBalance(
-    config: any,
+    config: SeiOnchainDataFetchConfig,
     address: string,
     client: SeiRpcClient,
     blockHeight: number,
@@ -287,7 +361,7 @@ export class SeiOnchainDataFetchHandler {
   }
 
   private async fetchNFTs(
-    config: any,
+    config: SeiOnchainDataFetchConfig,
     address: string,
     client: SeiRpcClient,
     blockHeight: number,
@@ -348,7 +422,7 @@ export class SeiOnchainDataFetchHandler {
   }
 
   private async fetchTransactionHistory(
-    config: any,
+    config: SeiOnchainDataFetchConfig,
     address: string,
     client: SeiRpcClient,
     blockHeight: number,
@@ -410,7 +484,7 @@ export class SeiOnchainDataFetchHandler {
   }
 
   private async fetchContractState(
-    config: any,
+    config: SeiOnchainDataFetchConfig,
     address: string,
     client: SeiRpcClient,
     blockHeight: number,
@@ -486,7 +560,7 @@ export class SeiOnchainDataFetchHandler {
   }
 
   private async fetchDelegations(
-    config: any,
+    config: SeiOnchainDataFetchConfig,
     address: string,
     client: SeiRpcClient,
     blockHeight: number,
@@ -535,55 +609,87 @@ export class SeiOnchainDataFetchHandler {
   }
 
   private async fetchRewards(
-    config: any,
+    config: SeiOnchainDataFetchConfig,
     address: string,
     client: SeiRpcClient,
     blockHeight: number,
     fetchTime: string,
   ): Promise<any> {
-    try {
-      // Get rewards using Cosmos SDK
-      const rewards = await client.getAllBalances(address); // Placeholder
-
-      return {
-        success: true,
-        dataType: 'rewards',
-        address,
-        network: config.network,
-        data: {
-          rewards,
-          totalCount: rewards.length,
-        },
-        rewards,
-        metadata: {
-          blockHeight,
-          fetchTime,
-          cached: false,
-        },
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        dataType: 'rewards',
-        address,
-        network: config.network,
-        error: error.message,
-        data: {
-          rewards: [],
-          totalCount: 0,
-        },
-        metadata: {
-          blockHeight,
-          fetchTime,
-          cached: false,
-        },
-        timestamp: new Date().toISOString(),
-      };
-    }
+    // This would require staking contract queries
+    return {
+      success: true,
+      dataType: 'rewards',
+      address,
+      network: config.network,
+      data: {
+        message: 'Rewards fetching not yet implemented',
+        rewards: [],
+      },
+      metadata: {
+        blockHeight,
+        fetchTime,
+        cached: false,
+      },
+      timestamp: new Date().toISOString(),
+    };
   }
 
-  private getFromCache(config: any, address: string): any | null {
+  private async fetchDeFiPositions(
+    config: SeiOnchainDataFetchConfig,
+    address: string,
+    client: SeiRpcClient,
+    blockHeight: number,
+    fetchTime: string,
+  ): Promise<any> {
+    // This would require DeFi protocol integrations
+    return {
+      success: true,
+      dataType: 'defi_positions',
+      address,
+      network: config.network,
+      data: {
+        message: 'DeFi positions fetching not yet implemented',
+        positions: [],
+      },
+      metadata: {
+        blockHeight,
+        fetchTime,
+        cached: false,
+      },
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  private async fetchGovernanceVotes(
+    config: SeiOnchainDataFetchConfig,
+    address: string,
+    client: SeiRpcClient,
+    blockHeight: number,
+    fetchTime: string,
+  ): Promise<any> {
+    // This would require governance contract queries
+    return {
+      success: true,
+      dataType: 'governance_votes',
+      address,
+      network: config.network,
+      data: {
+        message: 'Governance votes fetching not yet implemented',
+        votes: [],
+      },
+      metadata: {
+        blockHeight,
+        fetchTime,
+        cached: false,
+      },
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  private getFromCache(
+    config: SeiOnchainDataFetchConfig,
+    address: string,
+  ): any | null {
     const key = `${config.network}-${config.dataType}-${address}`;
     const cached = this.cache.get(key);
 
@@ -599,7 +705,11 @@ export class SeiOnchainDataFetchHandler {
     return null;
   }
 
-  private saveToCache(config: any, address: string, data: any): void {
+  private saveToCache(
+    config: SeiOnchainDataFetchConfig,
+    address: string,
+    data: any,
+  ): void {
     const key = `${config.network}-${config.dataType}-${address}`;
     this.cache.set(key, {
       data,

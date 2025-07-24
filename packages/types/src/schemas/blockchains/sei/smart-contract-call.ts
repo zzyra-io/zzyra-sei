@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import type { EnhancedBlockSchema } from '../../blockSchemas';
+import { z } from "zod";
+import type { EnhancedBlockSchema } from "../../blockSchemas";
 import {
   standardInputSchema,
   seiNetworkSchema,
@@ -9,7 +9,7 @@ import {
   transactionResultSchema,
   contractParamSchema,
   SEI_BLOCK_CATEGORIES,
-} from './common';
+} from "./common";
 
 /**
  * Sei Smart Contract Call Block Schema
@@ -33,7 +33,7 @@ export const seiSmartContractCallSchema: EnhancedBlockSchema = {
 
   inputSchema: standardInputSchema.extend({
     // Allow dynamic function parameters from previous blocks
-    dynamicParams: z.record(z.any()).optional(),
+    dynamicParams: z.record(z.string(), z.any()).optional(),
     // Allow overriding gas settings
     gasOverride: gasSettingsSchema.partial().optional(),
   }),
@@ -44,10 +44,14 @@ export const seiSmartContractCallSchema: EnhancedBlockSchema = {
     contractAddress: seiAddressSchema,
     functionName: z.string(),
     returnData: z.any().optional(), // Contract function return value
-    events: z.array(z.object({
-      eventName: z.string(),
-      data: z.any(),
-    })).optional(), // Contract events emitted
+    events: z
+      .array(
+        z.object({
+          eventName: z.string(),
+          data: z.any(),
+        })
+      )
+      .optional(), // Contract events emitted
     gasEstimate: z.number().optional(),
     actualGasUsed: z.number().optional(),
     executionTime: z.number().optional(), // ms
@@ -58,12 +62,26 @@ export const seiSmartContractCallSchema: EnhancedBlockSchema = {
 
   metadata: {
     category: SEI_BLOCK_CATEGORIES.ACTION,
-    icon: 'code',
-    description: 'Execute smart contract functions on Sei blockchain with secure wallet integration',
-    tags: ['sei', 'contract', 'call', 'blockchain', 'execute', 'smart-contract'],
+    icon: "code",
+    description:
+      "Execute smart contract functions on Sei blockchain with secure wallet integration",
+    tags: [
+      "sei",
+      "contract",
+      "call",
+      "blockchain",
+      "execute",
+      "smart-contract",
+    ],
   },
 };
 
-export type SeiSmartContractCallConfig = z.infer<typeof seiSmartContractCallSchema.configSchema>;
-export type SeiSmartContractCallInput = z.infer<typeof seiSmartContractCallSchema.inputSchema>;
-export type SeiSmartContractCallOutput = z.infer<typeof seiSmartContractCallSchema.outputSchema>;
+export type SeiSmartContractCallConfig = z.infer<
+  typeof seiSmartContractCallSchema.configSchema
+>;
+export type SeiSmartContractCallInput = z.infer<
+  typeof seiSmartContractCallSchema.inputSchema
+>;
+export type SeiSmartContractCallOutput = z.infer<
+  typeof seiSmartContractCallSchema.outputSchema
+>;

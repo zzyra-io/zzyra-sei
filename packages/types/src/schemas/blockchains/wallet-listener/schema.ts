@@ -30,7 +30,7 @@ export const walletListenerSchema: EnhancedBlockSchema = {
         timestamp: z.string(),
       })
       .optional(),
-    variables: z.record(z.any()).optional(),
+    variables: z.record(z.string(), z.any()).optional(),
   }),
   outputSchema: z.object({
     eventType: z.string(),
@@ -60,3 +60,14 @@ export const walletListenerSchema: EnhancedBlockSchema = {
     ],
   },
 };
+
+// Type exports
+export type WalletListenerConfig = z.infer<
+  typeof walletListenerSchema.configSchema
+>;
+export type WalletListenerInput = z.infer<
+  typeof walletListenerSchema.inputSchema
+>;
+export type WalletListenerOutput = z.infer<
+  typeof walletListenerSchema.outputSchema
+>;

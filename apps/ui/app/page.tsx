@@ -7,6 +7,7 @@ import { FloatingParticles } from "@/components/floating-particles";
 import { GradientButton } from "@/components/gradient-button";
 import { HeroAnimation } from "@/components/hero-animation";
 import { InteractiveDemo } from "@/components/interactive-demo";
+import { Logo } from "@/components/logo";
 import { PartnerLogos } from "@/components/partner-logos";
 import { StatsCounterGroup } from "@/components/stats-counter";
 import { TestimonialCard } from "@/components/testimonial-card";
@@ -241,10 +242,7 @@ export default function HomePage() {
             whileHover={{ scale: 1.05 }}
             transition={{ type: "spring", stiffness: 400, damping: 10 }}>
             <Link href='/' className='font-bold text-xl flex items-center'>
-              <Zap className='mr-2 h-5 w-5 text-primary' />
-              <span className='bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600'>
-                Zzyra
-              </span>
+              <Logo />
             </Link>
           </MotionDiv>
 

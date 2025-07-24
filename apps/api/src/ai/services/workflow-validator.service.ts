@@ -26,12 +26,12 @@ interface ValidationResult {
 }
 
 interface ValidationError {
-  type: 'schema' | 'business' | 'graph' | 'security';
+  type: "schema" | "business" | "graph" | "security";
   code: string;
   message: string;
   nodeId?: string;
   edgeId?: string;
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
 }
 
 interface ValidationWarning {
@@ -51,7 +51,7 @@ const WorkflowNodeSchema = z.object({
     nodeType: z.enum(["TRIGGER", "ACTION", "LOGIC"]),
     iconName: z.string(),
     isEnabled: z.boolean().default(true),
-    config: z.record(z.unknown()).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
     inputs: z.array(z.unknown()).default([]),
     outputs: z.array(z.unknown()).default([]),
   }),
@@ -88,7 +88,9 @@ export class WorkflowValidatorService {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 
-    this.logger.debug(`Validating workflow with ${nodes.length} nodes and ${edges.length} edges`);
+    this.logger.debug(
+      `Validating workflow with ${nodes.length} nodes and ${edges.length} edges`
+    );
 
     // Step 1: Schema Validation
     const schemaValidation = await this.validateSchema({ nodes, edges });
@@ -112,15 +114,21 @@ export class WorkflowValidatorService {
     warnings.push(...securityValidation.warnings);
 
     // Step 5: Auto-healing if enabled and there are correctable errors
-    let correctedWorkflow: { nodes: WorkflowNode[]; edges: WorkflowEdge[] } | undefined;
-    if (autoHeal && errors.some(e => this.isHealable(e))) {
+    let correctedWorkflow:
+      | { nodes: WorkflowNode[]; edges: WorkflowEdge[] }
+      | undefined;
+    if (autoHeal && errors.some((e) => this.isHealable(e))) {
       correctedWorkflow = await this.healWorkflow(nodes, edges, errors);
       if (correctedWorkflow) {
-        this.logger.log(`Auto-healed workflow with ${errors.length} corrections`);
+        this.logger.log(
+          `Auto-healed workflow with ${errors.length} corrections`
+        );
       }
     }
 
-    const isValid = strictMode ? errors.length === 0 : errors.filter(e => e.severity === 'error').length === 0;
+    const isValid = strictMode
+      ? errors.length === 0
+      : errors.filter((e) => e.severity === "error").length === 0;
 
     return {
       isValid,
@@ -133,19 +141,22 @@ export class WorkflowValidatorService {
   /**
    * Validate workflow against schema
    */
-  private async validateSchema(workflow: { nodes: WorkflowNode[]; edges: WorkflowEdge[] }) {
+  private async validateSchema(workflow: {
+    nodes: WorkflowNode[];
+    edges: WorkflowEdge[];
+  }) {
     const errors: ValidationError[] = [];
-    
+
     try {
       WorkflowSchema.parse(workflow);
     } catch (error) {
       if (error instanceof z.ZodError) {
         for (const issue of error.issues) {
           errors.push({
-            type: 'schema',
-            code: 'SCHEMA_VALIDATION_ERROR',
-            message: `${issue.path.join('.')}: ${issue.message}`,
-            severity: 'error',
+            type: "schema",
+            code: "SCHEMA_VALIDATION_ERROR",
+            message: `${issue.path.join(".")}: ${issue.message}`,
+            severity: "error",
           });
         }
       }
@@ -157,27 +168,31 @@ export class WorkflowValidatorService {
   /**
    * Validate business rules
    */
-  private async validateBusinessRules(nodes: WorkflowNode[], edges: WorkflowEdge[]) {
+  private async validateBusinessRules(
+    nodes: WorkflowNode[],
+    edges: WorkflowEdge[]
+  ) {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 
     // Rule 1: Must have at least one trigger node
-    const triggerNodes = nodes.filter(node => 
-      (node.data as any)?.nodeType === 'TRIGGER'
+    const triggerNodes = nodes.filter(
+      (node) => (node.data as any)?.nodeType === "TRIGGER"
     );
 
     if (triggerNodes.length === 0) {
       errors.push({
-        type: 'business',
-        code: 'NO_TRIGGER_NODE',
-        message: 'Workflow must have at least one trigger node',
-        severity: 'error',
+        type: "business",
+        code: "NO_TRIGGER_NODE",
+        message: "Workflow must have at least one trigger node",
+        severity: "error",
       });
     } else if (triggerNodes.length > 3) {
       warnings.push({
-        type: 'business',
-        message: 'Multiple trigger nodes may lead to complex execution patterns',
-        suggestion: 'Consider consolidating triggers or using logic nodes',
+        type: "business",
+        message:
+          "Multiple trigger nodes may lead to complex execution patterns",
+        suggestion: "Consider consolidating triggers or using logic nodes",
       });
     }
 
@@ -187,25 +202,28 @@ export class WorkflowValidatorService {
       const validationResult = this.validateNodeConfiguration(node);
       if (!validationResult.isValid) {
         errors.push({
-          type: 'business',
-          code: 'MISSING_REQUIRED_CONFIG',
-          message: `Node ${nodeData.label} is missing required configuration: ${validationResult.missing?.join(', ')}`,
+          type: "business",
+          code: "MISSING_REQUIRED_CONFIG",
+          message: `Node ${nodeData.label} is missing required configuration: ${validationResult.missing?.join(", ")}`,
           nodeId: node.id,
-          severity: 'error',
+          severity: "error",
         });
       }
     }
 
     // Rule 3: Validate block type compatibility
     for (const edge of edges) {
-      const sourceNode = nodes.find(n => n.id === edge.source);
-      const targetNode = nodes.find(n => n.id === edge.target);
-      
+      const sourceNode = nodes.find((n) => n.id === edge.source);
+      const targetNode = nodes.find((n) => n.id === edge.target);
+
       if (sourceNode && targetNode) {
-        const compatibilityResult = this.validateNodeCompatibility(sourceNode, targetNode);
+        const compatibilityResult = this.validateNodeCompatibility(
+          sourceNode,
+          targetNode
+        );
         if (!compatibilityResult.compatible) {
           warnings.push({
-            type: 'business',
+            type: "business",
             message: `Potential compatibility issue between ${(sourceNode.data as any).label} and ${(targetNode.data as any).label}`,
             suggestion: compatibilityResult.suggestion,
           });
@@ -226,10 +244,10 @@ export class WorkflowValidatorService {
     // Check for cycles
     if (this.hasCycles(nodes, edges)) {
       errors.push({
-        type: 'graph',
-        code: 'CYCLE_DETECTED',
-        message: 'Workflow contains cycles which may cause infinite loops',
-        severity: 'error',
+        type: "graph",
+        code: "CYCLE_DETECTED",
+        message: "Workflow contains cycles which may cause infinite loops",
+        severity: "error",
       });
     }
 
@@ -237,10 +255,10 @@ export class WorkflowValidatorService {
     const unreachableNodes = this.findUnreachableNodes(nodes, edges);
     if (unreachableNodes.length > 0) {
       errors.push({
-        type: 'graph',
-        code: 'UNREACHABLE_NODES',
+        type: "graph",
+        code: "UNREACHABLE_NODES",
         message: `Found ${unreachableNodes.length} unreachable nodes`,
-        severity: 'warning',
+        severity: "warning",
       });
     }
 
@@ -248,9 +266,9 @@ export class WorkflowValidatorService {
     const orphanedNodes = this.findOrphanedNodes(nodes, edges);
     if (orphanedNodes.length > 0) {
       warnings.push({
-        type: 'graph',
+        type: "graph",
         message: `Found ${orphanedNodes.length} orphaned nodes`,
-        suggestion: 'Connect orphaned nodes or remove them',
+        suggestion: "Connect orphaned nodes or remove them",
       });
     }
 
@@ -266,28 +284,31 @@ export class WorkflowValidatorService {
 
     for (const node of nodes) {
       const nodeData = node.data as any;
-      
+
       // Check for potential code injection in custom blocks
       if (nodeData.blockType === BlockType.CUSTOM && nodeData.config?.code) {
         const securityResult = this.analyzeCodeSecurity(nodeData.config.code);
         if (securityResult.hasIssues) {
           errors.push({
-            type: 'security',
-            code: 'UNSAFE_CODE_DETECTED',
-            message: `Potentially unsafe code in custom block: ${securityResult.issues.join(', ')}`,
+            type: "security",
+            code: "UNSAFE_CODE_DETECTED",
+            message: `Potentially unsafe code in custom block: ${securityResult.issues.join(", ")}`,
             nodeId: node.id,
-            severity: 'error',
+            severity: "error",
           });
         }
       }
 
       // Check for exposed sensitive data in configurations
-      const sensitiveDataResult = this.checkSensitiveData(nodeData.config || {});
+      const sensitiveDataResult = this.checkSensitiveData(
+        nodeData.config || {}
+      );
       if (sensitiveDataResult.hasSensitiveData) {
         warnings.push({
-          type: 'security',
+          type: "security",
           message: `Potential sensitive data exposure in node ${nodeData.label}`,
-          suggestion: 'Use environment variables or secure storage for sensitive data',
+          suggestion:
+            "Use environment variables or secure storage for sensitive data",
         });
       }
     }
@@ -310,25 +331,34 @@ export class WorkflowValidatorService {
     for (const error of errors) {
       if (this.isHealable(error)) {
         switch (error.code) {
-          case 'MISSING_ID':
+          case "MISSING_ID":
             if (error.nodeId) {
-              const nodeIndex = healedNodes.findIndex(n => n.id === error.nodeId);
+              const nodeIndex = healedNodes.findIndex(
+                (n) => n.id === error.nodeId
+              );
               if (nodeIndex !== -1) {
-                healedNodes[nodeIndex] = { ...healedNodes[nodeIndex], id: `node-${uuidv4()}` };
+                healedNodes[nodeIndex] = {
+                  ...healedNodes[nodeIndex],
+                  id: `node-${uuidv4()}`,
+                };
                 healed = true;
               }
             }
             break;
-          
-          case 'MISSING_REQUIRED_CONFIG':
+
+          case "MISSING_REQUIRED_CONFIG":
             if (error.nodeId) {
-              const nodeIndex = healedNodes.findIndex(n => n.id === error.nodeId);
+              const nodeIndex = healedNodes.findIndex(
+                (n) => n.id === error.nodeId
+              );
               if (nodeIndex !== -1) {
                 healedNodes[nodeIndex] = {
                   ...healedNodes[nodeIndex],
                   data: {
                     ...healedNodes[nodeIndex].data,
-                    config: this.generateDefaultConfig((healedNodes[nodeIndex].data as any).blockType),
+                    config: this.generateDefaultConfig(
+                      (healedNodes[nodeIndex].data as any).blockType
+                    ),
                   },
                 };
                 healed = true;
@@ -336,13 +366,19 @@ export class WorkflowValidatorService {
             }
             break;
 
-          case 'UNREACHABLE_NODES':
+          case "UNREACHABLE_NODES":
             // Auto-connect orphaned nodes to the main flow
-            const orphanedNodes = this.findOrphanedNodes(healedNodes, healedEdges);
-            const triggerNodes = healedNodes.filter(n => (n.data as any)?.nodeType === 'TRIGGER');
-            
+            const orphanedNodes = this.findOrphanedNodes(
+              healedNodes,
+              healedEdges
+            );
+            const triggerNodes = healedNodes.filter(
+              (n) => (n.data as any)?.nodeType === "TRIGGER"
+            );
+
             if (orphanedNodes.length > 0 && triggerNodes.length > 0) {
-              for (const orphan of orphanedNodes.slice(0, 3)) { // Limit auto-connections
+              for (const orphan of orphanedNodes.slice(0, 3)) {
+                // Limit auto-connections
                 healedEdges.push({
                   id: `edge-${uuidv4()}`,
                   source: triggerNodes[0].id,
@@ -364,10 +400,10 @@ export class WorkflowValidatorService {
    */
   private isHealable(error: ValidationError): boolean {
     const healableCodes = [
-      'MISSING_ID',
-      'MISSING_REQUIRED_CONFIG',
-      'UNREACHABLE_NODES',
-      'MISSING_POSITION',
+      "MISSING_ID",
+      "MISSING_REQUIRED_CONFIG",
+      "UNREACHABLE_NODES",
+      "MISSING_POSITION",
     ];
     return healableCodes.includes(error.code);
   }
@@ -375,45 +411,54 @@ export class WorkflowValidatorService {
   /**
    * Validate node configuration requirements
    */
-  private validateNodeConfiguration(node: WorkflowNode): { isValid: boolean; missing?: string[] } {
+  private validateNodeConfiguration(node: WorkflowNode): {
+    isValid: boolean;
+    missing?: string[];
+  } {
     const nodeData = node.data as any;
     const missing: string[] = [];
 
     // Check based on block type
     switch (nodeData.blockType) {
       case BlockType.HTTP_REQUEST:
-        if (!nodeData.config?.url) missing.push('url');
-        if (!nodeData.config?.method) missing.push('method');
+        if (!nodeData.config?.url) missing.push("url");
+        if (!nodeData.config?.method) missing.push("method");
         break;
-      
+
       case BlockType.WEBHOOK:
-        if (!nodeData.config?.url) missing.push('url');
+        if (!nodeData.config?.url) missing.push("url");
         break;
-      
+
       case BlockType.NOTIFICATION:
-        if (!nodeData.config?.message) missing.push('message');
+        if (!nodeData.config?.message) missing.push("message");
         break;
-      
+
       case BlockType.CUSTOM:
-        if (!nodeData.config?.code) missing.push('code');
+        if (!nodeData.config?.code) missing.push("code");
         break;
     }
 
-    return { isValid: missing.length === 0, missing: missing.length > 0 ? missing : undefined };
+    return {
+      isValid: missing.length === 0,
+      missing: missing.length > 0 ? missing : undefined,
+    };
   }
 
   /**
    * Validate compatibility between connected nodes
    */
-  private validateNodeCompatibility(sourceNode: WorkflowNode, targetNode: WorkflowNode): { compatible: boolean; suggestion?: string } {
+  private validateNodeCompatibility(
+    sourceNode: WorkflowNode,
+    targetNode: WorkflowNode
+  ): { compatible: boolean; suggestion?: string } {
     const sourceData = sourceNode.data as any;
     const targetData = targetNode.data as any;
 
     // Basic compatibility rules
-    if (sourceData.nodeType === 'ACTION' && targetData.nodeType === 'TRIGGER') {
+    if (sourceData.nodeType === "ACTION" && targetData.nodeType === "TRIGGER") {
       return {
         compatible: false,
-        suggestion: 'Actions should not connect directly to triggers',
+        suggestion: "Actions should not connect directly to triggers",
       };
     }
 
@@ -425,10 +470,10 @@ export class WorkflowValidatorService {
    */
   private hasCycles(nodes: WorkflowNode[], edges: WorkflowEdge[]): boolean {
     const adjacencyList = new Map<string, string[]>();
-    
+
     // Build adjacency list
-    nodes.forEach(node => adjacencyList.set(node.id, []));
-    edges.forEach(edge => {
+    nodes.forEach((node) => adjacencyList.set(node.id, []));
+    edges.forEach((edge) => {
       const adjacent = adjacencyList.get(edge.source) || [];
       adjacent.push(edge.target);
       adjacencyList.set(edge.source, adjacent);
@@ -466,29 +511,34 @@ export class WorkflowValidatorService {
   /**
    * Find unreachable nodes from trigger nodes
    */
-  private findUnreachableNodes(nodes: WorkflowNode[], edges: WorkflowEdge[]): WorkflowNode[] {
-    const triggerNodes = nodes.filter(n => (n.data as any)?.nodeType === 'TRIGGER');
+  private findUnreachableNodes(
+    nodes: WorkflowNode[],
+    edges: WorkflowEdge[]
+  ): WorkflowNode[] {
+    const triggerNodes = nodes.filter(
+      (n) => (n.data as any)?.nodeType === "TRIGGER"
+    );
     if (triggerNodes.length === 0) return nodes;
 
     const reachable = new Set<string>();
     const adjacencyList = new Map<string, string[]>();
 
     // Build adjacency list
-    nodes.forEach(node => adjacencyList.set(node.id, []));
-    edges.forEach(edge => {
+    nodes.forEach((node) => adjacencyList.set(node.id, []));
+    edges.forEach((edge) => {
       const adjacent = adjacencyList.get(edge.source) || [];
       adjacent.push(edge.target);
       adjacencyList.set(edge.source, adjacent);
     });
 
     // BFS from all trigger nodes
-    const queue = [...triggerNodes.map(n => n.id)];
-    triggerNodes.forEach(n => reachable.add(n.id));
+    const queue = [...triggerNodes.map((n) => n.id)];
+    triggerNodes.forEach((n) => reachable.add(n.id));
 
     while (queue.length > 0) {
       const current = queue.shift()!;
       const adjacent = adjacencyList.get(current) || [];
-      
+
       for (const adjNode of adjacent) {
         if (!reachable.has(adjNode)) {
           reachable.add(adjNode);
@@ -497,36 +547,45 @@ export class WorkflowValidatorService {
       }
     }
 
-    return nodes.filter(node => !reachable.has(node.id));
+    return nodes.filter((node) => !reachable.has(node.id));
   }
 
   /**
    * Find orphaned nodes (no connections)
    */
-  private findOrphanedNodes(nodes: WorkflowNode[], edges: WorkflowEdge[]): WorkflowNode[] {
+  private findOrphanedNodes(
+    nodes: WorkflowNode[],
+    edges: WorkflowEdge[]
+  ): WorkflowNode[] {
     const connectedNodes = new Set<string>();
-    edges.forEach(edge => {
+    edges.forEach((edge) => {
       connectedNodes.add(edge.source);
       connectedNodes.add(edge.target);
     });
 
-    return nodes.filter(node => !connectedNodes.has(node.id));
+    return nodes.filter((node) => !connectedNodes.has(node.id));
   }
 
   /**
    * Analyze code for security issues
    */
-  private analyzeCodeSecurity(code: string): { hasIssues: boolean; issues: string[] } {
+  private analyzeCodeSecurity(code: string): {
+    hasIssues: boolean;
+    issues: string[];
+  } {
     const issues: string[] = [];
-    
+
     // Basic static analysis patterns
     const dangerousPatterns = [
-      { pattern: /eval\s*\(/i, issue: 'eval() usage' },
-      { pattern: /Function\s*\(/i, issue: 'Function constructor usage' },
-      { pattern: /process\.exit/i, issue: 'process.exit usage' },
-      { pattern: /require\s*\(\s*['"]child_process['"]/i, issue: 'child_process module usage' },
-      { pattern: /require\s*\(\s*['"]fs['"]/i, issue: 'filesystem access' },
-      { pattern: /\/\*[\s\S]*\*\//g, issue: 'suspicious comments' },
+      { pattern: /eval\s*\(/i, issue: "eval() usage" },
+      { pattern: /Function\s*\(/i, issue: "Function constructor usage" },
+      { pattern: /process\.exit/i, issue: "process.exit usage" },
+      {
+        pattern: /require\s*\(\s*['"]child_process['"]/i,
+        issue: "child_process module usage",
+      },
+      { pattern: /require\s*\(\s*['"]fs['"]/i, issue: "filesystem access" },
+      { pattern: /\/\*[\s\S]*\*\//g, issue: "suspicious comments" },
     ];
 
     for (const { pattern, issue } of dangerousPatterns) {
@@ -541,7 +600,10 @@ export class WorkflowValidatorService {
   /**
    * Check for sensitive data in configuration
    */
-  private checkSensitiveData(config: Record<string, unknown>): { hasSensitiveData: boolean; fields: string[] } {
+  private checkSensitiveData(config: Record<string, unknown>): {
+    hasSensitiveData: boolean;
+    fields: string[];
+  } {
     const sensitiveFields: string[] = [];
     const sensitivePatterns = [
       /password/i,
@@ -553,12 +615,12 @@ export class WorkflowValidatorService {
     ];
 
     for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'string') {
+      if (typeof value === "string") {
         // Check field name
-        if (sensitivePatterns.some(pattern => pattern.test(key))) {
+        if (sensitivePatterns.some((pattern) => pattern.test(key))) {
           sensitiveFields.push(key);
         }
-        
+
         // Check for hardcoded secrets (simple heuristic)
         if (value.length > 20 && /^[A-Za-z0-9+/=]+$/.test(value)) {
           sensitiveFields.push(key);
@@ -566,7 +628,10 @@ export class WorkflowValidatorService {
       }
     }
 
-    return { hasSensitiveData: sensitiveFields.length > 0, fields: sensitiveFields };
+    return {
+      hasSensitiveData: sensitiveFields.length > 0,
+      fields: sensitiveFields,
+    };
   }
 
   /**
@@ -575,13 +640,13 @@ export class WorkflowValidatorService {
   private generateDefaultConfig(blockType: BlockType): Record<string, unknown> {
     switch (blockType) {
       case BlockType.HTTP_REQUEST:
-        return { method: 'GET', url: '', headers: {} };
+        return { method: "GET", url: "", headers: {} };
       case BlockType.WEBHOOK:
-        return { url: '', method: 'POST' };
+        return { url: "", method: "POST" };
       case BlockType.NOTIFICATION:
-        return { message: 'Default notification', type: 'info' };
+        return { message: "Default notification", type: "info" };
       case BlockType.CUSTOM:
-        return { code: 'async function execute(inputs) { return inputs; }' };
+        return { code: "async function execute(inputs) { return inputs; }" };
       default:
         return {};
     }

@@ -284,7 +284,7 @@ export class BlocksService {
         return {
           valid: result.success,
           data: result.success ? result.data : null,
-          errors: result.success ? [] : result.error.errors,
+          errors: result.success ? [] : result.error.issues,
         };
       }
 

@@ -13,8 +13,6 @@ import {
   Info,
   Loader2,
   Play,
-  Eye,
-  EyeOff,
   Link,
   Unlink,
   AlertTriangle,
@@ -30,8 +28,24 @@ import { getEnhancedBlockSchema } from "@zyra/types";
 import { executionsApi } from "@/lib/services/api";
 import { ScrollArea } from "./ui/scroll-area";
 import { EnhancedDataTransform } from "./enhanced-data-transform";
-import { getNodeSchema, type NodeSchema } from "./schema-aware-connection";
+import { getNodeSchema } from "./schema-aware-connection";
 import { Switch } from "@/components/ui/switch";
+
+// Define NodeSchema interface locally
+interface NodeSchema {
+  input: Array<{
+    name: string;
+    type: string;
+    required: boolean;
+    description?: string;
+  }>;
+  output: Array<{
+    name: string;
+    type: string;
+    required: boolean;
+    description?: string;
+  }>;
+}
 
 // Define TypeScript interfaces for better type safety
 interface WorkflowEdge {
@@ -107,12 +121,77 @@ export function BlockConfigPanel({
   >([]);
   const [enableRealTimeValidation, setEnableRealTimeValidation] =
     useState(true);
+  const [isLoadingSampleData, setIsLoadingSampleData] = useState(false);
+
+  // Memoize the data to prevent unnecessary re-renders
+  const data = useMemo(
+    () => nodeData || node?.data || {},
+    [nodeData, node?.data]
+  );
+
+  // Memoize the onChange callback to prevent infinite loops
+  const memoizedOnChange = useCallback(
+    (config: Record<string, unknown>) => {
+      // Only update the config part, not the entire data object
+      // This prevents the infinite loop caused by data dependency
+      const currentData = nodeData || node?.data || {};
+      const updatedData = {
+        ...currentData,
+        config: config,
+      };
+      onChange(updatedData);
+    },
+    [onChange, nodeData, node?.data]
+  );
 
   // Consolidate data source
-  const data = node?.data ?? nodeData ?? {};
   const blockType = getBlockType(data);
   const metadata = getBlockMetadata(blockType);
-  const enhancedSchema = getEnhancedBlockSchema(blockType);
+
+  // Get the appropriate config component based on block type
+  const ConfigComponent =
+    blockConfigRegistry.get(blockType) ||
+    (() => (
+      <Alert>
+        <AlertDescription>
+          No configuration component found for block type: {blockType}
+        </AlertDescription>
+      </Alert>
+    ));
+
+  // Fetch sample data and schema when component mounts or data changes
+  useEffect(() => {
+    const fetchSampleData = async () => {
+      if (!data.id || !workflowData?.workflowId) return;
+
+      setIsLoadingSampleData(true);
+      try {
+        const sampleData = await getSampleData(
+          data.id as string,
+          workflowData.workflowId
+        );
+        setSampleData(sampleData || {});
+      } catch (error) {
+        console.error("Failed to fetch sample data:", error);
+      } finally {
+        setIsLoadingSampleData(false);
+      }
+    };
+
+    const fetchNodeSchema = async () => {
+      if (!data.id || !workflowData?.workflowId) return;
+
+      try {
+        const schema = getNodeSchema(data.id as string, data.config || {});
+        setNodeSchema(schema);
+      } catch (error) {
+        console.error("Failed to fetch node schema:", error);
+      }
+    };
+
+    fetchSampleData();
+    fetchNodeSchema();
+  }, [data.id, workflowData?.workflowId]);
 
   // Compute input nodes
   const inputNodes = useMemo(() => {
@@ -133,9 +212,10 @@ export function BlockConfigPanel({
 
   // Set node schema
   useEffect(() => {
-    const schema = getNodeSchema(blockType, data.config || {});
+    const currentData = nodeData || node?.data || {};
+    const schema = getNodeSchema(blockType, currentData.config || {});
     setNodeSchema(schema);
-  }, [blockType, data.config]);
+  }, [blockType, nodeData, node?.data]);
 
   // Check compatibility with connected nodes
   useEffect(() => {
@@ -152,48 +232,38 @@ export function BlockConfigPanel({
       sourceNode?: string;
     }> = [];
 
-    for (const requiredInput of nodeSchema.input) {
-      let fieldProvided = false;
+    // Check each input node for compatibility
+    for (const inputNode of inputNodes) {
+      const inputSchema = extractSchemaDefinition(
+        inputNode.data.outputSchema as any
+      );
+      if (!inputSchema) continue;
 
-      for (const inputNode of inputNodes) {
-        const inputNodeSchema = getNodeSchema(
-          getBlockType(inputNode.data || inputNode),
-          inputNode.data?.config || {}
-        );
-        const matchingOutput = inputNodeSchema?.output.find(
-          (output) => output.name === requiredInput.name
-        );
-
-        if (matchingOutput) {
-          fieldProvided = true;
-          if (
-            matchingOutput.type !== requiredInput.type &&
-            requiredInput.type !== "any"
-          ) {
-            issues.push({
-              field: requiredInput.name,
-              issue: `Type mismatch: expected ${requiredInput.type}, got ${matchingOutput.type}`,
-              severity: "warning",
-              suggestion: `Consider adding a data transformation to convert ${matchingOutput.type} to ${requiredInput.type}`,
-              sourceNode: inputNode.id,
-            });
-          }
-          break;
+      // Compare input schema with current node's input requirements
+      for (const requiredInput of nodeSchema.input) {
+        const matchingField = inputSchema.properties?.[requiredInput.name];
+        if (!matchingField && requiredInput.required) {
+          issues.push({
+            field: requiredInput.name,
+            issue: `Missing required input field: ${requiredInput.name}`,
+            severity: "error",
+            suggestion: `Add ${requiredInput.name} to the output of ${inputNode.id}`,
+            sourceNode: inputNode.id,
+          });
+        } else if (matchingField && matchingField.type !== requiredInput.type) {
+          issues.push({
+            field: requiredInput.name,
+            issue: `Type mismatch: expected ${requiredInput.type}, got ${matchingField.type}`,
+            severity: "warning",
+            suggestion: `Transform ${requiredInput.name} from ${matchingField.type} to ${requiredInput.type}`,
+            sourceNode: inputNode.id,
+          });
         }
-      }
-
-      if (!fieldProvided && requiredInput.required) {
-        issues.push({
-          field: requiredInput.name,
-          issue: `Required field '${requiredInput.name}' not provided`,
-          severity: "error",
-          suggestion: `Connect a node that provides '${requiredInput.name}' or make this field optional`,
-        });
       }
     }
 
     setCompatibilityIssues(issues);
-  }, [nodeSchema, inputNodes, enableRealTimeValidation]);
+  }, [nodeSchema, enableRealTimeValidation, inputNodes]);
 
   // Fetch sample data for connected nodes
   useEffect(() => {
@@ -285,7 +355,9 @@ export function BlockConfigPanel({
       }),
     };
 
-    return mockData[nodeType]?.() ?? { message: "Sample data", value: 42 };
+    return (
+      mockData[nodeType]?.(nodeType) ?? { message: "Sample data", value: 42 }
+    );
   };
 
   // Simplified schema extraction
@@ -399,31 +471,41 @@ export function BlockConfigPanel({
       lastAutoFixTimestamp: new Date().toISOString(),
     };
 
-    onChange({ ...data, config: updatedConfig });
+    memoizedOnChange({ ...data, config: updatedConfig });
     onConfigurationChange?.(updatedConfig);
-  }, [compatibilityIssues, nodeSchema, data, onChange, onConfigurationChange]);
+  }, [
+    compatibilityIssues,
+    nodeSchema,
+    data,
+    memoizedOnChange,
+    onConfigurationChange,
+  ]);
+
+  // Handle configuration changes with transformation suggestions
+  const handleConfigurationChange = useCallback(
+    (updatedConfig: Record<string, unknown>) => {
+      // Suggest transformations if there are compatibility issues
+      if (compatibilityIssues.length > 0) {
+        const transformations = suggestTransformations(compatibilityIssues);
+        if (transformations.length > 0) {
+          // You could show a modal or notification here
+          console.log("Suggested transformations:", transformations);
+        }
+      }
+
+      memoizedOnChange(updatedConfig);
+      onConfigurationChange?.(updatedConfig);
+    },
+    [
+      compatibilityIssues,
+      nodeSchema,
+      data,
+      memoizedOnChange,
+      onConfigurationChange,
+    ]
+  );
 
   // Render logic remains largely unchanged, with accessibility improvements
-  const ConfigComponent = blockConfigRegistry.get(blockType);
-
-  if (!ConfigComponent) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Block Configuration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Alert>
-            <AlertCircle className='h-4 w-4' />
-            <AlertDescription>
-              No configuration component found for block type: {blockType}
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className='w-80 border-l border-border/50 bg-background/95 backdrop-blur-sm flex flex-col h-full max-h-screen'>
       {/* Header and other UI components remain unchanged, with added ARIA attributes */}
@@ -477,8 +559,12 @@ export function BlockConfigPanel({
               <Card>
                 <CardContent>
                   <ConfigComponent
-                    config={data.config ?? { __empty: true }}
-                    onChange={(config) => onChange({ ...data, config })}
+                    config={
+                      (data.config as Record<string, unknown>) ?? {
+                        __empty: true,
+                      }
+                    }
+                    onChange={memoizedOnChange}
                     executionStatus={executionStatus}
                     executionData={executionData}
                     onTest={onTest}

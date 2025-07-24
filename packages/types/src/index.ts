@@ -13,10 +13,22 @@ export {
   enhancedHttpRequestSchema,
   enhancedNotificationSchema,
   enhancedDataTransformSchema,
+  validateBlockConfig,
+  validateEnhancedBlockConfig,
+  validateBlockInputs,
+  validateBlockOutputs,
+  safeValidateBlockConfig,
+  safeValidateBlockInputs,
+  safeValidateBlockOutputs,
 } from "./schemas/blockSchemas";
 
 // Export blockchain schemas
 export { walletListenerSchema } from "./schemas/blockchains/wallet-listener/schema";
+export type {
+  WalletListenerConfig,
+  WalletListenerInput,
+  WalletListenerOutput,
+} from "./schemas/blockchains/wallet-listener/schema";
 export * from "./schemas/blockchains/sei";
 
 // Export metadata catalog

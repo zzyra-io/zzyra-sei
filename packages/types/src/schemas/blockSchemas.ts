@@ -13,7 +13,7 @@ import {
  * Enhanced block schema definition with input/output schemas
  */
 export interface EnhancedBlockSchema {
-  configSchema: z.ZodObject<any>;
+  configSchema: z.ZodTypeAny;
   inputSchema: z.ZodObject<any>;
   outputSchema: z.ZodObject<any>;
   metadata?: {
@@ -31,7 +31,7 @@ export const enhancedHttpRequestSchema: EnhancedBlockSchema = {
   configSchema: z.object({
     url: z.string().url(),
     method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).default("GET"),
-    headers: z.record(z.string()).optional(),
+    headers: z.record(z.string(), z.string()).optional(),
     body: z.any().optional(),
     dataPath: z.string().optional(),
     retries: z.number().min(0).max(10).default(3),
@@ -47,12 +47,12 @@ export const enhancedHttpRequestSchema: EnhancedBlockSchema = {
         timestamp: z.string(),
       })
       .optional(),
-    variables: z.record(z.any()).optional(), // Workflow variables
+    variables: z.record(z.string(), z.any()).optional(), // Workflow variables
   }),
   outputSchema: z.object({
     statusCode: z.number(),
     data: z.any(),
-    headers: z.record(z.string()),
+    headers: z.record(z.string(), z.string()),
     url: z.string(),
     method: z.string(),
     timestamp: z.string(),
@@ -73,21 +73,15 @@ export const enhancedHttpRequestSchema: EnhancedBlockSchema = {
  */
 export const enhancedNotificationSchema: EnhancedBlockSchema = {
   configSchema: z.object({
-    notificationType: z
-      .enum(["email", "webhook", "discord", "slack", "telegram"])
-      .default("email"),
-    to: z.string().email().optional(),
-    subject: z.string().min(1).optional(),
-    body: z.string().min(1).optional(),
+    notificationType: z.literal("email"),
+    to: z.string().email(),
+    subject: z.string().min(1),
+    body: z.string().min(1),
     template: z.string().optional(),
-    webhookUrl: z.string().url().optional(),
-    webhookHeaders: z.record(z.string()).optional(),
-    discordWebhookUrl: z.string().url().optional(),
-    slackWebhookUrl: z.string().url().optional(),
-    telegramBotToken: z.string().optional(),
-    telegramChatId: z.string().optional(),
     cc: z.string().email().optional(),
     bcc: z.string().email().optional(),
+    emailProvider: z.string().optional(),
+    htmlFormat: z.boolean().optional(),
   }),
   inputSchema: z.object({
     data: z.any().optional(), // Generic data from previous blocks
@@ -99,7 +93,7 @@ export const enhancedNotificationSchema: EnhancedBlockSchema = {
         timestamp: z.string(),
       })
       .optional(),
-    variables: z.record(z.any()).optional(), // Workflow variables
+    variables: z.record(z.string(), z.any()).optional(), // Workflow variables
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -112,17 +106,8 @@ export const enhancedNotificationSchema: EnhancedBlockSchema = {
   metadata: {
     category: "action",
     icon: "bell",
-    description:
-      "Send notifications via multiple channels with template support",
-    tags: [
-      "notification",
-      "email",
-      "webhook",
-      "discord",
-      "slack",
-      "telegram",
-      "communication",
-    ],
+    description: "Send email notifications with template support",
+    tags: ["notification", "email", "communication"],
   },
 };
 
@@ -149,7 +134,7 @@ export const enhancedPriceMonitorSchema: EnhancedBlockSchema = {
         timestamp: z.string(),
       })
       .optional(),
-    variables: z.record(z.any()).optional(), // Workflow variables
+    variables: z.record(z.string(), z.any()).optional(), // Workflow variables
   }),
   outputSchema: z.object({
     asset: z.string(),
@@ -189,7 +174,7 @@ export const enhancedEmailSchema: EnhancedBlockSchema = {
         timestamp: z.string(),
       })
       .optional(),
-    variables: z.record(z.any()).optional(), // Workflow variables
+    variables: z.record(z.string(), z.any()).optional(), // Workflow variables
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -225,7 +210,7 @@ export const enhancedConditionSchema: EnhancedBlockSchema = {
         timestamp: z.string(),
       })
       .optional(),
-    variables: z.record(z.any()).optional(), // Workflow variables
+    variables: z.record(z.string(), z.any()).optional(), // Workflow variables
   }),
   outputSchema: z.object({
     result: z.boolean(),
@@ -263,7 +248,7 @@ export const enhancedScheduleSchema: EnhancedBlockSchema = {
         timestamp: z.string(),
       })
       .optional(),
-    variables: z.record(z.any()).optional(), // Workflow variables
+    variables: z.record(z.string(), z.any()).optional(), // Workflow variables
   }),
   outputSchema: z.object({
     triggered: z.boolean(),
@@ -287,7 +272,7 @@ export const enhancedWebhookSchema: EnhancedBlockSchema = {
   configSchema: z.object({
     url: z.string().url(),
     method: z.enum(["GET", "POST", "PUT", "DELETE"]).default("POST"),
-    headers: z.record(z.string()).optional(),
+    headers: z.record(z.string(), z.string()).optional(),
     body: z.string().optional(),
   }),
   inputSchema: z.object({
@@ -300,7 +285,7 @@ export const enhancedWebhookSchema: EnhancedBlockSchema = {
         timestamp: z.string(),
       })
       .optional(),
-    variables: z.record(z.any()).optional(), // Workflow variables
+    variables: z.record(z.string(), z.any()).optional(), // Workflow variables
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -325,8 +310,8 @@ export const enhancedWebhookSchema: EnhancedBlockSchema = {
 export const enhancedCustomSchema: EnhancedBlockSchema = {
   configSchema: z.object({
     code: z.string().min(1),
-    inputs: z.record(z.any()).optional(),
-    outputs: z.record(z.any()).optional(),
+    inputs: z.record(z.string(), z.any()).optional(),
+    outputs: z.record(z.string(), z.any()).optional(),
     logicType: z.enum(["javascript", "python"]).default("javascript"),
     tags: z.array(z.string()).optional(),
     isPublic: z.boolean().default(false),
@@ -338,7 +323,7 @@ export const enhancedCustomSchema: EnhancedBlockSchema = {
     category: z.string().optional(),
     name: z.string().optional(),
     icon: z.string().optional(),
-    defaultConfig: z.record(z.any()).optional(),
+    defaultConfig: z.record(z.string(), z.any()).optional(),
   }),
   inputSchema: z.object({
     data: z.any().optional(), // Generic data from previous blocks
@@ -350,7 +335,7 @@ export const enhancedCustomSchema: EnhancedBlockSchema = {
         timestamp: z.string(),
       })
       .optional(),
-    variables: z.record(z.any()).optional(), // Workflow variables
+    variables: z.record(z.string(), z.any()).optional(), // Workflow variables
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -389,7 +374,7 @@ export const enhancedDataTransformSchema: EnhancedBlockSchema = {
         outputField: z.string().optional(),
       })
     ),
-    outputSchema: z.record(z.any()).optional(),
+    outputSchema: z.record(z.string(), z.any()).optional(),
     previewMode: z.boolean().default(true),
   }),
   inputSchema: z.object({
@@ -402,7 +387,7 @@ export const enhancedDataTransformSchema: EnhancedBlockSchema = {
         timestamp: z.string(),
       })
       .optional(),
-    variables: z.record(z.any()).optional(), // Workflow variables
+    variables: z.record(z.string(), z.any()).optional(), // Workflow variables
   }),
   outputSchema: z.object({
     transformedData: z.any(), // Transformed data

@@ -56,7 +56,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import type { Node, Edge } from "@xyflow/react";
 import { logsService } from "@/lib/services/logs-service";
@@ -88,6 +88,7 @@ export default function BuilderPage() {
     setGenerating,
     setRefining,
     setLoading,
+    isLoading,
     nlPrompt,
     isRefinementOpen,
     setNlPrompt,
@@ -111,6 +112,15 @@ export default function BuilderPage() {
   const searchParams = useSearchParams();
   const initialId = searchParams.get("id") || undefined;
 
+  // Debug search params (simplified)
+  useEffect(() => {
+    const currentId = searchParams.get("id");
+    if (currentId !== (window as any).__prevSearchId) {
+      console.log("BuilderPage: Search params changed - ID:", currentId);
+      (window as any).__prevSearchId = currentId;
+    }
+  }, [searchParams]);
+
   const [isClient, setIsClient] = useState(false);
 
   // Replace isSaveDialogOpen and isUpdateDialogOpen with saveState
@@ -118,6 +128,11 @@ export default function BuilderPage() {
     isOpen: false,
     mode: "new",
   });
+
+  // Track if we have loaded nodes to prevent unwanted resets
+  const hasLoadedNodes = useRef(false);
+  const nodesLengthRef = useRef(0);
+  const justLoadedWorkflow = useRef(false);
 
   // Add back exit dialog state
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
@@ -131,37 +146,97 @@ export default function BuilderPage() {
 
   // Load workflow on mount if ID is provided
   useEffect(() => {
+    console.log("BuilderPage: initialId changed to:", initialId);
+
+    // Check if we have a workflow loaded
+    const hasWorkflowId = workflowId && initialId;
+
     if (initialId) {
       (async () => {
         setLoading(true);
         try {
+          console.log("BuilderPage: Loading workflow with ID:", initialId);
           const workflow = await workflowService.getWorkflow(initialId);
           if (workflow) {
+            console.log(
+              "BuilderPage: Workflow loaded successfully:",
+              workflow.id
+            );
             setWorkflowId(workflow.id);
             setWorkflowName(workflow.name);
             setWorkflowDescription(workflow.description || "");
             setNodes((workflow.nodes || []) as Node[]);
             setEdges((workflow.edges || []) as Edge[]);
             setHasUnsavedChanges(false);
+            hasLoadedNodes.current = true; // Mark that we have loaded nodes
+            justLoadedWorkflow.current = true; // Mark that we just loaded a workflow
             toast({
               title: "Workflow loaded",
               description: "Your workflow has been loaded successfully.",
             });
+
+            // Clear the just loaded flag after a delay to allow for URL changes
+            setTimeout(() => {
+              justLoadedWorkflow.current = false;
+            }, 2000);
+          } else {
+            console.log("BuilderPage: Workflow not found for ID:", initialId);
+            toast({
+              title: "Workflow not found",
+              description: "The requested workflow could not be found.",
+              variant: "destructive",
+            });
           }
         } catch (error: unknown) {
           const err = error as Error;
+          console.error("BuilderPage: Error loading workflow:", error);
           toast({
             title: "Error",
             description: err.message || "Failed to load workflow.",
             variant: "destructive",
           });
+          // Don't reset flow on error - keep the URL intact
         } finally {
           setLoading(false);
         }
       })();
     } else {
-      // Reset workflow state when no ID is provided (new workflow)
-      resetFlow();
+      console.log(
+        "BuilderPage: No initialId provided, checking if we should reset flow"
+      );
+      // Only reset if we're not in the middle of loading a workflow AND we don't have a workflowId
+      // AND we don't have loaded nodes (which would indicate a loaded workflow)
+      // Note: We don't check hasWorkflowId because it depends on initialId which can be cleared
+      // Also check if we have nodes loaded as an additional safeguard
+      // And check if we just loaded a workflow to prevent immediate reset
+      if (
+        !isLoading &&
+        !workflowId &&
+        !hasLoadedNodes.current &&
+        nodesLengthRef.current === 0 &&
+        !justLoadedWorkflow.current
+      ) {
+        console.log(
+          "BuilderPage: Resetting flow - no loading, no workflowId, no loaded nodes"
+        );
+        hasLoadedNodes.current = false; // Reset the flag
+        resetFlow();
+      } else {
+        console.log(
+          "BuilderPage: Not resetting flow - isLoading:",
+          isLoading,
+          "workflowId:",
+          workflowId,
+          "hasWorkflowId:",
+          hasWorkflowId,
+          "hasLoadedNodes:",
+          hasLoadedNodes.current,
+          "nodesLength:",
+          nodesLengthRef.current,
+          "justLoadedWorkflow:",
+          justLoadedWorkflow.current
+        );
+      }
     }
   }, [
     initialId,
@@ -174,8 +249,25 @@ export default function BuilderPage() {
     setEdges,
     setHasUnsavedChanges,
     setLoading,
-    resetFlow,
   ]);
+
+  // Update nodes length ref when nodes change
+  useEffect(() => {
+    nodesLengthRef.current = nodes.length;
+  }, [nodes]);
+
+  // Restore URL if it gets cleared while we have a loaded workflow
+  useEffect(() => {
+    const currentId = searchParams.get("id");
+
+    // If we have a workflow loaded but the URL doesn't have the ID, restore it
+    if (workflowId && !currentId && hasLoadedNodes.current) {
+      console.log(
+        "BuilderPage: URL was cleared but workflow is loaded, restoring URL"
+      );
+      router.replace(`/builder?id=${workflowId}`, { scroll: false });
+    }
+  }, [searchParams, workflowId, router]);
 
   // Draft persistence effect (only for new workflows)
   useEffect(() => {

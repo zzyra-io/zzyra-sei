@@ -36,24 +36,25 @@ export function useBlockValidation(blockType: BlockType) {
       }
 
       try {
-        // Use Zod to validate against the schema
-        enhancedSchema.configSchema.parse(config);
-        return { isValid: true, errors: [], warnings: [] };
-      } catch (error) {
-        if (error instanceof z.ZodError) {
+        // Use Zod 4's safeParse for better error handling
+        const result = enhancedSchema.configSchema.safeParse(config);
+        
+        if (result.success) {
+          return { isValid: true, errors: [], warnings: [] };
+        } else {
           // Convert Zod errors to our format
           errors.push(
-            ...error.errors.map((err) => ({
+            ...result.error.issues.map((err: any) => ({
               path: err.path.map(String),
               message: err.message,
             }))
           );
-        } else {
-          errors.push({
-            path: [],
-            message: error instanceof Error ? error.message : "Validation failed",
-          });
         }
+      } catch (error) {
+        errors.push({
+          path: [],
+          message: error instanceof Error ? error.message : "Validation failed",
+        });
       }
 
       return { isValid: errors.length === 0, errors, warnings };
@@ -73,14 +74,53 @@ export function useBlockValidation(blockType: BlockType) {
     [validateConfig]
   );
 
-  // Check if a field is required based on the schema
+  // Check if a field is required based on the schema and current config
   const isFieldRequired = useCallback(
-    (fieldName: string): boolean => {
+    (fieldName: string, config?: Record<string, unknown>): boolean => {
       if (!enhancedSchema) return false;
+
+      // For discriminated unions, we need to check based on the current config
+      const schemaDef = enhancedSchema.configSchema._def as any;
+      if (schemaDef.typeName === "ZodDiscriminatedUnion") {
+        if (!config) return false;
+        
+        const discriminator = schemaDef.discriminator;
+        const discriminatorValue = config[discriminator];
+        
+        if (!discriminatorValue) return false;
+        
+        // Find the matching union option
+        const options = schemaDef.options;
+        const matchingOption = options.find((option: z.ZodTypeAny) => {
+          if (option instanceof z.ZodObject) {
+            const shape = option.shape;
+            const discriminatorField = shape[discriminator];
+            return discriminatorField && discriminatorField._def.value === discriminatorValue;
+          }
+          return false;
+        });
+        
+        if (matchingOption && matchingOption instanceof z.ZodObject) {
+          const shape = matchingOption.shape;
+          const fieldSchema = shape[fieldName];
+          
+          if (!fieldSchema) return false;
+          
+          // Check if the field is optional
+          if (fieldSchema instanceof z.ZodOptional) {
+            return false;
+          }
+          
+          return true;
+        }
+        
+        return false;
+      }
 
       try {
         // Try to parse the schema to see if the field is required
-        const shape = enhancedSchema.configSchema.shape;
+        const schema = enhancedSchema.configSchema as z.ZodObject<any>;
+        const shape = schema.shape;
         const fieldSchema = shape[fieldName];
         
         if (!fieldSchema) return false;
@@ -92,7 +132,7 @@ export function useBlockValidation(blockType: BlockType) {
 
         // For union types, check if any variant is optional
         if (fieldSchema instanceof z.ZodUnion) {
-          return !fieldSchema.options.some((option: z.ZodTypeAny) => option instanceof z.ZodOptional);
+          return !fieldSchema.options.some((option: any) => option instanceof z.ZodOptional);
         }
 
         // For other types, assume required unless it's explicitly optional
@@ -105,26 +145,160 @@ export function useBlockValidation(blockType: BlockType) {
   );
 
   // Get all required fields for the current block type
-  const getRequiredFields = useCallback((): string[] => {
+  const getRequiredFields = useCallback((config?: Record<string, unknown>): string[] => {
     if (!enhancedSchema) return [];
 
     const requiredFields: string[] = [];
-    const shape = enhancedSchema.configSchema.shape;
-
-    Object.keys(shape).forEach((fieldName) => {
-      if (isFieldRequired(fieldName)) {
-        requiredFields.push(fieldName);
+    
+    // For discriminated unions, we need to check based on the current config
+    const schemaDef = enhancedSchema.configSchema._def as any;
+    if (schemaDef.typeName === "ZodDiscriminatedUnion") {
+      if (!config) return [];
+      
+      const discriminator = schemaDef.discriminator;
+      const discriminatorValue = config[discriminator];
+      
+      if (!discriminatorValue) return [];
+      
+      // Find the matching union option
+      const options = schemaDef.options;
+      const matchingOption = options.find((option: z.ZodTypeAny) => {
+        if (option instanceof z.ZodObject) {
+          const shape = option.shape;
+          const discriminatorField = shape[discriminator];
+          return discriminatorField && discriminatorField._def.value === discriminatorValue;
+        }
+        return false;
+      });
+      
+      if (matchingOption && matchingOption instanceof z.ZodObject) {
+        const shape = matchingOption.shape;
+        Object.keys(shape).forEach((fieldName) => {
+          if (isFieldRequired(fieldName, config)) {
+            requiredFields.push(fieldName);
+          }
+        });
       }
-    });
+    } else {
+      const schema = enhancedSchema.configSchema as z.ZodObject<any>;
+      const shape = schema.shape;
+      Object.keys(shape).forEach((fieldName) => {
+        if (isFieldRequired(fieldName, config)) {
+          requiredFields.push(fieldName);
+        }
+      });
+    }
 
     return requiredFields;
   }, [enhancedSchema, isFieldRequired]);
+
+  // Clean config to match the discriminated union schema
+  const cleanConfigForDiscriminatedUnion = useCallback(
+    (config: Record<string, unknown>): Record<string, unknown> => {
+      if (!enhancedSchema) return config;
+
+      const schemaDef = enhancedSchema.configSchema._def as any;
+      if (schemaDef.typeName !== "ZodDiscriminatedUnion") {
+        return config;
+      }
+
+      const discriminator = schemaDef.discriminator;
+      const discriminatorValue = config[discriminator];
+
+      if (!discriminatorValue) {
+        // Default to first option if no discriminator value
+        const firstOption = schemaDef.options[0];
+        if (firstOption instanceof z.ZodObject) {
+          const shape = firstOption.shape;
+          const baseConfig = { [discriminator]: Object.keys(shape)[0] };
+          return { ...baseConfig, ...config };
+        }
+        return config;
+      }
+
+      // Find the matching union option
+      const options = schemaDef.options;
+      const matchingOption = options.find((option: z.ZodTypeAny) => {
+        if (option instanceof z.ZodObject) {
+          const shape = (option as z.ZodObject<any>).shape;
+          const discriminatorField = shape[discriminator];
+          return discriminatorField && discriminatorField._def.value === discriminatorValue;
+        }
+        return false;
+      });
+
+      if (matchingOption && matchingOption instanceof z.ZodObject) {
+        const shape = (matchingOption as z.ZodObject<any>).shape;
+        const cleanConfig: Record<string, unknown> = { [discriminator]: discriminatorValue };
+
+        // Only include fields that are part of this schema variant
+        Object.keys(shape).forEach((fieldName) => {
+          if (config[fieldName] !== undefined) {
+            cleanConfig[fieldName] = config[fieldName];
+          }
+        });
+
+        return cleanConfig;
+      }
+
+      return config;
+    },
+    [enhancedSchema]
+  );
+
+
+
+  // Get JSON Schema representation for the current config
+  const getJSONSchema = useCallback(
+    (config?: Record<string, unknown>) => {
+      if (!enhancedSchema) return null;
+
+      try {
+        // If we have a specific config, try to get the relevant schema variant
+        if (config) {
+          const cleanConfig = cleanConfigForDiscriminatedUnion(config);
+          const schemaDef = enhancedSchema.configSchema._def as any;
+          
+          if (schemaDef.typeName === "ZodDiscriminatedUnion") {
+            const discriminator = schemaDef.discriminator;
+            const discriminatorValue = cleanConfig[discriminator];
+            
+            if (discriminatorValue) {
+              // Find the matching union option
+              const options = schemaDef.options;
+              const matchingOption = options.find((option: any) => {
+                if (option instanceof z.ZodObject) {
+                  const shape = (option as z.ZodObject<any>).shape;
+                  const discriminatorField = shape[discriminator];
+                  return discriminatorField && discriminatorField._def.value === discriminatorValue;
+                }
+                return false;
+              });
+
+              if (matchingOption) {
+                return z.toJSONSchema(matchingOption);
+              }
+            }
+          }
+        }
+
+        // Fallback to full schema
+        return z.toJSONSchema(enhancedSchema.configSchema);
+      } catch (error) {
+        console.warn('Failed to generate JSON Schema:', error);
+        return null;
+      }
+    },
+    [enhancedSchema, cleanConfigForDiscriminatedUnion]
+  );
 
   return {
     validateConfig,
     getFieldError,
     isFieldRequired,
     getRequiredFields,
+    cleanConfigForDiscriminatedUnion,
+    getJSONSchema,
     hasSchema: !!enhancedSchema,
   };
 } 

@@ -63,7 +63,7 @@ const WorkflowResponseSchema = z.object({
         nodeType: z.enum(["TRIGGER", "ACTION", "LOGIC"]),
         iconName: z.string(),
         isEnabled: z.boolean().default(true),
-        config: z.record(z.unknown()).optional(),
+        config: z.record(z.string(), z.unknown()).optional(),
         inputs: z.array(z.unknown()).default([]),
         outputs: z.array(z.unknown()).default([]),
       }),

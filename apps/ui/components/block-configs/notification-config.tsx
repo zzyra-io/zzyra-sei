@@ -1,11 +1,20 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { z } from "zod";
+import React, { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -13,40 +22,71 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  Bell,
+  Send,
   AlertCircle,
   CheckCircle,
   Info,
   Loader2,
   Play,
-  Bell,
+  Settings,
+  ChevronDown,
+  ChevronRight,
+  X,
+  Plus,
+  Code,
   Eye,
   EyeOff,
-  Settings,
 } from "lucide-react";
-import { enhancedNotificationSchema, BlockType } from "@zyra/types";
-import { useBlockValidation } from "@/lib/hooks/use-block-validation";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { X, Plus, ChevronDown, ChevronRight, Send, Code } from "lucide-react";
+import { BlockType, getEnhancedBlockSchema } from "@zyra/types";
+import { cn } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { z } from "zod";
 
-// Remove circular dependency - don't self-register
-// import blockConfigRegistry from "@/lib/block-config-registry";
+// Template variables available from previous blocks
+const templateVariables: TemplateVariable[] = [
+  {
+    name: "{{json.email}}",
+    description: "Email from previous block",
+    example: "user@example.com",
+  },
+  {
+    name: "{{json.name}}",
+    description: "Name from previous block",
+    example: "John Doe",
+  },
+  {
+    name: "{{json.message}}",
+    description: "Message from previous block",
+    example: "Hello World",
+  },
+  {
+    name: "{{json.subject}}",
+    description: "Subject from previous block",
+    example: "Important Update",
+  },
+  {
+    name: "{{json.price}}",
+    description: "Price from previous block",
+    example: "2000.50",
+  },
+  {
+    name: "{{json.status}}",
+    description: "Status from previous block",
+    example: "success",
+  },
+  {
+    name: "{{json.timestamp}}",
+    description: "Timestamp from previous block",
+    example: "2024-01-01T00:00:00Z",
+  },
+];
 
 interface NotificationConfigProps {
   config: Record<string, unknown>;
@@ -80,108 +120,152 @@ export function NotificationConfig({
   executionData,
   onTest,
 }: NotificationConfigProps) {
-  const [showPassword, setShowPassword] = useState(false);
+  const [isValid, setIsValid] = useState(true);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>(
     []
   );
-  const [isValid, setIsValid] = useState(true);
   const [activeTab, setActiveTab] = useState("config");
-  const [advancedCollapsed, setAdvancedCollapsed] = useState(true);
-  const [templateCollapsed, setTemplateCollapsed] = useState(false);
-  const [webhookHeaders, setWebhookHeaders] = useState<Record<string, string>>(
-    (config.webhookHeaders as Record<string, string>) || {}
-  );
-  const [newHeaderKey, setNewHeaderKey] = useState("");
-  const [newHeaderValue, setNewHeaderValue] = useState("");
+  const [templateCollapsed, setTemplateCollapsed] = useState(true);
 
-  // Use dynamic validation hook
-  const {
-    validateConfig: validateConfigSchema,
-    getFieldError: getSchemaFieldError,
-    isFieldRequired,
-  } = useBlockValidation(BlockType.NOTIFICATION);
+  // Get the enhanced schema for validation
+  const enhancedSchema = getEnhancedBlockSchema(BlockType.NOTIFICATION);
 
-  // Template variables available from previous blocks
-  const templateVariables: TemplateVariable[] = useMemo(
-    () => [
-      {
-        name: "{{json.email}}",
-        description: "Email from previous block",
-        example: "user@example.com",
-      },
-      {
-        name: "{{json.name}}",
-        description: "Name from previous block",
-        example: "John Doe",
-      },
-      {
-        name: "{{json.message}}",
-        description: "Message from previous block",
-        example: "Hello World",
-      },
-      {
-        name: "{{json.subject}}",
-        description: "Subject from previous block",
-        example: "Important Update",
-      },
-      {
-        name: "{{json.price}}",
-        description: "Price from previous block",
-        example: "2000.50",
-      },
-      {
-        name: "{{json.status}}",
-        description: "Status from previous block",
-        example: "success",
-      },
-      {
-        name: "{{json.timestamp}}",
-        description: "Timestamp from previous block",
-        example: "2024-01-01T00:00:00Z",
-      },
-    ],
-    []
+  // Simple validation using Zod schema
+  const validateConfig = useCallback(
+    (configData: Record<string, unknown>) => {
+      if (!enhancedSchema) {
+        return { success: true, error: "" };
+      }
+
+      try {
+        enhancedSchema.configSchema.parse(configData);
+        return { success: true, error: "" };
+      } catch (error: any) {
+        if (error.errors) {
+          const errors = error.errors.map((err: any) => ({
+            path: err.path || [],
+            message: err.message,
+          }));
+          return {
+            success: false,
+            error: errors.map((e: any) => e.message).join(", "),
+            errors,
+          };
+        } else {
+          return {
+            success: false,
+            error: error.message || "Validation failed",
+          };
+        }
+      }
+    },
+    [enhancedSchema]
   );
 
-  // Dynamic validation using schema
-  const validateConfig = useMemo(() => {
-    return (configData: Record<string, unknown>) => {
-      const result = validateConfigSchema(configData);
-      setValidationErrors(result.errors);
-      setIsValid(result.isValid);
-      return result.isValid;
+  // Format field names for better display
+  const formatFieldName = (fieldName: string): string => {
+    const fieldMap: Record<string, string> = {
+      notificationType: "Notification Type",
+      to: "Email Address",
+      cc: "CC Email",
+      bcc: "BCC Email",
+      subject: "Subject",
+      body: "Message Body",
+      emailProvider: "Email Provider",
+      htmlFormat: "HTML Format",
     };
-  }, [validateConfigSchema]);
+    return fieldMap[fieldName] || fieldName;
+  };
 
-  // Get field validation error using schema validation
+  // Get field validation error using Zod schema - only for relevant fields
   const getFieldError = (fieldName: string): string | undefined => {
-    // Use schema validation directly
-    return getSchemaFieldError(fieldName, config);
+    const result = validateConfig(config);
+    if (!result.success && result.errors) {
+      const fieldError = result.errors.find((err: any) =>
+        err.path.includes(fieldName)
+      );
+      if (fieldError) {
+        // Convert Zod error messages to user-friendly ones
+        const message = fieldError.message;
+        if (message.includes("Invalid email address")) {
+          return "Please enter a valid email address";
+        }
+        if (message.includes("Invalid URL")) {
+          return "Please enter a valid URL";
+        }
+        if (message.includes("at least 1 character")) {
+          return "This field is required";
+        }
+        return message;
+      }
+    }
+    return undefined;
+  };
+
+  // Get all validation errors - only for email fields
+  const getAllValidationErrors = (): Array<{
+    field: string;
+    error: string;
+  }> => {
+    const result = validateConfig(config);
+    if (!result.success && result.errors) {
+      return result.errors
+        .map((err: any) => {
+          const field = err.path.join(".");
+          let message = err.message;
+
+          // Convert to user-friendly messages
+          if (message.includes("Invalid email address")) {
+            message = "Please enter a valid email address";
+          } else if (message.includes("at least 1 character")) {
+            message = "This field is required";
+          }
+
+          // Extract the actual field name from nested paths like 'config.to'
+          const fieldName = field.includes(".")
+            ? field.split(".").pop()
+            : field;
+
+          return {
+            field: formatFieldName(fieldName),
+            error: message,
+          };
+        })
+        .filter((error: any) => {
+          // Filter out empty field errors
+          if (!error.field || error.field === "") return false;
+
+          // Only show errors for email fields
+          const emailFields = ["to", "subject", "body", "cc", "bcc"];
+          const fieldName = error.field.toLowerCase();
+          return emailFields.includes(fieldName);
+        });
+    }
+    return [];
   };
 
   // Validate on config changes
   useEffect(() => {
-    validateConfig(config);
+    const result = validateConfig(config);
+    setIsValid(result.success);
+    if (!result.success) {
+      setValidationErrors(result.errors || []);
+    } else {
+      setValidationErrors([]);
+    }
   }, [config, validateConfig]);
 
   // Initialize with defaults if values are missing
   useEffect(() => {
     const defaults = {
-      notificationType: config.notificationType || "email",
+      notificationType: "email", // Always email
       to: config.to || "",
       subject: config.subject || "",
       body: config.body || "",
       emailProvider: config.emailProvider || "smtp",
       htmlFormat: config.htmlFormat !== false,
-      webhookUrl: config.webhookUrl || "",
-      webhookMethod: config.webhookMethod || "POST",
-      discordWebhookUrl: config.discordWebhookUrl || "",
-      slackWebhookUrl: config.slackWebhookUrl || "",
-      telegramBotToken: config.telegramBotToken || "",
-      telegramChatId: config.telegramChatId || "",
-      cc: config.cc || "",
-      bcc: config.bcc || "",
-      webhookHeaders: config.webhookHeaders || {},
+      cc: config.cc || undefined,
+      bcc: config.bcc || undefined,
     };
 
     // Only update if there are missing values
@@ -191,32 +275,22 @@ export function NotificationConfig({
   }, []);
 
   const handleChange = (field: string, value: unknown) => {
-    const newConfig = { ...config, [field]: value };
-    onChange(newConfig);
-    
-    // Log the change for debugging
-    console.log(`NotificationConfig: Updated ${field} to`, value);
-    console.log(`NotificationConfig: New config:`, newConfig);
-  };
+    // For optional fields, treat empty strings as undefined
+    let processedValue = value;
+    const optionalFields = ["cc", "bcc"];
 
-  const addWebhookHeader = () => {
-    if (newHeaderKey && newHeaderValue) {
-      const updatedHeaders = {
-        ...webhookHeaders,
-        [newHeaderKey]: newHeaderValue,
-      };
-      setWebhookHeaders(updatedHeaders);
-      handleChange("webhookHeaders", updatedHeaders);
-      setNewHeaderKey("");
-      setNewHeaderValue("");
+    if (optionalFields.includes(field) && value === "") {
+      processedValue = undefined;
     }
-  };
 
-  const removeWebhookHeader = (key: string) => {
-    const updatedHeaders = { ...webhookHeaders };
-    delete updatedHeaders[key];
-    setWebhookHeaders(updatedHeaders);
-    handleChange("webhookHeaders", updatedHeaders);
+    const newConfig = { ...config, [field]: processedValue };
+    console.log(
+      `NotificationConfig: handleChange called for ${field} with value:`,
+      value
+    );
+    console.log(`NotificationConfig: Previous config:`, config);
+    console.log(`NotificationConfig: New config:`, newConfig);
+    onChange(newConfig);
   };
 
   const getStatusIcon = () => {
@@ -249,24 +323,7 @@ export function NotificationConfig({
     }
   };
 
-  const getNotificationTypeIcon = (type: string) => {
-    switch (type) {
-      case "email":
-        return <Bell className='h-4 w-4' />;
-      case "webhook":
-        return <Send className='h-4 w-4' />;
-      case "discord":
-        return <Bell className='h-4 w-4' />;
-      case "slack":
-        return <Bell className='h-4 w-4' />;
-      case "telegram":
-        return <Bell className='h-4 w-4' />;
-      default:
-        return <Bell className='h-4 w-4' />;
-    }
-  };
-
-  const notificationType = (config.notificationType as string) || "email";
+  const notificationType = "email"; // Always email
 
   return (
     <div className='space-y-6'>
@@ -311,462 +368,159 @@ export function NotificationConfig({
         </TabsList>
 
         <TabsContent value='config' className='mt-6 space-y-6'>
-          {/* Notification Type Selection */}
+          {/* Email Configuration */}
           <Card className='border-l-4 border-l-primary/20'>
             <CardHeader className='pb-4'>
               <CardTitle className='flex items-center space-x-3 text-lg'>
-                {getNotificationTypeIcon(notificationType)}
-                <span>Notification Type</span>
+                <Bell className='h-4 w-4' />
+                <span>Email Configuration</span>
               </CardTitle>
             </CardHeader>
             <CardContent className='space-y-6'>
               <div className='space-y-3'>
-                <Label
-                  htmlFor='notificationType'
-                  className='text-sm font-medium'>
-                  Type
+                <Label htmlFor='emailProvider' className='text-sm font-medium'>
+                  Email Provider
                 </Label>
                 <Select
-                  value={notificationType}
+                  value={(config.emailProvider as string) || "smtp"}
                   onValueChange={(value) =>
-                    handleChange("notificationType", value)
+                    handleChange("emailProvider", value)
                   }>
-                  <SelectTrigger id='notificationType' className='h-11'>
-                    <SelectValue placeholder='Select notification type' />
+                  <SelectTrigger id='emailProvider' className='h-11'>
+                    <SelectValue placeholder='Select provider' />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value='email'>
-                      <div className='flex items-center space-x-2'>
-                        <Bell className='h-4 w-4' />
-                        <span>Email</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value='webhook'>
-                      <div className='flex items-center space-x-2'>
-                        <Send className='h-4 w-4' />
-                        <span>Webhook</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value='discord'>
-                      <div className='flex items-center space-x-2'>
-                        <Bell className='h-4 w-4' />
-                        <span>Discord</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value='slack'>
-                      <div className='flex items-center space-x-2'>
-                        <Bell className='h-4 w-4' />
-                        <span>Slack</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value='telegram'>
-                      <div className='flex items-center space-x-2'>
-                        <Bell className='h-4 w-4' />
-                        <span>Telegram</span>
-                      </div>
-                    </SelectItem>
+                    <SelectItem value='smtp'>SMTP</SelectItem>
+                    <SelectItem value='sendgrid'>SendGrid</SelectItem>
+                    <SelectItem value='ses'>AWS SES</SelectItem>
+                    <SelectItem value='gmail'>Gmail</SelectItem>
                   </SelectContent>
                 </Select>
-                {getFieldError("notificationType") && (
+              </div>
+
+              <div className='space-y-3'>
+                <Label htmlFor='to' className='text-sm font-medium'>
+                  To <span className='text-red-500'>*</span>
+                </Label>
+                <Input
+                  id='to'
+                  placeholder='recipient@example.com'
+                  value={(config.to as string) || ""}
+                  onChange={(e) => handleChange("to", e.target.value)}
+                  className='h-11'
+                  required
+                />
+                {getFieldError("to") && (
                   <div className='flex items-center space-x-2 text-sm text-red-500'>
                     <AlertCircle className='h-4 w-4' />
-                    <span>{getFieldError("notificationType")}</span>
+                    <span>{getFieldError("to")}</span>
                   </div>
                 )}
               </div>
 
-              {/* Email Configuration */}
-              {notificationType === "email" && (
-                <div className='space-y-6 pt-4 border-t border-border/50'>
-                  <div className='space-y-3'>
-                    <Label
-                      htmlFor='emailProvider'
-                      className='text-sm font-medium'>
-                      Email Provider
-                    </Label>
-                    <Select
-                      value={(config.emailProvider as string) || "smtp"}
-                      onValueChange={(value) =>
-                        handleChange("emailProvider", value)
-                      }>
-                      <SelectTrigger id='emailProvider' className='h-11'>
-                        <SelectValue placeholder='Select provider' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='smtp'>SMTP</SelectItem>
-                        <SelectItem value='sendgrid'>SendGrid</SelectItem>
-                        <SelectItem value='ses'>AWS SES</SelectItem>
-                        <SelectItem value='gmail'>Gmail</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className='space-y-3'>
-                    <Label htmlFor='to' className='text-sm font-medium'>
-                      To {isFieldRequired('to') && <span className='text-red-500'>*</span>}
-                    </Label>
-                    <Input
-                      id='to'
-                      placeholder='recipient@example.com'
-                      value={(config.to as string) || ""}
-                      onChange={(e) => handleChange("to", e.target.value)}
-                      className='h-11'
-                                              required={isFieldRequired('to')}
-                    />
-                    {getFieldError("to") && (
-                      <div className='flex items-center space-x-2 text-sm text-red-500'>
-                        <AlertCircle className='h-4 w-4' />
-                        <span>{getFieldError("to")}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className='space-y-3'>
-                    <Label htmlFor='subject' className='text-sm font-medium'>
-                      Subject {isFieldRequired('subject') && <span className='text-red-500'>*</span>}
-                    </Label>
-                    <Input
-                      id='subject'
-                      placeholder='Notification subject'
-                      value={(config.subject as string) || ""}
-                      onChange={(e) => handleChange("subject", e.target.value)}
-                      className='h-11'
-                                              required={isFieldRequired('subject')}
-                    />
-                    {getFieldError("subject") && (
-                      <div className='flex items-center space-x-2 text-sm text-red-500'>
-                        <AlertCircle className='h-4 w-4' />
-                        <span>{getFieldError("subject")}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className='space-y-3'>
-                    <Label htmlFor='body' className='text-sm font-medium'>
-                      Body <span className='text-red-500'>*</span>
-                    </Label>
-                    <Textarea
-                      id='body'
-                      placeholder='Notification message...'
-                      value={(config.body as string) || ""}
-                      onChange={(e) => handleChange("body", e.target.value)}
-                      rows={6}
-                      className='resize-none'
-                      required
-                    />
-                    {getFieldError("body") && (
-                      <div className='flex items-center space-x-2 text-sm text-red-500'>
-                        <AlertCircle className='h-4 w-4' />
-                        <span>{getFieldError("body")}</span>
-                      </div>
-                    )}
-                    {!config.body && (
-                      <div className='flex items-center space-x-2 text-sm text-amber-500'>
-                        <AlertCircle className='h-4 w-4' />
-                        <span>Email body is required for execution</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className='grid grid-cols-2 gap-4'>
-                    <div className='space-y-3'>
-                      <Label htmlFor='cc' className='text-sm font-medium'>
-                        CC (optional)
-                      </Label>
-                      <Input
-                        id='cc'
-                        placeholder='cc@example.com'
-                        value={(config.cc as string) || ""}
-                        onChange={(e) => handleChange("cc", e.target.value)}
-                        className='h-11'
-                      />
-                    </div>
-                    <div className='space-y-3'>
-                      <Label htmlFor='bcc' className='text-sm font-medium'>
-                        BCC (optional)
-                      </Label>
-                      <Input
-                        id='bcc'
-                        placeholder='bcc@example.com'
-                        value={(config.bcc as string) || ""}
-                        onChange={(e) => handleChange("bcc", e.target.value)}
-                        className='h-11'
-                      />
-                    </div>
-                  </div>
-
-                  <div className='flex items-center space-x-3 p-3 bg-muted/30 rounded-lg'>
-                    <Switch
-                      id='htmlFormat'
-                      checked={(config.htmlFormat as boolean) !== false}
-                      onCheckedChange={(checked) =>
-                        handleChange("htmlFormat", checked)
-                      }
-                    />
-                    <Label htmlFor='htmlFormat' className='text-sm font-medium'>
-                      Send as HTML
-                    </Label>
-                  </div>
-                </div>
-              )}
-
-              {/* Webhook Configuration */}
-              {notificationType === "webhook" && (
-                <div className='space-y-6 pt-4 border-t border-border/50'>
-                  <div className='space-y-3'>
-                    <Label htmlFor='webhookUrl' className='text-sm font-medium'>
-                      Webhook URL
-                    </Label>
-                    <Input
-                      id='webhookUrl'
-                      placeholder='https://api.example.com/webhook'
-                      value={(config.webhookUrl as string) || ""}
-                      onChange={(e) =>
-                        handleChange("webhookUrl", e.target.value)
-                      }
-                      className='h-11'
-                    />
-                    {getFieldError("webhookUrl") && (
-                      <div className='flex items-center space-x-2 text-sm text-red-500'>
-                        <AlertCircle className='h-4 w-4' />
-                        <span>{getFieldError("webhookUrl")}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className='space-y-3'>
-                    <Label
-                      htmlFor='webhookMethod'
-                      className='text-sm font-medium'>
-                      HTTP Method
-                    </Label>
-                    <Select
-                      value={(config.webhookMethod as string) || "POST"}
-                      onValueChange={(value) =>
-                        handleChange("webhookMethod", value)
-                      }>
-                      <SelectTrigger id='webhookMethod' className='h-11'>
-                        <SelectValue placeholder='Select method' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='POST'>POST</SelectItem>
-                        <SelectItem value='PUT'>PUT</SelectItem>
-                        <SelectItem value='PATCH'>PATCH</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <Collapsible
-                    open={!advancedCollapsed}
-                    onOpenChange={setAdvancedCollapsed}>
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        variant='outline'
-                        className='w-full justify-between'>
-                        <span>Advanced Settings</span>
-                        {advancedCollapsed ? (
-                          <ChevronRight className='h-4 w-4' />
-                        ) : (
-                          <ChevronDown className='h-4 w-4' />
-                        )}
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className='space-y-4 pt-4'>
-                      <div className='space-y-2'>
-                        <Label>Custom Headers</Label>
-                        <div className='space-y-2'>
-                          {Object.entries(webhookHeaders).map(
-                            ([key, value]) => (
-                              <div
-                                key={key}
-                                className='flex items-center space-x-2'>
-                                <Input
-                                  value={key}
-                                  disabled
-                                  className='flex-1'
-                                />
-                                <Input
-                                  value={value}
-                                  disabled
-                                  className='flex-1'
-                                />
-                                <Button
-                                  variant='outline'
-                                  size='sm'
-                                  onClick={() => removeWebhookHeader(key)}>
-                                  <X className='h-4 w-4' />
-                                </Button>
-                              </div>
-                            )
-                          )}
-                          <div className='flex items-center space-x-2'>
-                            <Input
-                              placeholder='Header name'
-                              value={newHeaderKey}
-                              onChange={(e) => setNewHeaderKey(e.target.value)}
-                              className='flex-1'
-                            />
-                            <Input
-                              placeholder='Header value'
-                              value={newHeaderValue}
-                              onChange={(e) =>
-                                setNewHeaderValue(e.target.value)
-                              }
-                              className='flex-1'
-                            />
-                            <Button
-                              variant='outline'
-                              size='sm'
-                              onClick={addWebhookHeader}
-                              disabled={!newHeaderKey || !newHeaderValue}>
-                              <Plus className='h-4 w-4' />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </div>
-              )}
-
-              {/* Discord Configuration */}
-              {notificationType === "discord" && (
-                <div className='space-y-6 pt-4 border-t border-border/50'>
-                  <div className='space-y-3'>
-                    <Label
-                      htmlFor='discordWebhookUrl'
-                      className='text-sm font-medium'>
-                      Discord Webhook URL
-                    </Label>
-                    <Input
-                      id='discordWebhookUrl'
-                      placeholder='https://discord.com/api/webhooks/...'
-                      value={(config.discordWebhookUrl as string) || ""}
-                      onChange={(e) =>
-                        handleChange("discordWebhookUrl", e.target.value)
-                      }
-                      className='h-11'
-                    />
-                    {getFieldError("discordWebhookUrl") && (
-                      <div className='flex items-center space-x-2 text-sm text-red-500'>
-                        <AlertCircle className='h-4 w-4' />
-                        <span>{getFieldError("discordWebhookUrl")}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Slack Configuration */}
-              {notificationType === "slack" && (
-                <div className='space-y-6 pt-4 border-t border-border/50'>
-                  <div className='space-y-3'>
-                    <Label
-                      htmlFor='slackWebhookUrl'
-                      className='text-sm font-medium'>
-                      Slack Webhook URL
-                    </Label>
-                    <Input
-                      id='slackWebhookUrl'
-                      placeholder='https://hooks.slack.com/...'
-                      value={(config.slackWebhookUrl as string) || ""}
-                      onChange={(e) =>
-                        handleChange("slackWebhookUrl", e.target.value)
-                      }
-                      className='h-11'
-                    />
-                    {getFieldError("slackWebhookUrl") && (
-                      <div className='flex items-center space-x-2 text-sm text-red-500'>
-                        <AlertCircle className='h-4 w-4' />
-                        <span>{getFieldError("slackWebhookUrl")}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Telegram Configuration */}
-              {notificationType === "telegram" && (
-                <div className='space-y-6 pt-4 border-t border-border/50'>
-                  <div className='space-y-3'>
-                    <Label
-                      htmlFor='telegramBotToken'
-                      className='text-sm font-medium'>
-                      Bot Token
-                    </Label>
-                    <div className='relative'>
-                      <Input
-                        id='telegramBotToken'
-                        type={showPassword ? "text" : "password"}
-                        placeholder='1234567890:ABCdefGHIjklMNOpqrsTUVwxyz'
-                        value={(config.telegramBotToken as string) || ""}
-                        onChange={(e) =>
-                          handleChange("telegramBotToken", e.target.value)
-                        }
-                        className='h-11'
-                      />
-                      <Button
-                        type='button'
-                        variant='ghost'
-                        size='sm'
-                        className='absolute right-0 top-0 h-full px-3'
-                        onClick={() => setShowPassword(!showPassword)}>
-                        {showPassword ? (
-                          <EyeOff className='h-4 w-4' />
-                        ) : (
-                          <Eye className='h-4 w-4' />
-                        )}
-                      </Button>
-                    </div>
-                    {getFieldError("telegramBotToken") && (
-                      <div className='flex items-center space-x-2 text-sm text-red-500'>
-                        <AlertCircle className='h-4 w-4' />
-                        <span>{getFieldError("telegramBotToken")}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className='space-y-3'>
-                    <Label
-                      htmlFor='telegramChatId'
-                      className='text-sm font-medium'>
-                      Chat ID
-                    </Label>
-                    <Input
-                      id='telegramChatId'
-                      placeholder='123456789'
-                      value={(config.telegramChatId as string) || ""}
-                      onChange={(e) =>
-                        handleChange("telegramChatId", e.target.value)
-                      }
-                      className='h-11'
-                    />
-                    {getFieldError("telegramChatId") && (
-                      <div className='flex items-center space-x-2 text-sm text-red-500'>
-                        <AlertCircle className='h-4 w-4' />
-                        <span>{getFieldError("telegramChatId")}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Save Configuration Button */}
-              <div className='pt-4 border-t border-border/50'>
-                <Button
-                  onClick={() => {
-                    console.log('Saving notification config:', config);
-                    onChange(config);
-                  }}
-                  className='w-full'
-                  disabled={!isValid}>
-                  {isValid ? 'Configuration Saved' : 'Fix Validation Errors'}
-                </Button>
-                {!isValid && (
-                  <div className='mt-2 text-sm text-red-500'>
-                    Please fix the validation errors above before saving.
+              <div className='space-y-3'>
+                <Label htmlFor='subject' className='text-sm font-medium'>
+                  Subject <span className='text-red-500'>*</span>
+                </Label>
+                <Input
+                  id='subject'
+                  placeholder='Notification subject'
+                  value={(config.subject as string) || ""}
+                  onChange={(e) => handleChange("subject", e.target.value)}
+                  className='h-11'
+                  required
+                />
+                {getFieldError("subject") && (
+                  <div className='flex items-center space-x-2 text-sm text-red-500'>
+                    <AlertCircle className='h-4 w-4' />
+                    <span>{getFieldError("subject")}</span>
                   </div>
                 )}
+              </div>
+
+              <div className='space-y-3'>
+                <Label htmlFor='body' className='text-sm font-medium'>
+                  Body <span className='text-red-500'>*</span>
+                </Label>
+                <Textarea
+                  id='body'
+                  placeholder='Notification message...'
+                  value={(config.body as string) || ""}
+                  onChange={(e) => handleChange("body", e.target.value)}
+                  rows={6}
+                  className='resize-none'
+                  required
+                />
+                {getFieldError("body") && (
+                  <div className='flex items-center space-x-2 text-sm text-red-500'>
+                    <AlertCircle className='h-4 w-4' />
+                    <span>{getFieldError("body")}</span>
+                  </div>
+                )}
+                {!config.body && (
+                  <div className='flex items-center space-x-2 text-sm text-amber-500'>
+                    <AlertCircle className='h-4 w-4' />
+                    <span>Email body is required for execution</span>
+                  </div>
+                )}
+              </div>
+
+              <div className='grid grid-cols-2 gap-4'>
+                <div className='space-y-3'>
+                  <Label htmlFor='cc' className='text-sm font-medium'>
+                    CC (optional)
+                  </Label>
+                  <Input
+                    id='cc'
+                    placeholder='cc@example.com'
+                    value={(config.cc as string) || ""}
+                    onChange={(e) => handleChange("cc", e.target.value)}
+                    className='h-11'
+                  />
+                </div>
+                <div className='space-y-3'>
+                  <Label htmlFor='bcc' className='text-sm font-medium'>
+                    BCC (optional)
+                  </Label>
+                  <Input
+                    id='bcc'
+                    placeholder='bcc@example.com'
+                    value={(config.bcc as string) || ""}
+                    onChange={(e) => handleChange("bcc", e.target.value)}
+                    className='h-11'
+                  />
+                </div>
+              </div>
+
+              {/* Show validation errors for CC and BCC */}
+              {(getFieldError("cc") || getFieldError("bcc")) && (
+                <div className='space-y-2'>
+                  {getFieldError("cc") && (
+                    <div className='flex items-center space-x-2 text-sm text-red-500'>
+                      <AlertCircle className='h-4 w-4' />
+                      <span>CC: {getFieldError("cc")}</span>
+                    </div>
+                  )}
+                  {getFieldError("bcc") && (
+                    <div className='flex items-center space-x-2 text-sm text-red-500'>
+                      <AlertCircle className='h-4 w-4' />
+                      <span>BCC: {getFieldError("bcc")}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className='flex items-center space-x-3 p-3 bg-muted/30 rounded-lg'>
+                <Switch
+                  id='htmlFormat'
+                  checked={(config.htmlFormat as boolean) !== false}
+                  onCheckedChange={(checked) =>
+                    handleChange("htmlFormat", checked)
+                  }
+                />
+                <Label htmlFor='htmlFormat' className='text-sm font-medium'>
+                  Send as HTML
+                </Label>
               </div>
             </CardContent>
           </Card>
@@ -917,10 +671,13 @@ export function NotificationConfig({
                   <Alert variant='destructive'>
                     <AlertCircle className='h-4 w-4' />
                     <AlertDescription>
-                      Please fix the configuration errors before testing:
-                      <ul className='mt-2 list-disc list-inside'>
-                        {validationErrors.map((error, index) => (
-                          <li key={index}>{error.message}</li>
+                      Please fix the configuration issues before testing:
+                      <ul className='mt-2 list-disc list-inside space-y-1'>
+                        {getAllValidationErrors().map((error, index) => (
+                          <li key={index} className='text-sm'>
+                            <span className='font-medium'>{error.field}:</span>{" "}
+                            {error.error}
+                          </li>
                         ))}
                       </ul>
                     </AlertDescription>

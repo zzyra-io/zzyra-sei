@@ -13,7 +13,13 @@ import {
 import { useBlockExecution } from "@/hooks/useBlockExecution";
 import { cn } from "@/lib/utils";
 import { useWorkflowValidation } from "@/lib/contexts/workflow-validation-context";
-import { Handle, Position, useConnection, useNodeConnections, useNodesData } from "@xyflow/react";
+import {
+  Handle,
+  Position,
+  useConnection,
+  useNodeConnections,
+  useNodesData,
+} from "@xyflow/react";
 import {
   Activity,
   AlertCircle,
@@ -108,18 +114,47 @@ export default function CustomNode({
   // Get validation errors for this specific node
   const { getNodeErrors, getNodeFieldError } = useWorkflowValidation();
 
+  // Format field names for better display
+  const formatFieldName = (fieldName: string): string => {
+    const fieldMap: Record<string, string> = {
+      notificationType: "Notification Type",
+      to: "Email Address",
+      cc: "CC Email",
+      bcc: "BCC Email",
+      subject: "Subject",
+      body: "Message Body",
+      emailProvider: "Email Provider",
+      htmlFormat: "HTML Format",
+    };
+    return fieldMap[fieldName] || fieldName;
+  };
+
+  // Format error messages to be user-friendly
+  const formatErrorMessage = (message: string): string => {
+    if (message.includes("Invalid email address")) {
+      return "Please enter a valid email address";
+    }
+    if (message.includes("Invalid URL")) {
+      return "Please enter a valid URL";
+    }
+    if (message.includes("at least 1 character")) {
+      return "This field is required";
+    }
+    return message;
+  };
+
   // Get validation errors for this node
-  const nodeValidationErrors = getNodeErrors(id).map(error => ({
-    field: error.field,
-    message: error.message,
+  const nodeValidationErrors = getNodeErrors(id).map((error) => ({
+    field: formatFieldName(error.field),
+    message: formatErrorMessage(error.message),
   }));
 
   // Get source node data for validation context
   const connections = useNodeConnections({
-    handleType: 'target',
+    handleType: "target",
   });
   const sourceNodesData = useNodesData(
-    connections.map((connection) => connection.source),
+    connections.map((connection) => connection.source)
   );
 
   // Check if node has validation errors
@@ -160,7 +195,7 @@ export default function CustomNode({
     blockName: data.label,
   });
 
-    // Use the new live node system for real-time updates
+  // Use the new live node system for real-time updates
   const liveNode = useLiveNode(id);
 
   // Handle real-time node updates from WebSocket (legacy)
@@ -760,9 +795,7 @@ export default function CustomNode({
               {hasValidationErrors ? (
                 <div className='flex items-center gap-1 cursor-help'>
                   <AlertCircle className='w-3 h-3 text-red-500' />
-                  <span className='text-xs text-red-600'>
-                    {errorCount}
-                  </span>
+                  <span className='text-xs text-red-600'>{errorCount}</span>
                 </div>
               ) : (
                 <div className='flex items-center gap-1'>
@@ -897,8 +930,6 @@ export default function CustomNode({
             </div>
           </div>
         )}
-
- 
       </div>
 
       {/* Handles - styled to cover the entire node */}
@@ -1038,48 +1069,47 @@ export default function CustomNode({
           </div>
         </div>
       )}
-             {/* Validation errors expandable section */}
-        {hasValidationErrors && (
-          <div className='mt-2 border-t border-red-200'>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowValidationErrors(!showValidationErrors);
-              }}
-              className='flex items-center justify-between w-full p-2 text-xs text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer'
-            >
-              <div className='flex items-center gap-2'>
-                <AlertCircle className='w-3 h-3' />
-                <span className='font-medium'>
-                  {errorCount} validation error{errorCount > 1 ? 's' : ''}
-                </span>
-              </div>
-              {showValidationErrors ? (
-                <ChevronUp className='w-3 h-3' />
-              ) : (
-                <ChevronDown className='w-3 h-3' />
-              )}
-            </button>
-            {showValidationErrors && (
-              <div className='px-2 pb-2'>
-                <div className='space-y-1'>
-                  {nodeValidationErrors.map((error, idx) => (
-                    <div key={idx} className='text-xs p-2 bg-red-50 border border-red-200 rounded'>
-                      <div className='font-medium text-red-700 mb-1'>
-                        {error.field}
-                      </div>
-                      <div className='text-red-600'>
-                        {error.message}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+      {/* Validation errors expandable section */}
+      {hasValidationErrors && (
+        <div className='mt-2 border-t border-red-200'>
+          <button
+            type='button'
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowValidationErrors(!showValidationErrors);
+            }}
+            className='flex items-center justify-between w-full p-2 text-xs text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer'>
+            <div className='flex items-center gap-2'>
+              <AlertCircle className='w-3 h-3' />
+              <span className='font-medium'>
+                {errorCount} configuration issue{errorCount > 1 ? "s" : ""}
+              </span>
+            </div>
+            {showValidationErrors ? (
+              <ChevronUp className='w-3 h-3' />
+            ) : (
+              <ChevronDown className='w-3 h-3' />
             )}
-          </div>
-        )}
+          </button>
+          {showValidationErrors && (
+            <div className='px-2 pb-2'>
+              <div className='space-y-1'>
+                {nodeValidationErrors.map((error, idx) => (
+                  <div
+                    key={idx}
+                    className='text-xs p-2 bg-red-50 border border-red-200 rounded'>
+                    <div className='font-medium text-red-700 mb-1'>
+                      {error.field}
+                    </div>
+                    <div className='text-red-600'>{error.message}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -24,7 +24,7 @@ export const WorkflowNodeDataSchema = z
     iconName: z.string(),
     isEnabled: z.boolean().default(true),
     description: z.string().optional(),
-    config: z.record(z.unknown()).default({}),
+    config: z.record(z.string(), z.unknown()).default({}),
     inputs: z.array(z.unknown()).default([]),
     outputs: z.array(z.unknown()).default([]),
     // Allow additional properties for React Flow

@@ -23,7 +23,7 @@
     "@zyra/types": "workspace:*",
     "jsonwebtoken": "^9.0.2",
     "uuid": "^9.0.1",
-    "zod": "^3.22.0"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.11",

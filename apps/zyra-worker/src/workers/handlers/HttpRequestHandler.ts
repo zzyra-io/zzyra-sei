@@ -38,7 +38,7 @@ export class HttpRequestHandler implements BlockHandler {
   /**
    * Get config schema for this block type
    */
-  static getConfigSchema(): z.ZodObject<any> {
+  static getConfigSchema(): z.ZodType<any> {
     return this.configSchema;
   }
 
