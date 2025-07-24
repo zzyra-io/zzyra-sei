@@ -3,33 +3,25 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Label } from "@/components/ui/label";
 import {
-  AlertCircle,
-  CheckCircle,
-  Info,
   Loader2,
   Play,
-  Link,
-  Unlink,
-  AlertTriangle,
-  ArrowDown,
   Settings,
-  ArrowUp,
-  Database,
+  CheckCircle,
+  AlertCircle,
+  Info,
   Zap,
+  Sparkles,
+  Shield,
+  Activity,
 } from "lucide-react";
 import { blockConfigRegistry } from "@/lib/block-config-registry";
 import { getBlockMetadata, getBlockType } from "@zyra/types";
-import { getEnhancedBlockSchema } from "@zyra/types";
-import { executionsApi } from "@/lib/services/api";
+
 import { ScrollArea } from "./ui/scroll-area";
-import { EnhancedDataTransform } from "./enhanced-data-transform";
 import { getNodeSchema } from "./schema-aware-connection";
-import { Switch } from "@/components/ui/switch";
 
 // Define NodeSchema interface locally
 interface NodeSchema {
@@ -99,16 +91,9 @@ export function BlockConfigPanel({
   executionStatus = "idle",
   executionData,
   onTest,
-  connectedNodes = [],
   workflowData = {},
-  onOpenDataTransform,
-  enableDataTransformation = true,
-  onConfigurationChange,
 }: BlockConfigPanelProps) {
   const [activeTab, setActiveTab] = useState("config");
-  const [showInputSchema, setShowInputSchema] = useState(true);
-  const [showOutputSchema, setShowOutputSchema] = useState(false);
-  const [sampleData, setSampleData] = useState<Record<string, unknown>>({});
   const [nodeSchema, setNodeSchema] = useState<NodeSchema | null>(null);
   const [compatibilityIssues, setCompatibilityIssues] = useState<
     Array<{
@@ -119,9 +104,6 @@ export function BlockConfigPanel({
       sourceNode?: string;
     }>
   >([]);
-  const [enableRealTimeValidation, setEnableRealTimeValidation] =
-    useState(true);
-  const [isLoadingSampleData, setIsLoadingSampleData] = useState(false);
 
   // Memoize the data to prevent unnecessary re-renders
   const data = useMemo(
@@ -132,8 +114,6 @@ export function BlockConfigPanel({
   // Memoize the onChange callback to prevent infinite loops
   const memoizedOnChange = useCallback(
     (config: Record<string, unknown>) => {
-      // Only update the config part, not the entire data object
-      // This prevents the infinite loop caused by data dependency
       const currentData = nodeData || node?.data || {};
       const updatedData = {
         ...currentData,
@@ -158,40 +138,6 @@ export function BlockConfigPanel({
         </AlertDescription>
       </Alert>
     ));
-
-  // Fetch sample data and schema when component mounts or data changes
-  useEffect(() => {
-    const fetchSampleData = async () => {
-      if (!data.id || !workflowData?.workflowId) return;
-
-      setIsLoadingSampleData(true);
-      try {
-        const sampleData = await getSampleData(
-          data.id as string,
-          workflowData.workflowId
-        );
-        setSampleData(sampleData || {});
-      } catch (error) {
-        console.error("Failed to fetch sample data:", error);
-      } finally {
-        setIsLoadingSampleData(false);
-      }
-    };
-
-    const fetchNodeSchema = async () => {
-      if (!data.id || !workflowData?.workflowId) return;
-
-      try {
-        const schema = getNodeSchema(data.id as string, data.config || {});
-        setNodeSchema(schema);
-      } catch (error) {
-        console.error("Failed to fetch node schema:", error);
-      }
-    };
-
-    fetchSampleData();
-    fetchNodeSchema();
-  }, [data.id, workflowData?.workflowId]);
 
   // Compute input nodes
   const inputNodes = useMemo(() => {
@@ -219,7 +165,7 @@ export function BlockConfigPanel({
 
   // Check compatibility with connected nodes
   useEffect(() => {
-    if (!nodeSchema || !enableRealTimeValidation || inputNodes.length === 0) {
+    if (!nodeSchema || inputNodes.length === 0) {
       setCompatibilityIssues([]);
       return;
     }
@@ -235,13 +181,15 @@ export function BlockConfigPanel({
     // Check each input node for compatibility
     for (const inputNode of inputNodes) {
       const inputSchema = extractSchemaDefinition(
-        inputNode.data.outputSchema as any
+        inputNode.data.outputSchema as Record<string, unknown>
       );
       if (!inputSchema) continue;
 
       // Compare input schema with current node's input requirements
       for (const requiredInput of nodeSchema.input) {
-        const matchingField = inputSchema.properties?.[requiredInput.name];
+        const matchingField = (
+          inputSchema.properties as Record<string, unknown>
+        )?.[requiredInput.name];
         if (!matchingField && requiredInput.required) {
           issues.push({
             field: requiredInput.name,
@@ -250,12 +198,15 @@ export function BlockConfigPanel({
             suggestion: `Add ${requiredInput.name} to the output of ${inputNode.id}`,
             sourceNode: inputNode.id,
           });
-        } else if (matchingField && matchingField.type !== requiredInput.type) {
+        } else if (
+          matchingField &&
+          (matchingField as Record<string, unknown>).type !== requiredInput.type
+        ) {
           issues.push({
             field: requiredInput.name,
-            issue: `Type mismatch: expected ${requiredInput.type}, got ${matchingField.type}`,
+            issue: `Type mismatch: expected ${requiredInput.type}, got ${(matchingField as Record<string, unknown>).type}`,
             severity: "warning",
-            suggestion: `Transform ${requiredInput.name} from ${matchingField.type} to ${requiredInput.type}`,
+            suggestion: `Transform ${requiredInput.name} from ${(matchingField as Record<string, unknown>).type} to ${requiredInput.type}`,
             sourceNode: inputNode.id,
           });
         }
@@ -263,102 +214,7 @@ export function BlockConfigPanel({
     }
 
     setCompatibilityIssues(issues);
-  }, [nodeSchema, enableRealTimeValidation, inputNodes]);
-
-  // Fetch sample data for connected nodes
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchSampleData = async () => {
-      const newSampleData: Record<string, unknown> = {};
-
-      for (const node of inputNodes) {
-        try {
-          const data = await getSampleData(node.id, workflowData?.workflowId);
-          if (mounted && data) {
-            newSampleData[node.id] = data;
-          }
-        } catch (error) {
-          // Handle error gracefully in UI
-          setCompatibilityIssues((prev) => [
-            ...prev,
-            {
-              field: node.id,
-              issue: `Failed to fetch sample data: ${error instanceof Error ? error.message : "Unknown error"}`,
-              severity: "warning",
-            },
-          ]);
-        }
-      }
-
-      if (mounted) {
-        setSampleData(newSampleData);
-      }
-    };
-
-    if (inputNodes.length > 0 && workflowData?.workflowId) {
-      fetchSampleData();
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [inputNodes, workflowData?.workflowId]);
-
-  // Helper function to fetch sample data
-  const getSampleData = async (nodeId: string, workflowId?: string) => {
-    if (!workflowId) return null;
-
-    const executions = await executionsApi.getWorkflowExecutions(
-      workflowId,
-      5,
-      0,
-      "completed"
-    );
-    const recentExecution = executions.data?.[0];
-    if (!recentExecution) return null;
-
-    const nodeExecutions = await executionsApi.getNodeExecutions(
-      recentExecution.id
-    );
-    const nodeExecution = nodeExecutions.find(
-      (node: { node_id: string }) => node.node_id === nodeId
-    );
-
-    if (nodeExecution?.output_data) {
-      return nodeExecution.output_data;
-    }
-
-    // Fallback to mock data
-    const node = inputNodes.find((n) => n.id === nodeId);
-    if (!node) return null;
-
-    const nodeType = getBlockType(node.data || node);
-    const mockData: Record<
-      string,
-      (nodeType: string) => Record<string, unknown> | null
-    > = {
-      HTTP_REQUEST: () => ({
-        status: 200,
-        data: { message: "Success", id: 123 },
-        headers: { "content-type": "application/json" },
-      }),
-      PRICE_MONITOR: () => ({
-        price: 45000.5,
-        asset: "ETHEREUM",
-        timestamp: new Date().toISOString(),
-      }),
-      EMAIL: () => ({
-        to: "user@example.com",
-        subject: "Test Email",
-        body: "This is a test email",
-      }),
-    };
-
-    return (
-      mockData[nodeType]?.(nodeType) ?? { message: "Sample data", value: 42 }
-    );
-  };
+  }, [nodeSchema, inputNodes]);
 
   // Simplified schema extraction
   const extractSchemaDefinition = (
@@ -395,132 +251,51 @@ export function BlockConfigPanel({
     return {};
   };
 
-  // Suggest transformations
-  const suggestTransformations = (
-    issues: Array<{
-      field: string;
-      issue: string;
-      severity: "error" | "warning" | "info";
-      suggestion?: string;
-      sourceNode?: string;
-    }>
-  ) => {
-    return issues
-      .map((issue) => {
-        if (
-          issue.severity === "warning" &&
-          issue.issue.includes("Type mismatch")
-        ) {
-          const match = issue.issue.match(/expected (\w+), got (\w+)/);
-          if (match) {
-            const [, expectedType, actualType] = match;
-            return {
-              field: issue.field,
-              operation: getTransformationOperation(actualType, expectedType),
-              reason: issue.issue,
-              confidence: 0.8,
-            };
-          }
-        }
-        return null;
-      })
-      .filter((s): s is NonNullable<typeof s> => s !== null);
+  const getStatusIcon = () => {
+    switch (executionStatus) {
+      case "success":
+        return <CheckCircle className='h-4 w-4 text-green-500' />;
+      case "error":
+        return <AlertCircle className='h-4 w-4 text-red-500' />;
+      case "warning":
+        return <AlertCircle className='h-4 w-4 text-yellow-500' />;
+      case "running":
+        return <Loader2 className='h-4 w-4 animate-spin text-blue-500' />;
+      default:
+        return <Activity className='h-4 w-4 text-gray-400' />;
+    }
   };
 
-  // Transformation operation mapping
-  const getTransformationOperation = (fromType: string, toType: string) => {
-    const typeMap: Record<string, Record<string, string>> = {
-      string: {
-        number: "parseFloat",
-        boolean: 'string === "true"',
-        array: "string.split(',')",
-        object: "JSON.parse",
-      },
-      number: {
-        string: "toString",
-        boolean: "number > 0",
-        array: "[number]",
-      },
-      // ... (other mappings unchanged)
-    };
-
-    return typeMap[fromType]?.[toType] ?? "custom transformation needed";
+  const getStatusColor = () => {
+    switch (executionStatus) {
+      case "success":
+        return "bg-green-50 border-green-200 text-green-800";
+      case "error":
+        return "bg-red-50 border-red-200 text-red-800";
+      case "warning":
+        return "bg-yellow-50 border-yellow-200 text-yellow-800";
+      case "running":
+        return "bg-blue-50 border-blue-200 text-blue-800";
+      default:
+        return "bg-gray-50 border-gray-200 text-gray-800";
+    }
   };
 
-  // Auto-fix compatibility issues
-  const handleAutoFix = useCallback(() => {
-    const suggestions = suggestTransformations(compatibilityIssues);
-    if (!suggestions.length) return;
-
-    const transformations = suggestions.map((suggestion) => ({
-      field: suggestion.field,
-      operation: {
-        type: "format",
-        config: {
-          operation: suggestion.operation,
-          outputType: nodeSchema?.input.find(
-            (input) => input.name === suggestion.field
-          )?.type,
-        },
-      },
-    }));
-
-    const updatedConfig = {
-      ...data.config,
-      autoGeneratedTransformations: transformations,
-      lastAutoFixTimestamp: new Date().toISOString(),
-    };
-
-    memoizedOnChange({ ...data, config: updatedConfig });
-    onConfigurationChange?.(updatedConfig);
-  }, [
-    compatibilityIssues,
-    nodeSchema,
-    data,
-    memoizedOnChange,
-    onConfigurationChange,
-  ]);
-
-  // Handle configuration changes with transformation suggestions
-  const handleConfigurationChange = useCallback(
-    (updatedConfig: Record<string, unknown>) => {
-      // Suggest transformations if there are compatibility issues
-      if (compatibilityIssues.length > 0) {
-        const transformations = suggestTransformations(compatibilityIssues);
-        if (transformations.length > 0) {
-          // You could show a modal or notification here
-          console.log("Suggested transformations:", transformations);
-        }
-      }
-
-      memoizedOnChange(updatedConfig);
-      onConfigurationChange?.(updatedConfig);
-    },
-    [
-      compatibilityIssues,
-      nodeSchema,
-      data,
-      memoizedOnChange,
-      onConfigurationChange,
-    ]
-  );
-
-  // Render logic remains largely unchanged, with accessibility improvements
   return (
     <div className='w-80 border-l border-border/50 bg-background/95 backdrop-blur-sm flex flex-col h-full max-h-screen'>
-      {/* Header and other UI components remain unchanged, with added ARIA attributes */}
+      {/* Modern Header */}
       <div className='sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50 flex-shrink-0'>
         <div className='p-6 space-y-4'>
           <div className='flex items-center justify-between'>
             <div className='flex items-center space-x-3'>
               {metadata?.icon && (
-                <div className='w-10 h-10 rounded-lg bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center'>
-                  <span className='text-sm font-medium text-primary'>
+                <div className='w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center shadow-sm'>
+                  <span className='text-lg font-semibold text-primary'>
                     {metadata.icon}
                   </span>
                 </div>
               )}
-              <div>
+              <div className='flex-1'>
                 <h3 className='font-semibold text-lg text-foreground'>
                   {metadata?.label ?? blockType}
                 </h3>
@@ -533,31 +308,81 @@ export function BlockConfigPanel({
         </div>
       </div>
 
-      {/* Tabs with ARIA attributes */}
+      {/* Status Bar */}
+      {executionStatus !== "idle" && (
+        <div className='px-6 py-3 border-b border-border/50'>
+          <Alert className={`${getStatusColor()} border-l-4`}>
+            <div className='flex items-center space-x-3'>
+              {getStatusIcon()}
+              <AlertDescription className='font-medium'>
+                {executionStatus === "running" && "Processing..."}
+                {executionStatus === "success" && "Completed successfully"}
+                {executionStatus === "error" &&
+                  `Error: ${executionData?.error || "Unknown error"}`}
+                {executionStatus === "warning" && "Completed with warnings"}
+              </AlertDescription>
+            </div>
+          </Alert>
+        </div>
+      )}
+
+      {/* Compatibility Issues */}
+      {compatibilityIssues.length > 0 && (
+        <div className='px-6 py-3 border-b border-border/50'>
+          <Alert variant='destructive'>
+            <AlertCircle className='h-4 w-4' />
+            <AlertDescription>
+              <div className='space-y-2'>
+                <p className='font-medium'>Compatibility Issues Found</p>
+                <div className='space-y-1'>
+                  {compatibilityIssues.slice(0, 3).map((issue, index) => (
+                    <p key={index} className='text-sm'>
+                      • {issue.issue}
+                    </p>
+                  ))}
+                  {compatibilityIssues.length > 3 && (
+                    <p className='text-sm text-muted-foreground'>
+                      +{compatibilityIssues.length - 3} more issues
+                    </p>
+                  )}
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Main Content */}
       <div className='px-6 py-4 flex-1 flex flex-col min-h-0'>
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
           className='w-full h-full flex flex-col'>
-          <TabsList
-            className='grid w-full grid-cols-5 h-12 bg-muted/50 flex-shrink-0 mb-4'
-            role='tablist'>
+          <TabsList className='grid w-full grid-cols-3 h-12 bg-muted/50 rounded-lg p-1 mb-6'>
             <TabsTrigger
               value='config'
-              className='flex items-center space-x-2 data-[state=active]:bg-background'
-              role='tab'
-              aria-selected={activeTab === "config"}>
+              className='flex items-center space-x-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md'>
               <Settings className='w-4 h-4' />
               <span className='hidden sm:inline'>Config</span>
             </TabsTrigger>
-            {/* Add similar role and aria-selected for other TabsTrigger components */}
+            <TabsTrigger
+              value='schema'
+              className='flex items-center space-x-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md'>
+              <Zap className='w-4 h-4' />
+              <span className='hidden sm:inline'>Schema</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value='test'
+              className='flex items-center space-x-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md'>
+              <Play className='w-4 h-4' />
+              <span className='hidden sm:inline'>Test</span>
+            </TabsTrigger>
           </TabsList>
 
           <ScrollArea className='h-full'>
             <TabsContent value='config' className='space-y-6 pb-6'>
-              {/* Config tab content with accessibility improvements */}
-              <Card>
-                <CardContent>
+              <Card className='border-0 shadow-sm bg-card/50'>
+                <CardContent className='p-6'>
                   <ConfigComponent
                     config={
                       (data.config as Record<string, unknown>) ?? {
@@ -572,32 +397,157 @@ export function BlockConfigPanel({
                 </CardContent>
               </Card>
             </TabsContent>
-            {/* Other TabsContent sections remain similar */}
+
+            <TabsContent value='schema' className='space-y-6 pb-6'>
+              <Card className='border-0 shadow-sm bg-card/50'>
+                <CardContent className='p-6'>
+                  <div className='space-y-6'>
+                    <div className='flex items-center space-x-2'>
+                      <Shield className='h-5 w-5 text-primary' />
+                      <h4 className='font-semibold'>Input Schema</h4>
+                    </div>
+                    {nodeSchema?.input && nodeSchema.input.length > 0 ? (
+                      <div className='space-y-3'>
+                        {nodeSchema.input.map((input, index) => (
+                          <div
+                            key={index}
+                            className='flex items-center justify-between p-3 bg-muted/30 rounded-lg'>
+                            <div>
+                              <p className='font-medium text-sm'>
+                                {input.name}
+                              </p>
+                              <p className='text-xs text-muted-foreground'>
+                                {input.type}{" "}
+                                {input.required ? "(required)" : "(optional)"}
+                              </p>
+                            </div>
+                            {input.required && (
+                              <span className='text-xs bg-red-100 text-red-700 px-2 py-1 rounded'>
+                                Required
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className='text-sm text-muted-foreground'>
+                        No input schema defined
+                      </p>
+                    )}
+
+                    <div className='flex items-center space-x-2 pt-4'>
+                      <Sparkles className='h-5 w-5 text-primary' />
+                      <h4 className='font-semibold'>Output Schema</h4>
+                    </div>
+                    {nodeSchema?.output && nodeSchema.output.length > 0 ? (
+                      <div className='space-y-3'>
+                        {nodeSchema.output.map((output, index) => (
+                          <div
+                            key={index}
+                            className='flex items-center justify-between p-3 bg-muted/30 rounded-lg'>
+                            <div>
+                              <p className='font-medium text-sm'>
+                                {output.name}
+                              </p>
+                              <p className='text-xs text-muted-foreground'>
+                                {output.type}{" "}
+                                {output.required ? "(required)" : "(optional)"}
+                              </p>
+                            </div>
+                            {output.required && (
+                              <span className='text-xs bg-green-100 text-green-700 px-2 py-1 rounded'>
+                                Required
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className='text-sm text-muted-foreground'>
+                        No output schema defined
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value='test' className='space-y-6 pb-6'>
+              <Card className='border-0 shadow-sm bg-card/50'>
+                <CardContent className='p-6'>
+                  <div className='space-y-4'>
+                    <div className='flex items-center space-x-2'>
+                      <Play className='h-5 w-5 text-primary' />
+                      <h4 className='font-semibold'>Test Configuration</h4>
+                    </div>
+
+                    <Alert>
+                      <Info className='h-4 w-4' />
+                      <AlertDescription>
+                        Test your block configuration to ensure it works
+                        correctly with sample data.
+                      </AlertDescription>
+                    </Alert>
+
+                    {onTest && (
+                      <Button
+                        onClick={onTest}
+                        disabled={executionStatus === "running"}
+                        className='w-full h-11 bg-primary hover:bg-primary/90'>
+                        {executionStatus === "running" ? (
+                          <>
+                            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                            Testing...
+                          </>
+                        ) : (
+                          <>
+                            <Play className='mr-2 h-4 w-4' />
+                            Test Block
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {executionData && (
+                      <div className='space-y-3'>
+                        <h5 className='font-medium text-sm'>
+                          Last Test Result
+                        </h5>
+                        <div className='p-4 bg-muted/30 rounded-lg space-y-2 text-sm'>
+                          <div className='flex justify-between'>
+                            <span className='text-muted-foreground'>
+                              Status:
+                            </span>
+                            <span className='font-medium'>
+                              {executionStatus}
+                            </span>
+                          </div>
+                          {executionData.duration && (
+                            <div className='flex justify-between'>
+                              <span className='text-muted-foreground'>
+                                Duration:
+                              </span>
+                              <span className='font-medium'>
+                                {executionData.duration}ms
+                              </span>
+                            </div>
+                          )}
+                          {executionData.error && (
+                            <div className='text-red-600 text-sm'>
+                              <span className='font-medium'>Error:</span>{" "}
+                              {executionData.error}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </ScrollArea>
         </Tabs>
       </div>
-
-      {/* Test Button with tooltip for disabled state */}
-      {onTest && (
-        <div className='flex justify-end'>
-          <Button
-            onClick={onTest}
-            disabled={executionStatus === "running"}
-            aria-disabled={executionStatus === "running"}
-            title={
-              executionStatus === "running"
-                ? "Cannot test while running"
-                : "Test Block"
-            }>
-            {executionStatus === "running" ? (
-              <Loader2 className='w-4 h-4 mr-2 animate-spin' />
-            ) : (
-              <Play className='w-4 h-4 mr-2' />
-            )}
-            Test Block
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

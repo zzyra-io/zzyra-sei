@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -33,11 +33,11 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
-  X,
-  Plus,
   Code,
-  Eye,
-  EyeOff,
+  Mail,
+  Sparkles,
+  Shield,
+  Zap,
 } from "lucide-react";
 import { BlockType, getEnhancedBlockSchema } from "@zyra/types";
 import { cn } from "@/lib/utils";
@@ -346,22 +346,22 @@ export function NotificationConfig({
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
-        <TabsList className='grid w-full grid-cols-3 h-12 bg-muted/50'>
+        <TabsList className='grid w-full grid-cols-3 h-12 bg-muted/50 rounded-lg p-1'>
           <TabsTrigger
             value='config'
-            className='flex items-center space-x-2 data-[state=active]:bg-background'>
+            className='flex items-center space-x-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md'>
             <Settings className='h-4 w-4' />
             <span>Configuration</span>
           </TabsTrigger>
           <TabsTrigger
             value='template'
-            className='flex items-center space-x-2 data-[state=active]:bg-background'>
+            className='flex items-center space-x-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md'>
             <Code className='h-4 w-4' />
             <span>Templates</span>
           </TabsTrigger>
           <TabsTrigger
             value='test'
-            className='flex items-center space-x-2 data-[state=active]:bg-background'>
+            className='flex items-center space-x-2 data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md'>
             <Play className='h-4 w-4' />
             <span>Test</span>
           </TabsTrigger>
@@ -369,172 +369,188 @@ export function NotificationConfig({
 
         <TabsContent value='config' className='mt-6 space-y-6'>
           {/* Email Configuration */}
-          <Card className='border-l-4 border-l-primary/20'>
-            <CardHeader className='pb-4'>
-              <CardTitle className='flex items-center space-x-3 text-lg'>
-                <Bell className='h-4 w-4' />
-                <span>Email Configuration</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-6'>
-              <div className='space-y-3'>
-                <Label htmlFor='emailProvider' className='text-sm font-medium'>
-                  Email Provider
-                </Label>
-                <Select
-                  value={(config.emailProvider as string) || "smtp"}
-                  onValueChange={(value) =>
-                    handleChange("emailProvider", value)
-                  }>
-                  <SelectTrigger id='emailProvider' className='h-11'>
-                    <SelectValue placeholder='Select provider' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='smtp'>SMTP</SelectItem>
-                    <SelectItem value='sendgrid'>SendGrid</SelectItem>
-                    <SelectItem value='ses'>AWS SES</SelectItem>
-                    <SelectItem value='gmail'>Gmail</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className='space-y-3'>
-                <Label htmlFor='to' className='text-sm font-medium'>
-                  To <span className='text-red-500'>*</span>
-                </Label>
-                <Input
-                  id='to'
-                  placeholder='recipient@example.com'
-                  value={(config.to as string) || ""}
-                  onChange={(e) => handleChange("to", e.target.value)}
-                  className='h-11'
-                  required
-                />
-                {getFieldError("to") && (
-                  <div className='flex items-center space-x-2 text-sm text-red-500'>
-                    <AlertCircle className='h-4 w-4' />
-                    <span>{getFieldError("to")}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className='space-y-3'>
-                <Label htmlFor='subject' className='text-sm font-medium'>
-                  Subject <span className='text-red-500'>*</span>
-                </Label>
-                <Input
-                  id='subject'
-                  placeholder='Notification subject'
-                  value={(config.subject as string) || ""}
-                  onChange={(e) => handleChange("subject", e.target.value)}
-                  className='h-11'
-                  required
-                />
-                {getFieldError("subject") && (
-                  <div className='flex items-center space-x-2 text-sm text-red-500'>
-                    <AlertCircle className='h-4 w-4' />
-                    <span>{getFieldError("subject")}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className='space-y-3'>
-                <Label htmlFor='body' className='text-sm font-medium'>
-                  Body <span className='text-red-500'>*</span>
-                </Label>
-                <Textarea
-                  id='body'
-                  placeholder='Notification message...'
-                  value={(config.body as string) || ""}
-                  onChange={(e) => handleChange("body", e.target.value)}
-                  rows={6}
-                  className='resize-none'
-                  required
-                />
-                {getFieldError("body") && (
-                  <div className='flex items-center space-x-2 text-sm text-red-500'>
-                    <AlertCircle className='h-4 w-4' />
-                    <span>{getFieldError("body")}</span>
-                  </div>
-                )}
-                {!config.body && (
-                  <div className='flex items-center space-x-2 text-sm text-amber-500'>
-                    <AlertCircle className='h-4 w-4' />
-                    <span>Email body is required for execution</span>
-                  </div>
-                )}
-              </div>
-
-              <div className='grid grid-cols-2 gap-4'>
-                <div className='space-y-3'>
-                  <Label htmlFor='cc' className='text-sm font-medium'>
-                    CC (optional)
-                  </Label>
-                  <Input
-                    id='cc'
-                    placeholder='cc@example.com'
-                    value={(config.cc as string) || ""}
-                    onChange={(e) => handleChange("cc", e.target.value)}
-                    className='h-11'
-                  />
+          <Card className='border-0 shadow-sm bg-card/50'>
+            <CardContent className='p-6 space-y-6'>
+              <div className='flex items-center space-x-3'>
+                <div className='w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/10 to-blue-600/20 flex items-center justify-center'>
+                  <Mail className='h-5 w-5 text-blue-600' />
                 </div>
-                <div className='space-y-3'>
-                  <Label htmlFor='bcc' className='text-sm font-medium'>
-                    BCC (optional)
-                  </Label>
-                  <Input
-                    id='bcc'
-                    placeholder='bcc@example.com'
-                    value={(config.bcc as string) || ""}
-                    onChange={(e) => handleChange("bcc", e.target.value)}
-                    className='h-11'
-                  />
+                <div>
+                  <h3 className='font-semibold text-lg'>Email Configuration</h3>
+                  <p className='text-sm text-muted-foreground'>
+                    Configure your email notification settings
+                  </p>
                 </div>
               </div>
 
-              {/* Show validation errors for CC and BCC */}
-              {(getFieldError("cc") || getFieldError("bcc")) && (
-                <div className='space-y-2'>
-                  {getFieldError("cc") && (
+              <div className='space-y-4'>
+                <div className='space-y-3'>
+                  <Label
+                    htmlFor='emailProvider'
+                    className='text-sm font-medium'>
+                    Email Provider
+                  </Label>
+                  <Select
+                    value={(config.emailProvider as string) || "smtp"}
+                    onValueChange={(value) =>
+                      handleChange("emailProvider", value)
+                    }>
+                    <SelectTrigger id='emailProvider' className='h-11'>
+                      <SelectValue placeholder='Select provider' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='smtp'>SMTP</SelectItem>
+                      <SelectItem value='sendgrid'>SendGrid</SelectItem>
+                      <SelectItem value='ses'>AWS SES</SelectItem>
+                      <SelectItem value='gmail'>Gmail</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className='space-y-3'>
+                  <Label htmlFor='to' className='text-sm font-medium'>
+                    To <span className='text-red-500'>*</span>
+                  </Label>
+                  <Input
+                    id='to'
+                    placeholder='recipient@example.com'
+                    value={(config.to as string) || ""}
+                    onChange={(e) => handleChange("to", e.target.value)}
+                    className='h-11'
+                    required
+                  />
+                  {getFieldError("to") && (
                     <div className='flex items-center space-x-2 text-sm text-red-500'>
                       <AlertCircle className='h-4 w-4' />
-                      <span>CC: {getFieldError("cc")}</span>
-                    </div>
-                  )}
-                  {getFieldError("bcc") && (
-                    <div className='flex items-center space-x-2 text-sm text-red-500'>
-                      <AlertCircle className='h-4 w-4' />
-                      <span>BCC: {getFieldError("bcc")}</span>
+                      <span>{getFieldError("to")}</span>
                     </div>
                   )}
                 </div>
-              )}
 
-              <div className='flex items-center space-x-3 p-3 bg-muted/30 rounded-lg'>
-                <Switch
-                  id='htmlFormat'
-                  checked={(config.htmlFormat as boolean) !== false}
-                  onCheckedChange={(checked) =>
-                    handleChange("htmlFormat", checked)
-                  }
-                />
-                <Label htmlFor='htmlFormat' className='text-sm font-medium'>
-                  Send as HTML
-                </Label>
+                <div className='space-y-3'>
+                  <Label htmlFor='subject' className='text-sm font-medium'>
+                    Subject <span className='text-red-500'>*</span>
+                  </Label>
+                  <Input
+                    id='subject'
+                    placeholder='Notification subject'
+                    value={(config.subject as string) || ""}
+                    onChange={(e) => handleChange("subject", e.target.value)}
+                    className='h-11'
+                    required
+                  />
+                  {getFieldError("subject") && (
+                    <div className='flex items-center space-x-2 text-sm text-red-500'>
+                      <AlertCircle className='h-4 w-4' />
+                      <span>{getFieldError("subject")}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className='space-y-3'>
+                  <Label htmlFor='body' className='text-sm font-medium'>
+                    Body <span className='text-red-500'>*</span>
+                  </Label>
+                  <Textarea
+                    id='body'
+                    placeholder='Notification message...'
+                    value={(config.body as string) || ""}
+                    onChange={(e) => handleChange("body", e.target.value)}
+                    rows={6}
+                    className='resize-none'
+                    required
+                  />
+                  {getFieldError("body") && (
+                    <div className='flex items-center space-x-2 text-sm text-red-500'>
+                      <AlertCircle className='h-4 w-4' />
+                      <span>{getFieldError("body")}</span>
+                    </div>
+                  )}
+                  {!config.body && (
+                    <div className='flex items-center space-x-2 text-sm text-amber-500'>
+                      <AlertCircle className='h-4 w-4' />
+                      <span>Email body is required for execution</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className='grid grid-cols-2 gap-4'>
+                  <div className='space-y-3'>
+                    <Label htmlFor='cc' className='text-sm font-medium'>
+                      CC (optional)
+                    </Label>
+                    <Input
+                      id='cc'
+                      placeholder='cc@example.com'
+                      value={(config.cc as string) || ""}
+                      onChange={(e) => handleChange("cc", e.target.value)}
+                      className='h-11'
+                    />
+                  </div>
+                  <div className='space-y-3'>
+                    <Label htmlFor='bcc' className='text-sm font-medium'>
+                      BCC (optional)
+                    </Label>
+                    <Input
+                      id='bcc'
+                      placeholder='bcc@example.com'
+                      value={(config.bcc as string) || ""}
+                      onChange={(e) => handleChange("bcc", e.target.value)}
+                      className='h-11'
+                    />
+                  </div>
+                </div>
+
+                {/* Show validation errors for CC and BCC */}
+                {(getFieldError("cc") || getFieldError("bcc")) && (
+                  <div className='space-y-2'>
+                    {getFieldError("cc") && (
+                      <div className='flex items-center space-x-2 text-sm text-red-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>CC: {getFieldError("cc")}</span>
+                      </div>
+                    )}
+                    {getFieldError("bcc") && (
+                      <div className='flex items-center space-x-2 text-sm text-red-500'>
+                        <AlertCircle className='h-4 w-4' />
+                        <span>BCC: {getFieldError("bcc")}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className='flex items-center space-x-3 p-4 bg-muted/30 rounded-lg'>
+                  <Switch
+                    id='htmlFormat'
+                    checked={(config.htmlFormat as boolean) !== false}
+                    onCheckedChange={(checked) =>
+                      handleChange("htmlFormat", checked)
+                    }
+                  />
+                  <Label htmlFor='htmlFormat' className='text-sm font-medium'>
+                    Send as HTML
+                  </Label>
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value='template' className='space-y-4'>
-          <Card>
-            <CardHeader>
-              <CardTitle className='flex items-center space-x-2'>
-                <Code className='h-4 w-4' />
-                <span>Template Variables</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-4'>
+          <Card className='border-0 shadow-sm bg-card/50'>
+            <CardContent className='p-6 space-y-6'>
+              <div className='flex items-center space-x-3'>
+                <div className='w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-600/20 flex items-center justify-center'>
+                  <Code className='h-5 w-5 text-purple-600' />
+                </div>
+                <div>
+                  <h3 className='font-semibold text-lg'>Template Variables</h3>
+                  <p className='text-sm text-muted-foreground'>
+                    Use dynamic variables in your notifications
+                  </p>
+                </div>
+              </div>
+
               <Alert>
                 <Info className='h-4 w-4' />
                 <AlertDescription>
@@ -544,9 +560,11 @@ export function NotificationConfig({
                 </AlertDescription>
               </Alert>
 
-              <div className='space-y-2'>
-                <Label>Available Variables</Label>
-                <div className='grid gap-2'>
+              <div className='space-y-4'>
+                <Label className='text-sm font-medium'>
+                  Available Variables
+                </Label>
+                <div className='grid gap-3'>
                   {templateVariables.map((variable) => (
                     <TooltipProvider key={variable.name}>
                       <Tooltip>
@@ -554,7 +572,7 @@ export function NotificationConfig({
                           <Button
                             variant='outline'
                             size='sm'
-                            className='justify-start text-left'
+                            className='justify-start text-left h-auto p-3'
                             onClick={() => {
                               // Insert variable into appropriate field based on notification type
                               if (notificationType === "email") {
@@ -566,10 +584,17 @@ export function NotificationConfig({
                                 );
                               }
                             }}>
-                            <Badge variant='secondary' className='mr-2'>
+                            <Badge variant='secondary' className='mr-3'>
                               {variable.name}
                             </Badge>
-                            {variable.description}
+                            <div className='text-left'>
+                              <p className='font-medium text-sm'>
+                                {variable.description}
+                              </p>
+                              <p className='text-xs text-muted-foreground'>
+                                Example: {variable.example}
+                              </p>
+                            </div>
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -587,7 +612,9 @@ export function NotificationConfig({
                 open={templateCollapsed}
                 onOpenChange={setTemplateCollapsed}>
                 <CollapsibleTrigger asChild>
-                  <Button variant='outline' className='w-full justify-between'>
+                  <Button
+                    variant='outline'
+                    className='w-full justify-between h-11'>
                     <span>Template Examples</span>
                     {templateCollapsed ? (
                       <ChevronRight className='h-4 w-4' />
@@ -598,33 +625,25 @@ export function NotificationConfig({
                 </CollapsibleTrigger>
                 <CollapsibleContent className='space-y-4 pt-4'>
                   <div className='space-y-4'>
-                    <div className='space-y-2'>
-                      <Label>Email Template Examples</Label>
-                      <div className='space-y-2 text-sm'>
-                        <div className='p-2 bg-gray-50 rounded'>
-                          <strong>Subject:</strong> Alert: {"{json.title}"} -{" "}
-                          {"{json.status}"}
+                    <div className='space-y-3'>
+                      <Label className='text-sm font-medium'>
+                        Email Template Examples
+                      </Label>
+                      <div className='space-y-3'>
+                        <div className='p-4 bg-muted/30 rounded-lg'>
+                          <p className='font-medium text-sm mb-2'>Subject:</p>
+                          <p className='text-sm'>
+                            Alert: {"{json.title}"} - {"{json.status}"}
+                          </p>
                         </div>
-                        <div className='p-2 bg-gray-50 rounded'>
-                          <strong>Body:</strong> Hello {"{json.name}"},<br />
-                          The price of {"{json.currency}"} has reached{" "}
-                          {"{json.price}"}.<br />
-                          Time: {"{json.timestamp}"}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className='space-y-2'>
-                      <Label>Webhook Template Examples</Label>
-                      <div className='space-y-2 text-sm'>
-                        <div className='p-2 bg-gray-50 rounded'>
-                          <strong>URL:</strong> https://api.example.com/webhook/
-                          {"{json.userId}"}
-                        </div>
-                        <div className='p-2 bg-gray-50 rounded'>
-                          <strong>Body:</strong> {"{"}"message": "
-                          {"{json.message}"}", "status": "{"{json.status}"}"
-                          {"}"}
+                        <div className='p-4 bg-muted/30 rounded-lg'>
+                          <p className='font-medium text-sm mb-2'>Body:</p>
+                          <p className='text-sm'>
+                            Hello {"{json.name}"},<br />
+                            The price of {"{json.currency}"} has reached{" "}
+                            {"{json.price}"}.<br />
+                            Time: {"{json.timestamp}"}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -636,14 +655,20 @@ export function NotificationConfig({
         </TabsContent>
 
         <TabsContent value='test' className='space-y-4'>
-          <Card>
-            <CardHeader>
-              <CardTitle className='flex items-center space-x-2'>
-                <Play className='h-4 w-4' />
-                <span>Test Notification</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className='space-y-4'>
+          <Card className='border-0 shadow-sm bg-card/50'>
+            <CardContent className='p-6 space-y-6'>
+              <div className='flex items-center space-x-3'>
+                <div className='w-10 h-10 rounded-lg bg-gradient-to-br from-green-500/10 to-green-600/20 flex items-center justify-center'>
+                  <Play className='h-5 w-5 text-green-600' />
+                </div>
+                <div>
+                  <h3 className='font-semibold text-lg'>Test Notification</h3>
+                  <p className='text-sm text-muted-foreground'>
+                    Test your configuration with sample data
+                  </p>
+                </div>
+              </div>
+
               <Alert>
                 <Info className='h-4 w-4' />
                 <AlertDescription>
@@ -653,10 +678,10 @@ export function NotificationConfig({
               </Alert>
 
               <div className='space-y-4'>
-                <div className='flex items-center justify-between'>
+                <div className='flex items-center justify-between p-4 bg-muted/30 rounded-lg'>
                   <div>
                     <h4 className='font-medium'>Configuration Status</h4>
-                    <p className='text-sm text-gray-500'>
+                    <p className='text-sm text-muted-foreground'>
                       {isValid
                         ? "Configuration is valid"
                         : "Configuration has errors"}
@@ -687,7 +712,7 @@ export function NotificationConfig({
                 <Button
                   onClick={onTest}
                   disabled={!isValid || executionStatus === "running"}
-                  className='w-full'>
+                  className='w-full h-11 bg-primary hover:bg-primary/90'>
                   {executionStatus === "running" ? (
                     <>
                       <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -702,32 +727,47 @@ export function NotificationConfig({
                 </Button>
 
                 {executionData && (
-                  <div className='space-y-2'>
+                  <div className='space-y-3'>
                     <h4 className='font-medium'>Last Test Result</h4>
-                    <div className='p-3 bg-gray-50 rounded text-sm'>
-                      <div>
-                        <strong>Status:</strong> {executionStatus}
+                    <div className='p-4 bg-muted/30 rounded-lg space-y-2 text-sm'>
+                      <div className='flex justify-between'>
+                        <span className='text-muted-foreground'>Status:</span>
+                        <span className='font-medium'>{executionStatus}</span>
                       </div>
                       {executionData.startTime && (
-                        <div>
-                          <strong>Start Time:</strong>{" "}
-                          {new Date(executionData.startTime).toLocaleString()}
+                        <div className='flex justify-between'>
+                          <span className='text-muted-foreground'>
+                            Start Time:
+                          </span>
+                          <span className='font-medium'>
+                            {new Date(executionData.startTime).toLocaleString()}
+                          </span>
                         </div>
                       )}
                       {executionData.endTime && (
-                        <div>
-                          <strong>End Time:</strong>{" "}
-                          {new Date(executionData.endTime).toLocaleString()}
+                        <div className='flex justify-between'>
+                          <span className='text-muted-foreground'>
+                            End Time:
+                          </span>
+                          <span className='font-medium'>
+                            {new Date(executionData.endTime).toLocaleString()}
+                          </span>
                         </div>
                       )}
                       {executionData.duration && (
-                        <div>
-                          <strong>Duration:</strong> {executionData.duration}ms
+                        <div className='flex justify-between'>
+                          <span className='text-muted-foreground'>
+                            Duration:
+                          </span>
+                          <span className='font-medium'>
+                            {executionData.duration}ms
+                          </span>
                         </div>
                       )}
                       {executionData.error && (
-                        <div className='text-red-600'>
-                          <strong>Error:</strong> {executionData.error}
+                        <div className='text-red-600 text-sm'>
+                          <span className='font-medium'>Error:</span>{" "}
+                          {executionData.error}
                         </div>
                       )}
                     </div>
