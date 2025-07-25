@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InlineTemplateVariable } from "@/components/ui/template-variable";
 import { Switch } from "@/components/ui/switch";
 
 interface ComparatorConfigProps {
@@ -180,19 +181,19 @@ export function ComparatorConfig({ config, onChange }: ComparatorConfigProps) {
             <div className='text-xs space-y-1'>
               <div>
                 <strong>Simple:</strong>{" "}
-                {`{"left": "{{price}}", "right": 2000}`}
+                <InlineTemplateVariable>{`{"left": "{{price}}", "right": 2000}`}</InlineTemplateVariable>
               </div>
               <div>
                 <strong>Between:</strong>{" "}
-                {`{"value": "{{age}}", "min": 18, "max": 65}`}
+                <InlineTemplateVariable>{`{"value": "{{age}}", "min": 18, "max": 65}`}</InlineTemplateVariable>
               </div>
               <div>
                 <strong>Contains:</strong>{" "}
-                {`{"text": "{{message}}", "substring": "error"}`}
+                <InlineTemplateVariable>{`{"text": "{{message}}", "substring": "error"}`}</InlineTemplateVariable>
               </div>
               <div>
                 <strong>In Array:</strong>{" "}
-                {`{"value": "{{status}}", "array": ["active", "pending"]}`}
+                <InlineTemplateVariable>{`{"value": "{{status}}", "array": ["active", "pending"]}`}</InlineTemplateVariable>
               </div>
             </div>
           </CardContent>

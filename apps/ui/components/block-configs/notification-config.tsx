@@ -48,6 +48,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { z } from "zod";
+import {
+  TemplateVariable,
+  InlineTemplateVariable,
+} from "@/components/ui/template-variable";
 
 // Template variables available from previous blocks
 const templateVariables: TemplateVariable[] = [
@@ -584,9 +588,11 @@ export function NotificationConfig({
                                 );
                               }
                             }}>
-                            <Badge variant='secondary' className='mr-3'>
-                              {variable.name}
-                            </Badge>
+                            <div className='mr-3'>
+                              <TemplateVariable variant='secondary' size='sm'>
+                                {variable.name}
+                              </TemplateVariable>
+                            </div>
                             <div className='text-left'>
                               <p className='font-medium text-sm'>
                                 {variable.description}
@@ -633,16 +639,37 @@ export function NotificationConfig({
                         <div className='p-4 bg-muted/30 rounded-lg'>
                           <p className='font-medium text-sm mb-2'>Subject:</p>
                           <p className='text-sm'>
-                            Alert: {"{json.title}"} - {"{json.status}"}
+                            Alert:{" "}
+                            <InlineTemplateVariable>
+                              {"{json.title}"}
+                            </InlineTemplateVariable>{" "}
+                            -{" "}
+                            <InlineTemplateVariable>
+                              {"{json.status}"}
+                            </InlineTemplateVariable>
                           </p>
                         </div>
                         <div className='p-4 bg-muted/30 rounded-lg'>
                           <p className='font-medium text-sm mb-2'>Body:</p>
                           <p className='text-sm'>
-                            Hello {"{json.name}"},<br />
-                            The price of {"{json.currency}"} has reached{" "}
-                            {"{json.price}"}.<br />
-                            Time: {"{json.timestamp}"}
+                            Hello{" "}
+                            <InlineTemplateVariable>
+                              {"{json.name}"}
+                            </InlineTemplateVariable>
+                            ,<br />
+                            The price of{" "}
+                            <InlineTemplateVariable>
+                              {"{json.currency}"}
+                            </InlineTemplateVariable>{" "}
+                            has reached{" "}
+                            <InlineTemplateVariable>
+                              {"{json.price}"}
+                            </InlineTemplateVariable>
+                            .<br />
+                            Time:{" "}
+                            <InlineTemplateVariable>
+                              {"{json.timestamp}"}
+                            </InlineTemplateVariable>
                           </p>
                         </div>
                       </div>

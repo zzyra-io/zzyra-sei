@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InlineTemplateVariable } from "@/components/ui/template-variable";
 
 interface CalculatorConfigProps {
   config: Record<string, unknown>;
@@ -137,10 +138,11 @@ export function CalculatorConfig({ config, onChange }: CalculatorConfigProps) {
               </div>
               <div>
                 <strong>Percentage:</strong>{" "}
-                {`{"value": "{{balance}}", "percentage": 10}`}
+                <InlineTemplateVariable>{`{"value": "{{balance}}", "percentage": 10}`}</InlineTemplateVariable>
               </div>
               <div>
-                <strong>Formula:</strong> {`Math.sqrt({{value}}) * 2`}
+                <strong>Formula:</strong>{" "}
+                <InlineTemplateVariable>{`Math.sqrt({{value}}) * 2`}</InlineTemplateVariable>
               </div>
             </div>
           </CardContent>

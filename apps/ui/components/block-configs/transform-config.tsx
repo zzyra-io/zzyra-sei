@@ -1,60 +1,66 @@
-"use client"
+"use client";
 
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { InlineTemplateVariable } from "@/components/ui/template-variable";
 
 interface TransformConfigProps {
-  config: any
-  onChange: (config: any) => void
+  config: any;
+  onChange: (config: any) => void;
 }
 
 export function TransformConfig({ config, onChange }: TransformConfigProps) {
   const handleChange = (key: string, value: any) => {
-    onChange({ ...config, [key]: value })
-  }
+    onChange({ ...config, [key]: value });
+  };
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="transformType">Transform Type</Label>
+    <div className='p-4 space-y-4'>
+      <div className='space-y-2'>
+        <Label htmlFor='transformType'>Transform Type</Label>
         <Select
           value={config.transformType || "javascript"}
-          onValueChange={(value) => handleChange("transformType", value)}
-        >
-          <SelectTrigger id="transformType">
-            <SelectValue placeholder="Select transform type" />
+          onValueChange={(value) => handleChange("transformType", value)}>
+          <SelectTrigger id='transformType'>
+            <SelectValue placeholder='Select transform type' />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="javascript">JavaScript</SelectItem>
-            <SelectItem value="jsonPath">JSON Path</SelectItem>
-            <SelectItem value="template">Template</SelectItem>
-            <SelectItem value="mapping">Field Mapping</SelectItem>
+            <SelectItem value='javascript'>JavaScript</SelectItem>
+            <SelectItem value='jsonPath'>JSON Path</SelectItem>
+            <SelectItem value='template'>Template</SelectItem>
+            <SelectItem value='mapping'>Field Mapping</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {config.transformType === "javascript" && (
-        <div className="space-y-2">
-          <Label htmlFor="code">JavaScript Code</Label>
+        <div className='space-y-2'>
+          <Label htmlFor='code'>JavaScript Code</Label>
           <Textarea
-            id="code"
-            placeholder="// Example: return { ...data, transformed: true };"
+            id='code'
+            placeholder='// Example: return { ...data, transformed: true };'
             value={config.code || ""}
             onChange={(e) => handleChange("code", e.target.value)}
             rows={8}
-            className="font-mono text-sm"
+            className='font-mono text-sm'
           />
         </div>
       )}
 
       {config.transformType === "jsonPath" && (
-        <div className="space-y-2">
-          <Label htmlFor="jsonPath">JSON Path Expression</Label>
+        <div className='space-y-2'>
+          <Label htmlFor='jsonPath'>JSON Path Expression</Label>
           <Textarea
-            id="jsonPath"
-            placeholder="$.data.items[*].name"
+            id='jsonPath'
+            placeholder='$.data.items[*].name'
             value={config.jsonPath || ""}
             onChange={(e) => handleChange("jsonPath", e.target.value)}
             rows={3}
@@ -63,23 +69,29 @@ export function TransformConfig({ config, onChange }: TransformConfigProps) {
       )}
 
       {config.transformType === "template" && (
-        <div className="space-y-2">
-          <Label htmlFor="template">Template</Label>
+        <div className='space-y-2'>
+          <Label htmlFor='template'>Template</Label>
           <Textarea
-            id="template"
-            placeholder="Hello {{name}}, your balance is {{amount}}."
+            id='template'
+            placeholder='Hello {{name}}, your balance is {{amount}}.'
             value={config.template || ""}
             onChange={(e) => handleChange("template", e.target.value)}
             rows={5}
           />
+          <p className='text-xs text-muted-foreground'>
+            Use template variables like{" "}
+            <InlineTemplateVariable>{"{{name}}"}</InlineTemplateVariable> and{" "}
+            <InlineTemplateVariable>{"{{amount}}"}</InlineTemplateVariable> to
+            include dynamic data.
+          </p>
         </div>
       )}
 
       {config.transformType === "mapping" && (
-        <div className="space-y-2">
-          <Label htmlFor="mapping">Field Mapping (JSON)</Label>
+        <div className='space-y-2'>
+          <Label htmlFor='mapping'>Field Mapping (JSON)</Label>
           <Textarea
-            id="mapping"
+            id='mapping'
             placeholder='{"sourceField": "targetField", "oldName": "newName"}'
             value={config.mapping || ""}
             onChange={(e) => handleChange("mapping", e.target.value)}
@@ -88,14 +100,16 @@ export function TransformConfig({ config, onChange }: TransformConfigProps) {
         </div>
       )}
 
-      <div className="flex items-center space-x-2">
+      <div className='flex items-center space-x-2'>
         <Switch
-          id="preserveOriginal"
+          id='preserveOriginal'
           checked={config.preserveOriginal || false}
-          onCheckedChange={(checked) => handleChange("preserveOriginal", checked)}
+          onCheckedChange={(checked) =>
+            handleChange("preserveOriginal", checked)
+          }
         />
-        <Label htmlFor="preserveOriginal">Preserve original data</Label>
+        <Label htmlFor='preserveOriginal'>Preserve original data</Label>
       </div>
     </div>
-  )
+  );
 }

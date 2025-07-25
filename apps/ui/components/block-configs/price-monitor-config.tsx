@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { InlineTemplateVariable } from "@/components/ui/template-variable";
 
 interface PriceMonitorConfigProps {
   config: any;
