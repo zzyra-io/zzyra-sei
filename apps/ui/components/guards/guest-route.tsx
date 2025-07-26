@@ -22,22 +22,13 @@ export function GuestRoute({ children, fallback = null }: GuestRouteProps) {
   // Handle authenticated users by redirecting to dashboard
   useEffect(() => {
     if (isClient && isAuthenticated && !isLoading) {
-      try {
-        // Don't redirect if we're already on the login page
-        if (window.location.pathname === "/login") {
-          return;
-        }
-
-        // Attempt to go back to previous page if available
-        if (window.history.length > 1) {
-          router.back();
-        } else {
-          router.push("/dashboard");
-        }
-      } catch (err) {
-        console.error("Navigation error:", err);
-        router.push("/dashboard");
+      // Don't redirect if we're already on the login page
+      if (window.location.pathname === "/login") {
+        return;
       }
+
+      // Simple redirect to dashboard
+      router.push("/dashboard");
     }
   }, [isClient, isAuthenticated, isLoading, router]);
 

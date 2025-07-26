@@ -28,13 +28,15 @@ export function wouldCreateCycle(nodes: Node[], edges: Edge[], newConnection: Co
 
   // Add existing edges to the graph
   edges.forEach((edge) => {
-    if (edge.source && edge.target) {
+    if (edge.source && edge.target && graph[edge.source]) {
       graph[edge.source].push(edge.target)
     }
   })
 
   // Add the new connection to the graph
-  graph[newConnection.source].push(newConnection.target)
+  if (graph[newConnection.source]) {
+    graph[newConnection.source].push(newConnection.target)
+  }
 
   // Set to keep track of visited nodes
   const visited = new Set<string>()
@@ -57,8 +59,9 @@ export function wouldCreateCycle(nodes: Node[], edges: Edge[], newConnection: Co
     visited.add(nodeId)
     recursionStack.add(nodeId)
 
-    // Visit all neighbors
-    for (const neighbor of graph[nodeId] || []) {
+    // Visit all neighbors - ensure graph[nodeId] exists
+    const neighbors = graph[nodeId] || []
+    for (const neighbor of neighbors) {
       if (dfs(neighbor)) {
         return true
       }

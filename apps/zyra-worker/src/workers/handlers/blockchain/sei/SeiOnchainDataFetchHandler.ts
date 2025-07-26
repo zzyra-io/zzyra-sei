@@ -119,16 +119,11 @@ export class SeiOnchainDataFetchHandler {
     } catch (error: any) {
       return {
         success: false,
-        dataType: node.config?.dataType || 'unknown',
-        address: node.config?.targetAddress || '',
-        network: node.config?.network || 'sei-testnet',
-        data: null,
-        metadata: {
-          blockHeight: 0,
-          fetchTime: new Date().toISOString(),
-          cached: false,
-        },
         error: error.message,
+        dataType: node.data?.config?.dataType || 'unknown',
+        address: node.data?.config?.targetAddress || '',
+        network: node.data?.config?.network || 'sei-testnet',
+        executionTime: new Date().toISOString(),
         timestamp: new Date().toISOString(),
       };
     }
@@ -138,13 +133,13 @@ export class SeiOnchainDataFetchHandler {
     node: any,
     ctx: BlockExecutionContext,
   ): SeiOnchainDataFetchConfig {
-    if (!node.config) {
+    if (!node.data?.config) {
       throw new Error('Block configuration is missing');
     }
 
     try {
       const result = seiOnchainDataFetchSchema.configSchema.safeParse(
-        node.config,
+        node.data.config,
       );
       if (!result.success) {
         throw new Error(

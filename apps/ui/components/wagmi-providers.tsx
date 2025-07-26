@@ -6,7 +6,6 @@ import { useTheme } from "next-themes";
 import { WagmiProvider } from "wagmi";
 import { createWagmiConfig, queryClient } from "@/lib/utils/wagmi.config";
 import { ConnectKitProvider } from "connectkit";
-import MagicProvider from "@/lib/magic-provider";
 
 type ZyraProvidersProps = PropsWithChildren;
 
@@ -32,7 +31,7 @@ export function WagmiProviders({ children }: ZyraProvidersProps) {
         <ConnectKitProvider
           mode={theme === "dark" ? "dark" : "light"}
           theme='soft'>
-          <MagicProvider>{children}</MagicProvider>
+          {children}
         </ConnectKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

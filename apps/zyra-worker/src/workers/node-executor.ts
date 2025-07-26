@@ -274,6 +274,27 @@ export class NodeExecutor {
           { output: result },
         );
 
+        // Check if the result indicates failure (success: false)
+        if (result && typeof result === 'object' && result.success === false) {
+          const errorMessage = result.error || 'Block execution failed';
+          this.logger.error(
+            `Node ${node.id} execution failed: ${errorMessage}`,
+            { nodeId: node.id, executionId, result },
+          );
+
+          // Log the failure
+          await this.executionLogger.logNodeEvent(
+            executionId,
+            node.id,
+            'error',
+            `Node execution failed: ${errorMessage}`,
+            { output: result },
+          );
+
+          // Throw an error to mark the node as failed
+          throw new Error(errorMessage);
+        }
+
         // Note: Block execution status is handled by WorkflowExecutor
 
         const duration = Date.now() - startTime;

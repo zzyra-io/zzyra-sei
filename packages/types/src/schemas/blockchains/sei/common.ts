@@ -4,8 +4,8 @@ import { z } from "zod";
  * Common types and schemas for Sei blockchain integration
  */
 
-// Sei address validation regex
-export const SEI_ADDRESS_REGEX = /^sei[0-9a-z]{38}$/;
+// Sei address validation regex - supports both EVM and Cosmos formats
+export const SEI_ADDRESS_REGEX = /^(sei[0-9a-z]{38}|0x[a-fA-F0-9]{40})$/;
 
 // Common Sei network types
 export const seiNetworkSchema = z
@@ -15,7 +15,7 @@ export const seiNetworkSchema = z
 // Sei address validation schema
 export const seiAddressSchema = z
   .string()
-  .regex(SEI_ADDRESS_REGEX, "Invalid Sei address format");
+  .regex(SEI_ADDRESS_REGEX, "Invalid Sei address format. Must be either sei1... (Cosmos) or 0x... (EVM)");
 
 // Standard input schema for all Sei blocks
 export const standardInputSchema = z.object({
@@ -152,6 +152,14 @@ export const SEI_ERROR_MESSAGES = {
 // Utility functions
 export const validateSeiAddress = (address: string): boolean => {
   return SEI_ADDRESS_REGEX.test(address);
+};
+
+// Helper function to determine address type
+export const getSeiAddressType = (address: string): 'evm' | 'cosmos' | 'invalid' => {
+  if (!validateSeiAddress(address)) {
+    return 'invalid';
+  }
+  return address.startsWith('0x') ? 'evm' : 'cosmos';
 };
 
 export const formatSeiAmount = (

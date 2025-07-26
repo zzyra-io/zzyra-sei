@@ -41,7 +41,6 @@ export function MagicLoginForm({ onSuccess }: MagicLoginFormProps) {
   // Handle authentication success
   useEffect(() => {
     if (isAuthenticated && onSuccess) {
-      console.log("Authentication successful, redirecting...");
       onSuccess();
     }
   }, [isAuthenticated, onSuccess]);

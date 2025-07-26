@@ -322,12 +322,25 @@ export default function BuilderPage() {
   const prepareWorkflowNodesForApi = useCallback(
     (nodes: Node[]): UnifiedWorkflowNode[] => {
       console.log("Original nodes:", nodes);
+      console.log("Original nodes length:", nodes.length);
+
       const processedNodes = prepareNodesForApi(
         nodes.map((node) =>
           ensureValidWorkflowNode(node as UnifiedWorkflowNode)
         )
       );
       console.log("Processed nodes:", processedNodes);
+      console.log("Processed nodes length:", processedNodes.length);
+
+      if (nodes.length !== processedNodes.length) {
+        console.error(
+          "Node filtering occurred! Original:",
+          nodes.length,
+          "Processed:",
+          processedNodes.length
+        );
+      }
+
       return processedNodes;
     },
     []
@@ -397,16 +410,20 @@ export default function BuilderPage() {
       method: "manual" | "ai",
       position?: { x: number; y: number }
     ) => {
-      const newNode: Node = {
+      const newNode: UnifiedWorkflowNode = ensureValidWorkflowNode({
         id: `${Date.now()}`,
         type: "CUSTOM",
         position: position || { x: 100, y: 100 },
-        data: customBlock as unknown as Record<string, unknown>,
+        data: {
+          ...customBlock,
+          blockType: customBlock.blockType || BlockType.CUSTOM,
+          label: customBlock.name || "Custom Block",
+        },
         dragHandle: ".custom-drag-handle",
         connectable: true,
-      };
+      });
       createCustomBlock({ customBlock, method });
-      addNode(newNode);
+      addNode(newNode as Node);
       setHasUnsavedChanges(true);
     },
     [addNode, setHasUnsavedChanges, createCustomBlock]

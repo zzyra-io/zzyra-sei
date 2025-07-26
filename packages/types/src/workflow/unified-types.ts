@@ -124,7 +124,7 @@ function getBlockMetadata(blockType: BlockType): {
     case BlockType.SCHEDULE:
     case BlockType.PRICE_MONITOR:
     case BlockType.WALLET_LISTEN:
-    case BlockType.SEI_CONTRACT_CALL:
+    case BlockType.SEI_WALLET_LISTEN:
       return {
         nodeType: "TRIGGER",
         iconName: "play",

@@ -61,12 +61,6 @@ export class BlockHandlerRegistry {
         new DataTransformHandler(),
       ),
 
-      // Edge transformation blocks
-      [BlockType.EDGE_TRANSFORM]: new MetricsBlockHandler(
-        BlockType.EDGE_TRANSFORM,
-        new EdgeTransformHandler(),
-      ),
-
       // Custom blocks
       [BlockType.CUSTOM]: new MetricsBlockHandler(
         BlockType.CUSTOM,

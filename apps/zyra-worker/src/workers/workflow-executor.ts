@@ -24,6 +24,7 @@ import { DataStateService } from '../services/data-state.service';
 import { ParallelExecutionService } from '../services/parallel-execution.service';
 import { BlockchainDataSyncService } from '../services/blockchain-data-sync.service';
 import { BlockType, getEnhancedBlockSchema } from '@zyra/types';
+import { z } from 'zod';
 
 @Injectable()
 export class WorkflowExecutor {
@@ -914,6 +915,8 @@ export class WorkflowExecutor {
 
       finalStatus = 'completed';
       finalError = null;
+
+      return { status: 'completed', outputs, error: null };
     } catch (error) {
       finalStatus = 'failed';
       finalError = error instanceof Error ? error.message : String(error);
@@ -1002,7 +1005,8 @@ export class WorkflowExecutor {
         `[executionId=${executionId}] Workflow execution completed in ${duration}ms`,
       );
 
-      return { status: finalStatus, outputs: {}, error: finalError };
+      // Don't override the return value from catch block
+      // The return value should come from the try or catch block, not finally
     }
   }
 
@@ -1083,8 +1087,8 @@ export class WorkflowExecutor {
             },
           });
         } catch (validationError: any) {
-          if (validationError.errors) {
-            validationError.errors.forEach((err: any) => {
+          if (validationError instanceof z.ZodError) {
+            validationError.issues.forEach((err: any) => {
               errors.push(`${err.path?.join('.')}: ${err.message}`);
             });
           } else {
@@ -1175,8 +1179,8 @@ export class WorkflowExecutor {
         try {
           enhancedSchema.outputSchema.parse(outputData);
         } catch (validationError: any) {
-          if (validationError.errors) {
-            validationError.errors.forEach((err: any) => {
+          if (validationError instanceof z.ZodError) {
+            validationError.issues.forEach((err: any) => {
               errors.push(`${err.path?.join('.')}: ${err.message}`);
             });
           } else {
@@ -1211,16 +1215,24 @@ export class WorkflowExecutor {
         case BlockType.PRICE_MONITOR:
           if (outputData) {
             // Handle both legacy and enhanced formats
-            const hasLegacyFormat = typeof outputData.price === 'number' && typeof outputData.conditionMet === 'boolean';
-            const hasEnhancedFormat = typeof outputData.currentPrice === 'number' && typeof outputData.triggered === 'boolean';
-            
+            const hasLegacyFormat =
+              typeof outputData.price === 'number' &&
+              typeof outputData.conditionMet === 'boolean';
+            const hasEnhancedFormat =
+              typeof outputData.currentPrice === 'number' &&
+              typeof outputData.triggered === 'boolean';
+
             if (!hasLegacyFormat && !hasEnhancedFormat) {
               // Check for legacy format
               if (typeof outputData.price !== 'number') {
-                errors.push('Price monitor should output numeric price (legacy) or currentPrice (enhanced)');
+                errors.push(
+                  'Price monitor should output numeric price (legacy) or currentPrice (enhanced)',
+                );
               }
               if (typeof outputData.conditionMet !== 'boolean') {
-                errors.push('Price monitor should output boolean conditionMet (legacy) or triggered (enhanced)');
+                errors.push(
+                  'Price monitor should output boolean conditionMet (legacy) or triggered (enhanced)',
+                );
               }
             }
           }

@@ -7,6 +7,8 @@ const PUBLIC_PATHS = [
   "/api/auth/logout",
   "/api/health",
   "/",
+  "/_next",
+  "/favicon.ico",
 ];
 
 const GUEST_PATHS = ["/login"];
@@ -19,19 +21,7 @@ const REDIRECT_CACHE_TTL = 2000;
 const isAuthenticated = (req: NextRequest): boolean => {
   // Check for access token in cookies
   const accessToken = req.cookies.get("token")?.value;
-
-  if (!accessToken) {
-    return false;
-  }
-
-  try {
-    // Simple JWT validation (check if it exists and isn't expired)
-    const payload = JSON.parse(atob(accessToken.split(".")[1]));
-    const now = Math.floor(Date.now() / 1000);
-    return payload.exp > now;
-  } catch {
-    return false;
-  }
+  return !!accessToken;
 };
 
 export async function middleware(req: NextRequest) {
@@ -76,21 +66,6 @@ export async function middleware(req: NextRequest) {
   // Handle guest routes (like login page)
   const isGuestPath = GUEST_PATHS.includes(pathname);
   if (isGuestPath && userIsAuthenticated) {
-    const callbackUrl =
-      searchParams.get("callbackUrl") || `${origin}/dashboard`;
-    try {
-      const redirectUrl = new URL(callbackUrl, origin);
-      if (
-        redirectUrl.origin === origin &&
-        !GUEST_PATHS.includes(redirectUrl.pathname)
-      ) {
-        redirectCache.set(requestUrl, now);
-        return NextResponse.redirect(redirectUrl);
-      }
-    } catch {
-      // Invalid callbackUrl
-    }
-
     redirectCache.set(requestUrl, now);
     return NextResponse.redirect(new URL("/dashboard", origin));
   }

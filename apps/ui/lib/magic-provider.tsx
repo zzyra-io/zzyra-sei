@@ -30,56 +30,63 @@ const MagicProvider = ({ children }: { children: ReactNode }) => {
   const [magic, setMagic] = useState<Magic | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    console.log("Magic Provider: Initializing Magic SDK");
-    if (typeof window !== "undefined") {
-      // Hardcoded API key for development - replace with your actual Magic API key
-      // In production, use process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY
-      console.log(
-        "Using Magic API Key:",
-        process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY ? "Available" : "Missing"
-      );
+    // Prevent multiple initializations
+    if (isInitialized || typeof window === "undefined") {
+      return;
+    }
+
+    // Add a small delay to ensure we're not in a hydration state
+    const timer = setTimeout(() => {
+      console.log("Magic Provider: Initializing Magic SDK");
 
       if (process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY) {
         setIsInitializing(true);
         try {
-          // Create a simpler Magic instance without network configuration
-          console.log("Creating Magic instance with basic configuration");
-
           const magic = new MagicBase(
             process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY,
             {
               extensions: [new OAuthExtension()],
-
               network: {
                 chainId: getChainId(),
                 rpcUrl: getNetworkUrl(),
               },
             }
           );
-          magic.preload().then(() => console.log("Magic <iframe> loaded."));
 
-          console.log("Magic instance created successfully");
-          setMagic(magic);
-          setIsInitializing(false);
+          magic.preload().then(() => {
+            console.log("Magic <iframe> loaded.");
+            setMagic(magic);
+            setIsInitializing(false);
+            setIsInitialized(true);
+          });
         } catch (error) {
           console.error("Error initializing Magic SDK:", error);
           setIsInitializing(false);
+          setIsInitialized(true);
         }
       } else {
-        console.error(
-          "Magic API Key is missing. Please check your environment variables."
-        );
+        console.error("Magic API Key is missing.");
+        setIsInitializing(false);
+        setIsInitialized(true);
       }
-    }
-  }, []);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [isInitialized]);
 
   useEffect(() => {
     if (magic) {
-      magic.user.isLoggedIn().then((isLoggedIn) => {
-        setIsAuthenticated(isLoggedIn);
-      });
+      magic.user
+        .isLoggedIn()
+        .then((isLoggedIn) => {
+          setIsAuthenticated(isLoggedIn);
+        })
+        .catch(() => {
+          setIsAuthenticated(false);
+        });
     }
   }, [magic]);
 

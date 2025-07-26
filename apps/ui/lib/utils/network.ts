@@ -58,10 +58,10 @@ export const NETWORK_CONFIG: Record<number, { chain: Chain; rpcUrl: string }> =
 
 // Active networks - change order to control priority (first is default)
 export const ACTIVE_NETWORKS = [
+  sei,
   baseSepolia,
   polygonAmoy,
   mainnet,
-  sei,
 ] as const;
 
 // Get the default network (first in ACTIVE_NETWORKS)

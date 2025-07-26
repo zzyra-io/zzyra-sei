@@ -97,21 +97,30 @@ export const useAuth = (): AuthHook => {
     setError(null);
 
     try {
-      // Step 1: Logout from backend
-      await api.post("/auth/logout");
+      // Clear auth store first
+      storeLogout();
 
-      // Step 2: Logout from Magic if available
+      // Logout from backend
+      try {
+        await api.post("/auth/logout");
+      } catch (err) {
+        console.warn("Backend logout failed:", err);
+      }
+
+      // Logout from Magic if available
       if (magic) {
-        const isLoggedIn = await magic.user.isLoggedIn();
-        if (isLoggedIn) {
-          await magic.user.logout();
+        try {
+          const isLoggedIn = await magic.user.isLoggedIn();
+          if (isLoggedIn) {
+            await magic.user.logout();
+          }
+        } catch (err) {
+          console.warn("Magic logout failed:", err);
         }
       }
 
-      // Step 3: Clear auth store
-      storeLogout();
-
-      // Step 4: Redirect to login
+      // Clear loading state and redirect
+      setIsLoading(false);
       router.push("/login");
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Logout failed";

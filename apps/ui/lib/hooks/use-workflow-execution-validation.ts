@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react";
 import { Node, Edge } from "@xyflow/react";
 import { BlockType, getEnhancedBlockSchema } from "@zyra/types";
 import { useBlockValidation } from "./use-block-validation";
+import { z } from "zod";
 
 interface ValidationError {
   nodeId: string;
@@ -23,53 +24,50 @@ interface WorkflowValidationResult {
  */
 export function useWorkflowExecutionValidation() {
   // Validate a single node's configuration
-  const validateNodeConfig = useCallback(
-    (node: Node): ValidationError[] => {
-      const errors: ValidationError[] = [];
-      
-      // Get block type from node
-      const blockType = node.data?.blockType || node.data?.type || node.type;
-      if (!blockType) {
-        errors.push({
-          nodeId: node.id,
-          field: "type",
-          message: "Node missing block type",
-        });
-        return errors;
-      }
+  const validateNodeConfig = useCallback((node: Node): ValidationError[] => {
+    const errors: ValidationError[] = [];
 
-      // Get enhanced schema for validation
-      const enhancedSchema = getEnhancedBlockSchema(blockType as BlockType);
-      if (!enhancedSchema) {
-        // No schema available - assume valid for backward compatibility
-        return errors;
-      }
+    // Get block type from node
+    const blockType = node.data?.blockType || node.data?.type || node.type;
+    if (!blockType) {
+      errors.push({
+        nodeId: node.id,
+        field: "type",
+        message: "Node missing block type",
+      });
+      return errors;
+    }
 
-      // Validate configuration against schema
-      try {
-        enhancedSchema.configSchema.parse(node.data?.config || {});
-      } catch (error: any) {
-        if (error.errors) {
-          error.errors.forEach((err: any) => {
-            errors.push({
-              nodeId: node.id,
-              field: err.path?.join('.') || 'config',
-              message: err.message,
-            });
-          });
-        } else {
+    // Get enhanced schema for validation
+    const enhancedSchema = getEnhancedBlockSchema(blockType as BlockType);
+    if (!enhancedSchema) {
+      // No schema available - assume valid for backward compatibility
+      return errors;
+    }
+
+    // Validate configuration against schema
+    try {
+      enhancedSchema.configSchema.parse(node.data?.config || {});
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        error.issues.forEach((err: any) => {
           errors.push({
             nodeId: node.id,
-            field: 'config',
-            message: error.message || 'Configuration validation failed',
+            field: err.path?.join(".") || "config",
+            message: err.message,
           });
-        }
+        });
+      } else {
+        errors.push({
+          nodeId: node.id,
+          field: "config",
+          message: error.message || "Configuration validation failed",
+        });
       }
+    }
 
-      return errors;
-    },
-    []
-  );
+    return errors;
+  }, []);
 
   // Validate entire workflow
   const validateWorkflow = useCallback(
@@ -101,7 +99,8 @@ export function useWorkflowExecutionValidation() {
       });
 
       const orphanedNodes = nodes.filter(
-        (node) => !connectedNodeIds.has(node.id) && node.data?.nodeType !== "trigger"
+        (node) =>
+          !connectedNodeIds.has(node.id) && node.data?.nodeType !== "trigger"
       );
 
       if (orphanedNodes.length > 0) {
@@ -149,7 +148,12 @@ export function useWorkflowExecutionValidation() {
 
   // Get field-specific error for a node
   const getNodeFieldError = useCallback(
-    (nodeId: string, fieldName: string, nodes: Node[], edges: Edge[]): string | undefined => {
+    (
+      nodeId: string,
+      fieldName: string,
+      nodes: Node[],
+      edges: Edge[]
+    ): string | undefined => {
       const nodeErrors = getNodeErrors(nodeId, nodes, edges);
       const fieldError = nodeErrors.find((error) => error.field === fieldName);
       return fieldError?.message;
@@ -171,12 +175,12 @@ export function useWorkflowExecutionValidation() {
  */
 function checkForCycles(nodes: Node[], edges: Edge[]): boolean {
   const graph = new Map<string, string[]>();
-  
+
   // Build adjacency list
   nodes.forEach((node) => {
     graph.set(node.id, []);
   });
-  
+
   edges.forEach((edge) => {
     const neighbors = graph.get(edge.source) || [];
     neighbors.push(edge.target);
@@ -191,7 +195,7 @@ function checkForCycles(nodes: Node[], edges: Edge[]): boolean {
     if (recursionStack.has(nodeId)) {
       return true;
     }
-    
+
     if (visited.has(nodeId)) {
       return false;
     }
@@ -220,4 +224,4 @@ function checkForCycles(nodes: Node[], edges: Edge[]): boolean {
   }
 
   return false;
-} 
+}

@@ -11,6 +11,7 @@ import React, {
 import { useToast } from "@/components/ui/use-toast";
 import { io, Socket } from "socket.io-client";
 import api from "@/lib/services/api";
+import useAuthStore from "@/lib/store/auth-store";
 
 // Define Notification type if not imported
 interface Notification {
@@ -50,12 +51,17 @@ export const NotificationSocketProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
   const { toast } = useToast();
+  const { isAuthenticated, user } = useAuthStore();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const socketRef = useRef<Socket | null>(null);
   const reconnectAttempts = useRef(0);
 
   const fetchNotifications = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      return;
+    }
+
     try {
       const response = await api.get("/notifications");
       const data = response.data;
@@ -71,7 +77,7 @@ export const NotificationSocketProvider: React.FC<{
     } catch (error: unknown) {
       // Silent fail
     }
-  }, []);
+  }, [isAuthenticated, user]);
 
   const refetchNotifications = useCallback(async () => {
     await fetchNotifications();
@@ -96,19 +102,23 @@ export const NotificationSocketProvider: React.FC<{
   }, []);
 
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    if (isAuthenticated && user) {
+      fetchNotifications();
+    }
+  }, [fetchNotifications, isAuthenticated, user]);
 
   useEffect(() => {
+    // Only connect if user is authenticated
+    if (!isAuthenticated || !user) {
+      return;
+    }
+
     // Connect to the worker's notification socket
-    const userId =
-      typeof window !== "undefined" ? localStorage.getItem("userId") : null;
-    if (!userId) return;
     const socket = io(
       process.env.NEXT_PUBLIC_NOTIFICATION_WS_URL ||
         "http://localhost:3007/notifications",
       {
-        auth: { userId },
+        auth: { userId: user.id },
         transports: ["websocket"],
         reconnection: true,
         reconnectionAttempts: 5,
@@ -148,7 +158,7 @@ export const NotificationSocketProvider: React.FC<{
     return () => {
       socket.disconnect();
     };
-  }, [toast]);
+  }, [toast, isAuthenticated, user]);
 
   const value: NotificationContextType = {
     notifications,

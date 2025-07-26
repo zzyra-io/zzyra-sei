@@ -12,6 +12,7 @@ import { Montserrat } from "next/font/google";
 import type React from "react";
 import { WagmiProviders } from "../components/wagmi-providers";
 import "./globals.css";
+import { AutoWalletConnect } from "@/components/auto-wallet-connect";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -22,13 +23,14 @@ const montserrat = Montserrat({
 
 export const metadata = {
   title: "Zzyra - AI-Powered Workflow Automation with Blockchain",
-  description: "Build powerful AI-native workflows that seamlessly integrate with blockchain technology",
+  description:
+    "Build powerful AI-native workflows that seamlessly integrate with blockchain technology",
   metadataBase: new URL("https://zyra.vercel.app"),
   generator: "v0.dev",
   icons: {
     icon: [
       { url: "/zyra-icon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", type: "image/x-icon" }
+      { url: "/favicon.ico", type: "image/x-icon" },
     ],
     apple: "/zyra-icon.svg",
   },
@@ -57,6 +59,7 @@ export default function RootLayout({
                     <main id='main-content'>{children}</main>
                     <Toaster />
                     <NotificationToastContainer />
+                    <AutoWalletConnect />
                   </NotificationSocketProvider>
                 </WorkflowExecutionProvider>
               </ThemeProvider>

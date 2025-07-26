@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { seiSmartContractCallSchema } from '@zyra/types';
 import { ethers } from 'ethers';
 import { SeiWalletService } from './services/SeiWalletService';
+import { validateSeiAddress } from '@zyra/types';
 
 // Explicit type definitions to avoid Zod inference issues
 interface SeiSmartContractCallConfig {
@@ -61,8 +62,10 @@ export class SeiSmartContractCallHandler {
       const walletService = this.getWalletService(config.network);
 
       // Validate contract address
-      if (!ethers.isAddress(config.contractAddress)) {
-        throw new Error(`Invalid contract address: ${config.contractAddress}`);
+      if (!validateSeiAddress(config.contractAddress)) {
+        throw new Error(
+          `Invalid Sei contract address: ${config.contractAddress}. Must be either sei1... (Cosmos) or 0x... (EVM)`,
+        );
       }
 
       // Create contract interface
@@ -101,18 +104,51 @@ export class SeiSmartContractCallHandler {
 
       return {
         success: true,
-        transactionHash: result.txHash,
+        transaction: {
+          txHash: result.txHash,
+          status: receipt ? 'success' : 'pending',
+          blockNumber: receipt?.blockNumber,
+          gasUsed: receipt?.gasUsed
+            ? parseInt(receipt.gasUsed.toString())
+            : undefined,
+          fees: receipt?.gasUsed
+            ? parseInt(receipt.gasUsed.toString()) *
+              (receipt?.gasPrice ? parseInt(receipt.gasPrice.toString()) : 0)
+            : undefined,
+          error: undefined,
+        },
         contractAddress: config.contractAddress,
-        method: config.method,
-        network: config.network,
-        gasUsed: receipt?.gasUsed?.toString(),
-        blockNumber: receipt?.blockNumber,
-        confirmations: receipt?.confirmations,
+        functionName: config.method,
+        returnData: undefined,
+        events: [],
+        gasEstimate: undefined,
+        actualGasUsed: receipt?.gasUsed
+          ? parseInt(receipt.gasUsed.toString())
+          : undefined,
+        executionTime: undefined,
+        confirmationTime: undefined,
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {
+      const config = this.validateAndExtractConfig(node, ctx);
       return {
         success: false,
+        transaction: {
+          txHash: '',
+          status: 'failed',
+          blockNumber: undefined,
+          gasUsed: undefined,
+          fees: undefined,
+          error: error.message,
+        },
+        contractAddress: config?.contractAddress || '',
+        functionName: config?.method || '',
+        returnData: undefined,
+        events: [],
+        gasEstimate: undefined,
+        actualGasUsed: undefined,
+        executionTime: undefined,
+        confirmationTime: undefined,
         error: error.message,
         timestamp: new Date().toISOString(),
       };
@@ -123,14 +159,18 @@ export class SeiSmartContractCallHandler {
     node: any,
     ctx: BlockExecutionContext,
   ): SeiSmartContractCallConfig {
-    if (!node.config) {
+    if (!node.data?.config) {
       throw new Error('Block configuration is missing');
     }
 
     try {
-      const result = seiSmartContractCallSchema.configSchema.safeParse(node.config);
+      const result = seiSmartContractCallSchema.configSchema.safeParse(
+        node.data.config,
+      );
       if (!result.success) {
-        throw new Error(`Configuration validation failed: ${result.error.message}`);
+        throw new Error(
+          `Configuration validation failed: ${result.error.message}`,
+        );
       }
       return result.data as SeiSmartContractCallConfig;
     } catch (error) {

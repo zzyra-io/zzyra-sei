@@ -142,7 +142,7 @@ export class SeiPaymentHandler {
       return {
         success: false,
         error: error.message,
-        network: node.config?.network || 'unknown',
+        network: node.data?.config?.network || 'sei-testnet',
         executionTime,
         timestamp: new Date().toISOString(),
       };
@@ -150,7 +150,7 @@ export class SeiPaymentHandler {
   }
 
   private validateAndExtractConfig(node: any, ctx: BlockExecutionContext): any {
-    const config = node.config || node.data?.config || {};
+    const config = node.data?.config || {};
     return SeiPaymentHandler.configSchema.parse(config);
   }
 

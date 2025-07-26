@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import axios from 'axios';
+import { validateSeiAddress } from '@zyra/types';
 
 /**
  * Sei Wallet Service for transaction delegation using Magic SDK
@@ -157,8 +158,10 @@ export class SeiWalletService {
       throw new Error('Transaction must have a recipient address (to)');
     }
 
-    if (!ethers.isAddress(transaction.to)) {
-      throw new Error('Invalid recipient address');
+    if (!validateSeiAddress(transaction.to)) {
+      throw new Error(
+        'Invalid Sei recipient address. Must be either sei1... (Cosmos) or 0x... (EVM)',
+      );
     }
 
     if (transaction.value && typeof transaction.value !== 'bigint') {
