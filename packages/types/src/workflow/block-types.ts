@@ -13,7 +13,7 @@ export enum BlockType {
   SCHEDULE = "SCHEDULE",
   WEBHOOK = "WEBHOOK",
   CUSTOM = "CUSTOM",
-  DATA_TRANSFORM = "DATA_TRANSFORM", // New transformation block
+  DATA_TRANSFORM = "DATA_TRANSFORM", // Enhanced transformation block
   WALLET_LISTEN = "WALLET_LISTEN",
   
   // Sei blockchain blocks
@@ -41,7 +41,7 @@ export const BLOCK_TYPES = [
   "SCHEDULE",
   "WEBHOOK",
   "CUSTOM",
-  "DATA_TRANSFORM", // New transformation block
+  "DATA_TRANSFORM", // Enhanced transformation block
   "WALLET_LISTEN",
   "SEI_WALLET_LISTEN",
   "SEI_CONTRACT_CALL",

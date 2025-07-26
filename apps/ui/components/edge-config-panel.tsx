@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import type { Edge } from "@xyflow/react";
-import { X, Link, Settings, Code, Zap } from "lucide-react";
+import { X, Link, Zap, Plus, ArrowUpDown, Eye, EyeOff, RefreshCw, AlertCircle, Loader2 } from "lucide-react";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +26,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { TransformationTemplateSelector } from "@/components/transformation-template-selector";
 
 interface EdgeConfigPanelProps {
   edge: Edge;
@@ -37,6 +40,17 @@ interface EdgeConfigPanelProps {
 interface FieldMapping {
   targetField: string;
   sourceField: string;
+  transformationType?: 'direct' | 'format' | 'calculate' | 'conditional';
+  transformConfig?: Record<string, any>;
+}
+
+interface DataTransformation {
+  type: 'map' | 'filter' | 'aggregate' | 'format' | 'extract' | 'combine' | 'conditional' | 'loop' | 'sort';
+  field: string;
+  operation: string;
+  value?: any;
+  outputField: string;
+  condition?: string;
 }
 
 export function EdgeConfigPanel({
@@ -57,18 +71,24 @@ export function EdgeConfigPanel({
 
   // Data flow configuration
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>(
-    edge.data?.mapping
-      ? Object.entries(edge.data.mapping).map(([target, source]) => ({
-          targetField: target,
-          sourceField: source as string,
-        }))
-      : []
+    (edge.data?.fieldMappings as FieldMapping[]) || []
+  );
+  const [transformations, setTransformations] = useState<DataTransformation[]>(
+    (edge.data?.transformations as DataTransformation[]) || []
   );
   const [transformCode, setTransformCode] = useState(
     edge.data?.transform || ""
   );
   const [condition, setCondition] = useState(edge.data?.condition || "");
   const [dataType, setDataType] = useState(edge.data?.dataType || "all");
+  
+  // Advanced transformation states
+  const [activeTransformTab, setActiveTransformTab] = useState("structured");
+  const [showPreview, setShowPreview] = useState(true);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [debouncedTransformations] = useDebounce(transformations, 500);
 
   useEffect(() => {
     setLabel(edge.label || "");
@@ -77,27 +97,14 @@ export function EdgeConfigPanel({
     setStrokeStyle(edge.style?.strokeDasharray ? "dashed" : "solid");
     setWidth(edge.style?.strokeWidth || 2);
     setAnimated(edge.animated || false);
-    setFieldMappings(
-      edge.data?.mapping
-        ? Object.entries(edge.data.mapping).map(([target, source]) => ({
-            targetField: target,
-            sourceField: source as string,
-          }))
-        : []
-    );
+    setFieldMappings((edge.data?.fieldMappings as FieldMapping[]) || []);
+    setTransformations((edge.data?.transformations as DataTransformation[]) || []);
     setTransformCode(edge.data?.transform || "");
     setCondition(edge.data?.condition || "");
     setDataType(edge.data?.dataType || "all");
   }, [edge]);
 
   const handleSave = () => {
-    const mapping: Record<string, string> = {};
-    fieldMappings.forEach(({ targetField, sourceField }) => {
-      if (targetField && sourceField) {
-        mapping[targetField] = sourceField;
-      }
-    });
-
     const updatedEdge: Edge = {
       ...edge,
       label,
@@ -106,11 +113,13 @@ export function EdgeConfigPanel({
         ...edge.style,
         stroke: color,
         strokeWidth: width,
+        strokeDasharray: strokeStyle === 'dashed' ? '5,5' : strokeStyle === 'dotted' ? '2,2' : undefined,
       },
+      animated,
       data: {
         ...edge.data,
-        animated,
-        mapping: Object.keys(mapping).length > 0 ? mapping : undefined,
+        fieldMappings: fieldMappings.length > 0 ? fieldMappings : undefined,
+        transformations: transformations.length > 0 ? transformations : undefined,
         transform: transformCode || undefined,
         condition: condition || undefined,
         dataType,
@@ -120,7 +129,12 @@ export function EdgeConfigPanel({
   };
 
   const addFieldMapping = () => {
-    setFieldMappings([...fieldMappings, { targetField: "", sourceField: "" }]);
+    setFieldMappings([...fieldMappings, { 
+      targetField: "", 
+      sourceField: "",
+      transformationType: 'direct',
+      transformConfig: {}
+    }]);
   };
 
   const removeFieldMapping = (index: number) => {
@@ -130,30 +144,81 @@ export function EdgeConfigPanel({
   const updateFieldMapping = (
     index: number,
     field: keyof FieldMapping,
-    value: string
+    value: any
   ) => {
     const updated = [...fieldMappings];
     updated[index] = { ...updated[index], [field]: value };
     setFieldMappings(updated);
+    handleSave();
   };
 
-  const getAvailableSourceFields = () => {
-    if (!sourceBlock?.data?.outputs) return [];
-    const outputs = sourceBlock.data.outputs;
-    if (typeof outputs === "object" && outputs !== null) {
-      return Object.keys(outputs);
-    }
-    return [];
+  // Advanced transformation functions
+  const addTransformation = () => {
+    const newTransform: DataTransformation = {
+      type: "map",
+      field: "",
+      operation: "",
+      value: "",
+      outputField: "",
+    };
+    const updated = [...transformations, newTransform];
+    setTransformations(updated);
+    handleSave();
   };
 
-  const getAvailableTargetFields = () => {
-    if (!targetBlock?.data?.inputs) return [];
-    const inputs = targetBlock.data.inputs;
-    if (typeof inputs === "object" && inputs !== null) {
-      return Object.keys(inputs);
-    }
-    return [];
+  const removeTransformation = (index: number) => {
+    const updated = transformations.filter((_, i) => i !== index);
+    setTransformations(updated);
+    handleSave();
   };
+
+  const updateTransformation = (index: number, field: string, value: any) => {
+    const updated = transformations.map((t, i) =>
+      i === index ? { ...t, [field]: value } : t
+    );
+    setTransformations(updated);
+    handleSave();
+  };
+
+  // Generate preview data using API
+  const generatePreview = useCallback(async () => {
+    if (!sourceBlock?.data || debouncedTransformations.length === 0) {
+      setPreviewData(null);
+      return;
+    }
+
+    setPreviewLoading(true);
+    try {
+      const response = await fetch('/api/transformations/preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: sourceBlock.data,
+          transformations: debouncedTransformations
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setPreviewData(result.data);
+        setValidationErrors([]);
+      } else {
+        throw new Error('Preview generation failed');
+      }
+    } catch (error: any) {
+      console.error('Preview generation error:', error);
+      setValidationErrors([error.message]);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [sourceBlock?.data, debouncedTransformations]);
+
+  useEffect(() => {
+    generatePreview();
+  }, [generatePreview]);
+
 
   return (
     <Card className='w-96 border-l-0 rounded-l-none h-full max-h-full flex flex-col bg-background/95 backdrop-blur-sm'>
@@ -200,7 +265,7 @@ export function EdgeConfigPanel({
                 <Input
                   id='edge-label'
                   placeholder='Enter connection label'
-                  value={label}
+                  value={label as string}
                   onChange={(e) => setLabel(e.target.value)}
                   onBlur={handleSave}
                   className='h-11'
@@ -287,9 +352,9 @@ export function EdgeConfigPanel({
               <div className='space-y-3'>
                 <div className='flex items-center justify-between'>
                   <Label className='text-sm font-medium'>Data Type</Label>
-                  <Badge variant='outline'>{dataType}</Badge>
+                  <Badge variant='outline'>{dataType as string}</Badge>
                 </div>
-                <Select value={dataType} onValueChange={setDataType}>
+                <Select value={dataType as string} onValueChange={setDataType}>
                   <SelectTrigger className='h-11'>
                     <SelectValue />
                   </SelectTrigger>
@@ -315,29 +380,19 @@ export function EdgeConfigPanel({
 
                 <div className='space-y-2'>
                   {fieldMappings.map((mapping, index) => (
+                    <React.Fragment key={index}>
                     <div
-                      key={index}
                       className='flex items-center gap-2 p-2 border rounded-lg'>
                       <div className='flex-1'>
                         <Label className='text-xs text-muted-foreground'>
                           Source
                         </Label>
-                        <Select
+                        <Input
                           value={mapping.sourceField}
-                          onValueChange={(value: string) =>
-                            updateFieldMapping(index, "sourceField", value)
-                          }>
-                          <SelectTrigger className='h-8 text-xs'>
-                            <SelectValue placeholder='Select source field' />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {getAvailableSourceFields().map((field) => (
-                              <SelectItem key={field} value={field}>
-                                {field}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onChange={(e) => updateFieldMapping(index, "sourceField", e.target.value)}
+                          placeholder='e.g., data.response'
+                          className='h-8 text-xs'
+                        />
                       </div>
                       <div className='flex items-center'>
                         <Zap className='w-4 h-4 text-muted-foreground' />
@@ -346,20 +401,28 @@ export function EdgeConfigPanel({
                         <Label className='text-xs text-muted-foreground'>
                           Target
                         </Label>
-                        <Select
+                        <Input
                           value={mapping.targetField}
-                          onValueChange={(value: string) =>
-                            updateFieldMapping(index, "targetField", value)
-                          }>
+                          onChange={(e) => updateFieldMapping(index, "targetField", e.target.value)}
+                          placeholder='e.g., input'
+                          className='h-8 text-xs'
+                        />
+                      </div>
+                      <div className='flex-1'>
+                        <Label className='text-xs text-muted-foreground'>
+                          Transform
+                        </Label>
+                        <Select
+                          value={mapping.transformationType || 'direct'}
+                          onValueChange={(value) => updateFieldMapping(index, "transformationType", value)}>
                           <SelectTrigger className='h-8 text-xs'>
-                            <SelectValue placeholder='Select target field' />
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {getAvailableTargetFields().map((field) => (
-                              <SelectItem key={field} value={field}>
-                                {field}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value='direct'>Direct</SelectItem>
+                            <SelectItem value='format'>Format</SelectItem>
+                            <SelectItem value='calculate'>Calculate</SelectItem>
+                            <SelectItem value='conditional'>Conditional</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -372,6 +435,25 @@ export function EdgeConfigPanel({
                         <X className='w-4 h-4' />
                       </Button>
                     </div>
+                    
+                    {mapping.transformationType && mapping.transformationType !== 'direct' && (
+                      <div className='ml-4 mt-2 p-2 bg-muted/20 rounded border-l-2 border-primary/20'>
+                        <Input
+                          value={JSON.stringify(mapping.transformConfig || {})}
+                          onChange={(e) => {
+                            try {
+                              const config = JSON.parse(e.target.value);
+                              updateFieldMapping(index, "transformConfig", config);
+                            } catch {
+                              // Invalid JSON, ignore
+                            }
+                          }}
+                          placeholder='{"operation": "uppercase"}'
+                          className='h-8 text-xs font-mono'
+                        />
+                      </div>
+                    )}
+                    </React.Fragment>
                   ))}
 
                   {fieldMappings.length === 0 && (
@@ -384,22 +466,170 @@ export function EdgeConfigPanel({
             </TabsContent>
 
             <TabsContent value='transform' className='space-y-4'>
-              <div className='space-y-3'>
-                <Label className='text-sm font-medium'>
-                  Data Transformation
-                </Label>
-                <Textarea
-                  placeholder='// Transform data before passing to target block
+              <Tabs value={activeTransformTab} onValueChange={setActiveTransformTab} className='w-full'>
+                <TabsList className='grid w-full grid-cols-3'>
+                  <TabsTrigger value='structured'>Structured</TabsTrigger>
+                  <TabsTrigger value='templates'>Templates</TabsTrigger>
+                  <TabsTrigger value='custom'>Custom Code</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value='structured' className='space-y-4'>
+                  <div className='space-y-3'>
+                    <div className='flex items-center justify-between'>
+                      <Label className='text-sm font-medium'>Data Transformations</Label>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        onClick={addTransformation}>
+                        <Plus className='w-4 h-4 mr-1' />
+                        Add
+                      </Button>
+                    </div>
+
+                    {transformations.length === 0 ? (
+                      <div className='text-center py-4 text-muted-foreground text-sm'>
+                        <ArrowUpDown className='w-8 h-8 mx-auto mb-2 opacity-50' />
+                        <p>No transformations configured</p>
+                      </div>
+                    ) : (
+                      <div className='space-y-2 max-h-48 overflow-y-auto'>
+                        {transformations.map((transform, index) => (
+                          <div key={index} className='p-2 border rounded-lg space-y-2'>
+                            <div className='flex items-center justify-between'>
+                              <Badge variant='outline' className='text-xs'>{transform.type}</Badge>
+                              <Button
+                                type='button'
+                                variant='ghost'
+                                size='sm'
+                                onClick={() => removeTransformation(index)}
+                                className='h-6 w-6 p-0'>
+                                <X className='w-3 h-3' />
+                              </Button>
+                            </div>
+                            
+                            <div className='grid grid-cols-2 gap-2'>
+                              <Select
+                                value={transform.type}
+                                onValueChange={(value) => updateTransformation(index, "type", value)}>
+                                <SelectTrigger className='h-8 text-xs'>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value='map'>Map</SelectItem>
+                                  <SelectItem value='filter'>Filter</SelectItem>
+                                  <SelectItem value='format'>Format</SelectItem>
+                                  <SelectItem value='aggregate'>Aggregate</SelectItem>
+                                </SelectContent>
+                              </Select>
+
+                              <Input
+                                value={transform.field || ""}
+                                onChange={(e) => updateTransformation(index, "field", e.target.value)}
+                                placeholder='Field name'
+                                className='h-8 text-xs'
+                              />
+                            </div>
+
+                            <Input
+                              value={transform.operation || ""}
+                              onChange={(e) => updateTransformation(index, "operation", e.target.value)}
+                              placeholder='Operation (e.g., uppercase, multiply)'
+                              className='h-8 text-xs'
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Preview Section */}
+                    {sourceBlock && (
+                      <div className='space-y-2'>
+                        <div className='flex items-center justify-between'>
+                          <Label className='text-sm font-medium'>Preview</Label>
+                          <div className='flex items-center space-x-1'>
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              size='sm'
+                              onClick={() => setShowPreview(!showPreview)}
+                              className='h-7 px-2'>
+                              {showPreview ? <EyeOff className='w-3 h-3' /> : <Eye className='w-3 h-3' />}
+                            </Button>
+                            <Button
+                              type='button'
+                              variant='ghost'
+                              size='sm'
+                              onClick={generatePreview}
+                              disabled={previewLoading}
+                              className='h-7 px-2'>
+                              {previewLoading ? <Loader2 className='w-3 h-3 animate-spin' /> : <RefreshCw className='w-3 h-3' />}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {showPreview && (
+                          <div className='space-y-2'>
+                            {previewLoading ? (
+                              <div className='text-center py-2'>
+                                <Loader2 className='w-4 h-4 mx-auto animate-spin text-blue-500' />
+                              </div>
+                            ) : previewData ? (
+                              <pre className='p-2 bg-green-50 rounded text-xs overflow-auto max-h-24'>
+                                {JSON.stringify(previewData, null, 2)}
+                              </pre>
+                            ) : (
+                              <div className='text-center py-2 text-muted-foreground text-xs'>
+                                No preview available
+                              </div>
+                            )}
+
+                            {validationErrors.length > 0 && (
+                              <Alert variant='destructive' className='py-2'>
+                                <AlertCircle className='h-3 w-3' />
+                                <AlertDescription className='text-xs'>
+                                  {validationErrors[0]}
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value='templates' className='space-y-4'>
+                  <div className='space-y-3'>
+                    <Label className='text-sm font-medium'>Transformation Templates</Label>
+                    <TransformationTemplateSelector
+                      onApplyTemplate={(templateTransformations) => {
+                        const updated = [...transformations, ...templateTransformations];
+                        setTransformations(updated);
+                        handleSave();
+                      }}
+                      currentTransformations={transformations}
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value='custom' className='space-y-4'>
+                  <div className='space-y-3'>
+                    <Label className='text-sm font-medium'>Custom JavaScript</Label>
+                    <Textarea
+                      placeholder='// Transform data before passing to target block
 // Example: return { ...data, processed: true };'
-                  value={transformCode}
-                  onChange={(e) => setTransformCode(e.target.value)}
-                  className='min-h-[120px] font-mono text-sm'
-                />
-                <p className='text-xs text-muted-foreground'>
-                  Use JavaScript to transform data. The input data is available
-                  as the 'data' variable.
-                </p>
-              </div>
+                      value={transformCode as string}
+                      onChange={(e) => setTransformCode(e.target.value)}
+                      onBlur={handleSave}
+                      className='min-h-[120px] font-mono text-sm'
+                    />
+                    <p className='text-xs text-muted-foreground'>
+                      Use JavaScript to transform data. The input data is available as the 'data' variable.
+                    </p>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </TabsContent>
 
             <TabsContent value='condition' className='space-y-4'>
@@ -409,7 +639,7 @@ export function EdgeConfigPanel({
                 </Label>
                 <Input
                   placeholder='data.price > 50000'
-                  value={condition}
+                  value={condition as string}
                   onChange={(e) => setCondition(e.target.value)}
                   className='font-mono text-sm'
                 />

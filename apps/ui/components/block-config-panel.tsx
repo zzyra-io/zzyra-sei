@@ -282,7 +282,7 @@ export function BlockConfigPanel({
   };
 
   return (
-    <div className='w-80 border-l border-border/50 bg-background/95 backdrop-blur-sm flex flex-col h-full max-h-screen'>
+    <div className='w-1/3 border-l border-border/50 bg-background/95 backdrop-blur-sm flex flex-col h-full max-h-screen'>
       {/* Modern Header */}
       <div className='sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50 flex-shrink-0'>
         <div className='p-6 space-y-4'>

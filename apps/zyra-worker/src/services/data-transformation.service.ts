@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 export interface DataTransformation {
   id: string;
-  type: 'map' | 'filter' | 'aggregate' | 'format' | 'extract' | 'combine' | 'validate' | 'enrich';
+  type: 'map' | 'filter' | 'aggregate' | 'format' | 'extract' | 'combine' | 'validate' | 'enrich' | 'conditional' | 'loop' | 'sort';
   sourceField?: string;
   targetField?: string;
   operation: string;
@@ -11,6 +11,13 @@ export interface DataTransformation {
   condition?: string;
   schema?: z.ZodSchema;
   priority?: number;
+  // Conditional transformation properties
+  trueTransformation?: DataTransformation;
+  falseTransformation?: DataTransformation;
+  // Loop transformation properties
+  itemTransformations?: DataTransformation[];
+  batchSize?: number;
+  parallel?: boolean;
 }
 
 export interface DataPipeline {
@@ -66,6 +73,12 @@ export class DataTransformationService {
           return this.validateData(data, transformation);
         case 'enrich':
           return this.enrichData(data, transformation);
+        case 'conditional':
+          return this.conditionalTransform(data, transformation);
+        case 'loop':
+          return this.loopTransform(data, transformation);
+        case 'sort':
+          return this.sortData(data, transformation);
         default:
           throw new Error(`Unsupported transformation type: ${transformation.type}`);
       }
@@ -285,18 +298,72 @@ export class DataTransformationService {
   }
 
   private filterData(data: any, transformation: DataTransformation): any {
-    if (!transformation.condition) {
-      throw new Error('Filter transformation requires condition');
+    if (!transformation.condition && !transformation.operation) {
+      throw new Error('Filter transformation requires condition or operation');
     }
 
+    // Handle array filtering
+    if (Array.isArray(data)) {
+      return data.filter(item => this.evaluateCondition(item, transformation));
+    }
+
+    // Handle single item filtering
+    const shouldKeep = this.evaluateCondition(data, transformation);
+    return shouldKeep ? data : null;
+  }
+
+  private evaluateCondition(data: any, transformation: DataTransformation): boolean {
     try {
-      // Simple condition evaluation (can be enhanced with a proper expression evaluator)
-      const conditionFunc = new Function('data', `return ${transformation.condition}`);
-      const shouldKeep = conditionFunc(data);
+      if (transformation.condition) {
+        // Enhanced condition evaluation with safe context
+        const safeEvaluate = (condition: string, context: any): boolean => {
+          // Replace field references with actual values
+          const processedCondition = condition.replace(/\b([a-zA-Z_][a-zA-Z0-9_.]*)\b/g, (match) => {
+            const value = this.getNestedValue(context, match);
+            if (typeof value === 'string') {
+              return `"${value}"`;
+            }
+            return value !== undefined ? String(value) : 'undefined';
+          });
+          
+          const conditionFunc = new Function('return ' + processedCondition);
+          return conditionFunc();
+        };
+        
+        return safeEvaluate(transformation.condition, data);
+      }
       
-      return shouldKeep ? data : null;
+      if (transformation.operation && transformation.sourceField) {
+        const value = this.getNestedValue(data, transformation.sourceField);
+        
+        switch (transformation.operation) {
+          case 'exists':
+            return value !== undefined && value !== null;
+          case 'not_exists':
+            return value === undefined || value === null;
+          case 'equals':
+            return value === transformation.value;
+          case 'not_equals':
+            return value !== transformation.value;
+          case 'greater_than':
+            return typeof value === 'number' && value > transformation.value;
+          case 'less_than':
+            return typeof value === 'number' && value < transformation.value;
+          case 'contains':
+            return typeof value === 'string' && value.includes(transformation.value);
+          case 'starts_with':
+            return typeof value === 'string' && value.startsWith(transformation.value);
+          case 'ends_with':
+            return typeof value === 'string' && value.endsWith(transformation.value);
+          default:
+            return true;
+        }
+      }
+      
+      return true;
     } catch (error) {
-      throw new Error(`Invalid filter condition: ${transformation.condition}`);
+      this.logger.warn(`Filter condition evaluation failed: ${error}`);
+      return false;
     }
   }
 
@@ -348,35 +415,107 @@ export class DataTransformationService {
   }
 
   private formatData(data: any, transformation: DataTransformation): any {
+    const result = { ...data };
     const value = transformation.sourceField 
       ? this.getNestedValue(data, transformation.sourceField)
       : data;
 
+    let formattedValue: any;
+
     switch (transformation.operation) {
       case 'uppercase':
-        return typeof value === 'string' ? value.toUpperCase() : value;
+        formattedValue = typeof value === 'string' ? value.toUpperCase() : value;
+        break;
       
       case 'lowercase':
-        return typeof value === 'string' ? value.toLowerCase() : value;
+        formattedValue = typeof value === 'string' ? value.toLowerCase() : value;
+        break;
       
       case 'trim':
-        return typeof value === 'string' ? value.trim() : value;
+        formattedValue = typeof value === 'string' ? value.trim() : value;
+        break;
+      
+      case 'title_case':
+        formattedValue = typeof value === 'string' 
+          ? value.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase())
+          : value;
+        break;
       
       case 'date':
-        return new Date(value).toISOString();
+        formattedValue = new Date(value).toISOString();
+        break;
       
       case 'number':
-        return Number(value);
+      case 'parse_number':
+        formattedValue = Number(value);
+        break;
       
       case 'string':
-        return String(value);
+      case 'to_string':
+        formattedValue = String(value);
+        break;
+      
+      case 'boolean':
+      case 'parse_boolean':
+        if (typeof value === 'boolean') {
+          formattedValue = value;
+        } else if (typeof value === 'string') {
+          formattedValue = value.toLowerCase() === 'true' || value === '1';
+        } else {
+          formattedValue = Boolean(value);
+        }
+        break;
       
       case 'json':
-        return JSON.stringify(value);
+        formattedValue = JSON.stringify(value);
+        break;
+      
+      case 'parse_json':
+        try {
+          formattedValue = typeof value === 'string' ? JSON.parse(value) : value;
+        } catch {
+          formattedValue = value;
+        }
+        break;
+      
+      case 'multiply':
+        formattedValue = typeof value === 'number' && typeof transformation.value === 'number'
+          ? value * transformation.value
+          : value;
+        break;
+      
+      case 'divide':
+        formattedValue = typeof value === 'number' && typeof transformation.value === 'number' && transformation.value !== 0
+          ? value / transformation.value
+          : value;
+        break;
+      
+      case 'add':
+        formattedValue = typeof value === 'number' && typeof transformation.value === 'number'
+          ? value + transformation.value
+          : value;
+        break;
+      
+      case 'subtract':
+        formattedValue = typeof value === 'number' && typeof transformation.value === 'number'
+          ? value - transformation.value
+          : value;
+        break;
       
       default:
         throw new Error(`Unsupported format operation: ${transformation.operation}`);
     }
+
+    // Set the formatted value in the result
+    if (transformation.targetField) {
+      this.setNestedValue(result, transformation.targetField, formattedValue);
+    } else if (transformation.sourceField) {
+      this.setNestedValue(result, transformation.sourceField, formattedValue);
+    } else {
+      return formattedValue;
+    }
+
+    return result;
   }
 
   private extractData(data: any, transformation: DataTransformation): any {
@@ -384,7 +523,15 @@ export class DataTransformationService {
       throw new Error('Extract transformation requires sourceField');
     }
 
-    return this.getNestedValue(data, transformation.sourceField);
+    const result = { ...data };
+    const extractedValue = this.getNestedValue(data, transformation.sourceField);
+    
+    if (transformation.targetField) {
+      this.setNestedValue(result, transformation.targetField, extractedValue);
+      return result;
+    }
+    
+    return extractedValue;
   }
 
   private combineData(data: any, transformation: DataTransformation): any {
@@ -439,7 +586,7 @@ export class DataTransformationService {
         break;
       
       case 'uuid':
-        result[transformation.targetField || 'id'] = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        result[transformation.targetField || 'id'] = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
         break;
       
       case 'computed':
@@ -455,6 +602,107 @@ export class DataTransformationService {
     }
 
     return result;
+  }
+
+  private conditionalTransform(data: any, transformation: DataTransformation): any {
+    if (!transformation.condition) {
+      throw new Error('Conditional transformation requires condition');
+    }
+
+    try {
+      const conditionMet = this.evaluateCondition(data, transformation);
+      
+      if (conditionMet && transformation.trueTransformation) {
+        return this.transform(data, transformation.trueTransformation);
+      } else if (!conditionMet && transformation.falseTransformation) {
+        return this.transform(data, transformation.falseTransformation);
+      }
+      
+      return data; // No transformation applied
+    } catch (error) {
+      this.logger.error('Conditional transformation failed:', error);
+      return data;
+    }
+  }
+
+  private async loopTransform(data: any, transformation: DataTransformation): Promise<any> {
+    if (!Array.isArray(data)) {
+      throw new Error('Loop transformation requires array data');
+    }
+
+    if (!transformation.itemTransformations || transformation.itemTransformations.length === 0) {
+      return data;
+    }
+
+    const batchSize = transformation.batchSize || 100;
+    const parallel = transformation.parallel !== false; // Default to true
+
+    try {
+      if (parallel) {
+        // Process all items in parallel
+        const transformedItems = await Promise.all(
+          data.map(async (item) => {
+            let result = item;
+            for (const itemTransformation of transformation.itemTransformations!) {
+              result = await this.transform(result, itemTransformation);
+            }
+            return result;
+          })
+        );
+        return transformedItems;
+      } else {
+        // Process items sequentially in batches
+        const result = [];
+        for (let i = 0; i < data.length; i += batchSize) {
+          const batch = data.slice(i, i + batchSize);
+          
+          for (const item of batch) {
+            let transformedItem = item;
+            for (const itemTransformation of transformation.itemTransformations!) {
+              transformedItem = await this.transform(transformedItem, itemTransformation);
+            }
+            result.push(transformedItem);
+          }
+        }
+        return result;
+      }
+    } catch (error) {
+      this.logger.error('Loop transformation failed:', error);
+      throw error;
+    }
+  }
+
+  private sortData(data: any, transformation: DataTransformation): any {
+    if (!Array.isArray(data)) {
+      return data;
+    }
+
+    const sortField = transformation.sourceField;
+    const sortOrder = transformation.operation || 'asc'; // 'asc' or 'desc'
+
+    try {
+      return [...data].sort((a, b) => {
+        let valueA = sortField ? this.getNestedValue(a, sortField) : a;
+        let valueB = sortField ? this.getNestedValue(b, sortField) : b;
+
+        // Handle different data types
+        if (typeof valueA === 'string' && typeof valueB === 'string') {
+          valueA = valueA.toLowerCase();
+          valueB = valueB.toLowerCase();
+        }
+
+        if (valueA < valueB) {
+          return sortOrder === 'asc' ? -1 : 1;
+        }
+        if (valueA > valueB) {
+          return sortOrder === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    } catch (error) {
+      this.logger.error('Sort transformation failed:', error);
+      return data;
+    }
   }
 
   /**

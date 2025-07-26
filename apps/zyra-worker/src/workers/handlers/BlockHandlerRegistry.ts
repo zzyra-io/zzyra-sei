@@ -6,6 +6,7 @@ import { BlockExecutionContext, BlockHandler } from '@zyra/types';
 import { EnhancedBlockRegistry } from './enhanced/EnhancedBlockRegistry';
 import { MetricsBlockHandler } from './MetricsBlockHandler';
 import { DataTransformHandler } from './DataTransformHandler';
+import { EdgeTransformHandler } from './EdgeTransformHandler';
 import { CustomBlockHandler } from './CustomBlockHandler';
 import { ScheduleBlockHandler } from './ScheduleBlockHandler';
 import { HttpRequestHandler } from './HttpRequestHandler';
@@ -58,6 +59,12 @@ export class BlockHandlerRegistry {
       [BlockType.DATA_TRANSFORM]: new MetricsBlockHandler(
         BlockType.DATA_TRANSFORM,
         new DataTransformHandler(),
+      ),
+
+      // Edge transformation blocks
+      [BlockType.EDGE_TRANSFORM]: new MetricsBlockHandler(
+        BlockType.EDGE_TRANSFORM,
+        new EdgeTransformHandler(),
       ),
 
       // Custom blocks

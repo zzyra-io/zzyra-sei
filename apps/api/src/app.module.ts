@@ -17,6 +17,7 @@ import { BillingModule } from "./billing/billing.module";
 import { AiModule } from "./ai/ai.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { HealthModule } from "./health/health.module";
+import { TransformationsModule } from "./transformations/transformations.module";
 import { TemplateController, TemplateService } from "./templates";
 // import { AppController } from "./app.controller";
 
@@ -48,6 +49,7 @@ import { PrismaExceptionFilter } from "./filters/prisma-exception.filter";
     AiModule,
     DashboardModule,
     HealthModule,
+    TransformationsModule,
   ],
   controllers: [TemplateController],
   providers: [

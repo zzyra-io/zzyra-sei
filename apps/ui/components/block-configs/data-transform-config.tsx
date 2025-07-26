@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +29,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { enhancedDataTransformSchema } from "@zyra/types";
+import { TransformationTemplateSelector } from "@/components/transformation-template-selector";
 
 interface DataTransformConfigProps {
   config: Record<string, unknown>;
@@ -66,6 +68,9 @@ export function DataTransformConfig({
     unknown
   > | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewSteps, setPreviewSteps] = useState<any[]>([]);
+  const [debouncedTransformations] = useDebounce(transformations, 500);
 
   // Use the enhanced schema from @zyra/types
   const schema = enhancedDataTransformSchema;
@@ -77,61 +82,82 @@ export function DataTransformConfig({
     }
   }, [config.transformations]);
 
-  // Generate preview data based on previous block
+  // Generate preview data using API
+  const generatePreview = useCallback(async () => {
+    if (!previousBlockData || debouncedTransformations.length === 0) {
+      setPreviewData(null);
+      setPreviewSteps([]);
+      return;
+    }
+
+    setPreviewLoading(true);
+    try {
+      const response = await fetch('/api/transformations/preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: previousBlockData,
+          transformations: debouncedTransformations
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setPreviewData(result.data);
+        setPreviewSteps(result.steps || []);
+        setValidationErrors([]);
+      } else {
+        throw new Error('Preview generation failed');
+      }
+    } catch (error) {
+      console.error('Preview generation error:', error);
+      setValidationErrors([error.message]);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [previousBlockData, debouncedTransformations]);
+
   useEffect(() => {
-    if (previousBlockData && transformations.length > 0) {
-      try {
-        const preview = applyTransformations(
-          previousBlockData,
+    generatePreview();
+  }, [generatePreview]);
+
+  // Validate transformations using API
+  const validateTransformations = useCallback(async () => {
+    if (transformations.length === 0) {
+      setValidationErrors([]);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/transformations/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           transformations
-        );
-        setPreviewData(preview);
-      } catch (error) {
-        console.error("Preview generation error:", error);
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const errors = result.errors.flatMap((err: any) => err.errors);
+        setValidationErrors(errors);
       }
+    } catch (error) {
+      console.error('Validation error:', error);
     }
-  }, [previousBlockData, transformations]);
+  }, [transformations]);
 
-  // Apply transformations to data
-  const applyTransformations = (data: any, transforms: any[]) => {
-    let result = { ...data };
+  useEffect(() => {
+    validateTransformations();
+  }, [validateTransformations]);
 
-    for (const transform of transforms) {
-      switch (transform.type) {
-        case "map":
-          if (transform.field && transform.outputField) {
-            result[transform.outputField] = result[transform.field];
-          }
-          break;
-        case "filter":
-          // Filter logic would go here
-          break;
-        case "format":
-          if (transform.field && transform.operation) {
-            // Apply formatting
-            if (
-              transform.operation === "uppercase" &&
-              result[transform.field]
-            ) {
-              result[transform.field] = String(
-                result[transform.field]
-              ).toUpperCase();
-            }
-          }
-          break;
-        case "extract":
-          if (transform.field && transform.outputField) {
-            // Extract nested field
-            const value = result[transform.field];
-            if (typeof value === "object" && value !== null) {
-              result[transform.outputField] = value;
-            }
-          }
-          break;
-      }
-    }
-
-    return result;
+  // Helper function to update config
+  const updateConfig = (updates: Record<string, any>) => {
+    onChange({ ...config, ...updates });
   };
 
   // Add new transformation
@@ -214,9 +240,10 @@ export function DataTransformConfig({
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className='w-full'>
-        <TabsList className='grid w-full grid-cols-4'>
+        <TabsList className='grid w-full grid-cols-5'>
           <TabsTrigger value='config'>Configuration</TabsTrigger>
           <TabsTrigger value='transformations'>Transformations</TabsTrigger>
+          <TabsTrigger value='templates'>Templates</TabsTrigger>
           <TabsTrigger value='preview'>Preview</TabsTrigger>
           <TabsTrigger value='validation'>Validation</TabsTrigger>
         </TabsList>
@@ -304,6 +331,9 @@ export function DataTransformConfig({
                               <SelectItem value='format'>Format</SelectItem>
                               <SelectItem value='extract'>Extract</SelectItem>
                               <SelectItem value='combine'>Combine</SelectItem>
+                              <SelectItem value='conditional'>Conditional</SelectItem>
+                              <SelectItem value='loop'>Loop</SelectItem>
+                              <SelectItem value='sort'>Sort</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -325,17 +355,74 @@ export function DataTransformConfig({
 
                         <div>
                           <Label>Operation</Label>
-                          <Input
-                            value={transform.operation || ""}
-                            onChange={(e) =>
-                              updateTransformation(
-                                index,
-                                "operation",
-                                e.target.value
-                              )
-                            }
-                            placeholder='e.g., uppercase, multiply, extract'
-                          />
+                          {transform.type === 'format' ? (
+                            <Select
+                              value={transform.operation || ""}
+                              onValueChange={(value) =>
+                                updateTransformation(index, "operation", value)
+                              }>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select operation" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value='uppercase'>Uppercase</SelectItem>
+                                <SelectItem value='lowercase'>Lowercase</SelectItem>
+                                <SelectItem value='trim'>Trim</SelectItem>
+                                <SelectItem value='title_case'>Title Case</SelectItem>
+                                <SelectItem value='parse_number'>Parse Number</SelectItem>
+                                <SelectItem value='to_string'>To String</SelectItem>
+                                <SelectItem value='parse_boolean'>Parse Boolean</SelectItem>
+                                <SelectItem value='multiply'>Multiply</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : transform.type === 'aggregate' ? (
+                            <Select
+                              value={transform.operation || ""}
+                              onValueChange={(value) =>
+                                updateTransformation(index, "operation", value)
+                              }>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select operation" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value='sum'>Sum</SelectItem>
+                                <SelectItem value='avg'>Average</SelectItem>
+                                <SelectItem value='count'>Count</SelectItem>
+                                <SelectItem value='max'>Maximum</SelectItem>
+                                <SelectItem value='min'>Minimum</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : transform.type === 'filter' ? (
+                            <Select
+                              value={transform.operation || ""}
+                              onValueChange={(value) =>
+                                updateTransformation(index, "operation", value)
+                              }>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select operation" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value='exists'>Exists</SelectItem>
+                                <SelectItem value='equals'>Equals</SelectItem>
+                                <SelectItem value='not_equals'>Not Equals</SelectItem>
+                                <SelectItem value='greater_than'>Greater Than</SelectItem>
+                                <SelectItem value='less_than'>Less Than</SelectItem>
+                                <SelectItem value='contains'>Contains</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              value={transform.operation || ""}
+                              onChange={(e) =>
+                                updateTransformation(
+                                  index,
+                                  "operation",
+                                  e.target.value
+                                )
+                              }
+                              placeholder='e.g., uppercase, multiply, extract'
+                            />
+                          )}
                         </div>
 
                         <div>
@@ -352,11 +439,64 @@ export function DataTransformConfig({
                             placeholder='e.g., formattedPrice, result'
                           />
                         </div>
+
+                        {(transform.operation === 'multiply' || transform.operation === 'equals' || transform.operation === 'greater_than' || transform.operation === 'less_than' || transform.operation === 'contains') && (
+                          <div className='col-span-2'>
+                            <Label>Value</Label>
+                            <Input
+                              value={transform.value || ""}
+                              onChange={(e) =>
+                                updateTransformation(
+                                  index,
+                                  "value",
+                                  e.target.value
+                                )
+                              }
+                              placeholder='Enter value for operation'
+                            />
+                          </div>
+                        )}
+
+                        {transform.type === 'filter' && (
+                          <div className='col-span-2'>
+                            <Label>Condition (JavaScript expression)</Label>
+                            <Input
+                              value={transform.condition || ""}
+                              onChange={(e) =>
+                                updateTransformation(
+                                  index,
+                                  "condition",
+                                  e.target.value
+                                )
+                              }
+                              placeholder='e.g., price > 100 && status === "active"'
+                            />
+                          </div>
+                        )}
                       </div>
                     </Card>
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Templates Tab */}
+        <TabsContent value='templates' className='space-y-4'>
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-base'>Transformation Templates</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TransformationTemplateSelector
+                onApplyTemplate={(templateTransformations) => {
+                  const updated = [...transformations, ...templateTransformations];
+                  setTransformations(updated);
+                  updateConfig({ transformations: updated });
+                }}
+                currentTransformations={transformations}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -382,16 +522,24 @@ export function DataTransformConfig({
                   <Button
                     variant='outline'
                     size='sm'
-                    onClick={() => {
-                      // Refresh preview
-                    }}>
-                    <RefreshCw className='w-4 h-4' />
+                    onClick={generatePreview}
+                    disabled={previewLoading}>
+                    {previewLoading ? (
+                      <Loader2 className='w-4 h-4 animate-spin' />
+                    ) : (
+                      <RefreshCw className='w-4 h-4' />
+                    )}
                   </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {showPreview && previousBlockData ? (
+              {previewLoading ? (
+                <div className='text-center py-8'>
+                  <Loader2 className='w-8 h-8 mx-auto mb-4 animate-spin text-blue-500' />
+                  <p className='text-sm text-muted-foreground'>Generating preview...</p>
+                </div>
+              ) : showPreview && previousBlockData ? (
                 <div className='space-y-4'>
                   <div>
                     <Label className='text-sm font-medium'>Input Data</Label>
@@ -400,10 +548,33 @@ export function DataTransformConfig({
                     </pre>
                   </div>
 
+                  {previewSteps.length > 0 && (
+                    <div>
+                      <Label className='text-sm font-medium mb-2 block'>
+                        Transformation Steps
+                      </Label>
+                      <div className='space-y-2 max-h-60 overflow-auto'>
+                        {previewSteps.map((step, index) => (
+                          <div key={index} className='border rounded p-2 bg-gray-50'>
+                            <div className='flex items-center justify-between mb-1'>
+                              <span className='text-sm font-medium'>Step {step.step}: {step.transformation.type}</span>
+                              <Badge variant={step.success ? 'default' : 'destructive'} className='text-xs'>
+                                {step.success ? 'Success' : 'Failed'}
+                              </Badge>
+                            </div>
+                            <pre className='text-xs bg-white p-2 rounded overflow-auto max-h-20'>
+                              {JSON.stringify(step.output, null, 2)}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {previewData && (
                     <div>
                       <Label className='text-sm font-medium'>
-                        Transformed Output
+                        Final Output
                       </Label>
                       <pre className='mt-2 p-3 bg-green-50 rounded-md text-sm overflow-auto max-h-40'>
                         {JSON.stringify(previewData, null, 2)}

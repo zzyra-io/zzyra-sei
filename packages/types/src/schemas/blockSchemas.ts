@@ -367,6 +367,9 @@ export const enhancedDataTransformSchema: EnhancedBlockSchema = {
           "format",
           "extract",
           "combine",
+          "conditional",
+          "loop",
+          "sort",
         ]),
         field: z.string(),
         operation: z.string(),
@@ -415,6 +418,7 @@ export const enhancedDataTransformSchema: EnhancedBlockSchema = {
     description: "Transform and manipulate data between blocks",
   },
 };
+
 
 /**
  * Zod schemas for block configurations
