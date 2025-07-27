@@ -11,6 +11,7 @@ import { ScheduleConfig } from "@/components/block-configs/schedule-config";
 import { WebhookConfig } from "@/components/block-configs/webhook-config";
 import { DataTransformConfig } from "@/components/block-configs/data-transform-config";
 import WalletListenerConfig from "@/components/block-configs/wallet-listen-config";
+import { ConditionConfig } from "@/components/block-configs/condition-config";
 
 // Sei block config imports
 import SeiWalletListenerConfig from "@/components/block-configs/sei/SeiWalletListenerConfig";
@@ -67,6 +68,7 @@ blockConfigRegistry.register(BlockType.SCHEDULE, ScheduleConfig);
 blockConfigRegistry.register(BlockType.WEBHOOK, WebhookConfig);
 blockConfigRegistry.register(BlockType.DATA_TRANSFORM, DataTransformConfig);
 blockConfigRegistry.register(BlockType.WALLET_LISTEN, WalletListenerConfig);
+blockConfigRegistry.register(BlockType.CONDITION, ConditionConfig);
 
 // Register Sei blockchain block components
 blockConfigRegistry.register(

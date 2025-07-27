@@ -91,7 +91,7 @@ export class BlockHandlerRegistry {
       // Sei blockchain blocks
       [BlockType.SEI_WALLET_LISTEN]: new MetricsBlockHandler(
         BlockType.SEI_WALLET_LISTEN,
-        new SeiWalletListenerHandler(),
+        new SeiWalletListenerHandler(this.executionLogger),
       ),
 
       [BlockType.SEI_CONTRACT_CALL]: new MetricsBlockHandler(

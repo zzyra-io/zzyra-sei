@@ -85,9 +85,14 @@ export class NodeExecutor {
         // Validate input data against enhanced schema if available
         if (enhancedSchema && previousOutputs) {
           try {
+            // Ensure previousOutputs is an object for validation
+            const inputData = Array.isArray(previousOutputs)
+              ? { arrayData: previousOutputs }
+              : previousOutputs;
+
             // Validate input data against the enhanced input schema
             const validatedInputs = enhancedSchema.inputSchema.parse({
-              data: previousOutputs,
+              data: inputData,
               context: {
                 workflowId: executionId,
                 executionId,

@@ -56,6 +56,7 @@ export class SeiRpcClient {
    * Get latest block number
    */
   async getLatestBlockNumber(): Promise<number> {
+    console.log('rpcUrl', this.rpcClient);
     const response = await this.rpcClient.post('', {
       jsonrpc: '2.0',
       method: 'eth_blockNumber',
