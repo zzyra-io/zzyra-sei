@@ -641,6 +641,12 @@ export class BlocksService {
     try {
       // This is a basic conversion - in production you'd use a proper library
       // For now, return a simplified representation
+
+      // Check if zodSchema is valid
+      if (!zodSchema || typeof zodSchema !== "object") {
+        return { type: "object", properties: {} };
+      }
+
       const shape = zodSchema._def?.shape;
       if (!shape) {
         return { type: "object", properties: {} };
@@ -651,11 +657,22 @@ export class BlocksService {
 
       Object.keys(shape).forEach((key) => {
         const field = shape[key];
+
+        // Skip if field is not valid
+        if (!field || typeof field !== "object") {
+          return;
+        }
+
         const fieldDef = field._def;
+
+        // Skip if fieldDef is not available
+        if (!fieldDef) {
+          return;
+        }
 
         // Extract basic type information
         properties[key] = {
-          type: this.getZodTypeString(fieldDef.typeName),
+          type: this.getZodTypeString(fieldDef.typeName || "ZodString"),
         };
 
         // Handle optional vs required
@@ -670,7 +687,19 @@ export class BlocksService {
 
         // Add default value if present
         if (fieldDef.defaultValue !== undefined) {
-          properties[key].default = fieldDef.defaultValue();
+          try {
+            // Check if defaultValue is a function and call it, otherwise use the value directly
+            properties[key].default =
+              typeof fieldDef.defaultValue === "function"
+                ? fieldDef.defaultValue()
+                : fieldDef.defaultValue;
+          } catch (error) {
+            // Skip default value if there's an error
+            console.warn(
+              `Failed to get default value for field ${key}:`,
+              error
+            );
+          }
         }
       });
 
@@ -685,7 +714,11 @@ export class BlocksService {
     }
   }
 
-  private getZodTypeString(typeName: string): string {
+  private getZodTypeString(typeName?: string): string {
+    if (!typeName) {
+      return "string";
+    }
+
     switch (typeName) {
       case "ZodString":
         return "string";
