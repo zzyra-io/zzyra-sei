@@ -17,7 +17,7 @@ import {
   Connection,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { NodeCategory } from "@zyra/types";
+import { BlockType, NodeCategory } from "@zyra/types";
 // Removed debounce import since we're using direct node updates
 import { useNodeConfigurations } from "@/app/builder/node-configurations";
 import { useWorkflowStore } from "@/lib/store/workflow-store";
@@ -170,7 +170,7 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
         };
         updateNode(selectedNode.id, updatedNode);
         setSelectedNode(updatedNode);
-        
+
         // Mark as having unsaved changes
         setHasUnsavedChanges(true);
       }
@@ -290,6 +290,7 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
   // Generate context menu options based on the clicked element
   const getContextMenuOptions = useCallback(() => {
     if (!contextMenu) return [];
+    console.log("contextMenu", contextMenu);
 
     if (contextMenu.type === "node") {
       return [
@@ -468,6 +469,9 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
           }}
           onConnect={onConnect}
           onNodeClick={(event, node) => {
+            if (node.type === BlockType.AI_AGENT) {
+              return;
+            }
             console.log("node", node);
             console.log("event", event);
             setSelectedNode(node);
