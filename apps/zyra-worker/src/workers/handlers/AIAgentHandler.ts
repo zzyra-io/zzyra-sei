@@ -232,8 +232,10 @@ export class AIAgentHandler implements BlockHandler {
               );
               const aiTool = {
                 id: tool.name, // Use simple name for now
+                name: tool.name, // Also add name property for consistency
                 description: tool.description,
-                parameters: tool.inputSchema,
+                inputSchema: tool.inputSchema, // Use inputSchema for parameter extraction
+                parameters: tool.inputSchema, // Keep parameters for backwards compatibility
                 execute: async (args: any) => {
                   try {
                     this.logger.log(
