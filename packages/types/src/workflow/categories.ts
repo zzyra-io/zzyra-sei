@@ -11,6 +11,7 @@ export enum NodeCategory {
   ACTION = "action",
   LOGIC = "logic",
   DATA_PROCESSING = "data_processing", // New category for data transformation
+  AI = "ai", // AI-powered blocks
 }
 
 /**
@@ -26,6 +27,8 @@ export function getCategoryColor(category: NodeCategory): string {
       return "purple";
     case NodeCategory.DATA_PROCESSING:
       return "purple"; // Purple for data processing
+    case NodeCategory.AI:
+      return "blue"; // Blue for AI blocks
     default:
       return "gray";
   }

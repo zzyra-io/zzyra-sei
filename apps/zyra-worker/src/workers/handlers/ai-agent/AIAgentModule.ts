@@ -8,6 +8,7 @@ import { LLMProviderManager } from './LLMProviderManager';
 import { MCPServerManager } from './MCPServerManager';
 import { SecurityValidator } from './SecurityValidator';
 import { ReasoningEngine } from './ReasoningEngine';
+import { SubscriptionService } from './SubscriptionService';
 import { GOATManager } from './GOATManager';
 
 /**
@@ -34,9 +35,14 @@ import { GOATManager } from './GOATManager';
       inject: [DatabaseService],
     },
     {
+      provide: SubscriptionService,
+      useFactory: () => new SubscriptionService(),
+      inject: [],
+    },
+    {
       provide: ReasoningEngine,
-      useFactory: (databaseService) => new ReasoningEngine(databaseService),
-      inject: [DatabaseService],
+      useFactory: (databaseService, subscriptionService) => new ReasoningEngine(databaseService, subscriptionService),
+      inject: [DatabaseService, SubscriptionService],
     },
     {
       provide: GOATManager,

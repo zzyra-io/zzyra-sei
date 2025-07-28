@@ -17,6 +17,7 @@ import { LLMProviderManager } from '../workers/handlers/ai-agent/LLMProviderMana
 import { MCPServerManager } from '../workers/handlers/ai-agent/MCPServerManager';
 import { SecurityValidator } from '../workers/handlers/ai-agent/SecurityValidator';
 import { ReasoningEngine } from '../workers/handlers/ai-agent/ReasoningEngine';
+import { SubscriptionService } from '../workers/handlers/ai-agent/SubscriptionService';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 
@@ -98,13 +99,13 @@ class AIAgentDemo {
     const llmProviderManager = new LLMProviderManager(this.configService);
     const mcpServerManager = new MCPServerManager(this.databaseService);
     const securityValidator = new SecurityValidator(this.databaseService);
-    const reasoningEngine = new ReasoningEngine(this.databaseService);
+    const subscriptionService = new SubscriptionService();
+    const reasoningEngine = new ReasoningEngine(this.databaseService, subscriptionService);
 
     // Create AI Agent handler
     this.aiAgentHandler = new AIAgentHandler(
       this.databaseService,
       this.executionLogger,
-      this.configService,
       llmProviderManager,
       mcpServerManager,
       securityValidator,

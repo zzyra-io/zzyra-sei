@@ -419,6 +419,61 @@ export const enhancedDataTransformSchema: EnhancedBlockSchema = {
   },
 };
 
+// AI Agent Schema
+const aiAgentConfigSchema = z.object({
+  provider: z.object({
+    type: z.enum(['openrouter', 'openai', 'anthropic', 'ollama']),
+    model: z.string(),
+    temperature: z.number().min(0).max(2).optional(),
+    maxTokens: z.number().min(1).optional(),
+  }),
+  agent: z.object({
+    name: z.string(),
+    systemPrompt: z.string(),
+    userPrompt: z.string(),
+    maxSteps: z.number().min(1).max(50),
+    thinkingMode: z.enum(['fast', 'deliberate', 'collaborative']),
+  }),
+  selectedTools: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.enum(['mcp', 'goat', 'builtin']),
+    config: z.record(z.string(), z.any()),
+  })),
+  execution: z.object({
+    mode: z.enum(['autonomous', 'interactive']),
+    timeout: z.number().min(1000),
+    requireApproval: z.boolean(),
+    saveThinking: z.boolean(),
+  }),
+});
+
+const enhancedAIAgentSchema: EnhancedBlockSchema = {
+  configSchema: aiAgentConfigSchema,
+  inputSchema: z.object({
+    prompt: z.string().optional(),
+    context: z.record(z.string(), z.any()).optional(),
+  }),
+  outputSchema: z.object({
+    result: z.string(),
+    reasoning: z.array(z.object({
+      step: z.number(),
+      type: z.string(),
+      reasoning: z.string(),
+      timestamp: z.string(),
+    })).optional(),
+    toolCalls: z.array(z.object({
+      name: z.string(),
+      parameters: z.record(z.string(), z.any()),
+      result: z.any().optional(),
+    })).optional(),
+  }),
+  metadata: {
+    category: "ai_automation",
+    icon: "brain",
+    description: "Execute tasks using AI agents with access to various tools",
+  }
+};
 
 /**
  * Zod schemas for block configurations
@@ -435,6 +490,7 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
   [BlockType.HTTP_REQUEST]: enhancedHttpRequestSchema.configSchema,
   [BlockType.CUSTOM]: enhancedCustomSchema.configSchema,
   [BlockType.DATA_TRANSFORM]: enhancedDataTransformSchema.configSchema,
+  [BlockType.AI_AGENT]: enhancedAIAgentSchema.configSchema,
   [BlockType.WALLET_LISTEN]: walletListenerSchema.configSchema,
   [BlockType.SEI_WALLET_LISTEN]: seiWalletListenerSchema.configSchema,
   [BlockType.SEI_CONTRACT_CALL]: seiSmartContractCallSchema.configSchema,
@@ -460,6 +516,7 @@ export const enhancedBlockSchemas: Partial<
   [BlockType.WEBHOOK]: enhancedWebhookSchema,
   [BlockType.CUSTOM]: enhancedCustomSchema,
   [BlockType.DATA_TRANSFORM]: enhancedDataTransformSchema,
+  [BlockType.AI_AGENT]: enhancedAIAgentSchema,
   [BlockType.WALLET_LISTEN]: walletListenerSchema,
   [BlockType.SEI_WALLET_LISTEN]: seiWalletListenerSchema,
   [BlockType.SEI_CONTRACT_CALL]: seiSmartContractCallSchema,

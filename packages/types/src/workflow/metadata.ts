@@ -25,6 +25,37 @@ export interface BlockMetadata {
  * This serves as the single source of truth for block metadata
  */
 export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
+  // AI Agent block
+  [BlockType.AI_AGENT]: {
+    type: BlockType.AI_AGENT,
+    label: "AI Agent",
+    description: "AI-powered agent with tools and reasoning capabilities",
+    category: NodeCategory.AI,
+    icon: "brain",
+    defaultConfig: {
+      provider: {
+        type: 'openrouter',
+        model: 'openai/gpt-4o-mini',
+        temperature: 0.7,
+        maxTokens: 2000,
+      },
+      agent: {
+        name: 'AI Assistant',
+        systemPrompt: 'You are a helpful AI assistant with access to various tools.',
+        userPrompt: '',
+        maxSteps: 10,
+        thinkingMode: 'deliberate',
+      },
+      selectedTools: [],
+      execution: {
+        mode: 'autonomous',
+        timeout: 120000,
+        requireApproval: false,
+        saveThinking: true,
+      },
+    },
+  },
+
   // Legacy blocks
   [BlockType.PRICE_MONITOR]: {
     type: BlockType.PRICE_MONITOR,

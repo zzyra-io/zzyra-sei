@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../services/database.service';
 import { MCPServerManager } from './MCPServerManager';
-import * as availableMcps from './mcps/available_mcps';
+import { defaultMCPs } from '@zyra/types';
 
 interface MCPServerConnection {
   id: string;
@@ -427,9 +427,7 @@ export class MCPToolsManager {
    * Initialize available MCP servers
    */
   private initializeAvailableServers(): void {
-    for (const server of Object.values(
-      availableMcps,
-    ) as MCPServerConnection[]) {
+    for (const server of Object.values(defaultMCPs) as MCPServerConnection[]) {
       this.availableServers.set(server.id, server);
     }
     this.logger.log(

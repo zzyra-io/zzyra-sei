@@ -18,6 +18,7 @@ import { AiModule } from "./ai/ai.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { HealthModule } from "./health/health.module";
 import { TransformationsModule } from "./transformations/transformations.module";
+import { AIAgentModule } from "./ai-agent/ai-agent.module";
 import { TemplateController, TemplateService } from "./templates";
 // import { AppController } from "./app.controller";
 
@@ -50,6 +51,7 @@ import { PrismaExceptionFilter } from "./filters/prisma-exception.filter";
     DashboardModule,
     HealthModule,
     TransformationsModule,
+    AIAgentModule,
   ],
   controllers: [TemplateController],
   providers: [

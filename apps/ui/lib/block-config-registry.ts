@@ -19,6 +19,7 @@ import SeiSmartContractCallConfig from "@/components/block-configs/sei/SeiSmartC
 import SeiOnchainDataFetchConfig from "@/components/block-configs/sei/SeiOnchainDataFetchConfig";
 import SeiPaymentConfig from "@/components/block-configs/sei/SeiPaymentConfig";
 import SeiNftConfig from "@/components/block-configs/sei/SeiNftConfig";
+import { AIAgentConfigComponent } from "@/components/block-configs/ai-agent-config";
 
 interface BlockConfigComponent {
   config: Record<string, unknown>;
@@ -69,6 +70,7 @@ blockConfigRegistry.register(BlockType.WEBHOOK, WebhookConfig);
 blockConfigRegistry.register(BlockType.DATA_TRANSFORM, DataTransformConfig);
 blockConfigRegistry.register(BlockType.WALLET_LISTEN, WalletListenerConfig);
 blockConfigRegistry.register(BlockType.CONDITION, ConditionConfig);
+blockConfigRegistry.register(BlockType.AI_AGENT, AIAgentConfigComponent);
 
 // Register Sei blockchain block components
 blockConfigRegistry.register(

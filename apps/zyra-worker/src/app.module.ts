@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NotificationModule } from './services/notification.module';
 import { TestNotificationController } from './controllers/test-notification.controller';
+import { ExecutionController } from './api/execution.controller';
 import { ExecutionWorker } from './workers/execution-worker';
 import { AIModule } from './modules/ai.module';
 import { BlockchainModule } from './lib/blockchain/BlockchainModule';
@@ -75,6 +76,7 @@ const configValidationSchema = {
   ],
   controllers: [
     AppController,
+    ExecutionController,
     ...(process.env.NODE_ENV !== 'production'
       ? [TestNotificationController]
       : []),

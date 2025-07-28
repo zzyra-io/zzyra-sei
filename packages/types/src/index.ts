@@ -84,3 +84,5 @@ export { BlockGroup, ConnectionType, PropertyType } from "./workflow/execution";
 
 // Re-export metadata helper functions
 export { getBlockMetadata, getBlockType } from "./workflow/metadata";
+
+export * as defaultMCPs from "./blocks/ai/mcps/available_mcps";

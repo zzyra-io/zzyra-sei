@@ -4,6 +4,7 @@
 
 // Export block types
 export * from "./block-types";
+export * from "./ai-agent-types";
 
 // Export other workflow types
 export * from "./categories";

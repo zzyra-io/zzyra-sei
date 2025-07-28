@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { trace } from '@opentelemetry/api';
 import { BlockHandler, BlockExecutionContext, BlockType } from '@zyra/types';
 import { DatabaseService } from '../services/database.service';
@@ -36,6 +37,7 @@ export class NodeExecutor {
     private readonly databaseService: DatabaseService,
     private readonly executionLogger: ExecutionLogger,
     private readonly magicAdminService: MagicAdminService,
+    private readonly configService: ConfigService,
   ) {
     this.circuitBreakerService = new CircuitBreakerDbService(
       this.databaseService,
@@ -45,6 +47,7 @@ export class NodeExecutor {
       this.logger,
       this.databaseService,
       this.executionLogger,
+      this.configService,
     );
     // Initialize EnhancedBlockRegistry with template processor
     const templateProcessor = new ZyraTemplateProcessor();
