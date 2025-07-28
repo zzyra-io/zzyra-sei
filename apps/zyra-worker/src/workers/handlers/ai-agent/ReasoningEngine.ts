@@ -377,6 +377,9 @@ This tool selection process is critical for enabling users to interact with vari
 3. **Parameter Identification**: Extract any specific values, identifiers, or inputs mentioned in the request that need to be passed as parameters
 4. **Tool Selection**: Choose only the tools that are directly required - never suggest generic alternatives
 
+Available tools:
+${toolsList}
+
 ### Tool Selection Rules
 - **MANDATORY**: You MUST use only the available tools provided in the toolsList
 - **NO GENERIC RESPONSES**: Never provide generic instructions or suggest actions outside the available tools

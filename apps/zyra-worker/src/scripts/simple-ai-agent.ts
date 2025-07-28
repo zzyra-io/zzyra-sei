@@ -30,6 +30,15 @@ import { MCPToolsManager } from '../workers/handlers/ai-agent/MCPToolsManager';
 import { SubscriptionService } from '../workers/handlers/ai-agent/SubscriptionService';
 import { GOATManager } from '../workers/handlers/ai-agent/GOATManager';
 import { randomUUID } from 'crypto';
+import * as dotenv from 'dotenv';
+dotenv.config();
+console.log('Environment variables loaded:', {
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ? 'SET' : 'NOT SET',
+  WALLET_PRIVATE_KEY: process.env.WALLET_PRIVATE_KEY ? 'SET' : 'NOT SET',
+  RPC_PROVIDER_URL: process.env.RPC_PROVIDER_URL ? 'SET' : 'NOT SET',
+  BRAVE_API_KEY: process.env.BRAVE_API_KEY ? 'SET' : 'NOT SET',
+  DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'NOT SET',
+});
 
 // Simple mock implementations
 class SimpleConfigService {
@@ -309,6 +318,21 @@ const TEST_SCENARIOS = {
         name: 'Portfolio Analysis',
         type: 'goat',
         config: {},
+      },
+    ],
+  },
+  'db-summary': {
+    name: 'Database Summary',
+    prompt: 'Summarize the database schema for the project.',
+    tools: [
+      {
+        id: 'postgres',
+        name: 'PostgreSQL',
+        type: 'mcp',
+        config: {
+          databaseUrl:
+            process.env.DATABASE_URL || 'postgresql://localhost/zyra',
+        },
       },
     ],
   },

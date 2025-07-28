@@ -24,6 +24,8 @@ interface MCPServerConnection {
     args?: string[];
     url?: string; // For SSE/WebSocket connections
     headers?: Record<string, string>;
+    // Dynamic argument mapping for config values
+    argMapping?: Record<string, 'positional' | 'flag' | 'env'>;
   };
 
   // Required configuration from user
@@ -123,6 +125,8 @@ export class MCPToolsManager {
       api: [],
       automation: [],
       development: [],
+      time: [],
+      weather: [],
     };
 
     for (const server of this.availableServers.values()) {
@@ -154,11 +158,34 @@ export class MCPToolsManager {
       }
 
       // Create server configuration with user-provided values
+      let args = [...(serverDef.connection.args || [])];
+      let env = { ...userConfig };
+
+      // Handle dynamic argument mapping from server definition
+      if (serverDef.connection.argMapping) {
+        for (const [configKey, mappingType] of Object.entries(
+          serverDef.connection.argMapping,
+        )) {
+          if (userConfig[configKey]) {
+            if (mappingType === 'positional') {
+              // Pass as positional argument
+              args.push(userConfig[configKey]);
+            } else if (mappingType === 'flag') {
+              // Pass as flag (e.g., --key=value)
+              args.push(`--${configKey}=${userConfig[configKey]}`);
+            } else if (mappingType === 'env') {
+              // Pass as environment variable
+              env[configKey] = userConfig[configKey];
+            }
+          }
+        }
+      }
+
       const serverConfig = {
         name: serverDef.displayName,
         command: serverDef.connection.command || '',
-        args: serverDef.connection.args || [],
-        env: userConfig, // User's API keys, paths, etc.
+        args,
+        env,
         description: serverDef.description,
       };
 

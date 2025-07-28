@@ -158,3 +158,69 @@ export const braveSearch = {
     },
   ],
 };
+
+export const time = {
+  id: 'time',
+  name: 'time',
+  displayName: 'Time',
+  description: 'Get the current time',
+  category: 'time',
+  icon: '🕒',
+  connection: {
+    type: 'stdio',
+    command: 'uvx',
+    args: ['mcp-server-time', '--local-timezone=America/New_York'],
+  },
+};
+
+export const weather = {
+  id: 'weather',
+  name: 'weather',
+  displayName: 'Weather',
+  description: 'Get the current weather',
+  category: 'weather',
+  icon: '🌤️',
+  connection: {
+    type: 'stdio',
+    command: 'uvx',
+    args: ['mcp-server-weather'],
+  },
+};
+
+export const postgres = {
+  id: 'postgres',
+  name: 'postgres',
+  displayName: 'PostgreSQL',
+  description: 'PostgreSQL database operations',
+  category: 'database',
+  icon: '🐘',
+  connection: {
+    type: 'stdio',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-postgres'],
+    // Dynamic argument mapping - config keys that should be passed as command-line args
+    argMapping: {
+      databaseUrl: 'positional', // Pass as positional argument
+    },
+  },
+  configSchema: {
+    type: 'object',
+    properties: {
+      databaseUrl: {
+        type: 'string',
+        description: 'PostgreSQL database URL',
+        required: true,
+      },
+    },
+    required: ['databaseUrl'],
+  },
+  examples: [
+    {
+      name: 'Database Operations',
+      description: 'Connect to PostgreSQL database',
+      configuration: {
+        databaseUrl: 'postgresql://user:password@localhost:5432/database',
+      },
+    },
+  ],
+};
