@@ -231,7 +231,7 @@ const TEST_SCENARIOS = {
   'goat-test': {
     name: 'GOAT Blockchain Test',
     prompt:
-      'Check my wallet balance for 0x30418a5C1C1Fd8297414F596A6C7B3bb8F7B4b7d and find yield farming opportunities for all tokens on Base Sepolia.',
+      'Check my wallet balance and find yield farming opportunities for all tokens on Base Sepolia.',
     tools: [
       {
         id: 'goat',

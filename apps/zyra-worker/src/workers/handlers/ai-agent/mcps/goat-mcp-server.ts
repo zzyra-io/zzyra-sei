@@ -74,8 +74,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     let properties = (inputSchema as any).properties || {};
     let required = (inputSchema as any).required || [];
 
-    // If this is a balance or address tool, remove address requirement
-    if (tool.name === 'get_balance' || tool.name === 'get_address') {
+    // For balance tools, allow optional address parameter
+    if (tool.name === 'get_balance') {
+      properties = {
+        address: {
+          type: 'string',
+          description:
+            'Wallet address to check balance for (optional, uses default wallet if not provided)',
+        },
+      };
+      required = [];
+    }
+
+    // For address tools, no parameters needed
+    if (tool.name === 'get_address') {
       properties = {};
       required = [];
     }
@@ -102,11 +114,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // For balance and address tools, automatically add the wallet address
     let toolArgs = request.params.arguments || {};
 
-    if (
-      request.params.name === 'get_balance' ||
-      request.params.name === 'get_address'
-    ) {
-      // Add the wallet address from the private key
+    if (request.params.name === 'get_balance') {
+      // Use provided address or default to the wallet address from private key
+      const addressToCheck = toolArgs.address || account.address;
+      toolArgs = {
+        ...toolArgs,
+        address: addressToCheck,
+      };
+    }
+
+    if (request.params.name === 'get_address') {
+      // For get_address, always use the wallet address from private key
       toolArgs = {
         ...toolArgs,
         address: account.address,

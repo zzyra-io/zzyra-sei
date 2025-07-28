@@ -258,20 +258,23 @@ export class ReasoningEngine {
 
         // Execute the selected tools
         const toolResults = [];
-        for (const toolName of selectedTools) {
-          const tool = params.tools.find((t) => t.id === toolName);
+        for (const toolEntry of selectedTools) {
+          const tool = params.tools.find((t) => t.id === toolEntry.name);
           if (tool && tool.execute) {
             try {
-              this.logger.log(`Executing tool: ${toolName}`);
-              const toolResult = await tool.execute({});
-              toolResults.push({ tool: toolName, result: toolResult });
+              this.logger.log(
+                `Executing tool: ${toolEntry.name} with parameters:`,
+                toolEntry.parameters || {},
+              );
+              const toolResult = await tool.execute(toolEntry.parameters || {});
+              toolResults.push({ tool: toolEntry.name, result: toolResult });
             } catch (error) {
               this.logger.error(
-                `Tool execution failed for ${toolName}:`,
+                `Tool execution failed for ${toolEntry.name}:`,
                 error,
               );
               toolResults.push({
-                tool: toolName,
+                tool: toolEntry.name,
                 error: error instanceof Error ? error.message : String(error),
               });
             }
@@ -357,19 +360,81 @@ export class ReasoningEngine {
       .join('\n');
 
     return `
-      For this request: "${prompt}"
-      
-      Available tools:
-      ${toolsList}
-      
-      IMPORTANT: You MUST use the available tools to answer this request. Do not provide generic instructions.
-      
-      Which tools should be used? List the exact tool names that are most relevant for this request.
-      
-      For example, if the request asks to check wallet balance, you should select "get_balance" tool.
-      If it asks for wallet address, select "get_address" tool.
-      
-      Selected tools: [list the tool names here]
+     ## Role
+You are an expert tool selector and parameter specialist with deep knowledge across multiple domains including blockchain operations, data analysis, content creation, web development, file management, API integrations, database operations, machine learning, automation, and various other technical and non-technical fields. You possess exceptional analytical skills for matching user requests to appropriate tools, with expertise in interpreting requirements and translating them into precise tool selections with accurate parameters.
+
+## Task
+Analyze incoming user requests and select the most appropriate tools from the available toolkit to fulfill each request. You must identify the exact tools needed and specify any required parameters based on the user's specific requirements across any domain or field of operation. For this request: "${prompt}"
+
+## Context
+This tool selection process is critical for enabling users to interact with various systems effectively across all domains, not limited to blockchain operations. Your selections directly impact the user's ability to perform operations in any field including but not limited to finance, content creation, data processing, web services, file operations, and countless other applications. Accurate tool selection with proper parameters ensures seamless interactions and prevents failed operations that could result in lost time, missed opportunities, or user frustration.
+
+## Instructions
+
+### Primary Analysis Process
+1. **Request Parsing**: Read the user request word by word to identify the specific operation they want to perform in any domain
+2. **Tool Matching**: Compare the request requirements against the available tools list to identify exact matches regardless of the field or domain
+3. **Parameter Identification**: Extract any specific values, identifiers, or inputs mentioned in the request that need to be passed as parameters
+4. **Tool Selection**: Choose only the tools that are directly required - never suggest generic alternatives
+
+### Tool Selection Rules
+- **MANDATORY**: You MUST use only the available tools provided in the toolsList
+- **NO GENERIC RESPONSES**: Never provide generic instructions or suggest actions outside the available tools
+- **EXACT MATCHING**: Match user requests to specific tool functions based on their described capabilities across all domains
+- **PARAMETER PRECISION**: When tools require parameters, extract them exactly as mentioned in the user request
+
+### Common Request Patterns and Tool Mappings Across All Domains
+
+**Blockchain/Crypto Operations:**
+- Balance inquiries → "get_balance" tool (requires address parameter)
+- Wallet address requests → "get_address" tool
+- Chain/network information → "get_chain" tool
+- Transaction details → Look for transaction-related tools in the available list
+- Token information → Look for token-related tools in the available list
+
+**Other Domain Examples:**
+- File operations → Look for file management tools
+- Data analysis → Look for data processing or analytics tools
+- Content creation → Look for writing, editing, or content generation tools
+- Web operations → Look for HTTP, API, or web-related tools
+- Database operations → Look for database query or management tools
+- Image/media processing → Look for media manipulation tools
+- Communication → Look for messaging, email, or notification tools
+- Automation → Look for workflow or scheduling tools
+
+For any domain not explicitly mentioned, match request intent to the appropriate tool in the available list based on the tool's described functionality.
+
+### Parameter Handling
+- Extract addresses, identifiers, file paths, URLs, or other values exactly as provided
+- Format parameters clearly: "tool_name with parameter_type: parameter_value"
+- If multiple parameters are needed, list each one separately
+- Validate that extracted parameters match the expected format for the operation
+- Handle parameters for any data type: strings, numbers, arrays, objects, file paths, URLs, etc.
+
+### Output Format Requirements
+Provide your response in this exact format:
+
+Selected tools: [tool_name with parameter_type: parameter_value, additional_tool_name, etc.]
+
+
+### Critical Error Prevention
+- **Your life depends on you** never selecting tools that are not in the provided toolsList regardless of the domain or field
+- Double-check that every selected tool exists in the available tools before including it
+- Verify that parameters are extracted correctly from the user request
+- Ensure you're not making assumptions about tool capabilities beyond what's available
+- If a request cannot be fulfilled with available tools, state this clearly rather than suggesting alternatives
+- Handle requests from any domain with the same precision as blockchain operations
+
+### Edge Cases to Handle
+- Requests mentioning multiple parameters across different domains
+- Ambiguous requests that could match multiple tools in various fields
+- Requests for operations not supported by available tools in any domain
+- Malformed parameters in user requests from any field
+- Requests combining multiple operations across different domains and fields
+- Cross-domain operations that might require multiple tools
+- Domain-specific terminology that needs to be mapped to generic tool functions
+
+Your accuracy in tool selection and parameter extraction is vital to the user's success in their operations across all domains and fields.
     `;
   }
 
@@ -384,8 +449,8 @@ export class ReasoningEngine {
   private extractSelectedTools(
     reasoning: string,
     availableTools: any[],
-  ): string[] {
-    const selected: string[] = [];
+  ): { name: string; parameters?: any }[] {
+    const selected: { name: string; parameters?: any }[] = [];
     const reasoningLower = reasoning.toLowerCase();
 
     for (const tool of availableTools) {
@@ -400,14 +465,44 @@ export class ReasoningEngine {
 
       // Check for exact tool name match
       if (reasoningLower.includes(toolNameLower)) {
-        selected.push(toolName);
+        const toolEntry: { name: string; parameters?: any } = {
+          name: toolName,
+        };
+
+        // Check for parameters in the reasoning
+        if (toolName === 'get_balance') {
+          const addressMatch = reasoning.match(/0x[a-fA-F0-9]{40}/);
+          if (addressMatch) {
+            toolEntry.parameters = { address: addressMatch[0] };
+            this.logger.log(
+              `Found address parameter for ${toolName}: ${addressMatch[0]}`,
+            );
+          }
+        }
+
+        selected.push(toolEntry);
         continue;
       }
 
       // Check for tool name with underscores replaced by spaces
       const toolNameSpaced = toolNameLower.replace(/_/g, ' ');
       if (reasoningLower.includes(toolNameSpaced)) {
-        selected.push(toolName);
+        const toolEntry: { name: string; parameters?: any } = {
+          name: toolName,
+        };
+
+        // Check for parameters in the reasoning
+        if (toolName === 'get_balance') {
+          const addressMatch = reasoning.match(/0x[a-fA-F0-9]{40}/);
+          if (addressMatch) {
+            toolEntry.parameters = { address: addressMatch[0] };
+            this.logger.log(
+              `Found address parameter for ${toolName}: ${addressMatch[0]}`,
+            );
+          }
+        }
+
+        selected.push(toolEntry);
         continue;
       }
 
@@ -415,13 +510,30 @@ export class ReasoningEngine {
       const toolWords = toolNameLower.split('_');
       for (const word of toolWords) {
         if (word.length > 3 && reasoningLower.includes(word)) {
-          selected.push(toolName);
+          const toolEntry: { name: string; parameters?: any } = {
+            name: toolName,
+          };
+
+          // Check for parameters in the reasoning
+          if (toolName === 'get_balance') {
+            const addressMatch = reasoning.match(/0x[a-fA-F0-9]{40}/);
+            if (addressMatch) {
+              toolEntry.parameters = { address: addressMatch[0] };
+              this.logger.log(
+                `Found address parameter for ${toolName}: ${addressMatch[0]}`,
+              );
+            }
+          }
+
+          selected.push(toolEntry);
           break;
         }
       }
     }
 
-    this.logger.log(`Extracted tools from reasoning: ${selected.join(', ')}`);
+    this.logger.log(
+      `Extracted tools from reasoning: ${selected.map((t) => t.name).join(', ')}`,
+    );
     return selected;
   }
 
