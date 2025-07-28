@@ -59,6 +59,9 @@ model User {
   teamMemberships      TeamMember[]
   ownedTeams           Team[]         @relation("TeamOwner")
   notificationPreferences NotificationPreference?
+  aiAgentExecutions    AiAgentExecution[]
+  mcpServers           McpServer[]
+  aiAgentSecurityEvents AiAgentSecurityEvent[]
 
   @@map("users")
 }
@@ -172,6 +175,8 @@ model WorkflowExecution {
   blockExecutions      BlockExecution[]
   blockchainTransactions BlockchainTransaction[]
   workflowPauses       WorkflowPause[]
+  aiAgentExecutions    AiAgentExecution[]
+  aiAgentSecurityEvents AiAgentSecurityEvent[]
   
   @@map("workflow_executions")
   @@index([workflowId])
@@ -355,6 +360,81 @@ model AiBlockchainOperation {
   @@map("ai_blockchain_operations")
   @@index([userId])
   @@index([executionId])
+}
+
+// ================ AI Agent Models ================
+
+model AiAgentExecution {
+  id                   String        @id @default(uuid())
+  executionId          String        @map("execution_id")
+  nodeId               String        @map("node_id")
+  userId               String        @map("user_id")
+  provider             String
+  model                String
+  agentConfig          Json          @map("agent_config")
+  toolsConfig          Json          @map("tools_config")
+  thinkingSteps        Json          @default("[]") @map("thinking_steps")
+  toolCalls            Json          @default("[]") @map("tool_calls")
+  securityViolations   Json          @default("[]") @map("security_violations")
+  performanceMetrics   Json          @default("{}") @map("performance_metrics")
+  status               String        @default("pending")
+  result               String?
+  error                String?
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  
+  // Relations
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  execution            WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  
+  @@map("ai_agent_executions")
+  @@index([executionId])
+  @@index([userId])
+  @@index([nodeId])
+}
+
+model McpServer {
+  id                   String        @id @default(uuid())
+  userId               String        @map("user_id")
+  name                 String
+  command              String
+  args                 Json          @default("[]")
+  env                  Json          @default("{}")
+  tools                Json          @default("[]")
+  resources            Json          @default("[]")
+  status               String        @default("connected")
+  lastHealthCheck      DateTime?     @map("last_health_check")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  
+  // Relations
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("mcp_servers")
+  @@index([userId])
+  @@index([status])
+}
+
+model AiAgentSecurityEvent {
+  id                   String        @id @default(uuid())
+  executionId          String?       @map("execution_id")
+  userId               String        @map("user_id")
+  violationType        String        @map("violation_type")
+  severity             String
+  description          String
+  blockedAction        String        @map("blocked_action")
+  evidence             Json          @default("{}")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  
+  // Relations
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  execution            WorkflowExecution? @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  
+  @@map("ai_agent_security_events")
+  @@index([executionId])
+  @@index([userId])
+  @@index([violationType])
+  @@index([severity])
 }
 
 // ================ Block & Execution Models ================

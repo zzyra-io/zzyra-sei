@@ -19,6 +19,7 @@ import { SeiSmartContractCallHandler } from './blockchain/sei/SeiSmartContractCa
 import { SeiOnchainDataFetchHandler } from './blockchain/sei/SeiOnchainDataFetchHandler';
 import { SeiPaymentHandler } from './blockchain/sei/SeiPaymentHandler';
 import { SeiNftHandler } from './blockchain/sei/SeiNftHandler';
+import { AIAgentHandler } from './AIAgentHandler';
 
 /**
  * Central registry for all block handlers.
@@ -113,6 +114,19 @@ export class BlockHandlerRegistry {
         BlockType.SEI_NFT,
         new SeiNftHandler(),
       ),
+
+      // AI Agent handler - commented out until dependencies are properly injected
+      // ['AI_AGENT']: new MetricsBlockHandler(
+      //   'AI_AGENT',
+      //   new AIAgentHandler(
+      //     this.databaseService,
+      //     this.executionLogger,
+      //     llmProviderManager,
+      //     mcpServerManager,
+      //     securityValidator,
+      //     reasoningEngine,
+      //   ),
+      // ),
 
       // Placeholder handlers for unimplemented block types
       [BlockType.UNKNOWN]: new MetricsBlockHandler(BlockType.UNKNOWN, {
