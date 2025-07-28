@@ -45,7 +45,10 @@ export class LLMProviderManager {
     this.initializeProviders();
   }
 
-  async getProvider(type: string, config: ProviderConfig): Promise<LLMProvider> {
+  async getProvider(
+    type: string,
+    config: ProviderConfig,
+  ): Promise<LLMProvider> {
     const provider = this.providers.get(type);
     if (!provider) {
       throw new Error(`LLM provider ${type} not found`);
@@ -60,7 +63,9 @@ export class LLMProviderManager {
         this.logger.warn(`Using fallback provider for ${type}`);
         return fallbackProvider;
       }
-      throw new Error(`LLM provider ${type} is not healthy and no fallback available`);
+      throw new Error(
+        `LLM provider ${type} is not healthy and no fallback available`,
+      );
     }
 
     return provider;
@@ -69,13 +74,13 @@ export class LLMProviderManager {
   private initializeProviders(): void {
     // Initialize OpenRouter provider
     this.providers.set('openrouter', this.createOpenRouterProvider());
-    
+
     // Initialize OpenAI provider
     this.providers.set('openai', this.createOpenAIProvider());
-    
+
     // Initialize Anthropic provider
     this.providers.set('anthropic', this.createAnthropicProvider());
-    
+
     // Initialize Ollama provider
     this.providers.set('ollama', this.createOllamaProvider());
   }
@@ -83,18 +88,22 @@ export class LLMProviderManager {
   private createOpenRouterProvider(): LLMProvider {
     return {
       name: 'openrouter',
-      generateText: async (params: GenerateTextParams): Promise<GenerateTextResult> => {
+      generateText: async (
+        params: GenerateTextParams,
+      ): Promise<GenerateTextResult> => {
         try {
           // Dynamic import to handle ES modules
-          const { createOpenRouter } = await import('@openrouter/ai-sdk-provider');
+          const { createOpenRouter } = await import(
+            '@openrouter/ai-sdk-provider'
+          );
           const { generateText } = await import('ai');
-          
+
           const openrouter = createOpenRouter({
             apiKey: this.configService.get<string>('OPENROUTER_API_KEY'),
           });
 
           const result = await generateText({
-            model: openrouter('anthropic/claude-3.5-sonnet'),
+            model: openrouter('openai/gpt-4o-mini'),
             prompt: params.prompt,
             system: params.systemPrompt,
             temperature: params.temperature || 0.7,
@@ -107,16 +116,19 @@ export class LLMProviderManager {
             text: result.text,
             steps: result.steps || [],
             toolCalls: this.extractToolCalls(result.steps),
-            usage: result.usage ? {
-              promptTokens: result.usage.promptTokens,
-              completionTokens: result.usage.completionTokens,
-              totalTokens: result.usage.totalTokens,
-            } : undefined,
+            usage: result.usage
+              ? {
+                  promptTokens: result.usage.promptTokens,
+                  completionTokens: result.usage.completionTokens,
+                  totalTokens: result.usage.totalTokens,
+                }
+              : undefined,
           };
-
         } catch (error) {
           this.logger.error('OpenRouter provider error:', error);
-          throw new Error(`OpenRouter generation failed: ${error instanceof Error ? error.message : String(error)}`);
+          throw new Error(
+            `OpenRouter generation failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       },
       isHealthy: async (): Promise<boolean> => {
@@ -125,7 +137,7 @@ export class LLMProviderManager {
           if (!apiKey) return false;
 
           const response = await fetch('https://openrouter.ai/api/v1/models', {
-            headers: { 'Authorization': `Bearer ${apiKey}` },
+            headers: { Authorization: `Bearer ${apiKey}` },
             signal: AbortSignal.timeout(5000),
           });
 
@@ -140,7 +152,9 @@ export class LLMProviderManager {
   private createOpenAIProvider(): LLMProvider {
     return {
       name: 'openai',
-      generateText: async (params: GenerateTextParams): Promise<GenerateTextResult> => {
+      generateText: async (
+        params: GenerateTextParams,
+      ): Promise<GenerateTextResult> => {
         try {
           // Try @ai-sdk/openai first, fallback to OpenRouter if not available
           try {
@@ -161,18 +175,24 @@ export class LLMProviderManager {
               text: result.text,
               steps: result.steps || [],
               toolCalls: this.extractToolCalls(result.steps),
-              usage: result.usage ? {
-                promptTokens: result.usage.promptTokens,
-                completionTokens: result.usage.completionTokens,
-                totalTokens: result.usage.totalTokens,
-              } : undefined,
+              usage: result.usage
+                ? {
+                    promptTokens: result.usage.promptTokens,
+                    completionTokens: result.usage.completionTokens,
+                    totalTokens: result.usage.totalTokens,
+                  }
+                : undefined,
             };
           } catch (importError) {
             // Fallback to OpenRouter with OpenAI models
-            this.logger.warn('OpenAI SDK not available, falling back to OpenRouter');
-            const { createOpenRouter } = await import('@openrouter/ai-sdk-provider');
+            this.logger.warn(
+              'OpenAI SDK not available, falling back to OpenRouter',
+            );
+            const { createOpenRouter } = await import(
+              '@openrouter/ai-sdk-provider'
+            );
             const { generateText } = await import('ai');
-            
+
             const openrouter = createOpenRouter({
               apiKey: this.configService.get<string>('OPENROUTER_API_KEY'),
             });
@@ -191,23 +211,27 @@ export class LLMProviderManager {
               text: result.text,
               steps: result.steps || [],
               toolCalls: this.extractToolCalls(result.steps),
-              usage: result.usage ? {
-                promptTokens: result.usage.promptTokens,
-                completionTokens: result.usage.completionTokens,
-                totalTokens: result.usage.totalTokens,
-              } : undefined,
+              usage: result.usage
+                ? {
+                    promptTokens: result.usage.promptTokens,
+                    completionTokens: result.usage.completionTokens,
+                    totalTokens: result.usage.totalTokens,
+                  }
+                : undefined,
             };
           }
-
         } catch (error) {
           this.logger.error('OpenAI provider error:', error);
-          throw new Error(`OpenAI generation failed: ${error instanceof Error ? error.message : String(error)}`);
+          throw new Error(
+            `OpenAI generation failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       },
       isHealthy: async (): Promise<boolean> => {
         try {
           const apiKey = this.configService.get<string>('OPENAI_API_KEY');
-          const openrouterKey = this.configService.get<string>('OPENROUTER_API_KEY');
+          const openrouterKey =
+            this.configService.get<string>('OPENROUTER_API_KEY');
           return !!(apiKey || openrouterKey);
         } catch {
           return false;
@@ -219,13 +243,17 @@ export class LLMProviderManager {
   private createAnthropicProvider(): LLMProvider {
     return {
       name: 'anthropic',
-      generateText: async (params: GenerateTextParams): Promise<GenerateTextResult> => {
+      generateText: async (
+        params: GenerateTextParams,
+      ): Promise<GenerateTextResult> => {
         try {
           // Always fallback to OpenRouter for Claude models since @ai-sdk/anthropic may not be available
           this.logger.debug('Using OpenRouter for Anthropic models');
-          const { createOpenRouter } = await import('@openrouter/ai-sdk-provider');
+          const { createOpenRouter } = await import(
+            '@openrouter/ai-sdk-provider'
+          );
           const { generateText } = await import('ai');
-          
+
           const openrouter = createOpenRouter({
             apiKey: this.configService.get<string>('OPENROUTER_API_KEY'),
           });
@@ -244,21 +272,25 @@ export class LLMProviderManager {
             text: result.text,
             steps: result.steps || [],
             toolCalls: this.extractToolCalls(result.steps),
-            usage: result.usage ? {
-              promptTokens: result.usage.promptTokens,
-              completionTokens: result.usage.completionTokens,
-              totalTokens: result.usage.totalTokens,
-            } : undefined,
+            usage: result.usage
+              ? {
+                  promptTokens: result.usage.promptTokens,
+                  completionTokens: result.usage.completionTokens,
+                  totalTokens: result.usage.totalTokens,
+                }
+              : undefined,
           };
-
         } catch (error) {
           this.logger.error('Anthropic provider error:', error);
-          throw new Error(`Anthropic generation failed: ${error instanceof Error ? error.message : String(error)}`);
+          throw new Error(
+            `Anthropic generation failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       },
       isHealthy: async (): Promise<boolean> => {
         try {
-          const openrouterKey = this.configService.get<string>('OPENROUTER_API_KEY');
+          const openrouterKey =
+            this.configService.get<string>('OPENROUTER_API_KEY');
           return !!openrouterKey;
         } catch {
           return false;
@@ -270,7 +302,9 @@ export class LLMProviderManager {
   private createOllamaProvider(): LLMProvider {
     return {
       name: 'ollama',
-      generateText: async (params: GenerateTextParams): Promise<GenerateTextResult> => {
+      generateText: async (
+        params: GenerateTextParams,
+      ): Promise<GenerateTextResult> => {
         try {
           const { ollama } = await import('ollama-ai-provider');
           const { generateText } = await import('ai');
@@ -288,15 +322,19 @@ export class LLMProviderManager {
             steps: [],
             toolCalls: [],
           };
-
         } catch (error) {
           this.logger.error('Ollama provider error:', error);
-          throw new Error(`Ollama generation failed: ${error instanceof Error ? error.message : String(error)}`);
+          throw new Error(
+            `Ollama generation failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       },
       isHealthy: async (): Promise<boolean> => {
         try {
-          const ollamaUrl = this.configService.get<string>('OLLAMA_URL', 'http://localhost:11434');
+          const ollamaUrl = this.configService.get<string>(
+            'OLLAMA_URL',
+            'http://localhost:11434',
+          );
           const response = await fetch(`${ollamaUrl}/api/tags`, {
             signal: AbortSignal.timeout(3000),
           });
@@ -308,19 +346,21 @@ export class LLMProviderManager {
     };
   }
 
-  private async getFallbackProvider(primaryType: string): Promise<LLMProvider | null> {
+  private async getFallbackProvider(
+    primaryType: string,
+  ): Promise<LLMProvider | null> {
     const fallbackOrder = {
-      'openrouter': ['openai', 'anthropic'],
-      'openai': ['openrouter', 'anthropic'],
-      'anthropic': ['openrouter', 'openai'],
-      'ollama': ['openrouter'],
+      openrouter: ['openai', 'anthropic'],
+      openai: ['openrouter', 'anthropic'],
+      anthropic: ['openrouter', 'openai'],
+      ollama: ['openrouter'],
     };
 
     const fallbacks = fallbackOrder[primaryType] || [];
-    
+
     for (const fallbackType of fallbacks) {
       const provider = this.providers.get(fallbackType);
-      if (provider && await provider.isHealthy()) {
+      if (provider && (await provider.isHealthy())) {
         return provider;
       }
     }
@@ -330,7 +370,7 @@ export class LLMProviderManager {
 
   private extractToolCalls(steps: any[] = []): any[] {
     const toolCalls = [];
-    
+
     for (const step of steps) {
       if (step.toolCalls) {
         toolCalls.push(...step.toolCalls);

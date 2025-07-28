@@ -91,7 +91,13 @@ export class AIAgentHandler implements BlockHandler {
       );
 
       // Execute AI agent
-      const result = await this.executeAgent(session, provider, tools, config);
+      const result = await this.executeAgent(
+        session,
+        provider,
+        tools,
+        config,
+        userId,
+      );
 
       // Log execution completion
       await this.logExecution(executionId, nodeId, {
@@ -139,7 +145,7 @@ export class AIAgentHandler implements BlockHandler {
       return {
         provider: {
           type: data.provider?.type || 'openrouter',
-          model: data.provider?.model || 'anthropic/claude-3.5-sonnet',
+          model: data.provider?.model || 'openai/gpt-4o-mini',
           temperature: data.provider?.temperature || 0.7,
           maxTokens: data.provider?.maxTokens || 4000,
         },
@@ -210,17 +216,33 @@ export class AIAgentHandler implements BlockHandler {
       try {
         if (toolConfig.type === 'mcp') {
           // For MCP tools, we need to get all tools from the server
+          this.logger.log(
+            `Loading MCP tools for user ${userId}, tool config: ${toolConfig.id}`,
+          );
           const servers = await this.mcpServerManager.getUserServers(userId);
+          this.logger.log(`Found ${servers.length} servers for user ${userId}`);
 
           for (const server of servers) {
             // Add all tools from this server
             for (const tool of server.tools) {
-              tools.push({
+              // Convert MCP tool to AI SDK function format
+              const aiTool = {
                 name: tool.name,
                 description: tool.description,
-                inputSchema: tool.inputSchema,
-                execute: tool.execute,
-              });
+                parameters: tool.inputSchema,
+                execute: async (args: any) => {
+                  try {
+                    return await tool.execute(args);
+                  } catch (error) {
+                    this.logger.error(
+                      `Tool execution failed for ${tool.name}:`,
+                      error,
+                    );
+                    throw error;
+                  }
+                },
+              };
+              tools.push(aiTool);
             }
           }
 
@@ -244,6 +266,7 @@ export class AIAgentHandler implements BlockHandler {
     provider: any,
     tools: any[],
     config: AIAgentConfig,
+    userId: string,
   ) {
     // Create timeout promise
     const timeoutPromise = new Promise((_, reject) => {
@@ -265,6 +288,7 @@ export class AIAgentHandler implements BlockHandler {
       maxSteps: config.agent.maxSteps,
       thinkingMode: config.agent.thinkingMode,
       sessionId: session.id,
+      userId: userId,
     });
 
     return Promise.race([executionPromise, timeoutPromise]);

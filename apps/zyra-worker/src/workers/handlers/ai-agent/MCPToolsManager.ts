@@ -144,6 +144,7 @@ export class MCPToolsManager {
   async connectAndDiscoverTools(
     serverId: string,
     userConfig: Record<string, any>,
+    userId: string = 'system',
   ): Promise<DiscoveredTool[]> {
     try {
       const serverDef = this.availableServers.get(serverId);
@@ -161,10 +162,12 @@ export class MCPToolsManager {
       };
 
       // Connect to the MCP server using our MCPServerManager
+      this.logger.log(`Registering server ${serverId} for user ${userId}`);
       const actualServerId = await this.mcpServerManager.registerServer(
         serverConfig,
-        'system', // System connection for tool discovery
+        userId, // Use the passed user ID
       );
+      this.logger.log(`Server registered with ID: ${actualServerId}`);
 
       // Get the server instance to discover tools
       const serverInstance =
@@ -622,6 +625,50 @@ export class MCPToolsManager {
           configuration: {
             headless: true,
             viewport: { width: 1920, height: 1080 },
+          },
+        },
+      ],
+    });
+
+    // GOAT (Blockchain) MCP Server
+    this.availableServers.set('goat', {
+      id: 'goat',
+      name: 'goat',
+      displayName: 'GOAT Blockchain',
+      description:
+        'Blockchain operations using GOAT SDK (wallet management, DeFi, NFTs, etc.)',
+      category: 'api',
+      icon: '🔗',
+      connection: {
+        type: 'stdio',
+        command: 'ts-node',
+        args: ['src/workers/handlers/ai-agent/mcps/goat-mcp-server.ts'],
+      },
+      configSchema: {
+        type: 'object',
+        properties: {
+          WALLET_PRIVATE_KEY: {
+            type: 'string',
+            description: 'Private key for wallet operations',
+            required: true,
+            sensitive: true,
+          },
+          RPC_PROVIDER_URL: {
+            type: 'string',
+            description: 'RPC provider URL for blockchain connection',
+            required: true,
+            default: 'https://sepolia.base.org',
+          },
+        },
+        required: ['WALLET_PRIVATE_KEY', 'RPC_PROVIDER_URL'],
+      },
+      examples: [
+        {
+          name: 'Base Sepolia Testnet',
+          description: 'Connect to Base Sepolia testnet for development',
+          configuration: {
+            WALLET_PRIVATE_KEY: '0x...',
+            RPC_PROVIDER_URL: 'https://sepolia.base.org',
           },
         },
       ],

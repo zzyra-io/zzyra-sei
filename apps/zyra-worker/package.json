@@ -32,6 +32,7 @@
     "@coinbase/agentkit": "^0.7.2",
     "@coinbase/agentkit-vercel-ai-sdk": "^0.1.0",
     "@goat-sdk/adapter-langchain": "^0.2.12",
+    "@goat-sdk/adapter-model-context-protocol": "^0.2.11",
     "@goat-sdk/adapter-vercel-ai": "^0.2.10",
     "@goat-sdk/crossmint": "^0.4.5",
     "@goat-sdk/plugin-erc20": "^0.2.14",

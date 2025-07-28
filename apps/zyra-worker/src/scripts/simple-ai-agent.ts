@@ -27,6 +27,7 @@ import { MCPServerManager } from '../workers/handlers/ai-agent/MCPServerManager'
 import { SecurityValidator } from '../workers/handlers/ai-agent/SecurityValidator';
 import { ReasoningEngine } from '../workers/handlers/ai-agent/ReasoningEngine';
 import { MCPToolsManager } from '../workers/handlers/ai-agent/MCPToolsManager';
+import { SubscriptionService } from '../workers/handlers/ai-agent/SubscriptionService';
 import { GOATManager } from '../workers/handlers/ai-agent/GOATManager';
 import { randomUUID } from 'crypto';
 
@@ -70,6 +71,7 @@ class SimpleDatabaseService {
           'blockchain_operations',
           'mcp_access',
           'brave_search_access',
+          'goat_access',
         ],
       }),
     },
@@ -119,10 +121,14 @@ async function createAIAgentHandler() {
   const llmProviderManager = new LLMProviderManager(configService);
   const mcpServerManager = new MCPServerManager(databaseService);
   const securityValidator = new SecurityValidator(databaseService);
-  const reasoningEngine = new ReasoningEngine(databaseService);
+  const subscriptionService = new SubscriptionService();
+  const reasoningEngine = new ReasoningEngine(
+    databaseService,
+    subscriptionService,
+  );
   const mcpToolsManager = new MCPToolsManager(
     databaseService,
-    mcpServerManager,
+    mcpServerManager, // Use the same mcpServerManager instance
   );
   const goatManager = new GOATManager(configService);
 
@@ -218,6 +224,25 @@ const TEST_SCENARIOS = {
         type: 'mcp',
         config: {
           apiKey: process.env.BRAVE_API_KEY || 'demo-key',
+        },
+      },
+    ],
+  },
+  'goat-test': {
+    name: 'GOAT Blockchain Test',
+    prompt:
+      'Check my wallet balance and find yield farming opportunities for USDC on Base Sepolia.',
+    tools: [
+      {
+        id: 'goat',
+        name: 'GOAT Blockchain',
+        type: 'mcp',
+        config: {
+          WALLET_PRIVATE_KEY:
+            process.env.WALLET_PRIVATE_KEY ||
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+          RPC_PROVIDER_URL:
+            process.env.RPC_PROVIDER_URL || 'https://sepolia.base.org',
         },
       },
     ],
@@ -342,6 +367,7 @@ async function runCompleteSystemTest() {
           const tools = await aiSystem.mcpToolsManager.connectAndDiscoverTools(
             tool.id,
             config,
+            'demo-user', // Pass the correct user ID
           );
           logger.log(
             `   ✅ Successfully discovered ${tools.length} tools from ${tool.name}`,
@@ -417,7 +443,7 @@ async function runCompleteSystemTest() {
         provider: {
           type: providerType,
           model: process.env.OPENROUTER_API_KEY
-            ? 'anthropic/claude-3.5-sonnet'
+            ? 'openai/gpt-4o-mini'
             : process.env.OPENAI_API_KEY
               ? 'gpt-4'
               : 'claude-3-5-sonnet-20241022',
@@ -587,8 +613,9 @@ Usage:
 Test Types:
   basic        - Basic AI response (default)
   mcp          - Test with MCP tools (filesystem)
-  mcp-real     - Test with real MCP servers (filesystem + web search)
-  mcp-multi    - Test with multiple MCP servers (filesystem + web search + git)
+  mcp-real     - Test with real MCP servers (web search)
+  mcp-multi    - Test with multiple MCP servers (web search)
+  goat-test    - Test with GOAT blockchain operations
   blockchain   - Test with GOAT SDK tools
   multi-tool   - Test with multiple tool types
   workflow     - Full workflow simulation
@@ -596,13 +623,15 @@ Test Types:
 Examples:
   ts-node src/scripts/simple-ai-agent.ts
   ts-node src/scripts/simple-ai-agent.ts mcp-real
-  ts-node src/scripts/simple-ai-agent.ts mcp-multi
+  ts-node src/scripts/simple-ai-agent.ts goat-test
 
 Environment Variables:
   OPENROUTER_API_KEY - OpenRouter API key (recommended)
   OPENAI_API_KEY     - OpenAI API key
   ANTHROPIC_API_KEY  - Anthropic API key
   BRAVE_API_KEY      - Brave Search API key (for web search tests)
+  WALLET_PRIVATE_KEY - For GOAT blockchain operations
+  RPC_PROVIDER_URL   - For blockchain RPC connection
 
 For Real MCP Server Testing:
   npm install -g @modelcontextprotocol/server-filesystem
@@ -622,10 +651,15 @@ if (require.main === module) {
     process.exit(0);
   }
 
-  runCompleteSystemTest().catch((error) => {
-    console.error('Script failed:', error);
-    process.exit(1);
-  });
+  runCompleteSystemTest()
+    .then(() => {
+      console.log('Script completed successfully');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('Script failed:', error);
+      process.exit(1);
+    });
 }
 
 export { runCompleteSystemTest, createAIAgentHandler };

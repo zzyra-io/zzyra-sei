@@ -41,7 +41,10 @@ export class MCPServerManager {
 
   constructor(private readonly databaseService: DatabaseService) {}
 
-  async registerServer(config: MCPServerConfig, userId: string): Promise<string> {
+  async registerServer(
+    config: MCPServerConfig,
+    userId: string,
+  ): Promise<string> {
     try {
       // Create MCP client
       const client = await this.createMCPClient(config);
@@ -52,7 +55,9 @@ export class MCPServerManager {
       // Try to save to database, fallback to memory-only storage
       let serverRecord = { id: serverId, name: config.name };
       try {
-        const dbRecord = await (this.databaseService.prisma as any).mcpServer?.create({
+        const dbRecord = await (
+          this.databaseService.prisma as any
+        ).mcpServer?.create({
           data: {
             userId,
             name: config.name,
@@ -66,7 +71,9 @@ export class MCPServerManager {
         });
         if (dbRecord) serverRecord = dbRecord;
       } catch (dbError) {
-        this.logger.warn('Database table not available, using memory-only storage for MCP server');
+        this.logger.warn(
+          'Database table not available, using memory-only storage for MCP server',
+        );
       }
 
       // Discover available tools and resources
@@ -78,7 +85,7 @@ export class MCPServerManager {
         id: serverRecord.id,
         name: config.name,
         client,
-        tools: tools.map(tool => this.createToolExecutor(tool, client)),
+        tools: tools.map((tool) => this.createToolExecutor(tool, client)),
         resources,
         status: 'connected',
         lastHealthCheck: new Date(),
@@ -86,12 +93,15 @@ export class MCPServerManager {
 
       this.servers.set(serverRecord.id, server);
 
-      this.logger.log(`Registered MCP server: ${config.name} with ${tools.length} tools and ${resources.length} resources`);
+      this.logger.log(
+        `Registered MCP server: ${config.name} with ${tools.length} tools and ${resources.length} resources`,
+      );
       return serverRecord.id;
-
     } catch (error) {
       this.logger.error(`Failed to register MCP server ${config.name}:`, error);
-      throw new Error(`MCP server registration failed: ${(error as Error).message}`);
+      throw new Error(
+        `MCP server registration failed: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -103,7 +113,9 @@ export class MCPServerManager {
 
     // Try to load from database if available
     try {
-      const serverRecord = await (this.databaseService.prisma as any).mcpServer?.findUnique({
+      const serverRecord = await (
+        this.databaseService.prisma as any
+      ).mcpServer?.findUnique({
         where: { id: serverId },
       });
 
@@ -122,19 +134,25 @@ export class MCPServerManager {
         return server;
       }
     } catch (error) {
-      this.logger.debug(`Database not available for MCP server lookup: ${serverId}`);
+      this.logger.debug(
+        `Database not available for MCP server lookup: ${serverId}`,
+      );
     }
 
     return null;
   }
 
-  async loadTool(toolId: string, config: any, userId: string): Promise<MCPTool | null> {
+  async loadTool(
+    toolId: string,
+    config: any,
+    userId: string,
+  ): Promise<MCPTool | null> {
     try {
       // Find server that contains this tool
       const servers = await this.getUserServers(userId);
-      
+
       for (const server of servers) {
-        const tool = server.tools.find(t => t.name === toolId);
+        const tool = server.tools.find((t) => t.name === toolId);
         if (tool) {
           return tool;
         }
@@ -142,7 +160,6 @@ export class MCPServerManager {
 
       this.logger.warn(`Tool ${toolId} not found for user ${userId}`);
       return null;
-
     } catch (error) {
       this.logger.error(`Failed to load tool ${toolId}:`, error);
       return null;
@@ -150,14 +167,20 @@ export class MCPServerManager {
   }
 
   async getUserServers(userId: string): Promise<MCPServer[]> {
+    this.logger.log(`Getting servers for user: ${userId}`);
     try {
       // Try database first
       try {
-        const serverRecords = await (this.databaseService.prisma as any).mcpServer?.findMany({
+        const serverRecords = await (
+          this.databaseService.prisma as any
+        ).mcpServer?.findMany({
           where: { userId, status: 'connected' },
         });
 
         if (serverRecords) {
+          this.logger.log(
+            `Found ${serverRecords.length} servers in database for user ${userId}`,
+          );
           const servers = [];
           for (const record of serverRecords) {
             const server = await this.getServer(record.id);
@@ -168,12 +191,27 @@ export class MCPServerManager {
           return servers;
         }
       } catch (dbError) {
-        this.logger.debug('Database not available, using memory-only server list');
+        this.logger.debug(
+          'Database not available, using memory-only server list',
+        );
       }
 
-      // Fallback to memory-only servers
-      return Array.from(this.servers.values()).filter(server => server.status === 'connected');
-
+      // Fallback to memory-only servers - return all connected servers for demo
+      const connectedServers = Array.from(this.servers.values()).filter(
+        (server) => server.status === 'connected',
+      );
+      this.logger.log(
+        `Found ${connectedServers.length} connected servers in memory for user ${userId}`,
+      );
+      this.logger.log(
+        `All servers in memory: ${Array.from(this.servers.keys()).join(', ')}`,
+      );
+      this.logger.log(
+        `Server statuses: ${Array.from(this.servers.entries())
+          .map(([id, server]) => `${id}: ${server.status}`)
+          .join(', ')}`,
+      );
+      return connectedServers;
     } catch (error) {
       this.logger.error(`Failed to get user servers for ${userId}:`, error);
       return [];
@@ -192,12 +230,12 @@ export class MCPServerManager {
 
       // Update health check timestamp in memory
       server.lastHealthCheck = new Date();
-      
+
       // Try to update database if available
       try {
         await (this.databaseService.prisma as any).mcpServer?.update({
           where: { id: serverId },
-          data: { 
+          data: {
             lastHealthCheck: new Date(),
             status: isHealthy ? 'connected' : 'error',
           },
@@ -207,10 +245,9 @@ export class MCPServerManager {
       }
 
       return isHealthy;
-
     } catch (error) {
       this.logger.warn(`Health check failed for server ${serverId}:`, error);
-      
+
       // Mark server as error in memory
       const server = this.servers.get(serverId);
       if (server) {
@@ -224,9 +261,13 @@ export class MCPServerManager {
   private async createMCPClient(config: MCPServerConfig): Promise<any> {
     try {
       // Dynamic import of MCP SDK
-      const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
-      const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
-      
+      const { Client } = await import(
+        '@modelcontextprotocol/sdk/client/index.js'
+      );
+      const { StdioClientTransport } = await import(
+        '@modelcontextprotocol/sdk/client/stdio.js'
+      );
+
       // Create transport for subprocess
       const transport = new StdioClientTransport({
         command: config.command,
@@ -238,21 +279,25 @@ export class MCPServerManager {
       });
 
       // Create and connect client
-      const client = new Client({
-        name: 'zyra-worker',
-        version: '1.0.0',
-      }, {
-        capabilities: {
-          tools: {},
-          resources: {},
+      const client = new Client(
+        {
+          name: 'zyra-worker',
+          version: '1.0.0',
         },
-      });
+        {
+          capabilities: {
+            tools: {},
+            resources: {},
+          },
+        },
+      );
 
       await client.connect(transport);
       return client;
-
     } catch (error) {
-      throw new Error(`Failed to create MCP client: ${(error as Error).message}`);
+      throw new Error(
+        `Failed to create MCP client: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -287,7 +332,11 @@ export class MCPServerManager {
     };
   }
 
-  private async executeToolCall(toolName: string, params: any, client: any): Promise<any> {
+  private async executeToolCall(
+    toolName: string,
+    params: any,
+    client: any,
+  ): Promise<any> {
     try {
       const response = await client.callTool({
         name: toolName,
@@ -299,7 +348,6 @@ export class MCPServerManager {
         result: response.content,
         error: response.isError ? response.content : null,
       };
-
     } catch (error) {
       this.logger.error(`Tool execution failed for ${toolName}:`, error);
       throw error;

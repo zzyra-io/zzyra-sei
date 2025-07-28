@@ -1,9 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../services/database.service';
+import { SubscriptionService } from './SubscriptionService';
 
 interface ThinkingStep {
   step: number;
-  type: 'planning' | 'reasoning' | 'tool_selection' | 'execution' | 'reflection';
+  type:
+    | 'planning'
+    | 'reasoning'
+    | 'tool_selection'
+    | 'execution'
+    | 'reflection';
   reasoning: string;
   confidence: number;
   toolsConsidered?: string[];
@@ -19,6 +25,7 @@ interface ReasoningParams {
   maxSteps: number;
   thinkingMode: 'fast' | 'deliberate' | 'collaborative';
   sessionId: string;
+  userId?: string;
 }
 
 interface ReasoningResult {
@@ -33,7 +40,10 @@ interface ReasoningResult {
 export class ReasoningEngine {
   private readonly logger = new Logger(ReasoningEngine.name);
 
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly subscriptionService: SubscriptionService,
+  ) {}
 
   async execute(params: ReasoningParams): Promise<ReasoningResult> {
     const steps: ThinkingStep[] = [];
@@ -41,6 +51,18 @@ export class ReasoningEngine {
     let currentStep = 1;
 
     try {
+      // Check subscription for advanced thinking modes
+      if (params.userId && params.thinkingMode !== 'fast') {
+        const canUseAdvanced =
+          await this.subscriptionService.canUseAdvancedThinking(params.userId);
+        if (!canUseAdvanced) {
+          this.logger.warn(
+            `User ${params.userId} attempted to use ${params.thinkingMode} thinking without subscription`,
+          );
+          params.thinkingMode = 'fast'; // Fallback to fast thinking
+        }
+      }
+
       // Step 1: Planning
       const planningStep = await this.planExecution(params, currentStep++);
       steps.push(planningStep);
@@ -53,16 +75,29 @@ export class ReasoningEngine {
 
       // Step 3: Execute with provider
       const executionResult = await this.executeWithProvider(params, steps);
-      
+
       // Extract tool calls from execution
       if (executionResult.toolCalls) {
         toolCalls.push(...executionResult.toolCalls);
       }
 
-      // Step 4: Reflection (if deliberate mode)
-      if (params.thinkingMode === 'deliberate') {
-        const reflectionStep = await this.reflect(executionResult, currentStep++);
-        steps.push(reflectionStep);
+      // Step 4: Reflection (if deliberate mode and user has access)
+      if (params.thinkingMode === 'deliberate' && params.userId) {
+        const canUseDeliberate =
+          await this.subscriptionService.canUseDeliberateThinking(
+            params.userId,
+          );
+        if (canUseDeliberate) {
+          const reflectionStep = await this.reflect(
+            executionResult,
+            currentStep++,
+          );
+          steps.push(reflectionStep);
+        } else {
+          this.logger.warn(
+            `User ${params.userId} attempted deliberate thinking without subscription`,
+          );
+        }
       }
 
       // Save thinking process
@@ -73,12 +108,11 @@ export class ReasoningEngine {
         steps,
         toolCalls,
         confidence: this.calculateOverallConfidence(steps),
-        executionPath: steps.map(s => s.type),
+        executionPath: steps.map((s) => s.type),
       };
-
     } catch (error) {
       this.logger.error('Reasoning engine execution failed:', error);
-      
+
       // Add error step
       steps.push({
         step: currentStep,
@@ -93,13 +127,17 @@ export class ReasoningEngine {
     }
   }
 
-  private async planExecution(params: ReasoningParams, stepNumber: number): Promise<ThinkingStep> {
+  private async planExecution(
+    params: ReasoningParams,
+    stepNumber: number,
+  ): Promise<ThinkingStep> {
     const planningPrompt = this.buildPlanningPrompt(params);
-    
+
     try {
       const planningResult = await params.provider.generateText({
         prompt: planningPrompt,
-        systemPrompt: 'You are a planning assistant. Create a step-by-step plan.',
+        systemPrompt:
+          'You are a planning assistant. Create a step-by-step plan.',
         temperature: 0.3,
         maxTokens: 500,
       });
@@ -114,10 +152,9 @@ export class ReasoningEngine {
         confidence,
         timestamp: new Date().toISOString(),
       };
-
     } catch (error) {
       this.logger.warn('Planning step failed, using fallback:', error);
-      
+
       return {
         step: stepNumber,
         type: 'planning',
@@ -128,53 +165,70 @@ export class ReasoningEngine {
     }
   }
 
-  private async selectTools(params: ReasoningParams, stepNumber: number): Promise<ThinkingStep> {
-    const availableTools = params.tools.map(tool => ({
+  private async selectTools(
+    params: ReasoningParams,
+    stepNumber: number,
+  ): Promise<ThinkingStep> {
+    this.logger.log(
+      `Selecting tools from ${params.tools.length} available tools`,
+    );
+    this.logger.log(
+      `Available tools: ${params.tools.map((t) => t.name).join(', ')}`,
+    );
+
+    const availableTools = params.tools.map((tool) => ({
       id: tool.id,
       name: tool.name,
       description: tool.description,
     }));
 
-    const toolSelectionPrompt = this.buildToolSelectionPrompt(params.prompt, availableTools);
+    const toolSelectionPrompt = this.buildToolSelectionPrompt(
+      params.prompt,
+      availableTools,
+    );
 
     try {
       const selectionResult = await params.provider.generateText({
         prompt: toolSelectionPrompt,
-        systemPrompt: 'You are a tool selection assistant. Choose the most appropriate tools.',
+        systemPrompt:
+          'You are a tool selection assistant. Choose the most appropriate tools.',
         temperature: 0.2,
         maxTokens: 300,
       });
 
       const reasoning = selectionResult.text || selectionResult.content;
-      const selectedTools = this.extractSelectedTools(reasoning, availableTools);
+      const selectedTools = this.extractSelectedTools(
+        reasoning,
+        availableTools,
+      );
 
       return {
         step: stepNumber,
         type: 'tool_selection',
         reasoning,
         confidence: selectedTools.length > 0 ? 0.8 : 0.3,
-        toolsConsidered: availableTools.map(t => t.name),
+        toolsConsidered: availableTools.map((t) => t.name),
         decision: `Selected tools: ${selectedTools.join(', ')}`,
         timestamp: new Date().toISOString(),
       };
-
     } catch (error) {
       this.logger.warn('Tool selection failed:', error);
-      
+
       return {
         step: stepNumber,
         type: 'tool_selection',
-        reasoning: 'Tool selection failed, proceeding with all available tools.',
+        reasoning:
+          'Tool selection failed, proceeding with all available tools.',
         confidence: 0.4,
-        toolsConsidered: availableTools.map(t => t.name),
+        toolsConsidered: availableTools.map((t) => t.name),
         timestamp: new Date().toISOString(),
       };
     }
   }
 
   private async executeWithProvider(
-    params: ReasoningParams, 
-    previousSteps: ThinkingStep[]
+    params: ReasoningParams,
+    previousSteps: ThinkingStep[],
   ): Promise<any> {
     const context = this.buildExecutionContext(previousSteps);
     const enhancedPrompt = `${context}\n\nUser Request: ${params.prompt}`;
@@ -188,7 +242,10 @@ export class ReasoningEngine {
     });
   }
 
-  private async reflect(executionResult: any, stepNumber: number): Promise<ThinkingStep> {
+  private async reflect(
+    executionResult: any,
+    stepNumber: number,
+  ): Promise<ThinkingStep> {
     const reflectionPrompt = `
       Analyze the following execution result and provide insights:
       
@@ -204,7 +261,10 @@ export class ReasoningEngine {
     try {
       // Use a simple reflection for now
       const confidence = this.assessResultQuality(executionResult);
-      const reasoning = this.generateReflectionReasoning(executionResult, confidence);
+      const reasoning = this.generateReflectionReasoning(
+        executionResult,
+        confidence,
+      );
 
       return {
         step: stepNumber,
@@ -213,10 +273,9 @@ export class ReasoningEngine {
         confidence,
         timestamp: new Date().toISOString(),
       };
-
     } catch (error) {
       this.logger.warn('Reflection step failed:', error);
-      
+
       return {
         step: stepNumber,
         type: 'reflection',
@@ -228,8 +287,8 @@ export class ReasoningEngine {
   }
 
   private buildPlanningPrompt(params: ReasoningParams): string {
-    const availableTools = params.tools.map(t => t.name).join(', ');
-    
+    const availableTools = params.tools.map((t) => t.name).join(', ');
+
     return `
       Create a step-by-step plan to address this request: "${params.prompt}"
       
@@ -241,35 +300,69 @@ export class ReasoningEngine {
   }
 
   private buildToolSelectionPrompt(prompt: string, tools: any[]): string {
-    const toolsList = tools.map(t => `- ${t.name}: ${t.description}`).join('\n');
-    
+    const toolsList = tools
+      .map((t) => `- ${t.name}: ${t.description}`)
+      .join('\n');
+
     return `
       For this request: "${prompt}"
       
       Available tools:
       ${toolsList}
       
-      Which tools would be most helpful? Explain your reasoning and list the selected tools.
+      IMPORTANT: You MUST use the available tools to answer this request. Do not provide generic instructions.
+      
+      Which tools should be used? List the exact tool names that are most relevant for this request.
+      
+      For example, if the request asks to check wallet balance, you should select "get_balance" tool.
+      If it asks for wallet address, select "get_address" tool.
+      
+      Selected tools: [list the tool names here]
     `;
   }
 
   private buildExecutionContext(steps: ThinkingStep[]): string {
-    const context = steps.map(step => 
-      `${step.type.toUpperCase()}: ${step.reasoning}`
-    ).join('\n\n');
+    const context = steps
+      .map((step) => `${step.type.toUpperCase()}: ${step.reasoning}`)
+      .join('\n\n');
 
     return `Based on the following analysis:\n\n${context}`;
   }
 
-  private extractSelectedTools(reasoning: string, availableTools: any[]): string[] {
+  private extractSelectedTools(
+    reasoning: string,
+    availableTools: any[],
+  ): string[] {
     const selected: string[] = [];
-    
+    const reasoningLower = reasoning.toLowerCase();
+
     for (const tool of availableTools) {
-      if (reasoning.toLowerCase().includes(tool.name.toLowerCase())) {
+      const toolNameLower = tool.name.toLowerCase();
+
+      // Check for exact tool name match
+      if (reasoningLower.includes(toolNameLower)) {
         selected.push(tool.name);
+        continue;
+      }
+
+      // Check for tool name with underscores replaced by spaces
+      const toolNameSpaced = toolNameLower.replace(/_/g, ' ');
+      if (reasoningLower.includes(toolNameSpaced)) {
+        selected.push(tool.name);
+        continue;
+      }
+
+      // Check for partial matches (for tools like "get_balance" matching "balance")
+      const toolWords = toolNameLower.split('_');
+      for (const word of toolWords) {
+        if (word.length > 3 && reasoningLower.includes(word)) {
+          selected.push(tool.name);
+          break;
+        }
       }
     }
 
+    this.logger.log(`Extracted tools from reasoning: ${selected.join(', ')}`);
     return selected;
   }
 
@@ -277,7 +370,10 @@ export class ReasoningEngine {
     // Simple heuristic based on plan structure
     const hasSteps = /\d+\.|\d+\)/.test(plan);
     const hasDetails = plan.length > 100;
-    const hasLogicalFlow = plan.includes('first') || plan.includes('then') || plan.includes('finally');
+    const hasLogicalFlow =
+      plan.includes('first') ||
+      plan.includes('then') ||
+      plan.includes('finally');
 
     let confidence = 0.4; // Base confidence
     if (hasSteps) confidence += 0.2;
@@ -307,7 +403,10 @@ export class ReasoningEngine {
     }
 
     // Check for error indicators
-    if (!text.toLowerCase().includes('error') && !text.toLowerCase().includes('failed')) {
+    if (
+      !text.toLowerCase().includes('error') &&
+      !text.toLowerCase().includes('failed')
+    ) {
       confidence += 0.1;
     }
 
@@ -337,16 +436,22 @@ export class ReasoningEngine {
   private calculateOverallConfidence(steps: ThinkingStep[]): number {
     if (steps.length === 0) return 0.5;
 
-    const totalConfidence = steps.reduce((sum, step) => sum + step.confidence, 0);
+    const totalConfidence = steps.reduce(
+      (sum, step) => sum + step.confidence,
+      0,
+    );
     return totalConfidence / steps.length;
   }
 
-  private async saveThinkingProcess(sessionId: string, steps: ThinkingStep[]): Promise<void> {
+  private async saveThinkingProcess(
+    sessionId: string,
+    steps: ThinkingStep[],
+  ): Promise<void> {
     try {
       // Try to save to database if available
       await (this.databaseService.prisma as any).aiAgentExecution?.update({
         where: { id: sessionId },
-        data: { 
+        data: {
           thinkingSteps: steps as any,
           updatedAt: new Date(),
         },
