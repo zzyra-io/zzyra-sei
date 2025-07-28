@@ -229,9 +229,9 @@ const TEST_SCENARIOS = {
     ],
   },
   'goat-test': {
-    name: 'GOAT Blockchain Test',
+    name: 'GOAT Blockchain Test with brave search',
     prompt:
-      'Check my wallet balance and find yield farming opportunities for all tokens on Base Sepolia.',
+      'Check my wallet balance for all tokens on Base Sepolia and find the best yield farming opportunities for the tokens. Search for the best yield farming opportunities for the tokens.',
     tools: [
       {
         id: 'goat',
@@ -243,6 +243,14 @@ const TEST_SCENARIOS = {
             '0x0000000000000000000000000000000000000000000000000000000000000001',
           RPC_PROVIDER_URL:
             process.env.RPC_PROVIDER_URL || 'https://sepolia.base.org',
+        },
+      },
+      {
+        id: 'brave-search',
+        name: 'Web Search',
+        type: 'mcp',
+        config: {
+          apiKey: process.env.BRAVE_API_KEY || 'demo-key',
         },
       },
     ],

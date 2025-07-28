@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../services/database.service';
 import { MCPServerManager } from './MCPServerManager';
+import * as availableMcps from './mcps/available_mcps';
 
 interface MCPServerConnection {
   id: string;
@@ -15,7 +16,7 @@ interface MCPServerConnection {
     | 'automation'
     | 'development';
   icon?: string;
-  
+
   // Connection details to existing MCP server
   connection: {
     type: 'stdio' | 'sse' | 'websocket';
@@ -24,25 +25,25 @@ interface MCPServerConnection {
     url?: string; // For SSE/WebSocket connections
     headers?: Record<string, string>;
   };
-  
+
   // Required configuration from user
   configSchema: {
     type: 'object';
     properties: Record<
       string,
       {
-      type: string;
-      description: string;
-      required?: boolean;
-      default?: any;
-      enum?: string[];
-      format?: string;
-      sensitive?: boolean; // For API keys, passwords
+        type: string;
+        description: string;
+        required?: boolean;
+        default?: any;
+        enum?: string[];
+        format?: string;
+        sensitive?: boolean; // For API keys, passwords
       }
     >;
     required?: string[];
   };
-  
+
   // Examples for user guidance
   examples: Array<{
     name: string;
@@ -103,11 +104,11 @@ export class MCPToolsManager {
    */
   getAvailableServers(category?: string): MCPServerConnection[] {
     const servers = Array.from(this.availableServers.values());
-    
+
     if (category) {
       return servers.filter((server) => server.category === category);
     }
-    
+
     return servers.sort((a, b) => a.displayName.localeCompare(b.displayName));
   }
 
@@ -179,10 +180,10 @@ export class MCPToolsManager {
       // Extract discovered tools
       const discoveredTools: DiscoveredTool[] = serverInstance.tools.map(
         (tool) => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        serverId: actualServerId,
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+          serverId: actualServerId,
         }),
       );
 
@@ -210,7 +211,7 @@ export class MCPToolsManager {
     blockId: string,
     toolSelections: UserToolSelection[],
   ): Promise<void> {
-      const configKey = `${userId}:${blockId}`;
+    const configKey = `${userId}:${blockId}`;
 
     // Convert tool selections to server-based configuration
     const serverConfigurations = new Map<string, UserServerSelection>();
@@ -399,281 +400,11 @@ export class MCPToolsManager {
    * Initialize available MCP servers
    */
   private initializeAvailableServers(): void {
-    // File System MCP Server
-    this.availableServers.set('filesystem', {
-      id: 'filesystem',
-      name: 'filesystem',
-      displayName: 'File System',
-      description:
-        'Access and manipulate files and directories on the filesystem',
-      category: 'filesystem',
-      icon: '📁',
-      connection: {
-        type: 'stdio',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-filesystem'],
-      },
-      configSchema: {
-        type: 'object',
-        properties: {
-          allowedDirectories: {
-            type: 'string',
-            description: 'Base directory path for file operations',
-            required: true,
-            format: 'path',
-          },
-          allowWrite: {
-            type: 'boolean',
-            description: 'Allow write operations',
-            default: false,
-          },
-        },
-        required: ['allowedDirectories'],
-      },
-      examples: [
-        {
-          name: 'Project Files Access',
-          description: 'Access files in a project directory',
-          configuration: {
-            allowedDirectories: '/home/user/project',
-            allowWrite: true,
-          },
-        },
-      ],
-    });
-
-    // Web Search MCP Server (Brave Search)
-    this.availableServers.set('brave-search', {
-      id: 'brave-search',
-      name: 'brave-search',
-      displayName: 'Brave Search',
-      description: 'Search the web using Brave Search API',
-      category: 'web',
-      icon: '🔍',
-      connection: {
-        type: 'stdio',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-brave-search'],
-      },
-      configSchema: {
-        type: 'object',
-        properties: {
-          apiKey: {
-            type: 'string',
-            description: 'Brave Search API key',
-            required: true,
-            sensitive: true,
-          },
-        },
-        required: ['apiKey'],
-      },
-      examples: [
-        {
-          name: 'Web Search',
-          description: 'Search for information on the web',
-          configuration: {
-            apiKey: 'your-brave-api-key',
-          },
-        },
-      ],
-    });
-
-    // SQLite Database MCP Server
-    this.availableServers.set('sqlite', {
-      id: 'sqlite',
-      name: 'sqlite',
-      displayName: 'SQLite Database',
-      description: 'Query and manipulate SQLite databases',
-      category: 'database',
-      icon: '🗄️',
-      connection: {
-        type: 'stdio',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-sqlite'],
-      },
-      configSchema: {
-        type: 'object',
-        properties: {
-          dbPath: {
-            type: 'string',
-            description: 'Path to SQLite database file',
-            required: true,
-            format: 'path',
-          },
-        },
-        required: ['dbPath'],
-      },
-      examples: [
-        {
-          name: 'App Database',
-          description: 'Connect to application database',
-          configuration: {
-            dbPath: '/data/app.db',
-          },
-        },
-      ],
-    });
-
-    // Git Repository MCP Server
-    this.availableServers.set('git', {
-      id: 'git',
-      name: 'git',
-      displayName: 'Git Repository',
-      description: 'Git version control operations',
-      category: 'development',
-      icon: '🌿',
-      connection: {
-        type: 'stdio',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-git'],
-      },
-      configSchema: {
-        type: 'object',
-        properties: {
-          repository: {
-            type: 'string',
-            description: 'Path to git repository',
-            required: true,
-            format: 'path',
-          },
-        },
-        required: ['repository'],
-      },
-      examples: [
-        {
-          name: 'Project Repository',
-          description: 'Work with project git repository',
-          configuration: {
-            repository: '/home/user/project',
-          },
-        },
-      ],
-    });
-
-    // Fetch (HTTP) MCP Server
-    this.availableServers.set('fetch', {
-      id: 'fetch',
-      name: 'fetch',
-      displayName: 'HTTP Requests',
-      description: 'Make HTTP requests to APIs and web services',
-      category: 'api',
-      icon: '🌐',
-      connection: {
-        type: 'stdio',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-fetch'],
-      },
-      configSchema: {
-        type: 'object',
-        properties: {
-          userAgent: {
-            type: 'string',
-            description: 'User agent for requests',
-            default: 'Zyra-AI-Agent/1.0',
-          },
-          timeout: {
-            type: 'number',
-            description: 'Request timeout in milliseconds',
-            default: 30000,
-          },
-        },
-      },
-      examples: [
-        {
-          name: 'API Requests',
-          description: 'Make requests to REST APIs',
-          configuration: {
-            userAgent: 'MyApp/1.0',
-            timeout: 15000,
-          },
-        },
-      ],
-    });
-
-    // Puppeteer (Web Automation) MCP Server
-    this.availableServers.set('puppeteer', {
-      id: 'puppeteer',
-      name: 'puppeteer',
-      displayName: 'Web Automation',
-      description: 'Automate web browsers with Puppeteer',
-      category: 'automation',
-      icon: '🤖',
-      connection: {
-        type: 'stdio',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-puppeteer'],
-      },
-      configSchema: {
-        type: 'object',
-        properties: {
-          headless: {
-            type: 'boolean',
-            description: 'Run browser in headless mode',
-            default: true,
-          },
-          viewport: {
-            type: 'object',
-            description: 'Browser viewport size',
-            default: { width: 1280, height: 720 },
-          },
-        },
-      },
-      examples: [
-        {
-          name: 'Web Scraping',
-          description: 'Scrape data from websites',
-          configuration: {
-            headless: true,
-            viewport: { width: 1920, height: 1080 },
-          },
-        },
-      ],
-    });
-
-    // GOAT (Blockchain) MCP Server
-    this.availableServers.set('goat', {
-      id: 'goat',
-      name: 'goat',
-      displayName: 'GOAT Blockchain',
-      description:
-        'Blockchain operations using GOAT SDK (wallet management, DeFi, NFTs, etc.)',
-      category: 'api',
-      icon: '🔗',
-      connection: {
-        type: 'stdio',
-        command: 'ts-node',
-        args: ['src/workers/handlers/ai-agent/mcps/goat-mcp-server.ts'],
-      },
-      configSchema: {
-        type: 'object',
-        properties: {
-          WALLET_PRIVATE_KEY: {
-            type: 'string',
-            description: 'Private key for wallet operations',
-            required: true,
-            sensitive: true,
-          },
-          RPC_PROVIDER_URL: {
-            type: 'string',
-            description: 'RPC provider URL for blockchain connection',
-            required: true,
-            default: 'https://sepolia.base.org',
-          },
-        },
-        required: ['WALLET_PRIVATE_KEY', 'RPC_PROVIDER_URL'],
-      },
-      examples: [
-        {
-          name: 'Base Sepolia Testnet',
-          description: 'Connect to Base Sepolia testnet for development',
-          configuration: {
-            WALLET_PRIVATE_KEY: '0x...',
-            RPC_PROVIDER_URL: 'https://sepolia.base.org',
-          },
-        },
-      ],
-    });
-
+    for (const server of Object.values(
+      availableMcps,
+    ) as MCPServerConnection[]) {
+      this.availableServers.set(server.id, server);
+    }
     this.logger.log(
       `Initialized ${this.availableServers.size} available MCP server connections`,
     );
