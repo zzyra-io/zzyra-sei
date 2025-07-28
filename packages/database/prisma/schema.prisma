@@ -62,6 +62,7 @@ model User {
   aiAgentExecutions    AiAgentExecution[]
   mcpServers           McpServer[]
   aiAgentSecurityEvents AiAgentSecurityEvent[]
+  goatWalletConfigs    GoatWalletConfig[]
 
   @@map("users")
 }
@@ -373,68 +374,110 @@ model AiAgentExecution {
   model                String
   agentConfig          Json          @map("agent_config")
   toolsConfig          Json          @map("tools_config")
+  executionConfig      Json          @default("{}") @map("execution_config") // mode, timeout, approval settings
   thinkingSteps        Json          @default("[]") @map("thinking_steps")
   toolCalls            Json          @default("[]") @map("tool_calls")
   securityViolations   Json          @default("[]") @map("security_violations")
   performanceMetrics   Json          @default("{}") @map("performance_metrics")
   status               String        @default("pending")
+  startedAt            DateTime?     @map("started_at")
+  completedAt          DateTime?     @map("completed_at")
+  totalTokens          Int?          @map("total_tokens")
+  executionTimeMs      Int?          @map("execution_time_ms")
   result               String?
   error                String?
+  errorCode            String?       @map("error_code")
+  retryCount           Int           @default(0) @map("retry_count")
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
   
   // Relations
   user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   execution            WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  securityEvents       AiAgentSecurityEvent[]
   
   @@map("ai_agent_executions")
   @@index([executionId])
   @@index([userId])
   @@index([nodeId])
+  @@index([status])
+  @@index([provider])
 }
 
 model McpServer {
   id                   String        @id @default(uuid())
   userId               String        @map("user_id")
   name                 String
+  description          String?
   command              String
   args                 Json          @default("[]")
   env                  Json          @default("{}")
+  timeout              Int           @default(30000) // Connection timeout in ms
   tools                Json          @default("[]")
   resources            Json          @default("[]")
+  capabilities         Json          @default("{}") // Server capabilities
   status               String        @default("connected")
   lastHealthCheck      DateTime?     @map("last_health_check")
+  healthCheckInterval  Int           @default(300000) @map("health_check_interval") // 5 minutes
+  isActive             Boolean       @default(true) @map("is_active")
+  isPublic             Boolean       @default(false) @map("is_public") // Can other users use this server
+  maxConcurrentCalls   Int           @default(5) @map("max_concurrent_calls")
+  metadata             Json?         @default("{}")
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
   
   // Relations
   user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  toolCalls            McpToolCall[]
   
   @@map("mcp_servers")
   @@index([userId])
   @@index([status])
+  @@index([isActive])
+  @@index([isPublic])
+  @@unique([userId, name])
 }
 
 model AiAgentSecurityEvent {
   id                   String        @id @default(uuid())
   executionId          String?       @map("execution_id")
+  aiAgentExecutionId   String?       @map("ai_agent_execution_id") // Separate field for AI agent execution
   userId               String        @map("user_id")
   violationType        String        @map("violation_type")
-  severity             String
+  severity             String        @default("medium") // low, medium, high, critical
   description          String
+  violationData        Json?         @map("violation_data") // Details of what was detected
   blockedAction        String        @map("blocked_action")
   evidence             Json          @default("{}")
+  
+  // Context
+  userPrompt           String?       @map("user_prompt") // The prompt that triggered the event
+  systemPrompt         String?       @map("system_prompt")
+  toolName             String?       @map("tool_name") // Tool involved if applicable
+  ipAddress            String?       @map("ip_address")
+  userAgent            String?       @map("user_agent")
+  
+  // Response
+  actionTaken          String?       @map("action_taken") // blocked, warned, logged, etc.
+  resolved             Boolean       @default(false)
+  resolvedAt           DateTime?     @map("resolved_at")
+  resolvedBy           String?       @map("resolved_by")
+  
+  metadata             Json?         @default("{}")
   createdAt            DateTime      @default(now()) @map("created_at")
   
   // Relations
   user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   execution            WorkflowExecution? @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  aiAgentExecution     AiAgentExecution? @relation(fields: [aiAgentExecutionId], references: [id], onDelete: SetNull)
   
   @@map("ai_agent_security_events")
   @@index([executionId])
+  @@index([aiAgentExecutionId])
   @@index([userId])
   @@index([violationType])
   @@index([severity])
+  @@index([resolved])
 }
 
 // ================ Block & Execution Models ================
@@ -1028,4 +1071,118 @@ model WorkflowStateSnapshot {
   @@index([snapshotType])
   @@index([createdAt])
   @@index([expiresAt])
+}
+
+// ================ GOAT SDK Blockchain Integration (New Models) ================
+
+model GoatWalletConfig {
+  id                   String             @id @default(uuid())
+  userId               String             @map("user_id")
+  name                 String
+  
+  // Wallet details
+  walletType           String             @map("wallet_type") // smart_wallet, eoa, etc.
+  networkId            String             @map("network_id") // base, ethereum, polygon, etc.
+  address              String?            // Wallet address (public)
+  
+  // Configuration (encrypted sensitive data)
+  encryptedConfig      String?            @map("encrypted_config") // Encrypted private key or wallet data
+  
+  // Status
+  isActive             Boolean            @default(true) @map("is_active")
+  lastUsed             DateTime?          @map("last_used")
+  
+  // Metadata
+  metadata             Json?              @default("{}")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions         GoatTransaction[]
+  
+  @@map("goat_wallet_configs")
+  @@index([userId])
+  @@index([networkId])
+  @@index([isActive])
+  @@index([address])
+  @@unique([userId, name])
+}
+
+// GOAT Transaction Logs
+model GoatTransaction {
+  id                   String             @id @default(uuid())
+  walletConfigId       String             @map("wallet_config_id")
+  executionId          String?            @map("execution_id") // Reference to AI agent execution
+  
+  // Transaction details
+  transactionHash      String?            @map("transaction_hash")
+  networkId            String             @map("network_id")
+  toAddress            String             @map("to_address")
+  value                String?            // In wei or token units
+  gasUsed              String?            @map("gas_used")
+  gasPrice             String?            @map("gas_price")
+  
+  // Tool context
+  toolName             String?            @map("tool_name") // Which GOAT tool was used
+  toolParameters       Json?              @map("tool_parameters")
+  
+  // Status
+  status               String             @default("pending") // pending, confirmed, failed
+  blockNumber          String?            @map("block_number")
+  confirmations        Int                @default(0)
+  
+  // Timing
+  submittedAt          DateTime           @default(now()) @map("submitted_at")
+  confirmedAt          DateTime?          @map("confirmed_at")
+  
+  // Error handling
+  error                String?
+  retryCount           Int                @default(0) @map("retry_count")
+  
+  // Metadata
+  metadata             Json?              @default("{}")
+
+  // Relations
+  walletConfig         GoatWalletConfig   @relation(fields: [walletConfigId], references: [id], onDelete: Cascade)
+  
+  @@map("goat_transactions")
+  @@index([walletConfigId])
+  @@index([executionId])
+  @@index([transactionHash])
+  @@index([networkId])
+  @@index([status])
+  @@index([submittedAt])
+}
+
+// MCP Tool Call Logs (Enhancement to existing MCP system)
+model McpToolCall {
+  id                   String             @id @default(uuid())
+  serverId             String             @map("server_id")
+  executionId          String?            @map("execution_id") // Reference to AI agent execution
+  
+  // Tool details
+  toolName             String             @map("tool_name")
+  parameters           Json
+  
+  // Execution
+  startedAt            DateTime           @default(now()) @map("started_at")
+  completedAt          DateTime?          @map("completed_at")
+  success              Boolean?
+  result               Json?
+  error                String?
+  executionTimeMs      Int?               @map("execution_time_ms")
+  
+  // Metadata
+  metadata             Json?              @default("{}")
+
+  // Relations
+  server               McpServer          @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  
+  @@map("mcp_tool_calls")
+  @@index([serverId])
+  @@index([executionId])
+  @@index([toolName])
+  @@index([startedAt])
+  @@index([success])
 }

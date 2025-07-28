@@ -20,6 +20,11 @@ import { SeiOnchainDataFetchHandler } from './blockchain/sei/SeiOnchainDataFetch
 import { SeiPaymentHandler } from './blockchain/sei/SeiPaymentHandler';
 import { SeiNftHandler } from './blockchain/sei/SeiNftHandler';
 import { AIAgentHandler } from './AIAgentHandler';
+import { LLMProviderManager } from './ai-agent/LLMProviderManager';
+import { MCPServerManager } from './ai-agent/MCPServerManager';
+import { SecurityValidator } from './ai-agent/SecurityValidator';
+import { ReasoningEngine } from './ai-agent/ReasoningEngine';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * Central registry for all block handlers.
@@ -37,6 +42,7 @@ export class BlockHandlerRegistry {
     private readonly logger: Logger,
     private readonly databaseService: DatabaseService,
     private readonly executionLogger: ExecutionLogger,
+    private readonly configService: ConfigService,
   ) {
     // Initialize enhanced block system
     const templateProcessor = new ZyraTemplateProcessor();
@@ -115,18 +121,11 @@ export class BlockHandlerRegistry {
         new SeiNftHandler(),
       ),
 
-      // AI Agent handler - commented out until dependencies are properly injected
-      // ['AI_AGENT']: new MetricsBlockHandler(
-      //   'AI_AGENT',
-      //   new AIAgentHandler(
-      //     this.databaseService,
-      //     this.executionLogger,
-      //     llmProviderManager,
-      //     mcpServerManager,
-      //     securityValidator,
-      //     reasoningEngine,
-      //   ),
-      // ),
+      // AI Agent handler with proper dependency injection
+      ['AI_AGENT']: new MetricsBlockHandler(
+        'AI_AGENT' as any,
+        this.createAIAgentHandler(),
+      ),
 
       // Placeholder handlers for unimplemented block types
       [BlockType.UNKNOWN]: new MetricsBlockHandler(BlockType.UNKNOWN, {
@@ -398,6 +397,37 @@ export class BlockHandlerRegistry {
         );
       default:
         throw new Error(`Unsupported logic type: ${blockDefinition.logicType}`);
+    }
+  }
+
+  /**
+   * Create AI Agent handler with proper dependency injection
+   */
+  private createAIAgentHandler(): AIAgentHandler {
+    try {
+      // Initialize AI Agent dependencies
+      const llmProviderManager = new LLMProviderManager(this.configService);
+      const mcpServerManager = new MCPServerManager(this.databaseService);
+      const securityValidator = new SecurityValidator(this.databaseService);
+      const reasoningEngine = new ReasoningEngine(this.databaseService);
+
+      // Create and return AI Agent handler
+      return new AIAgentHandler(
+        this.databaseService,
+        this.executionLogger,
+        llmProviderManager,
+        mcpServerManager,
+        securityValidator,
+        reasoningEngine,
+      );
+    } catch (error) {
+      this.logger.error('Failed to create AI Agent handler:', error);
+      // Return a dummy handler that throws an error
+      return {
+        execute: async () => {
+          throw new Error('AI Agent handler initialization failed');
+        },
+      } as unknown as AIAgentHandler;
     }
   }
 
