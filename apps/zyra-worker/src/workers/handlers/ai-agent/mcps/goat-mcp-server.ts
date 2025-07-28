@@ -46,7 +46,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   const { listOfTools } = await toolsPromise;
   const tools = listOfTools();
 
-  // Fix tool schemas to match MCP format
+  // Fix tool schemas to match MCP format and add wallet context
   const formattedTools = tools.map((tool) => {
     // Handle different inputSchema formats from GOAT SDK
     let inputSchema = tool.inputSchema;
@@ -69,12 +69,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       };
     }
 
+    // For balance and address tools, they should work with the configured wallet
+    // So we don't need to require address parameters
+    let properties = (inputSchema as any).properties || {};
+    let required = (inputSchema as any).required || [];
+
+    // If this is a balance or address tool, remove address requirement
+    if (tool.name === 'get_balance' || tool.name === 'get_address') {
+      properties = {};
+      required = [];
+    }
+
     return {
       ...tool,
       inputSchema: {
         type: 'object',
-        properties: (inputSchema as any).properties || {},
-        required: (inputSchema as any).required || [],
+        properties,
+        required,
         description: (inputSchema as any).description || tool.description,
       },
     };
@@ -88,7 +99,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { toolHandler } = await toolsPromise;
   try {
-    return toolHandler(request.params.name, request.params.arguments);
+    // For balance and address tools, automatically add the wallet address
+    let toolArgs = request.params.arguments || {};
+
+    if (
+      request.params.name === 'get_balance' ||
+      request.params.name === 'get_address'
+    ) {
+      // Add the wallet address from the private key
+      toolArgs = {
+        ...toolArgs,
+        address: account.address,
+      };
+    }
+
+    return toolHandler(request.params.name, toolArgs);
   } catch (error) {
     throw new Error(`Tool ${request.params.name} failed: ${error}`);
   }

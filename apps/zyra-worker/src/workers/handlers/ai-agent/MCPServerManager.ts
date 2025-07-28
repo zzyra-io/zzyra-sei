@@ -4,6 +4,7 @@ import { DatabaseService } from '../../../services/database.service';
 interface MCPServer {
   id: string;
   name: string;
+  userId: string; // Track which user owns this server
   client: any; // MCP client instance
   tools: MCPTool[];
   resources: MCPResource[];
@@ -84,6 +85,7 @@ export class MCPServerManager {
       const server: MCPServer = {
         id: serverRecord.id,
         name: config.name,
+        userId, // Include the user ID
         client,
         tools: tools.map((tool) => this.createToolExecutor(tool, client)),
         resources,
@@ -123,6 +125,7 @@ export class MCPServerManager {
         const server: MCPServer = {
           id: serverRecord.id,
           name: serverRecord.name,
+          userId: serverRecord.userId, // Get userId from database record
           client: null, // Client would need to be recreated
           tools: [],
           resources: [],
@@ -177,7 +180,7 @@ export class MCPServerManager {
           where: { userId, status: 'connected' },
         });
 
-        if (serverRecords) {
+        if (serverRecords && serverRecords.length > 0) {
           this.logger.log(
             `Found ${serverRecords.length} servers in database for user ${userId}`,
           );
@@ -189,6 +192,10 @@ export class MCPServerManager {
             }
           }
           return servers;
+        } else {
+          this.logger.log(
+            `No servers found in database for user ${userId}, checking memory...`,
+          );
         }
       } catch (dbError) {
         this.logger.debug(
@@ -196,9 +203,9 @@ export class MCPServerManager {
         );
       }
 
-      // Fallback to memory-only servers - return all connected servers for demo
+      // Fallback to memory-only servers - filter by user ID and connected status
       const connectedServers = Array.from(this.servers.values()).filter(
-        (server) => server.status === 'connected',
+        (server) => server.userId === userId && server.status === 'connected',
       );
       this.logger.log(
         `Found ${connectedServers.length} connected servers in memory for user ${userId}`,

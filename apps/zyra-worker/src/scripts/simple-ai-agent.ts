@@ -231,7 +231,7 @@ const TEST_SCENARIOS = {
   'goat-test': {
     name: 'GOAT Blockchain Test',
     prompt:
-      'Check my wallet balance and find yield farming opportunities for USDC on Base Sepolia.',
+      'Check my wallet balance for 0x30418a5C1C1Fd8297414F596A6C7B3bb8F7B4b7d and find yield farming opportunities for all tokens on Base Sepolia.',
     tools: [
       {
         id: 'goat',
@@ -507,7 +507,7 @@ async function runCompleteSystemTest() {
         result.steps.forEach((step: any, index: number) => {
           console.log(`\n${index + 1}. ${step.type?.toUpperCase() || 'STEP'}`);
           if (step.reasoning) {
-            console.log(`   Reasoning: ${step.reasoning.substring(0, 200)}...`);
+            console.log(`   Reasoning: ${step.reasoning}`);
           }
           if (step.confidence) {
             console.log(`   Confidence: ${Math.round(step.confidence * 100)}%`);
@@ -526,9 +526,7 @@ async function runCompleteSystemTest() {
             `   Parameters: ${JSON.stringify(call.parameters || {}, null, 2)}`,
           );
           if (call.result) {
-            console.log(
-              `   Result: ${JSON.stringify(call.result).substring(0, 200)}...`,
-            );
+            console.log(`   Result: ${JSON.stringify(call.result, null, 2)}`);
           }
           if (call.error) {
             console.log(`   Error: ${call.error}`);

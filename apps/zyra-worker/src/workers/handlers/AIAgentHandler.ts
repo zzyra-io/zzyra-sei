@@ -226,12 +226,20 @@ export class AIAgentHandler implements BlockHandler {
             // Add all tools from this server
             for (const tool of server.tools) {
               // Convert MCP tool to AI SDK function format
+              this.logger.log(
+                `Converting tool: ${tool.name}, schema:`,
+                JSON.stringify(tool.inputSchema, null, 2),
+              );
               const aiTool = {
-                name: tool.name,
+                id: tool.name, // Use simple name for now
                 description: tool.description,
                 parameters: tool.inputSchema,
                 execute: async (args: any) => {
                   try {
+                    this.logger.log(
+                      `Executing tool ${tool.name} with args:`,
+                      args,
+                    );
                     return await tool.execute(args);
                   } catch (error) {
                     this.logger.error(

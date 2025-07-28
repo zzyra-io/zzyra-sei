@@ -15,7 +15,7 @@ interface MCPServerConnection {
     | 'automation'
     | 'development';
   icon?: string;
-
+  
   // Connection details to existing MCP server
   connection: {
     type: 'stdio' | 'sse' | 'websocket';
@@ -24,25 +24,25 @@ interface MCPServerConnection {
     url?: string; // For SSE/WebSocket connections
     headers?: Record<string, string>;
   };
-
+  
   // Required configuration from user
   configSchema: {
     type: 'object';
     properties: Record<
       string,
       {
-        type: string;
-        description: string;
-        required?: boolean;
-        default?: any;
-        enum?: string[];
-        format?: string;
-        sensitive?: boolean; // For API keys, passwords
+      type: string;
+      description: string;
+      required?: boolean;
+      default?: any;
+      enum?: string[];
+      format?: string;
+      sensitive?: boolean; // For API keys, passwords
       }
     >;
     required?: string[];
   };
-
+  
   // Examples for user guidance
   examples: Array<{
     name: string;
@@ -103,11 +103,11 @@ export class MCPToolsManager {
    */
   getAvailableServers(category?: string): MCPServerConnection[] {
     const servers = Array.from(this.availableServers.values());
-
+    
     if (category) {
       return servers.filter((server) => server.category === category);
     }
-
+    
     return servers.sort((a, b) => a.displayName.localeCompare(b.displayName));
   }
 
@@ -179,10 +179,10 @@ export class MCPToolsManager {
       // Extract discovered tools
       const discoveredTools: DiscoveredTool[] = serverInstance.tools.map(
         (tool) => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-          serverId: actualServerId,
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        serverId: actualServerId,
         }),
       );
 
@@ -210,7 +210,7 @@ export class MCPToolsManager {
     blockId: string,
     toolSelections: UserToolSelection[],
   ): Promise<void> {
-    const configKey = `${userId}:${blockId}`;
+      const configKey = `${userId}:${blockId}`;
 
     // Convert tool selections to server-based configuration
     const serverConfigurations = new Map<string, UserServerSelection>();

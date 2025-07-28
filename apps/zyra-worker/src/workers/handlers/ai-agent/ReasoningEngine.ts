@@ -178,7 +178,7 @@ export class ReasoningEngine {
 
     const availableTools = params.tools.map((tool) => ({
       id: tool.id,
-      name: tool.name,
+      name: tool.id, // Use id as name since we're using simple names
       description: tool.description,
     }));
 
@@ -233,13 +233,65 @@ export class ReasoningEngine {
     const context = this.buildExecutionContext(previousSteps);
     const enhancedPrompt = `${context}\n\nUser Request: ${params.prompt}`;
 
-    return params.provider.generateText({
+    // Get the execution result from LLM
+    const result = await params.provider.generateText({
       prompt: enhancedPrompt,
       systemPrompt: params.systemPrompt,
-      tools: params.tools,
       maxSteps: params.maxSteps,
       temperature: params.thinkingMode === 'fast' ? 0.7 : 0.5,
     });
+
+    // Check if any tools were selected in previous steps
+    const toolSelectionStep = previousSteps.find(
+      (step) => step.type === 'tool_selection',
+    );
+    if (toolSelectionStep && toolSelectionStep.decision) {
+      const selectedTools = this.extractSelectedTools(
+        toolSelectionStep.reasoning,
+        params.tools,
+      );
+
+      if (selectedTools.length > 0) {
+        this.logger.log(
+          `Executing selected tools: ${selectedTools.join(', ')}`,
+        );
+
+        // Execute the selected tools
+        const toolResults = [];
+        for (const toolName of selectedTools) {
+          const tool = params.tools.find((t) => t.id === toolName);
+          if (tool && tool.execute) {
+            try {
+              this.logger.log(`Executing tool: ${toolName}`);
+              const toolResult = await tool.execute({});
+              toolResults.push({ tool: toolName, result: toolResult });
+            } catch (error) {
+              this.logger.error(
+                `Tool execution failed for ${toolName}:`,
+                error,
+              );
+              toolResults.push({
+                tool: toolName,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+          }
+        }
+
+        // Add tool results to the response
+        return {
+          text: result.text || result.content,
+          toolCalls: toolResults,
+          steps: result.steps || [],
+        };
+      }
+    }
+
+    return {
+      text: result.text || result.content,
+      toolCalls: [],
+      steps: result.steps || [],
+    };
   }
 
   private async reflect(
@@ -337,18 +389,25 @@ export class ReasoningEngine {
     const reasoningLower = reasoning.toLowerCase();
 
     for (const tool of availableTools) {
-      const toolNameLower = tool.name.toLowerCase();
+      // Handle both name and id properties
+      const toolName = tool.name || tool.id;
+      if (!toolName) {
+        this.logger.warn(`Tool missing name/id property:`, tool);
+        continue;
+      }
+
+      const toolNameLower = toolName.toLowerCase();
 
       // Check for exact tool name match
       if (reasoningLower.includes(toolNameLower)) {
-        selected.push(tool.name);
+        selected.push(toolName);
         continue;
       }
 
       // Check for tool name with underscores replaced by spaces
       const toolNameSpaced = toolNameLower.replace(/_/g, ' ');
       if (reasoningLower.includes(toolNameSpaced)) {
-        selected.push(tool.name);
+        selected.push(toolName);
         continue;
       }
 
@@ -356,7 +415,7 @@ export class ReasoningEngine {
       const toolWords = toolNameLower.split('_');
       for (const word of toolWords) {
         if (word.length > 3 && reasoningLower.includes(word)) {
-          selected.push(tool.name);
+          selected.push(toolName);
           break;
         }
       }
