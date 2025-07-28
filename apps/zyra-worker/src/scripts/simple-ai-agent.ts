@@ -62,8 +62,15 @@ class SimpleDatabaseService {
     user: {
       findUnique: async ({ where }: any) => ({
         id: where.id,
-        role: 'user',
+        role: 'admin',
         email: 'demo@example.com',
+        permissions: [
+          'filesystem_access',
+          'web_search',
+          'blockchain_operations',
+          'mcp_access',
+          'brave_search_access',
+        ],
       }),
     },
     executions: {
@@ -185,6 +192,36 @@ const TEST_SCENARIOS = {
       },
     ],
   },
+  'mcp-real': {
+    name: 'Real MCP Servers Test',
+    prompt:
+      'Search for information about TypeScript best practices online and provide a summary.',
+    tools: [
+      {
+        id: 'brave-search',
+        name: 'Web Search',
+        type: 'mcp',
+        config: {
+          apiKey: process.env.BRAVE_API_KEY || 'demo-key',
+        },
+      },
+    ],
+  },
+  'mcp-multi': {
+    name: 'Multiple MCP Servers Test',
+    prompt:
+      'Search for recent TypeScript documentation and best practices, then search for information about AI agents and automation.',
+    tools: [
+      {
+        id: 'brave-search',
+        name: 'Web Search',
+        type: 'mcp',
+        config: {
+          apiKey: process.env.BRAVE_API_KEY || 'demo-key',
+        },
+      },
+    ],
+  },
   blockchain: {
     name: 'Blockchain Tools Test',
     prompt:
@@ -287,20 +324,58 @@ async function runCompleteSystemTest() {
         `   Found ${Object.keys(availableServers).length} MCP server categories`,
       );
 
-      // Test tool discovery for filesystem if requested
-      if (scenario.tools.find((t) => t.id === 'filesystem')) {
+      // Test real MCP server connections
+      for (const tool of scenario.tools.filter((t) => t.type === 'mcp')) {
+        logger.log(`   Testing MCP server: ${tool.name} (${tool.id})`);
+
         try {
-          const tools = await aiSystem.mcpToolsManager.connectAndDiscoverTools(
-            'filesystem',
-            {
+          // Fix filesystem server configuration
+          let config = tool.config;
+          if (tool.id === 'filesystem') {
+            config = {
+              ...tool.config,
               allowedDirectories: process.cwd(),
-            },
+              allowWrite: false,
+            };
+          }
+
+          const tools = await aiSystem.mcpToolsManager.connectAndDiscoverTools(
+            tool.id,
+            config,
           );
-          logger.log(`   Discovered ${tools.length} filesystem tools`);
+          logger.log(
+            `   ✅ Successfully discovered ${tools.length} tools from ${tool.name}`,
+          );
+
+          // Log discovered tools
+          tools.forEach((tool) => {
+            logger.log(`     - ${tool.name}: ${tool.description}`);
+          });
         } catch (error) {
           logger.warn(
-            '   Filesystem tools discovery failed (this is expected without MCP server running)',
+            `   ⚠️  MCP server ${tool.name} connection failed: ${error}`,
           );
+          logger.log(`   💡 To test with real MCP servers:`);
+          if (tool.id === 'filesystem') {
+            logger.log(
+              `      npm install -g @modelcontextprotocol/server-filesystem`,
+            );
+            logger.log(
+              `      npx @modelcontextprotocol/server-filesystem ${process.cwd()}`,
+            );
+          } else if (tool.id === 'brave-search') {
+            logger.log(
+              `      npm install -g @modelcontextprotocol/server-brave-search`,
+            );
+            logger.log(
+              `      BRAVE_API_KEY=your_key npx @modelcontextprotocol/server-brave-search`,
+            );
+          } else {
+            logger.log(
+              `      npm install -g @modelcontextprotocol/server-${tool.id}`,
+            );
+            logger.log(`      npx @modelcontextprotocol/server-${tool.id}`);
+          }
         }
       }
     }
@@ -504,20 +579,35 @@ async function runCompleteSystemTest() {
 
 function showUsage() {
   console.log(`
-🤖 Simple AI Agent Demo
+🤖 Complete AI Agent System Test
 
 Usage:
-  OPENROUTER_API_KEY=your_key ts-node src/scripts/simple-ai-agent.ts [prompt]
+  OPENROUTER_API_KEY=your_key ts-node src/scripts/simple-ai-agent.ts [test-type]
+
+Test Types:
+  basic        - Basic AI response (default)
+  mcp          - Test with MCP tools (filesystem)
+  mcp-real     - Test with real MCP servers (filesystem + web search)
+  mcp-multi    - Test with multiple MCP servers (filesystem + web search + git)
+  blockchain   - Test with GOAT SDK tools
+  multi-tool   - Test with multiple tool types
+  workflow     - Full workflow simulation
 
 Examples:
   ts-node src/scripts/simple-ai-agent.ts
-  ts-node src/scripts/simple-ai-agent.ts "Write a Python function to calculate fibonacci numbers"
-  ts-node src/scripts/simple-ai-agent.ts "Explain machine learning in simple terms"
+  ts-node src/scripts/simple-ai-agent.ts mcp-real
+  ts-node src/scripts/simple-ai-agent.ts mcp-multi
 
 Environment Variables:
   OPENROUTER_API_KEY - OpenRouter API key (recommended)
   OPENAI_API_KEY     - OpenAI API key
   ANTHROPIC_API_KEY  - Anthropic API key
+  BRAVE_API_KEY      - Brave Search API key (for web search tests)
+
+For Real MCP Server Testing:
+  npm install -g @modelcontextprotocol/server-filesystem
+  npm install -g @modelcontextprotocol/server-brave-search
+  npm install -g @modelcontextprotocol/server-git
 
 The script will automatically detect which API key is available and use the appropriate provider.
 `);

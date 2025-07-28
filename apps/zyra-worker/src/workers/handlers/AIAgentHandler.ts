@@ -68,11 +68,13 @@ export class AIAgentHandler implements BlockHandler {
       const securityResult = await this.securityValidator.validateExecution(
         config,
         userId,
-        executionId
+        executionId,
       );
 
       if (!securityResult.isValid) {
-        const violations = securityResult.violations.map(v => v.description).join(', ');
+        const violations = securityResult.violations
+          .map((v) => v.description)
+          .join(', ');
         throw new Error(`Security violations detected: ${violations}`);
       }
 
@@ -85,7 +87,7 @@ export class AIAgentHandler implements BlockHandler {
       // Initialize LLM provider
       const provider = await this.llmProviderManager.getProvider(
         config.provider.type,
-        config.provider
+        config.provider,
       );
 
       // Execute AI agent
@@ -108,11 +110,13 @@ export class AIAgentHandler implements BlockHandler {
         executionTime: Date.now() - startTime,
         sessionId: session.id,
       };
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      this.logger.error(`AI Agent execution failed for node ${nodeId}: ${errorMessage}`);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      this.logger.error(
+        `AI Agent execution failed for node ${nodeId}: ${errorMessage}`,
+      );
 
       // Log execution failure
       await this.logExecution(executionId, nodeId, {
@@ -141,7 +145,8 @@ export class AIAgentHandler implements BlockHandler {
         },
         agent: {
           name: data.agent?.name || 'AI Assistant',
-          systemPrompt: data.agent?.systemPrompt || 'You are a helpful AI assistant.',
+          systemPrompt:
+            data.agent?.systemPrompt || 'You are a helpful AI assistant.',
           userPrompt: data.agent?.userPrompt || '',
           maxSteps: data.agent?.maxSteps || 10,
           thinkingMode: data.agent?.thinkingMode || 'fast',
@@ -160,21 +165,26 @@ export class AIAgentHandler implements BlockHandler {
     }
   }
 
-  private async createExecutionSession(config: AIAgentConfig, ctx: BlockExecutionContext) {
+  private async createExecutionSession(
+    config: AIAgentConfig,
+    ctx: BlockExecutionContext,
+  ) {
     // For now, return a mock session object since the database model might not exist yet
     try {
-      return await (this.databaseService.prisma as any).aiAgentExecution.create({
-        data: {
-          executionId: ctx.executionId,
-          nodeId: ctx.nodeId,
-          userId: ctx.userId,
-          provider: config.provider.type,
-          model: config.provider.model,
-          agentConfig: config.agent as any,
-          toolsConfig: config.selectedTools as any,
-          status: 'running',
+      return await (this.databaseService.prisma as any).aiAgentExecution.create(
+        {
+          data: {
+            executionId: ctx.executionId,
+            nodeId: ctx.nodeId,
+            userId: ctx.userId,
+            provider: config.provider.type,
+            model: config.provider.model,
+            agentConfig: config.agent as any,
+            toolsConfig: config.selectedTools as any,
+            status: 'running',
+          },
         },
-      });
+      );
     } catch (error) {
       // Fallback to mock session if database model doesn't exist
       return {
@@ -190,33 +200,59 @@ export class AIAgentHandler implements BlockHandler {
     }
   }
 
-  private async loadTools(selectedTools: AIAgentConfig['selectedTools'], userId: string) {
+  private async loadTools(
+    selectedTools: AIAgentConfig['selectedTools'],
+    userId: string,
+  ) {
     const tools = [];
 
     for (const toolConfig of selectedTools) {
       try {
         if (toolConfig.type === 'mcp') {
-          const mcpTool = await this.mcpServerManager.loadTool(
-            toolConfig.id,
-            toolConfig.config,
-            userId
+          // For MCP tools, we need to get all tools from the server
+          const servers = await this.mcpServerManager.getUserServers(userId);
+
+          for (const server of servers) {
+            // Add all tools from this server
+            for (const tool of server.tools) {
+              tools.push({
+                name: tool.name,
+                description: tool.description,
+                inputSchema: tool.inputSchema,
+                execute: tool.execute,
+              });
+            }
+          }
+
+          this.logger.log(
+            `Loaded ${tools.length} MCP tools for user ${userId}`,
           );
-          tools.push(mcpTool);
         }
         // Add other tool types (goat, builtin) here later
       } catch (error) {
-        this.logger.warn(`Failed to load tool ${toolConfig.name}: ${error instanceof Error ? error.message : String(error)}`);
+        this.logger.warn(
+          `Failed to load tool ${toolConfig.name}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
     return tools;
   }
 
-  private async executeAgent(session: any, provider: any, tools: any[], config: AIAgentConfig) {
+  private async executeAgent(
+    session: any,
+    provider: any,
+    tools: any[],
+    config: AIAgentConfig,
+  ) {
     // Create timeout promise
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => {
-        reject(new Error(`AI Agent execution timeout after ${config.execution.timeout}ms`));
+        reject(
+          new Error(
+            `AI Agent execution timeout after ${config.execution.timeout}ms`,
+          ),
+        );
       }, config.execution.timeout);
     });
 
@@ -243,7 +279,9 @@ export class AIAgentHandler implements BlockHandler {
         data,
       });
     } catch (error) {
-      this.logger.error(`Failed to log execution: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `Failed to log execution: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

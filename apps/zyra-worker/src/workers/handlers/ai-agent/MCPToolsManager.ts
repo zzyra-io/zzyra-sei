@@ -7,9 +7,15 @@ interface MCPServerConnection {
   name: string;
   displayName: string;
   description: string;
-  category: 'filesystem' | 'web' | 'database' | 'api' | 'automation' | 'development';
+  category:
+    | 'filesystem'
+    | 'web'
+    | 'database'
+    | 'api'
+    | 'automation'
+    | 'development';
   icon?: string;
-  
+
   // Connection details to existing MCP server
   connection: {
     type: 'stdio' | 'sse' | 'websocket';
@@ -18,22 +24,25 @@ interface MCPServerConnection {
     url?: string; // For SSE/WebSocket connections
     headers?: Record<string, string>;
   };
-  
+
   // Required configuration from user
   configSchema: {
     type: 'object';
-    properties: Record<string, {
-      type: string;
-      description: string;
-      required?: boolean;
-      default?: any;
-      enum?: string[];
-      format?: string;
-      sensitive?: boolean; // For API keys, passwords
-    }>;
+    properties: Record<
+      string,
+      {
+        type: string;
+        description: string;
+        required?: boolean;
+        default?: any;
+        enum?: string[];
+        format?: string;
+        sensitive?: boolean; // For API keys, passwords
+      }
+    >;
     required?: string[];
   };
-  
+
   // Examples for user guidance
   examples: Array<{
     name: string;
@@ -62,6 +71,15 @@ interface UserToolConfiguration {
   executionId?: string;
 }
 
+// Add the missing UserToolSelection interface
+interface UserToolSelection {
+  toolId: string;
+  serverId: string;
+  displayName: string;
+  enabled: boolean;
+  configuration: Record<string, any>;
+}
+
 /**
  * MCP Tools Manager for UI-configurable MCP server connections
  * Manages connections to existing MCP servers and tool discovery
@@ -85,11 +103,11 @@ export class MCPToolsManager {
    */
   getAvailableServers(category?: string): MCPServerConnection[] {
     const servers = Array.from(this.availableServers.values());
-    
+
     if (category) {
-      return servers.filter(server => server.category === category);
+      return servers.filter((server) => server.category === category);
     }
-    
+
     return servers.sort((a, b) => a.displayName.localeCompare(b.displayName));
   }
 
@@ -149,26 +167,34 @@ export class MCPToolsManager {
       );
 
       // Get the server instance to discover tools
-      const serverInstance = await this.mcpServerManager.getServer(actualServerId);
+      const serverInstance =
+        await this.mcpServerManager.getServer(actualServerId);
       if (!serverInstance) {
         throw new Error(`Failed to get server instance ${actualServerId}`);
       }
 
       // Extract discovered tools
-      const discoveredTools: DiscoveredTool[] = serverInstance.tools.map(tool => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        serverId: actualServerId,
-      }));
+      const discoveredTools: DiscoveredTool[] = serverInstance.tools.map(
+        (tool) => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+          serverId: actualServerId,
+        }),
+      );
 
       // Cache discovered tools
       this.discoveredTools.set(serverId, discoveredTools);
 
-      this.logger.log(`Discovered ${discoveredTools.length} tools from server ${serverId}`);
+      this.logger.log(
+        `Discovered ${discoveredTools.length} tools from server ${serverId}`,
+      );
       return discoveredTools;
     } catch (error) {
-      this.logger.error(`Failed to discover tools from server ${serverId}:`, error);
+      this.logger.error(
+        `Failed to discover tools from server ${serverId}:`,
+        error,
+      );
       return [];
     }
   }
@@ -181,34 +207,39 @@ export class MCPToolsManager {
     blockId: string,
     toolSelections: UserToolSelection[],
   ): Promise<void> {
-    try {
-      const configKey = `${userId}:${blockId}`;
-      this.userToolConfigurations.set(configKey, toolSelections);
+    const configKey = `${userId}:${blockId}`;
 
-      // Save to database if available
-      try {
-        await (this.databaseService.prisma as any).aiAgentToolConfiguration?.upsert({
-          where: { userId_blockId: { userId, blockId } },
-          create: {
-            userId,
-            blockId,
-            toolSelections: toolSelections as any,
-            createdAt: new Date(),
-          },
-          update: {
-            toolSelections: toolSelections as any,
-            updatedAt: new Date(),
-          },
+    // Convert tool selections to server-based configuration
+    const serverConfigurations = new Map<string, UserServerSelection>();
+
+    for (const selection of toolSelections) {
+      const serverDef = this.availableServers.get(selection.serverId);
+      if (!serverDef) continue;
+
+      if (!serverConfigurations.has(selection.serverId)) {
+        serverConfigurations.set(selection.serverId, {
+          serverId: selection.serverId,
+          displayName: serverDef.displayName,
+          enabled: selection.enabled,
+          configuration: selection.configuration,
+          selectedTools: [],
         });
-      } catch (dbError) {
-        this.logger.debug('Database not available for tool configuration storage');
       }
 
-      this.logger.log(`Saved tool configuration for user ${userId}, block ${blockId}: ${toolSelections.length} tools`);
-    } catch (error) {
-      this.logger.error(`Failed to save tool configuration:`, error);
-      throw error;
+      const serverConfig = serverConfigurations.get(selection.serverId)!;
+      serverConfig.selectedTools!.push(selection.toolId);
     }
+
+    const userConfig: UserToolConfiguration = {
+      servers: Array.from(serverConfigurations.values()),
+    };
+
+    this.userConfigurations.set(configKey, userConfig);
+
+    // Save to memory (database operations removed for now)
+    this.logger.log(
+      `Saved tool configuration for user ${userId}, block ${blockId}`,
+    );
   }
 
   /**
@@ -218,147 +249,160 @@ export class MCPToolsManager {
     userId: string,
     blockId: string,
   ): Promise<UserToolSelection[]> {
-    try {
-      // Try database first
-      try {
-        const dbConfig = await (this.databaseService.prisma as any).aiAgentToolConfiguration?.findUnique({
-          where: { userId_blockId: { userId, blockId } },
-        });
-        
-        if (dbConfig) {
-          return dbConfig.toolSelections as UserToolSelection[];
-        }
-      } catch (dbError) {
-        this.logger.debug('Database not available for tool configuration lookup');
-      }
+    const configKey = `${userId}:${blockId}`;
 
-      // Fallback to memory
-      const configKey = `${userId}:${blockId}`;
-      return this.userToolConfigurations.get(configKey) || [];
-    } catch (error) {
-      this.logger.error(`Failed to get tool configuration for user ${userId}, block ${blockId}:`, error);
-      return [];
+    // Try to get from memory first
+    const memoryConfig = this.userConfigurations.get(configKey);
+    if (memoryConfig) {
+      // Convert back to tool selections
+      const toolSelections: UserToolSelection[] = [];
+      for (const server of memoryConfig.servers) {
+        const serverDef = this.availableServers.get(server.serverId);
+        if (!serverDef) continue;
+
+        for (const toolId of server.selectedTools || []) {
+          toolSelections.push({
+            toolId,
+            serverId: server.serverId,
+            displayName: `${serverDef.displayName} - ${toolId}`,
+            enabled: server.enabled,
+            configuration: server.configuration,
+          });
+        }
+      }
+      return toolSelections;
     }
+
+    // Try to get from database (database operations removed for now)
+    this.logger.log(
+      `Loading tool configuration for user ${userId}, block ${blockId} from memory`,
+    );
+
+    const storedConfig = this.userConfigurations.get(configKey);
+    if (storedConfig) {
+      // Convert back to tool selections
+      const toolSelections: UserToolSelection[] = [];
+      for (const server of storedConfig.servers) {
+        const serverDef = this.availableServers.get(server.serverId);
+        if (!serverDef) continue;
+
+        for (const toolId of server.selectedTools || []) {
+          toolSelections.push({
+            toolId,
+            serverId: server.serverId,
+            displayName: `${serverDef.displayName} - ${toolId}`,
+            enabled: server.enabled,
+            configuration: server.configuration,
+          });
+        }
+      }
+      return toolSelections;
+    }
+
+    return [];
   }
 
   /**
-   * Prepare MCP servers based on user's tool selections
-   * This is called during AI Agent execution to set up only the needed MCP servers
+   * Prepare MCP servers for execution based on user's tool selections
    */
   async prepareMCPServersForExecution(
     userId: string,
     toolSelections: UserToolSelection[],
   ): Promise<Array<{ serverId: string; tools: string[] }>> {
-    const serverToolMap = new Map<string, string[]>();
-    const preparedServers: Array<{ serverId: string; tools: string[] }> = [];
-
-    try {
-      // Group tools by server type
-      for (const selection of toolSelections.filter(s => s.enabled)) {
-        const toolDef = this.availableTools.get(selection.toolId);
-        if (!toolDef) continue;
-
-        if (!serverToolMap.has(toolDef.serverType)) {
-          serverToolMap.set(toolDef.serverType, []);
-        }
-        serverToolMap.get(toolDef.serverType)!.push(toolDef.name);
-      }
-
-      // Register MCP servers for each server type needed
-      for (const [serverType, tools] of serverToolMap.entries()) {
-        const serverConfig = this.getServerConfigForType(serverType, toolSelections);
-        
-        if (serverConfig) {
-          const serverId = await this.mcpServerManager.registerServer(
-            serverConfig,
-            userId,
-          );
-          
-          preparedServers.push({ serverId, tools });
-        }
-      }
-
-      this.logger.log(`Prepared ${preparedServers.length} MCP servers for user ${userId}`);
-      return preparedServers;
-    } catch (error) {
-      this.logger.error(`Failed to prepare MCP servers for execution:`, error);
-      return [];
-    }
-  }
-
-  /**
-   * Validate tool configuration before saving
-   */
-  validateToolConfiguration(toolSelections: UserToolSelection[]): { valid: boolean; errors: string[] } {
-    const errors: string[] = [];
+    const serverGroups = new Map<string, string[]>();
 
     for (const selection of toolSelections) {
-      const toolDef = this.availableTools.get(selection.toolId);
-      if (!toolDef) {
-        errors.push(`Tool ${selection.toolId} not found`);
+      if (!selection.enabled) continue;
+
+      const serverDef = this.availableServers.get(selection.serverId);
+      if (!serverDef) {
+        this.logger.warn(
+          `Server definition not found for ${selection.serverId}`,
+        );
         continue;
       }
 
-      // Validate required parameters
-      if (toolDef.inputSchema.required) {
-        for (const requiredParam of toolDef.inputSchema.required) {
-          if (!selection.configuration[requiredParam] && !selection.customParameters?.[requiredParam]) {
-            errors.push(`Required parameter ${requiredParam} missing for tool ${selection.displayName}`);
-          }
-        }
+      if (!serverGroups.has(selection.serverId)) {
+        serverGroups.set(selection.serverId, []);
       }
 
-      // Validate environment variables if needed
-      if (toolDef.serverConfig.requiredEnvVars) {
-        for (const envVar of toolDef.serverConfig.requiredEnvVars) {
-          if (!selection.configuration[envVar]) {
-            errors.push(`Required environment variable ${envVar} missing for tool ${selection.displayName}`);
-          }
+      serverGroups.get(selection.serverId)!.push(selection.toolId);
+    }
+
+    return Array.from(serverGroups.entries()).map(([serverId, tools]) => ({
+      serverId,
+      tools,
+    }));
+  }
+
+  /**
+   * Validate tool configuration
+   */
+  validateToolConfiguration(toolSelections: UserToolSelection[]): {
+    valid: boolean;
+    errors: string[];
+  } {
+    const errors: string[] = [];
+
+    for (const selection of toolSelections) {
+      const serverDef = this.availableServers.get(selection.serverId);
+      if (!serverDef) {
+        errors.push(`Server ${selection.serverId} not found`);
+        continue;
+      }
+
+      // Validate configuration against server schema
+      const configSchema = serverDef.configSchema;
+      for (const [key, schema] of Object.entries(configSchema.properties)) {
+        if (schema.required && !selection.configuration[key]) {
+          errors.push(
+            `Required configuration missing: ${key} for server ${selection.serverId}`,
+          );
         }
       }
     }
 
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
+    return { valid: errors.length === 0, errors };
   }
 
-  private getServerConfigForType(serverType: string, toolSelections: UserToolSelection[]) {
-    // Find tool selections for this server type to get configuration
-    const relevantSelections = toolSelections.filter(s => {
-      const toolDef = this.availableTools.get(s.toolId);
-      return toolDef?.serverType === serverType && s.enabled;
-    });
-
+  /**
+   * Get server configuration for a specific server type
+   */
+  private getServerConfigForType(
+    serverType: string,
+    toolSelections: UserToolSelection[],
+  ) {
+    const relevantSelections = toolSelections.filter(
+      (s) => s.serverId === serverType,
+    );
     if (relevantSelections.length === 0) return null;
 
-    // Get base server config from first tool
-    const firstTool = this.availableTools.get(relevantSelections[0].toolId);
+    const serverDef = this.availableServers.get(relevantSelections[0].serverId);
+    if (!serverDef) return null;
+
+    // Use the first selection's configuration as the base
+    const firstTool = this.availableServers.get(relevantSelections[0].serverId);
     if (!firstTool) return null;
 
-    // Merge configurations from all relevant tool selections
-    const mergedEnv = { ...firstTool.serverConfig.env };
-    for (const selection of relevantSelections) {
-      Object.assign(mergedEnv, selection.configuration);
-    }
-
     return {
-      name: `${serverType}-${Date.now()}`,
-      command: firstTool.serverConfig.command,
-      args: firstTool.serverConfig.args,
-      env: mergedEnv,
-      description: `MCP server for ${serverType} tools`,
+      name: serverDef.displayName,
+      command: serverDef.connection.command,
+      args: serverDef.connection.args,
+      env: relevantSelections[0].configuration,
     };
   }
 
+  /**
+   * Initialize available MCP servers
+   */
   private initializeAvailableServers(): void {
     // File System MCP Server
     this.availableServers.set('filesystem', {
       id: 'filesystem',
       name: 'filesystem',
       displayName: 'File System',
-      description: 'Access and manipulate files and directories on the filesystem',
+      description:
+        'Access and manipulate files and directories on the filesystem',
       category: 'filesystem',
       icon: '📁',
       connection: {
@@ -583,201 +627,8 @@ export class MCPToolsManager {
       ],
     });
 
-    this.logger.log(`Initialized ${this.availableServers.size} available MCP server connections`);
-  }
-      displayName: 'Write File',
-      description: 'Write content to a file',
-      category: 'filesystem',
-      icon: '✏️',
-      serverType: 'filesystem',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          path: {
-            type: 'string',
-            description: 'Path where to write the file',
-            required: true,
-          },
-          content: {
-            type: 'string',
-            description: 'Content to write to the file',
-            required: true,
-          },
-        },
-        required: ['path', 'content'],
-      },
-      examples: [
-        {
-          name: 'Create Text File',
-          description: 'Create a new text file',
-          parameters: { path: '/path/to/new-file.txt', content: 'Hello World!' },
-        },
-      ],
-      serverConfig: {
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-filesystem'],
-        env: {},
-        requiredEnvVars: ['FILESYSTEM_BASE_PATH'],
-      },
-    });
-
-    // Web Search Tools
-    this.availableTools.set('web-search', {
-      id: 'web-search',
-      name: 'web_search',
-      displayName: 'Web Search',
-      description: 'Search the web for information',
-      category: 'web',
-      icon: '🔍',
-      serverType: 'web-search',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'Search query',
-            required: true,
-          },
-          count: {
-            type: 'number',
-            description: 'Number of results to return',
-            default: 10,
-          },
-          offset: {
-            type: 'number',
-            description: 'Offset for pagination',
-            default: 0,
-          },
-        },
-        required: ['query'],
-      },
-      examples: [
-        {
-          name: 'Search News',
-          description: 'Search for recent news',
-          parameters: { query: 'artificial intelligence news', count: 5 },
-        },
-      ],
-      serverConfig: {
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-brave-search'],
-        env: {},
-        requiredEnvVars: ['BRAVE_SEARCH_API_KEY'],
-      },
-    });
-
-    // Database Tools
-    this.availableTools.set('sql-query', {
-      id: 'sql-query',
-      name: 'query',
-      displayName: 'SQL Query',
-      description: 'Execute SQL queries on a database',
-      category: 'database',
-      icon: '🗄️',
-      serverType: 'sqlite',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          sql: {
-            type: 'string',
-            description: 'SQL query to execute',
-            required: true,
-          },
-        },
-        required: ['sql'],
-      },
-      examples: [
-        {
-          name: 'Select Users',
-          description: 'Get list of users',
-          parameters: { sql: 'SELECT * FROM users LIMIT 10' },
-        },
-      ],
-      serverConfig: {
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-sqlite'],
-        env: {},
-        requiredEnvVars: ['SQLITE_DB_PATH'],
-      },
-    });
-
-    // Git Tools
-    this.availableTools.set('git-status', {
-      id: 'git-status',
-      name: 'git_status',
-      displayName: 'Git Status',
-      description: 'Get git repository status',
-      category: 'development',
-      icon: '📋',
-      serverType: 'git',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-      },
-      examples: [
-        {
-          name: 'Check Status',
-          description: 'Check git repository status',
-          parameters: {},
-        },
-      ],
-      serverConfig: {
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-git'],
-        env: {},
-        requiredEnvVars: ['GIT_REPOSITORY_PATH'],
-      },
-    });
-
-    // HTTP API Tool
-    this.availableTools.set('http-request', {
-      id: 'http-request',
-      name: 'http_request',
-      displayName: 'HTTP Request',
-      description: 'Make HTTP requests to APIs',
-      category: 'api',
-      icon: '🌐',
-      serverType: 'http',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          url: {
-            type: 'string',
-            description: 'URL to make request to',
-            required: true,
-            format: 'uri',
-          },
-          method: {
-            type: 'string',
-            description: 'HTTP method',
-            default: 'GET',
-            enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-          },
-          headers: {
-            type: 'object',
-            description: 'Request headers',
-          },
-          body: {
-            type: 'string',
-            description: 'Request body',
-          },
-        },
-        required: ['url'],
-      },
-      examples: [
-        {
-          name: 'Get API Data',
-          description: 'Fetch data from an API',
-          parameters: { url: 'https://api.example.com/data', method: 'GET' },
-        },
-      ],
-      serverConfig: {
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-fetch'],
-        env: {},
-      },
-    });
-
-    this.logger.log(`Initialized ${this.availableTools.size} available MCP tools for UI configuration`);
+    this.logger.log(
+      `Initialized ${this.availableServers.size} available MCP server connections`,
+    );
   }
 }
