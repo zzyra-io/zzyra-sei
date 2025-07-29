@@ -444,14 +444,13 @@ export class AIAgentHandler implements BlockHandler {
   }
 
   private getMCPServerConfigs(toolId: string): any[] {
-    // Map tool IDs to MCP server configurations
     const serverConfigs: Record<string, any> = {
       filesystem: {
         name: 'filesystem-server',
         command: 'npx',
         args: ['@modelcontextprotocol/server-filesystem', process.cwd()],
         env: {},
-        timeout: 30000,
+        timeout: 300000, // 5 minutes
       },
       'brave-search': {
         name: 'brave-search-server',
@@ -460,7 +459,7 @@ export class AIAgentHandler implements BlockHandler {
         env: {
           BRAVE_API_KEY: process.env.BRAVE_API_KEY || 'demo-key',
         },
-        timeout: 30000,
+        timeout: 300000, // 5 minutes
       },
       postgres: {
         name: 'postgres-server',
@@ -470,14 +469,14 @@ export class AIAgentHandler implements BlockHandler {
           DATABASE_URL:
             process.env.DATABASE_URL || 'postgresql://localhost/zyra',
         },
-        timeout: 30000,
+        timeout: 300000, // 5 minutes
       },
       git: {
         name: 'git-server',
         command: 'npx',
         args: ['@modelcontextprotocol/server-git'],
         env: {},
-        timeout: 30000,
+        timeout: 300000, // 5 minutes
       },
     };
 

@@ -30,7 +30,7 @@ export class NodeExecutor {
     process.env.NODE_EXECUTION_RETRY_JITTER_MS || '100',
   );
   private static readonly NODE_EXECUTION_TIMEOUT = parseInt(
-    process.env.NODE_EXECUTION_TIMEOUT_MS || '30000',
+    process.env.NODE_EXECUTION_TIMEOUT || '300000', // 5 minutes to match AI Agent timeout
   );
 
   constructor(

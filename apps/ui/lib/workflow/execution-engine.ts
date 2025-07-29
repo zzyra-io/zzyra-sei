@@ -47,16 +47,18 @@ export class WorkflowExecutionEngine {
     const windowMs = Number(process.env.USER_WORKFLOW_RATE_WINDOW_MS) || 60000;
     const windowStart = new Date(startTime.getTime() - windowMs).toISOString();
     const { count, error: countError } = await supabase
-      .from('workflow_executions')
-      .select('id', { count: 'exact', head: true })
-      .eq('created_by', userId)
-      .gte('started_at', windowStart);
+      .from("workflow_executions")
+      .select("id", { count: "exact", head: true })
+      .eq("created_by", userId)
+      .gte("started_at", windowStart);
     if (countError) {
-      console.error('Rate limit count error:', countError);
-      throw new Error('Failed to enforce rate limit');
+      console.error("Rate limit count error:", countError);
+      throw new Error("Failed to enforce rate limit");
     }
     if ((count || 0) >= rateLimit) {
-      throw new Error(`Rate limit exceeded: max ${rateLimit} workflows per window`);
+      throw new Error(
+        `Rate limit exceeded: max ${rateLimit} workflows per window`
+      );
     }
 
     // Create execution record
@@ -160,7 +162,7 @@ export class WorkflowExecutionEngine {
     const retries = Number(process.env.NODE_RETRY_COUNT) || 3;
     const factor = Number(process.env.NODE_RETRY_FACTOR) || 2;
     const minTimeout = Number(process.env.NODE_RETRY_MIN_TIMEOUT) || 1000;
-    const maxTimeout = Number(process.env.NODE_RETRY_MAX_TIMEOUT) || 30000;
+    const maxTimeout = Number(process.env.NODE_RETRY_MAX_TIMEOUT) || 300000; // 5 minutes
 
     const execAttempt = async (): Promise<NodeExecutionResult> => {
       const nodeType = node.type || node.data?.nodeType;
@@ -229,16 +231,14 @@ export class WorkflowExecutionEngine {
     const supabase = await createClient();
 
     // Log node execution into node_executions table
-    await supabase
-      .from("node_executions")
-      .insert({
-        execution_id: executionId,
-        node_id: nodeId,
-        status: result.success ? "completed" : "failed",
-        output_data: result.data || null,
-        error: result.error || null,
-        // started_at and completed_at default to now()
-      });
+    await supabase.from("node_executions").insert({
+      execution_id: executionId,
+      node_id: nodeId,
+      status: result.success ? "completed" : "failed",
+      output_data: result.data || null,
+      error: result.error || null,
+      // started_at and completed_at default to now()
+    });
   }
 
   // Node-specific executors

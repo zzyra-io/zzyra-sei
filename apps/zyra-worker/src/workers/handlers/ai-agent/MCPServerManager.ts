@@ -38,7 +38,7 @@ interface MCPServerConfig {
 export class MCPServerManager {
   private readonly logger = new Logger(MCPServerManager.name);
   private readonly servers = new Map<string, MCPServer>();
-  private readonly defaultTimeout = 30000; // 30 seconds
+  private readonly defaultTimeout = 300000; // 5 minutes to match AI Agent timeout
 
   constructor(private readonly databaseService: DatabaseService) {}
 

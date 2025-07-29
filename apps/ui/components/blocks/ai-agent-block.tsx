@@ -20,6 +20,9 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
+  Loader2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -35,6 +38,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { AIAgentAPI } from "@/lib/api/ai-agent";
+import { MCPServerConfig } from "@zyra/types";
 
 // Types
 interface ToolNode {
@@ -49,6 +63,7 @@ interface ToolNode {
   isEnabled: boolean;
   disabled?: boolean;
   config?: Record<string, unknown>;
+  configSchema?: MCPServerConfig["configSchema"];
 }
 
 interface AIAgentData {
@@ -92,6 +107,14 @@ interface AddComponentPopoverProps {
   items: ToolNode[];
   onSelect: (item: ToolNode) => void;
   onClose: () => void;
+  isLoading?: boolean;
+}
+
+interface ToolConfigModalProps {
+  tool: ToolNode | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (tool: ToolNode, config: Record<string, unknown>) => void;
 }
 
 // Tool Icons Mapping
@@ -117,61 +140,118 @@ const toolColors: Record<string, string> = {
   automation: "bg-yellow-500",
 };
 
-// Mock available tools - in real implementation, this would come from MCP server discovery
-const mockAvailableTools: ToolNode[] = [
-  {
-    id: "postgres",
-    name: "PostgreSQL",
-    description: "Database operations and queries",
-    category: "database",
+// Helper function to convert MCP server config to ToolNode
+const convertMCPServerToToolNode = (server: MCPServerConfig): ToolNode => {
+  const category = server.category || "ai";
+  return {
+    id: server.id,
+    name: server.displayName || server.name,
+    description: server.description,
+    category,
     type: "mcp",
-    icon: toolIcons.database,
-    color: toolColors.database,
+    icon: toolIcons[category] || toolIcons.ai,
+    color: toolColors[category] || toolColors.ai,
     isConnected: false,
     isEnabled: false,
     disabled: false,
-  },
-  {
-    id: "brave-search",
-    name: "Web Search",
-    description: "Search the web for information",
-    category: "web",
-    type: "mcp",
-    icon: toolIcons.search,
-    color: toolColors.search,
-    isConnected: false,
-    isEnabled: false,
-    disabled: false,
-  },
-  {
-    id: "filesystem",
-    name: "File System",
-    description: "Read and write files",
-    category: "filesystem",
-    type: "mcp",
-    icon: toolIcons.filesystem,
-    color: toolColors.filesystem,
-    isConnected: false,
-    isEnabled: false,
-    disabled: false,
-  },
-  {
-    id: "goat-blockchain",
-    name: "GOAT Blockchain",
-    description: "Blockchain operations and wallet management",
-    category: "ai",
-    type: "goat",
-    icon: toolIcons.ai,
-    color: toolColors.ai,
-    isConnected: false,
-    isEnabled: false,
-    disabled: false,
-  },
-];
+    config: {},
+    configSchema: server.configSchema,
+  };
+};
+
+// Hook to fetch MCP servers
+const useMCPServers = () => {
+  const [availableTools, setAvailableTools] = useState<ToolNode[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchMCPServers = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const servers = await AIAgentAPI.getMCPServers();
+        const toolNodes = servers.map(convertMCPServerToToolNode);
+
+        setAvailableTools(toolNodes);
+      } catch (err) {
+        console.error("Failed to fetch MCP servers:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load MCP servers"
+        );
+
+        // Fallback to static tools if API fails
+        const fallbackTools: ToolNode[] = [
+          {
+            id: "postgres",
+            name: "PostgreSQL",
+            description: "Database operations and queries",
+            category: "database",
+            type: "mcp",
+            icon: toolIcons.database,
+            color: toolColors.database,
+            isConnected: false,
+            isEnabled: false,
+            disabled: false,
+          },
+          {
+            id: "brave-search",
+            name: "Web Search",
+            description: "Search the web for information",
+            category: "web",
+            type: "mcp",
+            icon: toolIcons.search,
+            color: toolColors.search,
+            isConnected: false,
+            isEnabled: false,
+            disabled: false,
+          },
+          {
+            id: "filesystem",
+            name: "File System",
+            description: "Read and write files",
+            category: "filesystem",
+            type: "mcp",
+            icon: toolIcons.filesystem,
+            color: toolColors.filesystem,
+            isConnected: false,
+            isEnabled: false,
+            disabled: false,
+          },
+          {
+            id: "goat-blockchain",
+            name: "GOAT Blockchain",
+            description: "Blockchain operations and wallet management",
+            category: "ai",
+            type: "goat",
+            icon: toolIcons.ai,
+            color: toolColors.ai,
+            isConnected: false,
+            isEnabled: false,
+            disabled: false,
+          },
+        ];
+        setAvailableTools(fallbackTools);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMCPServers();
+  }, []);
+
+  return { availableTools, isLoading, error };
+};
 
 // --- POPOVER COMPONENT ---
 const AddComponentPopover = memo(
-  ({ items, onSelect, onClose }: AddComponentPopoverProps) => {
+  ({
+    items,
+    onSelect,
+    onClose,
+    isLoading = false,
+  }: AddComponentPopoverProps) => {
     const popoverRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -193,27 +273,40 @@ const AddComponentPopover = memo(
         ref={popoverRef}
         className='absolute top-full mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-100 z-20 animate-in fade-in-0 slide-in-from-top-2 duration-200'>
         <div className='p-2'>
-          {items.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => onSelect(item)}
-              className='w-full text-left p-3 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-3 disabled:opacity-50 disabled:hover:bg-transparent'
-              disabled={item.disabled || false}>
-              <div
-                className={cn(
-                  "w-8 h-8 rounded-md flex items-center justify-center text-white",
-                  item.color
-                )}>
-                {item.icon}
-              </div>
-              <div>
-                <p className='font-semibold text-sm text-gray-800'>
-                  {item.name}
-                </p>
-                <p className='text-xs text-gray-500'>{item.description}</p>
-              </div>
-            </button>
-          ))}
+          {isLoading ? (
+            <div className='flex items-center justify-center p-4'>
+              <Loader2 className='w-4 h-4 animate-spin mr-2' />
+              <span className='text-sm text-gray-500'>
+                Loading MCP servers...
+              </span>
+            </div>
+          ) : items.length === 0 ? (
+            <div className='p-4 text-center text-sm text-gray-500'>
+              No MCP servers available
+            </div>
+          ) : (
+            items.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => onSelect(item)}
+                className='w-full text-left p-3 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-3 disabled:opacity-50 disabled:hover:bg-transparent'
+                disabled={item.disabled || false}>
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-md flex items-center justify-center text-white",
+                    item.color
+                  )}>
+                  {item.icon}
+                </div>
+                <div>
+                  <p className='font-semibold text-sm text-gray-800'>
+                    {item.name}
+                  </p>
+                  <p className='text-xs text-gray-500'>{item.description}</p>
+                </div>
+              </button>
+            ))
+          )}
         </div>
       </div>
     );
@@ -233,6 +326,11 @@ export function AgentNodeComponent({
   const [isExpanded, setIsExpanded] = useState(false);
   const [connectedTools, setConnectedTools] = useState<ToolNode[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [configModal, setConfigModal] = useState<{
+    isOpen: boolean;
+    tool: ToolNode | null;
+  }>({ isOpen: false, tool: null });
+  const { availableTools, isLoading, error } = useMCPServers();
 
   const { updateNode } = useReactFlow();
 
@@ -242,9 +340,24 @@ export function AgentNodeComponent({
   };
 
   const handleSelect = (item: ToolNode) => {
-    const newTool = { ...item, isConnected: true, isEnabled: true };
+    // Check if tool needs configuration
+    const hasConfigSchema =
+      item.configSchema?.properties &&
+      Object.keys(item.configSchema.properties).length > 0;
+
+    if (hasConfigSchema) {
+      // Open configuration modal
+      setConfigModal({ isOpen: true, tool: item });
+      setPopover(null);
+    } else {
+      // Add tool directly without configuration
+      addToolToConfig(item, {});
+    }
+  };
+
+  const addToolToConfig = (tool: ToolNode, config: Record<string, unknown>) => {
+    const newTool = { ...tool, isConnected: true, isEnabled: true, config };
     setConnectedTools((prev) => [...prev, newTool]);
-    setPopover(null);
 
     // Update the selectedTools in the config with the proper format
     const currentSelectedTools =
@@ -252,18 +365,30 @@ export function AgentNodeComponent({
         id: string;
         name: string;
         type: string;
-        config?: any;
+        config?: Record<string, unknown>;
       }>) || [];
     const newSelectedTool = {
-      id: item.id,
-      name: item.name,
-      type: item.type,
-      config: item.config || {},
+      id: tool.id,
+      name: tool.name,
+      type: tool.type,
+      config: config || {},
     };
 
     handleConfigUpdate({
       selectedTools: [...currentSelectedTools, newSelectedTool],
     });
+  };
+
+  const handleConfigModalSave = (
+    tool: ToolNode,
+    config: Record<string, unknown>
+  ) => {
+    addToolToConfig(tool, config);
+    setConfigModal({ isOpen: false, tool: null });
+  };
+
+  const handleConfigModalClose = () => {
+    setConfigModal({ isOpen: false, tool: null });
   };
 
   const handleToolToggle = (toolId: string, enabled: boolean) => {
@@ -283,7 +408,7 @@ export function AgentNodeComponent({
         id: string;
         name: string;
         type: string;
-        config?: any;
+        config?: Record<string, unknown>;
       }>) || [];
     const updatedSelectedTools = currentSelectedTools.filter(
       (tool) => tool.id !== toolId
@@ -479,9 +604,10 @@ export function AgentNodeComponent({
             </div>
             {popover === "tool" && (
               <AddComponentPopover
-                items={mockAvailableTools}
+                items={availableTools}
                 onSelect={handleSelect}
                 onClose={() => setPopover(null)}
+                isLoading={isLoading}
               />
             )}
           </div>
@@ -493,14 +619,19 @@ export function AgentNodeComponent({
                 Thinking Process
               </h4>
               <div className='space-y-1 max-h-20 overflow-y-auto'>
-                {data.thinkingSteps.slice(-3).map((step: any, index) => (
-                  <div
-                    key={index}
-                    className='text-xs text-gray-600 bg-gray-50 p-2 rounded'>
-                    <span className='font-medium'>{step.type}:</span>{" "}
-                    {step.reasoning.substring(0, 50)}...
-                  </div>
-                ))}
+                {data.thinkingSteps.slice(-3).map((step, index) => {
+                  const stepData = step as Record<string, unknown>;
+                  return (
+                    <div
+                      key={index}
+                      className='text-xs text-gray-600 bg-gray-50 p-2 rounded'>
+                      <span className='font-medium'>
+                        {stepData.type as string}:
+                      </span>{" "}
+                      {(stepData.reasoning as string)?.substring(0, 50)}...
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -602,39 +733,52 @@ export function AgentNodeComponent({
             <TabsContent value='tools' className='p-4'>
               <div className='space-y-2'>
                 <h4 className='text-sm font-semibold'>Available Tools</h4>
-                {mockAvailableTools.map((tool) => (
-                  <div
-                    key={tool.id}
-                    className='flex items-center justify-between p-2 bg-gray-50 rounded'>
-                    <div className='flex items-center gap-2'>
-                      <div
-                        className={cn(
-                          "w-6 h-6 rounded flex items-center justify-center",
-                          tool.color
-                        )}>
-                        {tool.icon}
-                      </div>
-                      <div>
-                        <div className='text-sm font-medium'>{tool.name}</div>
-                        <div className='text-xs text-gray-500'>
-                          {tool.description}
+                {isLoading ? (
+                  <div className='flex items-center justify-center p-4'>
+                    <Loader2 className='w-6 h-6 animate-spin mr-2' />
+                    <span className='text-sm text-gray-500'>
+                      Loading tools...
+                    </span>
+                  </div>
+                ) : error ? (
+                  <div className='p-4 text-center text-sm text-red-500'>
+                    Failed to load tools: {error}
+                  </div>
+                ) : (
+                  availableTools.map((tool) => (
+                    <div
+                      key={tool.id}
+                      className='flex items-center justify-between p-2 bg-gray-50 rounded'>
+                      <div className='flex items-center gap-2'>
+                        <div
+                          className={cn(
+                            "w-6 h-6 rounded flex items-center justify-center",
+                            tool.color
+                          )}>
+                          {tool.icon}
+                        </div>
+                        <div>
+                          <div className='text-sm font-medium'>{tool.name}</div>
+                          <div className='text-xs text-gray-500'>
+                            {tool.description}
+                          </div>
                         </div>
                       </div>
+                      <Switch
+                        checked={connectedTools.some(
+                          (t) => t.id === tool.id && t.isEnabled
+                        )}
+                        onCheckedChange={(enabled) => {
+                          if (enabled) {
+                            handleSelect(tool);
+                          } else {
+                            handleRemoveTool(tool.id);
+                          }
+                        }}
+                      />
                     </div>
-                    <Switch
-                      checked={connectedTools.some(
-                        (t) => t.id === tool.id && t.isEnabled
-                      )}
-                      onCheckedChange={(enabled) => {
-                        if (enabled) {
-                          handleSelect(tool);
-                        } else {
-                          handleRemoveTool(tool.id);
-                        }
-                      }}
-                    />
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </TabsContent>
 
@@ -713,6 +857,14 @@ export function AgentNodeComponent({
           </Tabs>
         </div>
       )}
+
+      {/* Tool Configuration Modal */}
+      <ToolConfigModal
+        tool={configModal.tool}
+        isOpen={configModal.isOpen}
+        onClose={handleConfigModalClose}
+        onSave={handleConfigModalSave}
+      />
     </div>
   );
 }
@@ -778,6 +930,7 @@ export function AIAgentConfig({
 }) {
   const [connectedTools, setConnectedTools] = useState<ToolNode[]>([]);
   const [popover, setPopover] = useState<string | null>(null);
+  const { availableTools, isLoading, error } = useMCPServers();
 
   const handleAddClick = (type: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -795,7 +948,7 @@ export function AIAgentConfig({
         id: string;
         name: string;
         type: string;
-        config?: any;
+        config?: Record<string, unknown>;
       }>) || [];
     const newSelectedTool = {
       id: item.id,
@@ -818,7 +971,7 @@ export function AIAgentConfig({
         id: string;
         name: string;
         type: string;
-        config?: any;
+        config?: Record<string, unknown>;
       }>) || [];
     const updatedSelectedTools = currentSelectedTools.filter(
       (tool) => tool.id !== toolId
@@ -1069,44 +1222,56 @@ export function AIAgentConfig({
                 <Plus className='w-3 h-3 text-white' />
               </button>
             </div>
-            {mockAvailableTools.map((tool) => (
-              <div
-                key={tool.id}
-                className='flex items-center justify-between p-2 bg-gray-50 rounded'>
-                <div className='flex items-center gap-2'>
-                  <div
-                    className={cn(
-                      "w-6 h-6 rounded flex items-center justify-center",
-                      tool.color
-                    )}>
-                    {tool.icon}
-                  </div>
-                  <div>
-                    <div className='text-sm font-medium'>{tool.name}</div>
-                    <div className='text-xs text-gray-500'>
-                      {tool.description}
+            {isLoading ? (
+              <div className='flex items-center justify-center p-4'>
+                <Loader2 className='w-6 h-6 animate-spin mr-2' />
+                <span className='text-sm text-gray-500'>Loading tools...</span>
+              </div>
+            ) : error ? (
+              <div className='p-4 text-center text-sm text-red-500'>
+                Failed to load tools: {error}
+              </div>
+            ) : (
+              availableTools.map((tool) => (
+                <div
+                  key={tool.id}
+                  className='flex items-center justify-between p-2 bg-gray-50 rounded'>
+                  <div className='flex items-center gap-2'>
+                    <div
+                      className={cn(
+                        "w-6 h-6 rounded flex items-center justify-center",
+                        tool.color
+                      )}>
+                      {tool.icon}
+                    </div>
+                    <div>
+                      <div className='text-sm font-medium'>{tool.name}</div>
+                      <div className='text-xs text-gray-500'>
+                        {tool.description}
+                      </div>
                     </div>
                   </div>
+                  <Switch
+                    checked={connectedTools.some(
+                      (t) => t.id === tool.id && t.isEnabled
+                    )}
+                    onCheckedChange={(enabled) => {
+                      if (enabled) {
+                        handleSelect(tool);
+                      } else {
+                        handleRemoveTool(tool.id);
+                      }
+                    }}
+                  />
                 </div>
-                <Switch
-                  checked={connectedTools.some(
-                    (t) => t.id === tool.id && t.isEnabled
-                  )}
-                  onCheckedChange={(enabled) => {
-                    if (enabled) {
-                      handleSelect(tool);
-                    } else {
-                      handleRemoveTool(tool.id);
-                    }
-                  }}
-                />
-              </div>
-            ))}
+              ))
+            )}
             {popover === "tool" && (
               <AddComponentPopover
-                items={mockAvailableTools}
+                items={availableTools} // Pass availableTools to the popover
                 onSelect={handleSelect}
                 onClose={() => setPopover(null)}
+                isLoading={isLoading}
               />
             )}
           </div>
@@ -1215,3 +1380,155 @@ export function AIAgentConfig({
     </div>
   );
 }
+
+// --- TOOL CONFIGURATION MODAL ---
+const ToolConfigModal = ({
+  tool,
+  isOpen,
+  onClose,
+  onSave,
+}: ToolConfigModalProps) => {
+  const [config, setConfig] = useState<Record<string, unknown>>({});
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>(
+    {}
+  );
+
+  useEffect(() => {
+    if (tool) {
+      // Initialize config with default values from schema
+      const initialConfig: Record<string, unknown> = {};
+      if (tool.configSchema?.properties) {
+        Object.entries(tool.configSchema.properties).forEach(([key, prop]) => {
+          if (prop.default !== undefined) {
+            initialConfig[key] = prop.default;
+          }
+        });
+      }
+      setConfig(initialConfig);
+    }
+  }, [tool]);
+
+  const handleSave = () => {
+    if (tool) {
+      onSave(tool, config);
+      onClose();
+    }
+  };
+
+  const renderConfigField = (key: string, prop: Record<string, unknown>) => {
+    const value = config[key];
+    const showPassword = showPasswords[key] || false;
+
+    return (
+      <div key={key} className='space-y-2'>
+        <Label htmlFor={key} className='text-sm font-medium'>
+          {key}
+          {prop.required && <span className='text-red-500 ml-1'>*</span>}
+        </Label>
+        <div className='relative'>
+          {prop.type === "string" && prop.sensitive ? (
+            <div className='relative'>
+              <Input
+                id={key}
+                type={showPassword ? "text" : "password"}
+                value={(value as string) || ""}
+                onChange={(e) =>
+                  setConfig({ ...config, [key]: e.target.value })
+                }
+                placeholder={String(prop.description || "")}
+                className='pr-10'
+              />
+              <button
+                type='button'
+                onClick={() =>
+                  setShowPasswords({
+                    ...showPasswords,
+                    [key]: !showPassword,
+                  })
+                }
+                className='absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700'>
+                {showPassword ? (
+                  <EyeOff className='w-4 h-4' />
+                ) : (
+                  <Eye className='w-4 h-4' />
+                )}
+              </button>
+            </div>
+          ) : prop.type === "string" ? (
+            <Input
+              id={key}
+              value={(value as string) || ""}
+              onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
+              placeholder={String(prop.description || "")}
+            />
+          ) : prop.type === "number" ? (
+            <Input
+              id={key}
+              type='number'
+              value={(value as number) || ""}
+              onChange={(e) =>
+                setConfig({ ...config, [key]: Number(e.target.value) })
+              }
+              placeholder={String(prop.description || "")}
+            />
+          ) : prop.type === "boolean" ? (
+            <Switch
+              id={key}
+              checked={(value as boolean) || false}
+              onCheckedChange={(checked) =>
+                setConfig({ ...config, [key]: checked })
+              }
+            />
+          ) : (
+            <Textarea
+              id={key}
+              value={(value as string) || ""}
+              onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
+              placeholder={String(prop.description || "")}
+              rows={3}
+            />
+          )}
+        </div>
+        {prop.description && (
+          <p className='text-xs text-gray-500'>{String(prop.description)}</p>
+        )}
+      </div>
+    );
+  };
+
+  if (!tool) return null;
+
+  const hasConfigSchema =
+    tool.configSchema?.properties &&
+    Object.keys(tool.configSchema.properties).length > 0;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className='max-w-md'>
+        <DialogHeader>
+          <DialogTitle>Configure {tool.name}</DialogTitle>
+          <DialogDescription>{String(tool.description)}</DialogDescription>
+        </DialogHeader>
+
+        <div className='space-y-4'>
+          {hasConfigSchema ? (
+            Object.entries(tool.configSchema!.properties).map(([key, prop]) =>
+              renderConfigField(key, prop)
+            )
+          ) : (
+            <p className='text-sm text-gray-500'>
+              This tool doesn&apos;t require any configuration.
+            </p>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant='outline' onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>Save Configuration</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
