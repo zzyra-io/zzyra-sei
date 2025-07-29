@@ -399,6 +399,58 @@ export class ZyraTemplateProcessor implements TemplateProcessor {
       return this.formatValue(value);
     });
 
+    // Process {blockId.fieldName} expressions - access data from specific block by ID
+    result = result.replace(
+      /\{([A-Z_]+-[0-9]+)\.([^}]+)\}/g,
+      (match, blockId, path) => {
+        this.logger.debug(`[TEMPLATE] Processing {${blockId}.${path}} pattern`);
+        const previousOutputs =
+          context?.previousOutputs || context?.blockOutputs || {};
+
+        const output = previousOutputs[blockId];
+        if (!output) {
+          this.logger.debug(
+            `[TEMPLATE] Block ${blockId} not found in previous outputs`,
+          );
+          return '';
+        }
+
+        // Try to get the value from the specific block output
+        let value = this.getNestedValue(output, path);
+
+        // If not found, try nested access within the block output
+        if (value === undefined) {
+          for (const [nestedKey, nestedOutput] of Object.entries(
+            output || {},
+          )) {
+            if (typeof nestedOutput === 'object' && nestedOutput !== null) {
+              const nestedValue = this.getNestedValue(nestedOutput, path);
+              if (nestedValue !== undefined) {
+                value = nestedValue;
+                break;
+              }
+            }
+          }
+        }
+
+        return this.formatValue(value);
+      },
+    );
+
+    // Process {nodeData.config.field} expressions - access block configuration data
+    result = result.replace(/\{nodeData\.config\.([^}]+)\}/g, (match, path) => {
+      this.logger.debug(
+        `[TEMPLATE] Processing {nodeData.config.${path}} pattern`,
+      );
+
+      // This would need access to the current node's configuration
+      // For now, return empty string as this requires context not available
+      this.logger.debug(
+        `[TEMPLATE] nodeData.config access not implemented yet`,
+      );
+      return '';
+    });
+
     // Process {{field}} expressions (legacy support)
     result = result.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
       this.logger.debug(`[TEMPLATE] Processing {{${path}}} pattern`);

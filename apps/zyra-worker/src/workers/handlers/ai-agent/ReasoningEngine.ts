@@ -281,9 +281,17 @@ export class ReasoningEngine {
           }
         }
 
-        // Add tool results to the response
+        // Process tool results and generate final response
+        const finalResponse = await this.generateFinalResponse(
+          params.prompt,
+          result.text || result.content,
+          toolResults,
+          params.provider,
+          params.systemPrompt,
+        );
+
         return {
-          text: result.text || result.content,
+          text: finalResponse,
           toolCalls: toolResults,
           steps: result.steps || [],
         };
@@ -295,6 +303,102 @@ export class ReasoningEngine {
       toolCalls: [],
       steps: result.steps || [],
     };
+  }
+
+  private async generateFinalResponse(
+    originalPrompt: string,
+    initialResponse: string,
+    toolResults: any[],
+    provider: any,
+    systemPrompt: string,
+  ): Promise<string> {
+    // Build a comprehensive prompt for the final response
+    let finalPrompt = `Based on the original request and the tool execution results, provide a comprehensive final response.
+
+Original Request: ${originalPrompt}
+
+Initial Response: ${initialResponse}
+
+Tool Execution Results:`;
+
+    for (const toolResult of toolResults) {
+      if (toolResult.error) {
+        finalPrompt += `\n\n${toolResult.tool} (ERROR): ${toolResult.error}`;
+      } else {
+        // Format the tool result for better readability
+        const resultText = this.formatToolResult(toolResult.result);
+        finalPrompt += `\n\n${toolResult.tool} Results:\n${resultText}`;
+      }
+    }
+
+    finalPrompt += `\n\nPlease provide a comprehensive final response that addresses the original request using the information gathered from the tool executions.`;
+
+    try {
+      const finalResult = await provider.generateText({
+        prompt: finalPrompt,
+        systemPrompt:
+          systemPrompt +
+          '\n\nYou are a helpful AI assistant that provides comprehensive responses based on tool execution results.',
+        temperature: 0.7,
+        maxTokens: 2000,
+      });
+
+      return (
+        finalResult.text ||
+        finalResult.content ||
+        'Unable to generate final response.'
+      );
+    } catch (error) {
+      this.logger.error('Failed to generate final response:', error);
+      // Fallback: return a summary of the tool results
+      return this.createFallbackResponse(originalPrompt, toolResults);
+    }
+  }
+
+  private formatToolResult(result: any): string {
+    if (typeof result === 'string') {
+      return result;
+    } else if (result && typeof result === 'object') {
+      // Handle structured results (like search results)
+      if (Array.isArray(result)) {
+        return result
+          .map((item, index) => {
+            if (typeof item === 'string') {
+              return `${index + 1}. ${item}`;
+            } else if (item && typeof item === 'object') {
+              return `${index + 1}. ${JSON.stringify(item, null, 2)}`;
+            }
+            return `${index + 1}. ${String(item)}`;
+          })
+          .join('\n');
+      } else {
+        return JSON.stringify(result, null, 2);
+      }
+    }
+    return String(result);
+  }
+
+  private createFallbackResponse(
+    originalPrompt: string,
+    toolResults: any[],
+  ): string {
+    let response = `Based on the original request: "${originalPrompt}"\n\n`;
+
+    if (toolResults.length === 0) {
+      response += 'No tools were executed.';
+    } else {
+      response += 'Tool execution results:\n';
+      for (const toolResult of toolResults) {
+        if (toolResult.error) {
+          response += `\n- ${toolResult.tool}: Error - ${toolResult.error}`;
+        } else {
+          const resultText = this.formatToolResult(toolResult.result);
+          response += `\n- ${toolResult.tool}: ${resultText.substring(0, 200)}...`;
+        }
+      }
+    }
+
+    return response;
   }
 
   private async reflect(
@@ -494,7 +598,11 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
       if (!toolFound) continue;
 
       // Dynamic parameter extraction based on tool's input schema
-      const parameters = this.extractParametersDynamically(reasoning, tool, toolName);
+      const parameters = this.extractParametersDynamically(
+        reasoning,
+        tool,
+        toolName,
+      );
 
       selected.push({
         name: toolName,
@@ -511,45 +619,62 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
   /**
    * Dynamically extract parameters based on tool schema and natural language context
    */
-  private extractParametersDynamically(reasoning: string, tool: any, toolName: string): any {
+  private extractParametersDynamically(
+    reasoning: string,
+    tool: any,
+    toolName: string,
+  ): any {
     const parameters: any = {};
-    
+
     this.logger.log(`Extracting parameters for tool ${toolName}`);
     this.logger.log(`Tool schema:`, JSON.stringify(tool.inputSchema, null, 2));
-    
+
     // Get tool context (text around the tool mention)
     const toolContext = this.extractToolContext(reasoning, toolName);
     this.logger.log(`Tool context: ${toolContext.substring(0, 200)}...`);
-    
+
     // If tool has input schema, use it to guide parameter extraction
     if (tool.inputSchema?.properties) {
-      this.logger.log(`Found ${Object.keys(tool.inputSchema.properties).length} parameters in schema`);
-      
-      for (const [paramName, paramSchema] of Object.entries(tool.inputSchema.properties)) {
-        this.logger.log(`Extracting parameter: ${paramName} (type: ${(paramSchema as any)?.type})`);
-        
-        const extractedValue = this.extractParameterValue(
-          reasoning, 
-          toolContext, 
-          paramName, 
-          paramSchema as any
+      this.logger.log(
+        `Found ${Object.keys(tool.inputSchema.properties).length} parameters in schema`,
+      );
+
+      for (const [paramName, paramSchema] of Object.entries(
+        tool.inputSchema.properties,
+      )) {
+        this.logger.log(
+          `Extracting parameter: ${paramName} (type: ${(paramSchema as any)?.type})`,
         );
-        
+
+        const extractedValue = this.extractParameterValue(
+          reasoning,
+          toolContext,
+          paramName,
+          paramSchema as any,
+        );
+
         if (extractedValue !== null) {
           parameters[paramName] = extractedValue;
-          this.logger.log(`✅ Successfully extracted ${paramName}: ${extractedValue}`);
+          this.logger.log(
+            `✅ Successfully extracted ${paramName}: ${extractedValue}`,
+          );
         } else {
           this.logger.log(`❌ Failed to extract parameter: ${paramName}`);
         }
       }
     } else {
-      this.logger.log(`No input schema found, using common parameter extraction`);
+      this.logger.log(
+        `No input schema found, using common parameter extraction`,
+      );
       // Fallback: extract common parameter patterns when no schema available
       const commonParams = this.extractCommonParameters(reasoning, toolContext);
       Object.assign(parameters, commonParams);
     }
 
-    this.logger.log(`Final extracted parameters:`, JSON.stringify(parameters, null, 2));
+    this.logger.log(
+      `Final extracted parameters:`,
+      JSON.stringify(parameters, null, 2),
+    );
     return parameters;
   }
 
@@ -557,16 +682,19 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
    * Extract a specific parameter value using multiple strategies
    */
   private extractParameterValue(
-    fullReasoning: string, 
-    toolContext: string, 
-    paramName: string, 
-    paramSchema: any
+    fullReasoning: string,
+    toolContext: string,
+    paramName: string,
+    paramSchema: any,
   ): any {
     // Strategy 1: Look for explicit "parameter: value" patterns
     const explicitPatterns = [
       new RegExp(`${paramName}\\s*[:=]\\s*["']?([^"'\\n,}]+)["']?`, 'i'),
       new RegExp(`"${paramName}"\\s*[:=]\\s*["']?([^"'\\n,}]+)["']?`, 'i'),
-      new RegExp(`with\\s+${paramName}\\s*[:=]\\s*["']?([^"'\\n,}]+)["']?`, 'i'),
+      new RegExp(
+        `with\\s+${paramName}\\s*[:=]\\s*["']?([^"'\\n,}]+)["']?`,
+        'i',
+      ),
     ];
 
     for (const pattern of explicitPatterns) {
@@ -577,35 +705,53 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
     }
 
     // Strategy 2: Content-based extraction based on parameter name and type
-    if (paramName.toLowerCase().includes('query') || paramName.toLowerCase().includes('sql') || paramName === 'sql') {
+    if (
+      paramName.toLowerCase().includes('query') ||
+      paramName.toLowerCase().includes('sql') ||
+      paramName === 'sql'
+    ) {
       // Look for SQL queries in code blocks
-      const codeBlockMatch = fullReasoning.match(/```(?:sql)?\s*(SELECT|INSERT|UPDATE|DELETE|SHOW|DESCRIBE|CREATE|DROP|ALTER)[\s\S]*?```/i);
+      const codeBlockMatch = fullReasoning.match(
+        /```(?:sql)?\s*(SELECT|INSERT|UPDATE|DELETE|SHOW|DESCRIBE|CREATE|DROP|ALTER)[\s\S]*?```/i,
+      );
       if (codeBlockMatch) {
-        const sqlQuery = codeBlockMatch[0].replace(/```(?:sql)?\s*/, '').replace(/```$/, '').trim();
+        const sqlQuery = codeBlockMatch[0]
+          .replace(/```(?:sql)?\s*/, '')
+          .replace(/```$/, '')
+          .trim();
         this.logger.log(`Found SQL in code block: ${sqlQuery}`);
         return sqlQuery;
       }
-      
+
       // Look for SQL-like content anywhere in the text (only for SQL parameters)
-      if (paramName.toLowerCase() === 'sql' || paramName.toLowerCase() === 'query') {
-        const sqlMatch = fullReasoning.match(/(SELECT|INSERT|UPDATE|DELETE|SHOW|DESCRIBE|CREATE|DROP|ALTER)[\s\S]*?(?=;|\.|$|```)/i);
+      if (
+        paramName.toLowerCase() === 'sql' ||
+        paramName.toLowerCase() === 'query'
+      ) {
+        const sqlMatch = fullReasoning.match(
+          /(SELECT|INSERT|UPDATE|DELETE|SHOW|DESCRIBE|CREATE|DROP|ALTER)[\s\S]*?(?=;|\.|$|```)/i,
+        );
         if (sqlMatch) {
           const sqlQuery = sqlMatch[0].trim().replace(/[;.]$/, '');
           this.logger.log(`Found SQL statement: ${sqlQuery}`);
           return sqlQuery;
         }
       }
-      
+
       // Look for information_schema queries specifically
-      const infoSchemaMatch = fullReasoning.match(/SELECT[\s\S]*?FROM\s+information_schema[\s\S]*?(?=;|\.|$|```)/i);
+      const infoSchemaMatch = fullReasoning.match(
+        /SELECT[\s\S]*?FROM\s+information_schema[\s\S]*?(?=;|\.|$|```)/i,
+      );
       if (infoSchemaMatch) {
         const sqlQuery = infoSchemaMatch[0].trim().replace(/[;.]$/, '');
         this.logger.log(`Found information_schema query: ${sqlQuery}`);
         return sqlQuery;
       }
-      
+
       // Look for question-like queries as fallback
-      const queryMatch = fullReasoning.match(/(?:find|search|show|get|list|what|how|when|where)[\s\S]*?(?=[.?!]|$)/i);
+      const queryMatch = fullReasoning.match(
+        /(?:find|search|show|get|list|what|how|when|where)[\s\S]*?(?=[.?!]|$)/i,
+      );
       if (queryMatch) {
         return queryMatch[0].trim().replace(/[.?!]$/, '');
       }
@@ -619,15 +765,23 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
       }
     }
 
-    if (paramName.toLowerCase().includes('path') || paramName.toLowerCase().includes('file')) {
+    if (
+      paramName.toLowerCase().includes('path') ||
+      paramName.toLowerCase().includes('file')
+    ) {
       // Look for file paths
-      const pathMatch = fullReasoning.match(/([\/\w.-]+\.[a-zA-Z]{2,4}|\/[\w\/.-]+)/g);
+      const pathMatch = fullReasoning.match(
+        /([\/\w.-]+\.[a-zA-Z]{2,4}|\/[\w\/.-]+)/g,
+      );
       if (pathMatch) {
         return pathMatch[0];
       }
     }
 
-    if (paramName.toLowerCase().includes('url') || paramName.toLowerCase().includes('link')) {
+    if (
+      paramName.toLowerCase().includes('url') ||
+      paramName.toLowerCase().includes('link')
+    ) {
       // Look for URLs
       const urlMatch = fullReasoning.match(/(https?:\/\/[^\s"'<>]+)/i);
       if (urlMatch) {
@@ -639,11 +793,18 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
     if (paramSchema.description) {
       const descWords = paramSchema.description.toLowerCase().split(/\s+/);
       for (const word of descWords) {
-        if (word.length > 3 && /^[a-zA-Z]+$/.test(word)) { // Only use alphanumeric words for regex
+        if (word.length > 3 && /^[a-zA-Z]+$/.test(word)) {
+          // Only use alphanumeric words for regex
           try {
-            const contextMatch = new RegExp(`\\b${this.escapeRegex(word)}\\b[\\s:]*["']?([^"'\\n,}]+)["']?`, 'i').exec(toolContext);
+            const contextMatch = new RegExp(
+              `\\b${this.escapeRegex(word)}\\b[\\s:]*["']?([^"'\\n,}]+)["']?`,
+              'i',
+            ).exec(toolContext);
             if (contextMatch) {
-              return this.convertValueToType(contextMatch[1].trim(), paramSchema);
+              return this.convertValueToType(
+                contextMatch[1].trim(),
+                paramSchema,
+              );
             }
           } catch (error) {
             // Ignore regex errors and continue with next word
@@ -659,9 +820,12 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
   /**
    * Extract common parameters when no schema is available
    */
-  private extractCommonParameters(fullReasoning: string, toolContext: string): any {
+  private extractCommonParameters(
+    fullReasoning: string,
+    toolContext: string,
+  ): any {
     const parameters: any = {};
-    
+
     // Common parameter extraction patterns
     const commonPatterns = {
       query: /(?:search|find|look\s+for|query)[:=]\s*["']?([^"'\n,}]+)["']?/i,
@@ -672,19 +836,26 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
     };
 
     // For search tools, also look for direct search terms
-    if (toolContext.toLowerCase().includes('search') || toolContext.toLowerCase().includes('typescript')) {
+    if (
+      toolContext.toLowerCase().includes('search') ||
+      toolContext.toLowerCase().includes('typescript')
+    ) {
       // Extract search terms more intelligently
-      const searchMatch = fullReasoning.match(/(?:about|for|regarding)\s+([^.!?]+)/i) ||
-                         fullReasoning.match(/information\s+about\s+([^.!?]+)/i) ||
-                         fullReasoning.match(/search\s+for\s+([^.!?]+)/i);
+      const searchMatch =
+        fullReasoning.match(/(?:about|for|regarding)\s+([^.!?]+)/i) ||
+        fullReasoning.match(/information\s+about\s+([^.!?]+)/i) ||
+        fullReasoning.match(/search\s+for\s+([^.!?]+)/i);
       if (searchMatch) {
         parameters.query = searchMatch[1].trim();
-        this.logger.log(`Extracted search query from context: ${parameters.query}`);
+        this.logger.log(
+          `Extracted search query from context: ${parameters.query}`,
+        );
       }
     }
 
     for (const [paramName, pattern] of Object.entries(commonPatterns)) {
-      if (!parameters[paramName]) { // Don't override already extracted parameters
+      if (!parameters[paramName]) {
+        // Don't override already extracted parameters
         const match = pattern.exec(toolContext) || pattern.exec(fullReasoning);
         if (match) {
           parameters[paramName] = match[1].trim();
@@ -703,7 +874,8 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
       return value;
     }
 
-    const schemaType = typeof paramSchema.type === 'string' ? paramSchema.type : 'string';
+    const schemaType =
+      typeof paramSchema.type === 'string' ? paramSchema.type : 'string';
 
     switch (schemaType) {
       case 'number':
@@ -716,7 +888,7 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
         try {
           return JSON.parse(value);
         } catch {
-          return value.split(',').map(v => v.trim());
+          return value.split(',').map((v) => v.trim());
         }
       case 'object':
         try {
