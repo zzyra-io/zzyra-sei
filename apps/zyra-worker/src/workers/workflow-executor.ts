@@ -56,6 +56,16 @@ export class WorkflowExecutor {
   ): Map<string, string[]> {
     const dependencyMap = new Map<string, string[]>();
 
+    this.logger.debug(`[buildNodeDependencyMap] Building dependency map:`, {
+      nodesCount: nodes.length,
+      edgesCount: edges.length,
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        type: n.data?.blockType || n.type,
+      })),
+      edges: edges.map((e) => ({ source: e.source, target: e.target })),
+    });
+
     // Initialize all nodes with empty dependency arrays
     nodes.forEach((node) => {
       dependencyMap.set(node.id, []);
@@ -66,12 +76,22 @@ export class WorkflowExecutor {
       const sourceId = edge.source;
       const targetId = edge.target;
 
+      this.logger.debug(`[buildNodeDependencyMap] Processing edge:`, {
+        sourceId,
+        targetId,
+        edge,
+      });
+
       // Add source as a dependency for target
       const dependencies = dependencyMap.get(targetId) || [];
       if (!dependencies.includes(sourceId)) {
         dependencies.push(sourceId);
         dependencyMap.set(targetId, dependencies);
       }
+    });
+
+    this.logger.debug(`[buildNodeDependencyMap] Final dependency map:`, {
+      dependencyMap: Object.fromEntries(dependencyMap),
     });
 
     return dependencyMap;
@@ -94,13 +114,31 @@ export class WorkflowExecutor {
     const relevantOutputs: Record<string, any> = {};
     const dependencies = dependencyMap.get(nodeId) || [];
 
+    this.logger.debug(`[getRelevantOutputs] For node ${nodeId}:`, {
+      nodeId,
+      dependencies,
+      allOutputsKeys: Object.keys(allOutputs),
+      edgesCount: edges.length,
+    });
+
     // Include outputs from direct dependencies
     dependencies.forEach((depId) => {
+      this.logger.debug(`[getRelevantOutputs] Checking dependency ${depId}:`, {
+        depId,
+        hasOutput: allOutputs[depId] !== undefined,
+        outputKeys: allOutputs[depId] ? Object.keys(allOutputs[depId]) : [],
+      });
+
       if (allOutputs[depId] !== undefined) {
         // Find edge connecting this dependency to the current node
         const edge = edges.find(
           (e) => e.source === depId && e.target === nodeId,
         );
+
+        this.logger.debug(`[getRelevantOutputs] Found edge:`, {
+          edge,
+          hasMapping: edge?.data?.mapping ? true : false,
+        });
 
         if (edge && edge.data?.mapping) {
           // Apply field mapping from edge configuration
@@ -120,6 +158,15 @@ export class WorkflowExecutor {
         }
       }
     });
+
+    this.logger.debug(
+      `[getRelevantOutputs] Final relevant outputs for ${nodeId}:`,
+      {
+        nodeId,
+        relevantOutputsKeys: Object.keys(relevantOutputs),
+        relevantOutputs,
+      },
+    );
 
     return relevantOutputs;
   }
@@ -340,6 +387,25 @@ export class WorkflowExecutor {
       validateTerminals(nodes, edges);
 
       // Check multi-level circuit breaker before execution
+      if (!workflowId || workflowId === 'unknown') {
+        this.logger.error(
+          `[executionId=${executionId}] Invalid workflowId: ${workflowId}`,
+        );
+        throw new Error(`Invalid workflowId: ${workflowId}`);
+      }
+
+      if (!userId) {
+        this.logger.error(
+          `[executionId=${executionId}] Invalid userId: ${userId}`,
+        );
+        throw new Error(`Invalid userId: ${userId}`);
+      }
+
+      if (!executionId) {
+        this.logger.error(`Invalid executionId: ${executionId}`);
+        throw new Error(`Invalid executionId: ${executionId}`);
+      }
+
       executionContext = {
         workflowId,
         userId,
@@ -564,7 +630,9 @@ export class WorkflowExecutor {
           }
         }
 
-        this.logger.log(`Starting execution of node ${node.id}`);
+        this.logger.log(
+          `Starting execution of node ${node.id} at ${new Date().toISOString()}`,
+        );
 
         // Add to active executions set for tracking
         activeNodeExecutions.add(node.id);
@@ -604,6 +672,14 @@ export class WorkflowExecutor {
         this.logger.debug(
           `Executing node ${node.id} with relevant outputs from dependencies`,
         );
+
+        this.logger.debug(`Node ${node.id} previous outputs:`, {
+          nodeId: node.id,
+          outputsCount: Object.keys(outputs).length,
+          outputsKeys: Object.keys(outputs),
+          relevantOutputsCount: Object.keys(edgeProcessedOutputs).length,
+          relevantOutputsKeys: Object.keys(edgeProcessedOutputs),
+        });
 
         try {
           // Get the block execution record for this node
@@ -708,6 +784,10 @@ export class WorkflowExecutor {
               `Node ${node.id} executed successfully in ${nodeDuration}ms, output: ${outputSummary}`,
             );
 
+            this.logger.log(
+              `Node ${node.id} completed at ${new Date().toISOString()}`,
+            );
+
             // Log output data summary
             await this.executionLogger.logExecutionEvent(executionId, {
               level: 'info',
@@ -755,6 +835,13 @@ export class WorkflowExecutor {
             }
 
             outputs[node.id] = nodeOutput;
+
+            this.logger.debug(`Saved output for node ${node.id}:`, {
+              nodeId: node.id,
+              outputKeys: Object.keys(nodeOutput || {}),
+              outputsCount: Object.keys(outputs).length,
+              outputsKeys: Object.keys(outputs),
+            });
 
             // Save output data state
             await this.dataStateService.saveDataState(
@@ -1356,16 +1443,11 @@ export class WorkflowExecutor {
       }
     }
 
-    // For other node types, apply basic filtering to keep only relevant data
-    const relevantKeys = this.getRelevantDataKeys(node, inputData);
-    if (relevantKeys.length > 0) {
-      const filtered = this.dataTransformationService.filterRelevantData(
-        inputData,
-        relevantKeys,
-      );
-      return filtered;
-    }
-
+    // For other node types, return the input data as-is without filtering
+    // The filtering was causing issues where blocks received empty previousOutputs
+    this.logger.debug(
+      `Skipping data filtering for ${nodeType} block ${node.id}, returning input data as-is`,
+    );
     return inputData;
   }
 
@@ -1416,6 +1498,8 @@ export class WorkflowExecutor {
           targetBlockType as BlockType,
         );
 
+        // CRITICAL FIX: Always process the edge data, even without transformations
+        // This ensures that previous outputs are passed through to the target node
         if (sourceSchema && targetSchema) {
           // Check if this edge has a transformation configuration
           if (edge.data?.transformation) {
@@ -1495,11 +1579,34 @@ export class WorkflowExecutor {
               processedOutputs[sourceId] = inputData; // Fallback to original data
             }
           }
+
+          // CRITICAL FIX: If no transformation or condition, still pass through the data
+          if (!edge.data?.transformation && !edge.data?.condition) {
+            this.logger.debug(
+              `No edge transformation or condition for ${sourceId}->${nodeId}, passing through data`,
+            );
+            processedOutputs[sourceId] = inputData;
+          }
+        } else {
+          // CRITICAL FIX: Even without schemas, pass through the data
+          this.logger.debug(
+            `No schemas available for ${sourceId}->${nodeId}, passing through data`,
+          );
+          processedOutputs[sourceId] = inputData;
         }
       });
 
     // Wait for all edge processing to complete
     await Promise.all(edgePromises);
+
+    this.logger.debug(
+      `[applyEdgeProcessing] Final processed outputs for ${nodeId}:`,
+      {
+        nodeId,
+        processedOutputsKeys: Object.keys(processedOutputs),
+        processedOutputs,
+      },
+    );
 
     return processedOutputs;
   }

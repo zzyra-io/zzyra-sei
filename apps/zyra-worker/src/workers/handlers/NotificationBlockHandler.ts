@@ -426,7 +426,7 @@ export class NotificationBlockHandler implements EnhancedBlockHandler {
       throw new Error('Email body is required');
     }
 
-    // Process template variables
+    // Process template variables with enhanced cross-block data access
     const processedTo = context.helpers.processTemplate(to, item.json);
     const processedSubject = context.helpers.processTemplate(
       subject,

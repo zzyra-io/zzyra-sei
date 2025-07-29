@@ -422,7 +422,7 @@ export const enhancedDataTransformSchema: EnhancedBlockSchema = {
 // AI Agent Schema
 const aiAgentConfigSchema = z.object({
   provider: z.object({
-    type: z.enum(['openrouter', 'openai', 'anthropic', 'ollama']),
+    type: z.enum(["openrouter", "openai", "anthropic", "ollama"]),
     model: z.string(),
     temperature: z.number().min(0).max(2).optional(),
     maxTokens: z.number().min(1).optional(),
@@ -432,16 +432,18 @@ const aiAgentConfigSchema = z.object({
     systemPrompt: z.string(),
     userPrompt: z.string(),
     maxSteps: z.number().min(1).max(50),
-    thinkingMode: z.enum(['fast', 'deliberate', 'collaborative']),
+    thinkingMode: z.enum(["fast", "deliberate", "collaborative"]),
   }),
-  selectedTools: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    type: z.enum(['mcp', 'goat', 'builtin']),
-    config: z.record(z.string(), z.any()),
-  })),
+  selectedTools: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      type: z.enum(["mcp", "goat", "builtin"]),
+      config: z.record(z.string(), z.any()),
+    })
+  ),
   execution: z.object({
-    mode: z.enum(['autonomous', 'interactive']),
+    mode: z.enum(["autonomous", "interactive"]),
     timeout: z.number().min(1000),
     requireApproval: z.boolean(),
     saveThinking: z.boolean(),
@@ -455,24 +457,42 @@ const enhancedAIAgentSchema: EnhancedBlockSchema = {
     context: z.record(z.string(), z.any()).optional(),
   }),
   outputSchema: z.object({
+    success: z.boolean(),
     result: z.string(),
-    reasoning: z.array(z.object({
-      step: z.number(),
-      type: z.string(),
-      reasoning: z.string(),
-      timestamp: z.string(),
-    })).optional(),
-    toolCalls: z.array(z.object({
-      name: z.string(),
-      parameters: z.record(z.string(), z.any()),
-      result: z.any().optional(),
-    })).optional(),
+    response: z.string(), // Add response field for {data.response} templates
+    data: z.string(), // Add data field for generic data access
+    output: z.string(), // Add output field for {previousBlock.output} templates
+    reasoning: z
+      .array(
+        z.object({
+          step: z.number(),
+          type: z.string(),
+          reasoning: z.string(),
+          timestamp: z.string(),
+        })
+      )
+      .optional(),
+    toolCalls: z
+      .array(
+        z.object({
+          name: z.string(),
+          parameters: z.record(z.string(), z.any()),
+          result: z.any().optional(),
+        })
+      )
+      .optional(),
+    executionTime: z.number(),
+    sessionId: z.string(),
+    // Additional fields for template consumption
+    text: z.string(),
+    content: z.string(),
+    summary: z.string(),
   }),
   metadata: {
     category: "ai_automation",
     icon: "brain",
     description: "Execute tasks using AI agents with access to various tools",
-  }
+  },
 };
 
 /**

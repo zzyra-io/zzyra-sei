@@ -103,25 +103,34 @@ export class DataStateService {
         },
       };
 
-      // Ensure NodeExecution exists before creating NodeOutput
-      await this.databaseService.prisma.nodeExecution.upsert({
-        where: {
-          executionId_nodeId: {
+      // Ensure NodeExecution exists before creating NodeOutput with proper atomic operation
+      const currentTimestamp = new Date();
+      await this.databaseService.prisma.$transaction(async (tx) => {
+        // Use upsert with proper error handling for race conditions
+        await tx.nodeExecution.upsert({
+          where: {
+            executionId_nodeId: {
+              executionId: dataState.executionId,
+              nodeId: dataState.nodeId,
+            },
+          },
+          create: {
             executionId: dataState.executionId,
             nodeId: dataState.nodeId,
+            status: 'running',
+            startedAt: currentTimestamp,
+            updatedAt: currentTimestamp,
           },
-        },
-        create: {
-          executionId: dataState.executionId,
-          nodeId: dataState.nodeId,
-          status: 'running',
-          startedAt: new Date(),
-          completedAt: new Date(),
-        },
-        update: {
-          // Update timestamp when data state is stored
-          updatedAt: new Date(),
-        },
+          update: {
+            // Update timestamp and ensure status progression is valid
+            updatedAt: currentTimestamp,
+            // Only update completedAt if status is completed/failed
+            ...(dataState.metadata?.tags?.includes('completed') && {
+              completedAt: currentTimestamp,
+              status: 'completed'
+            }),
+          },
+        });
       });
 
       // Store in database using existing NodeOutput table for now
@@ -231,39 +240,72 @@ export class DataStateService {
    */
   async getExecutionDataStates(executionId: string): Promise<Record<string, DataState>> {
     try {
+      // First, get the execution to retrieve workflowId
+      const execution = await this.databaseService.executions.findById(executionId);
+      const workflowId = execution?.workflowId || 'unknown';
+
+      // Get node outputs with proper ordering for latest versions
       const nodeOutputs = await this.databaseService.prisma.nodeOutput.findMany({
         where: { executionId },
         orderBy: [{ nodeId: 'asc' }, { createdAt: 'desc' }],
       });
 
-      // Group by nodeId and take the latest version
-      const result: Record<string, DataState> = {};
-      const seen = new Set<string>();
+      // Use Map for better performance and data integrity
+      const nodeDataMap = new Map<string, DataState>();
 
       for (const nodeOutput of nodeOutputs) {
-        if (!seen.has(nodeOutput.nodeId)) {
-          const outputData = nodeOutput.outputData as any;
-          const metadata = outputData?._metadata || {};
-          const dataVersion = outputData?._version || 1;
-          
-          // Remove metadata from data
-          const { _metadata, _version, ...data } = outputData || {};
+        // Skip if we already have a more recent version for this node
+        if (nodeDataMap.has(nodeOutput.nodeId)) {
+          continue;
+        }
 
-          result[nodeOutput.nodeId] = {
+        try {
+          const outputData = nodeOutput.outputData as any;
+          
+          // Ensure outputData exists and is valid
+          if (!outputData || typeof outputData !== 'object') {
+            this.logger.warn(`Invalid output data for node ${nodeOutput.nodeId} in execution ${executionId}`);
+            continue;
+          }
+
+          const metadata = outputData._metadata || {};
+          const dataVersion = typeof outputData._version === 'number' ? outputData._version : 1;
+          
+          // Safely extract data, preserving null/undefined values
+          const { _metadata, _version, ...data } = outputData;
+
+          // Validate critical data integrity
+          const dataState: DataState = {
             id: nodeOutput.id,
             executionId: nodeOutput.executionId,
             nodeId: nodeOutput.nodeId,
-            workflowId: 'unknown', // Would need to fetch from execution
-            data,
+            workflowId,
+            data: data || {},
             version: dataVersion,
             createdAt: nodeOutput.createdAt || new Date(),
             updatedAt: nodeOutput.createdAt || new Date(),
-            metadata,
+            metadata: {
+              dataSize: metadata.dataSize || JSON.stringify(data).length,
+              dataType: metadata.dataType || this.detectDataType(data),
+              checksum: metadata.checksum || this.calculateChecksum(data),
+              tags: Array.isArray(metadata.tags) ? metadata.tags : [],
+            },
           };
-          seen.add(nodeOutput.nodeId);
+
+          nodeDataMap.set(nodeOutput.nodeId, dataState);
+        } catch (nodeError) {
+          this.logger.error(`Failed to process node output ${nodeOutput.id}:`, nodeError);
+          // Continue processing other nodes
         }
       }
 
+      // Convert Map to Record for return value
+      const result: Record<string, DataState> = {};
+      for (const [nodeId, dataState] of nodeDataMap.entries()) {
+        result[nodeId] = dataState;
+      }
+
+      this.logger.debug(`Retrieved ${Object.keys(result).length} node data states for execution ${executionId}`);
       return result;
 
     } catch (error) {

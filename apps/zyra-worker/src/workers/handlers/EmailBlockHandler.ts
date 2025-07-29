@@ -16,19 +16,104 @@ export class EmailBlockHandler implements BlockHandler {
     const config = (node.data as any).config;
 
     this.logger.log(`Executing Email block: ${nodeId}`);
+    this.logger.debug(`Email config:`, JSON.stringify(config, null, 2));
+    this.logger.debug(
+      `Previous outputs:`,
+      JSON.stringify(ctx.previousOutputs, null, 2),
+    );
+
+    // Initialize template variables at function scope for proper error handling
+    let emailBody = config.body || '';
+    let emailSubject = config.subject || '';
+    let emailTo = config.to || '';
+    let emailCc = config.cc || '';
 
     try {
       // Validate required email configuration
       this.validateEmailConfig();
 
-      // Validate required fields
-      if (!config.to) {
+      // Create enhanced context for cross-block template processing
+      const templateContext = {
+        previousOutputs: ctx.previousOutputs || {},
+        blockOutputs: ctx.previousOutputs || {},
+        currentNode: config,
+      };
+
+      this.logger.debug('Template processing context:', {
+        previousOutputsKeys: Object.keys(ctx.previousOutputs || {}),
+        templateContext: templateContext,
+      });
+
+      // Process templates BEFORE validation - this is critical!
+      if (ctx.previousOutputs && Object.keys(ctx.previousOutputs).length > 0) {
+        this.logger.debug('Processing templates with previous outputs');
+        this.logger.debug(
+          'Previous outputs structure:',
+          JSON.stringify(ctx.previousOutputs, null, 2),
+        );
+
+        // Process recipient email with enhanced context
+        this.logger.debug(`[EMAIL] Processing emailTo template: "${emailTo}"`);
+        emailTo = this.templateProcessor.process(
+          emailTo,
+          ctx.previousOutputs,
+          templateContext,
+        );
+        this.logger.debug(`[EMAIL] Processed emailTo: "${emailTo}"`);
+
+        // Process subject with enhanced context
+        this.logger.debug(
+          `[EMAIL] Processing emailSubject template: "${emailSubject}"`,
+        );
+        emailSubject = this.templateProcessor.process(
+          emailSubject,
+          ctx.previousOutputs,
+          templateContext,
+        );
+        this.logger.debug(`[EMAIL] Processed emailSubject: "${emailSubject}"`);
+
+        // Process body with enhanced context
+        this.logger.debug(
+          `[EMAIL] Processing emailBody template (first 200 chars): "${emailBody.substring(0, 200)}..."`,
+        );
+        emailBody = this.templateProcessor.process(
+          emailBody,
+          ctx.previousOutputs,
+          templateContext,
+        );
+        this.logger.debug(
+          `[EMAIL] Processed emailBody length: ${emailBody.length}`,
+        );
+        this.logger.debug(
+          `[EMAIL] Processed emailBody preview: "${emailBody.substring(0, 200)}..."`,
+        );
+
+        // Process CC if provided
+        if (emailCc) {
+          this.logger.debug(
+            `[EMAIL] Processing emailCc template: "${emailCc}"`,
+          );
+          emailCc = this.templateProcessor.process(
+            emailCc,
+            ctx.previousOutputs,
+            templateContext,
+          );
+          this.logger.debug(`[EMAIL] Processed emailCc: "${emailCc}"`);
+        }
+      } else {
+        this.logger.debug(
+          'No previous outputs available for template processing',
+        );
+      }
+
+      // Validate required fields AFTER template processing
+      if (!emailTo || emailTo.trim() === '') {
         throw new Error('Email recipient is required');
       }
-      if (!config.subject) {
+      if (!emailSubject || emailSubject.trim() === '') {
         throw new Error('Email subject is required');
       }
-      if (!config.body) {
+      if (!emailBody || emailBody.trim() === '') {
         throw new Error('Email body is required');
       }
 
@@ -43,57 +128,59 @@ export class EmailBlockHandler implements BlockHandler {
         },
       });
 
-      // Process email template variables from previous node outputs using unified template processor
-      let emailBody = config.body;
-      let emailSubject = config.subject;
-
-      // If we have previous outputs from the workflow, use them for template substitution
-      if (ctx.previousOutputs && Object.keys(ctx.previousOutputs).length > 0) {
-        emailBody = this.templateProcessor.process(
-          emailBody,
-          ctx.previousOutputs,
-        );
-        emailSubject = this.templateProcessor.process(
-          emailSubject,
-          ctx.previousOutputs,
-        );
-      }
-
       // Send email
       const mailOptions = {
         from: process.env.EMAIL_FROM || process.env.SMTP_USER,
-        to: config.to,
+        to: emailTo, // Use processed email address
         subject: emailSubject,
         html: emailBody,
-        cc: config.cc || undefined,
+        cc: emailCc || undefined,
       };
+
+      this.logger.log('Sending email with options:', {
+        to: emailTo,
+        subject: emailSubject,
+        bodyLength: emailBody.length,
+        cc: emailCc,
+      });
 
       const result = await transporter.sendMail(mailOptions);
 
       // Log successful email send
       await this.logEmailSent(userId, executionId, nodeId, {
-        to: config.to,
+        to: emailTo, // Use processed email address
         subject: emailSubject,
         messageId: result.messageId,
         status: 'sent',
       });
 
+      // Return structured output for EMAIL block
       return {
         success: true,
+        messageId: result.messageId,
+        timestamp: new Date().toISOString(),
+        recipient: emailTo,
+        subject: emailSubject,
+        status: 'sent',
         data: {
           messageId: result.messageId,
           envelope: result.envelope,
           accepted: result.accepted,
           rejected: result.rejected,
         },
+        // Additional fields for template consumption
+        to: emailTo,
+        body: emailBody,
+        cc: emailCc,
+        from: process.env.EMAIL_FROM || process.env.SMTP_USER,
       };
     } catch (error: any) {
       this.logger.error(`Email sending failed: ${error.message}`);
 
       // Log failed email attempt
       await this.logEmailSent(userId, executionId, nodeId, {
-        to: config.to || 'unknown',
-        subject: config.subject || 'unknown',
+        to: emailTo || config.to || 'unknown',
+        subject: emailSubject || config.subject || 'unknown',
         status: 'failed',
         error: error.message,
       });

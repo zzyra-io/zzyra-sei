@@ -6,8 +6,6 @@ import {
   EnhancedBlockExecutionContext,
   ZyraNodeData,
   BlockType,
-  getBlockType,
-  getBlockMetadata,
   HttpRequestOptions,
 } from '@zyra/types';
 import { ZyraTemplateProcessor } from '../../../utils/template-processor';
@@ -79,51 +77,80 @@ export class EnhancedBlockRegistry {
   }
 
   /**
-   * Get a block handler by type (enhanced or legacy)
+   * Get a block handler by type with consistent resolution and caching
    */
   getHandler(blockType: string): EnhancedBlockHandler | BlockHandler | null {
-    this.logger.debug(`Looking for handler for block type: ${blockType}`);
-
-    // Try exact match first
-    if (this.enhancedBlocks.has(blockType)) {
-      this.logger.debug(`Found exact match for enhanced block: ${blockType}`);
-      return this.enhancedBlocks.get(blockType)!;
+    if (!blockType || typeof blockType !== 'string') {
+      this.logger.warn(`Invalid block type provided: ${blockType}`);
+      return null;
     }
 
-    // Try case-insensitive match for enhanced blocks
-    const upperBlockType = blockType.toUpperCase();
-    for (const [key, handler] of this.enhancedBlocks.entries()) {
-      if (key.toUpperCase() === upperBlockType) {
-        this.logger.debug(
-          `Found case-insensitive match for enhanced block: ${blockType} -> ${key}`,
-        );
-        return handler;
-      }
+    // Normalize block type to prevent race conditions
+    const normalizedType = blockType.trim();
+    
+    this.logger.debug(`Looking for handler for block type: ${normalizedType}`);
+
+    // Use a deterministic lookup strategy to prevent race conditions
+    const handler = this.findHandlerDeterministically(normalizedType);
+    
+    if (handler) {
+      const handlerType = this.isEnhancedBlock(normalizedType) ? 'enhanced' : 'legacy';
+      this.logger.debug(`Found ${handlerType} handler for block type: ${normalizedType}`);
+      return handler;
     }
 
-    // Fall back to legacy blocks with exact match
-    if (this.legacyBlocks.has(blockType)) {
-      this.logger.debug(`Found exact match for legacy block: ${blockType}`);
-      return this.legacyBlocks.get(blockType)!;
-    }
-
-    // Try case-insensitive match for legacy blocks
-    for (const [key, handler] of this.legacyBlocks.entries()) {
-      if (key.toUpperCase() === upperBlockType) {
-        this.logger.debug(
-          `Found case-insensitive match for legacy block: ${blockType} -> ${key}`,
-        );
-        return handler;
-      }
-    }
-
-    this.logger.warn(`No handler found for block type: ${blockType}`);
+    // Log detailed debugging information only when handler is not found
+    this.logger.warn(`No handler found for block type: ${normalizedType}`);
     this.logger.debug(
       `Available enhanced blocks: ${Array.from(this.enhancedBlocks.keys()).join(', ')}`,
     );
     this.logger.debug(
       `Available legacy blocks: ${Array.from(this.legacyBlocks.keys()).join(', ')}`,
     );
+    return null;
+  }
+
+  /**
+   * Find handler using deterministic lookup strategy to prevent race conditions
+   */
+  private findHandlerDeterministically(
+    blockType: string,
+  ): EnhancedBlockHandler | BlockHandler | null {
+    // Priority 1: Exact match in enhanced blocks
+    if (this.enhancedBlocks.has(blockType)) {
+      return this.enhancedBlocks.get(blockType)!;
+    }
+
+    // Priority 2: Exact match in legacy blocks  
+    if (this.legacyBlocks.has(blockType)) {
+      return this.legacyBlocks.get(blockType)!;
+    }
+
+    // Priority 3: Case-insensitive match in enhanced blocks (deterministic order)
+    const upperBlockType = blockType.toUpperCase();
+    const enhancedKeys = Array.from(this.enhancedBlocks.keys()).sort(); // Sorted for determinism
+    
+    for (const key of enhancedKeys) {
+      if (key.toUpperCase() === upperBlockType) {
+        this.logger.debug(
+          `Found case-insensitive match for enhanced block: ${blockType} -> ${key}`,
+        );
+        return this.enhancedBlocks.get(key)!;
+      }
+    }
+
+    // Priority 4: Case-insensitive match in legacy blocks (deterministic order)
+    const legacyKeys = Array.from(this.legacyBlocks.keys()).sort(); // Sorted for determinism
+    
+    for (const key of legacyKeys) {
+      if (key.toUpperCase() === upperBlockType) {
+        this.logger.debug(
+          `Found case-insensitive match for legacy block: ${blockType} -> ${key}`,
+        );
+        return this.legacyBlocks.get(key)!;
+      }
+    }
+
     return null;
   }
 
@@ -259,17 +286,20 @@ export class EnhancedBlockRegistry {
     context: BlockExecutionContext,
     previousOutputs: Record<string, any>,
   ): EnhancedBlockExecutionContext {
-    // Convert previous outputs to ZyraNodeData format
+    // Convert previous outputs to ZyraNodeData format while preserving structure
     const inputData: ZyraNodeData[] = [];
 
     if (previousOutputs && Object.keys(previousOutputs).length > 0) {
       // Convert each previous output to ZyraNodeData format
-      for (const [nodeId, output] of Object.entries(previousOutputs)) {
+      // Preserve the block-specific structure for template processing
+      for (const [blockId, output] of Object.entries(previousOutputs)) {
         if (output && typeof output === 'object') {
           inputData.push({
             json: output,
             pairedItem: { item: 0 },
-          });
+            // Add metadata to track source block
+            metadata: { sourceBlockId: blockId }
+          } as ZyraNodeData);
         }
       }
     }
@@ -279,49 +309,67 @@ export class EnhancedBlockRegistry {
       inputData.push({ json: {} });
     }
 
-    // Create the node logger
-    let nodeLogger;
-    if (context.executionId && context.nodeId) {
-      nodeLogger = this.executionLogger.createNodeLogger(
-        context.executionId,
-        context.nodeId,
-      );
+    // Create structured context for template processing
+    const templateContext = {
+      previousOutputs,
+      blockOutputs: previousOutputs, // Alternative naming for clarity
+      // Add current node data for fallback
+      currentNode: node.data?.config || {},
+    };
+
+    // Create the node logger with proper fallback and validation
+    let nodeLogger: any;
+    const executionId = context.executionId || node.executionId;
+    const nodeId = context.nodeId || node.id;
+    
+    if (executionId && nodeId) {
+      try {
+        nodeLogger = this.executionLogger.createNodeLogger(executionId, nodeId);
+      } catch (error) {
+        this.logger.error('Failed to create node logger, using fallback', {
+          executionId,
+          nodeId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        nodeLogger = this.createFallbackLogger(executionId, nodeId);
+      }
     } else {
       this.logger.error('Missing executionId or nodeId for logger creation', {
         executionId: context.executionId,
         nodeId: context.nodeId,
+        nodeExecutionId: node.executionId,
+        nodeIdFromNode: node.id,
       });
-      // No-op logger to avoid crashes
-      nodeLogger = {
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-        debug: () => {},
-        log: () => {},
-      };
+      nodeLogger = this.createFallbackLogger(executionId || 'unknown', nodeId || 'unknown');
     }
-    // Contract: context.logger must always be safe to call and log to node_logs if possible.
-    return {
+
+    // Enhanced context with all critical fields populated
+    const enhancedContext: EnhancedBlockExecutionContext = {
       ...context,
+      // Ensure critical fields are always present
+      executionId: executionId || context.executionId || 'unknown',
+      nodeId: nodeId || context.nodeId || 'unknown',
+      workflowId: context.workflowId || node.workflowId || 'unknown',
+      userId: context.userId || 'unknown',
       logger: nodeLogger,
 
-      getInputData: (inputIndex = 0) => {
+      getInputData: () => {
         return inputData;
       },
 
-      getNodeParameter: (parameterName: string, itemIndex = 0) => {
+      getNodeParameter: (parameterName: string) => {
         const nodeData = node.data || {};
         const config = nodeData.config || {};
         return config[parameterName];
       },
 
-      getCredentials: async (type: string) => {
+      getCredentials: async () => {
         // For now, return empty credentials
         // This can be enhanced later to fetch from a credentials service
         return {};
       },
 
-      getWorkflowStaticData: (type: string) => {
+      getWorkflowStaticData: () => {
         // For now, return empty static data
         // This can be enhanced later to fetch from a static data service
         return {};
@@ -339,7 +387,8 @@ export class EnhancedBlockRegistry {
         },
 
         processTemplate: (template: string, data: any) => {
-          return this.templateProcessor.process(template, data);
+          // Enhance template processing with structured context for cross-block data access
+          return this.templateProcessor.process(template, data, templateContext);
         },
 
         formatValue: (value: any, format?: string) => {
@@ -350,7 +399,7 @@ export class EnhancedBlockRegistry {
         },
 
         constructExecutionMetaData: (
-          inputData: ZyraNodeData[],
+          _inputData: ZyraNodeData[],
           outputData: any[],
         ) => {
           return outputData.map((item, index) => ({
@@ -375,6 +424,31 @@ export class EnhancedBlockRegistry {
             pairedItem: { item: index },
           }));
         },
+      },
+    };
+
+    return enhancedContext;
+  }
+
+  /**
+   * Create a fallback logger when the execution logger fails
+   */
+  private createFallbackLogger(executionId: string, nodeId: string) {
+    return {
+      info: (message: string, ...args: any[]) => {
+        this.logger.log(`[${executionId}:${nodeId}] ${message}`, ...args);
+      },
+      warn: (message: string, ...args: any[]) => {
+        this.logger.warn(`[${executionId}:${nodeId}] ${message}`, ...args);
+      },
+      error: (message: string, ...args: any[]) => {
+        this.logger.error(`[${executionId}:${nodeId}] ${message}`, ...args);
+      },
+      debug: (message: string, ...args: any[]) => {
+        this.logger.debug(`[${executionId}:${nodeId}] ${message}`, ...args);
+      },
+      log: (message: string, ...args: any[]) => {
+        this.logger.log(`[${executionId}:${nodeId}] ${message}`, ...args);
       },
     };
   }

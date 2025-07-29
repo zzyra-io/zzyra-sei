@@ -8,9 +8,9 @@ export interface CircuitBreakerLevel {
 }
 
 export interface ExecutionContext {
-  workflowId: string;
-  userId: string;
-  executionId: string;
+  workflowId?: string;
+  userId?: string;
+  executionId?: string;
   nodeId?: string;
   blockType?: string;
   apiEndpoint?: string;
@@ -27,29 +27,52 @@ export class MultiLevelCircuitBreakerService {
   /**
    * Generate circuit breaker levels for Zyra's multi-level strategy
    */
-  private generateCircuitLevels(context: ExecutionContext): CircuitBreakerLevel[] {
+  private generateCircuitLevels(
+    context: ExecutionContext,
+  ): CircuitBreakerLevel[] {
     const levels: CircuitBreakerLevel[] = [];
 
+    // Validate context
+    if (!context) {
+      this.logger.warn(
+        'ExecutionContext is undefined, using global circuit breaker only',
+      );
+      levels.push({
+        level: 'global',
+        circuitId: 'global:workflow-execution',
+        priority: 1,
+      });
+      return levels;
+    }
+
     // 1. Per-Workflow Circuit Breaker (Highest Priority)
-    levels.push({
-      level: 'workflow',
-      circuitId: `workflow:${context.workflowId}`,
-      priority: 4
-    });
+    if (context.workflowId) {
+      levels.push({
+        level: 'workflow',
+        circuitId: `workflow:${context.workflowId}`,
+        priority: 4,
+      });
+    } else {
+      this.logger.warn('workflowId is undefined in ExecutionContext');
+    }
 
     // 2. Per-User Circuit Breaker
-    levels.push({
-      level: 'user',
-      circuitId: `user:${context.userId}`,
-      priority: 3
-    });
+    if (context.userId) {
+      levels.push({
+        level: 'user',
+        circuitId: `user:${context.userId}`,
+        priority: 3,
+      });
+    } else {
+      this.logger.warn('userId is undefined in ExecutionContext');
+    }
 
     // 3. Per-API Circuit Breaker (if API endpoint is involved)
     if (context.apiEndpoint) {
       levels.push({
         level: 'api',
         circuitId: `api:${context.apiEndpoint}`,
-        priority: 2
+        priority: 2,
       });
     }
 
@@ -57,7 +80,7 @@ export class MultiLevelCircuitBreakerService {
     levels.push({
       level: 'global',
       circuitId: 'global:workflow-execution',
-      priority: 1
+      priority: 1,
     });
 
     // Sort by priority (highest first)
@@ -76,27 +99,29 @@ export class MultiLevelCircuitBreakerService {
 
     for (const level of levels) {
       try {
-        const state = await this.circuitBreakerDbService.getCircuitState(level.circuitId);
-        
+        const state = await this.circuitBreakerDbService.getCircuitState(
+          level.circuitId,
+        );
+
         if (state === 'OPEN') {
           this.logger.warn(
-            `Execution blocked by ${level.level} circuit breaker: ${level.circuitId}`
+            `Execution blocked by ${level.level} circuit breaker: ${level.circuitId}`,
           );
-          
+
           return {
             allowed: false,
             blockedBy: level,
-            reason: `${level.level} circuit breaker is OPEN`
+            reason: `${level.level} circuit breaker is OPEN`,
           };
         }
 
         this.logger.debug(
-          `${level.level} circuit breaker ${level.circuitId}: ${state}`
+          `${level.level} circuit breaker ${level.circuitId}: ${state}`,
         );
       } catch (error) {
         this.logger.error(
           `Error checking ${level.level} circuit breaker ${level.circuitId}:`,
-          error
+          error,
         );
         // Continue checking other levels if one fails
       }
@@ -116,15 +141,15 @@ export class MultiLevelCircuitBreakerService {
         try {
           await this.circuitBreakerDbService.recordSuccess(level.circuitId);
           this.logger.debug(
-            `Recorded success for ${level.level} circuit breaker: ${level.circuitId}`
+            `Recorded success for ${level.level} circuit breaker: ${level.circuitId}`,
           );
         } catch (error) {
           this.logger.error(
             `Error recording success for ${level.level} circuit breaker ${level.circuitId}:`,
-            error
+            error,
           );
         }
-      })
+      }),
     );
   }
 
@@ -142,22 +167,25 @@ export class MultiLevelCircuitBreakerService {
         try {
           await this.circuitBreakerDbService.recordFailure(level.circuitId);
           this.logger.debug(
-            `Recorded failure for ${level.level} circuit breaker: ${level.circuitId}`
+            `Recorded failure for ${level.level} circuit breaker: ${level.circuitId}`,
           );
         } catch (dbError) {
           this.logger.error(
             `Error recording failure for ${level.level} circuit breaker ${level.circuitId}:`,
-            dbError
+            dbError,
           );
         }
-      })
+      }),
     );
   }
 
   /**
    * Classify error impact to determine which circuit breaker levels should be affected
    */
-  private classifyErrorImpact(error: Error, levels: CircuitBreakerLevel[]): CircuitBreakerLevel[] {
+  private classifyErrorImpact(
+    error: Error,
+    levels: CircuitBreakerLevel[],
+  ): CircuitBreakerLevel[] {
     const errorMessage = error.message.toLowerCase();
     const affectedLevels: CircuitBreakerLevel[] = [];
 
@@ -169,7 +197,7 @@ export class MultiLevelCircuitBreakerService {
       errorMessage.includes('missing')
     ) {
       affectedLevels.push(
-        ...levels.filter(l => l.level === 'workflow' || l.level === 'user')
+        ...levels.filter((l) => l.level === 'workflow' || l.level === 'user'),
       );
     }
     // API/Network errors - affect API and potentially global levels
@@ -181,7 +209,7 @@ export class MultiLevelCircuitBreakerService {
       errorMessage.includes('api')
     ) {
       affectedLevels.push(
-        ...levels.filter(l => l.level === 'api' || l.level === 'global')
+        ...levels.filter((l) => l.level === 'api' || l.level === 'global'),
       );
     }
     // System errors - affect global level
@@ -191,15 +219,11 @@ export class MultiLevelCircuitBreakerService {
       errorMessage.includes('system') ||
       errorMessage.includes('unavailable')
     ) {
-      affectedLevels.push(
-        ...levels.filter(l => l.level === 'global')
-      );
+      affectedLevels.push(...levels.filter((l) => l.level === 'global'));
     }
     // Unknown errors - affect workflow level only (most conservative)
     else {
-      affectedLevels.push(
-        ...levels.filter(l => l.level === 'workflow')
-      );
+      affectedLevels.push(...levels.filter((l) => l.level === 'workflow'));
     }
 
     return affectedLevels;
@@ -208,13 +232,18 @@ export class MultiLevelCircuitBreakerService {
   /**
    * Get circuit breaker status for all levels
    */
-  async getCircuitStatus(context: ExecutionContext): Promise<Record<string, {
-    level: string;
-    circuitId: string;
-    state: string;
-    failureCount: number;
-    lastFailureTime?: Date;
-  }>> {
+  async getCircuitStatus(context: ExecutionContext): Promise<
+    Record<
+      string,
+      {
+        level: string;
+        circuitId: string;
+        state: string;
+        failureCount: number;
+        lastFailureTime?: Date;
+      }
+    >
+  > {
     const levels = this.generateCircuitLevels(context);
     const status: Record<string, any> = {};
 
@@ -223,7 +252,7 @@ export class MultiLevelCircuitBreakerService {
         try {
           const [state, details] = await Promise.all([
             this.circuitBreakerDbService.getCircuitState(level.circuitId),
-            this.circuitBreakerDbService.getCircuitDetails(level.circuitId)
+            this.circuitBreakerDbService.getCircuitDetails(level.circuitId),
           ]);
 
           status[level.level] = {
@@ -231,21 +260,21 @@ export class MultiLevelCircuitBreakerService {
             circuitId: level.circuitId,
             state,
             failureCount: details?.failureCount || 0,
-            lastFailureTime: details?.lastFailureTime
+            lastFailureTime: details?.lastFailureTime,
           };
         } catch (error) {
           this.logger.error(
             `Error getting status for ${level.level} circuit breaker:`,
-            error
+            error,
           );
           status[level.level] = {
             level: level.level,
             circuitId: level.circuitId,
             state: 'ERROR',
-            failureCount: -1
+            failureCount: -1,
           };
         }
-      })
+      }),
     );
 
     return status;
@@ -255,8 +284,10 @@ export class MultiLevelCircuitBreakerService {
    * Force open a circuit breaker at a specific level
    */
   async forceOpen(circuitId: string, reason: string): Promise<void> {
-    this.logger.warn(`Force opening circuit breaker: ${circuitId}, reason: ${reason}`);
-    
+    this.logger.warn(
+      `Force opening circuit breaker: ${circuitId}, reason: ${reason}`,
+    );
+
     try {
       // Record multiple failures to trigger OPEN state
       await this.circuitBreakerDbService.recordFailure(circuitId);
@@ -265,7 +296,10 @@ export class MultiLevelCircuitBreakerService {
       await this.circuitBreakerDbService.recordFailure(circuitId);
       await this.circuitBreakerDbService.recordFailure(circuitId);
     } catch (error) {
-      this.logger.error(`Error force opening circuit breaker ${circuitId}:`, error);
+      this.logger.error(
+        `Error force opening circuit breaker ${circuitId}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -274,15 +308,20 @@ export class MultiLevelCircuitBreakerService {
    * Force close a circuit breaker at a specific level
    */
   async forceClose(circuitId: string, reason: string): Promise<void> {
-    this.logger.warn(`Force closing circuit breaker: ${circuitId}, reason: ${reason}`);
-    
+    this.logger.warn(
+      `Force closing circuit breaker: ${circuitId}, reason: ${reason}`,
+    );
+
     try {
       // Record multiple successes to trigger CLOSED state
       await this.circuitBreakerDbService.recordSuccess(circuitId);
       await this.circuitBreakerDbService.recordSuccess(circuitId);
       await this.circuitBreakerDbService.recordSuccess(circuitId);
     } catch (error) {
-      this.logger.error(`Error force closing circuit breaker ${circuitId}:`, error);
+      this.logger.error(
+        `Error force closing circuit breaker ${circuitId}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -290,7 +329,10 @@ export class MultiLevelCircuitBreakerService {
   /**
    * Generate specific circuit IDs for different contexts
    */
-  generateCircuitId(type: 'workflow' | 'user' | 'api' | 'global', identifier: string): string {
+  generateCircuitId(
+    type: 'workflow' | 'user' | 'api' | 'global',
+    identifier: string,
+  ): string {
     switch (type) {
       case 'workflow':
         return `workflow:${identifier}`;
@@ -309,8 +351,10 @@ export class MultiLevelCircuitBreakerService {
    * Clean up old circuit breaker states (maintenance)
    */
   async cleanup(olderThanDays: number = 7): Promise<void> {
-    this.logger.log(`Cleaning up circuit breaker states older than ${olderThanDays} days`);
-    
+    this.logger.log(
+      `Cleaning up circuit breaker states older than ${olderThanDays} days`,
+    );
+
     try {
       await this.circuitBreakerDbService.cleanupOldStates(olderThanDays);
       this.logger.log('Circuit breaker cleanup completed successfully');

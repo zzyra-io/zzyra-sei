@@ -56,15 +56,32 @@ export class AIAgentHandler implements BlockHandler {
     const userId = ctx.userId;
 
     try {
-      this.logger.log(`Starting AI Agent execution for node: ${nodeId}`);
+      this.logger.log(
+        `[AI_AGENT] Starting AI Agent execution for node: ${nodeId}`,
+      );
+      this.logger.debug(`[AI_AGENT] Execution context:`, {
+        executionId,
+        userId,
+        nodeId,
+        previousOutputs: Object.keys(ctx.previousOutputs || {}),
+      });
 
       // Parse and validate configuration
+      this.logger.log(`[AI_AGENT] Parsing configuration for node: ${nodeId}`);
       const config = this.parseConfiguration(node.data);
       if (!config) {
         throw new Error('Invalid AI Agent configuration');
       }
+      this.logger.debug(`[AI_AGENT] Configuration parsed:`, {
+        provider: config.provider.type,
+        model: config.provider.model,
+        agentName: config.agent.name,
+        userPrompt: config.agent.userPrompt.substring(0, 100) + '...',
+        selectedTools: config.selectedTools.length,
+      });
 
       // Security validation
+      this.logger.log(`[AI_AGENT] Validating security for node: ${nodeId}`);
       const securityResult = await this.securityValidator.validateExecution(
         config,
         userId,
@@ -77,20 +94,42 @@ export class AIAgentHandler implements BlockHandler {
           .join(', ');
         throw new Error(`Security violations detected: ${violations}`);
       }
+      this.logger.log(
+        `[AI_AGENT] Security validation passed for node: ${nodeId}`,
+      );
 
       // Create execution session
+      this.logger.log(
+        `[AI_AGENT] Creating execution session for node: ${nodeId}`,
+      );
       const session = await this.createExecutionSession(config, ctx);
+      this.logger.debug(`[AI_AGENT] Session created:`, {
+        sessionId: session.id,
+      });
 
       // Load selected tools
+      this.logger.log(`[AI_AGENT] Loading tools for node: ${nodeId}`);
       const tools = await this.loadTools(config.selectedTools, userId);
+      this.logger.debug(`[AI_AGENT] Tools loaded:`, {
+        toolCount: tools.length,
+        toolNames: tools.map((t) => t.name || t.id || 'unknown'),
+      });
 
       // Initialize LLM provider
+      this.logger.log(
+        `[AI_AGENT] Initializing LLM provider for node: ${nodeId}`,
+      );
       const provider = await this.llmProviderManager.getProvider(
         config.provider.type,
         config.provider,
       );
+      this.logger.debug(`[AI_AGENT] LLM provider initialized:`, {
+        providerType: config.provider.type,
+        model: config.provider.model,
+      });
 
       // Execute AI agent
+      this.logger.log(`[AI_AGENT] Executing agent for node: ${nodeId}`);
       const result = await this.executeAgent(
         session,
         provider,
@@ -98,37 +137,96 @@ export class AIAgentHandler implements BlockHandler {
         config,
         userId,
       );
-
-      // Log execution completion
-      await this.logExecution(executionId, nodeId, {
-        status: 'completed',
-        duration: Date.now() - startTime,
-        result: (result as any).text || (result as any).content,
-        steps: (result as any).steps?.length || 0,
-        toolCalls: (result as any).toolCalls?.length || 0,
+      this.logger.debug(`[AI_AGENT] Agent execution completed:`, {
+        resultType: typeof result,
+        hasText: !!(result as any).text,
+        hasContent: !!(result as any).content,
+        resultLength:
+          (result as any).text?.length || (result as any).content?.length || 0,
       });
 
-      return {
-        success: true,
+      // Log execution completion
+      this.logger.log(
+        `[AI_AGENT] Logging execution completion for node: ${nodeId}`,
+      );
+      await this.logExecution(executionId, nodeId, {
+        status: 'completed',
         result: (result as any).text || (result as any).content,
+        steps: (result as any).steps?.length || 0,
+        userId,
+        provider: config.provider.type,
+        model: config.provider.model,
+        agentConfig: config.agent,
+        toolsConfig: config.selectedTools,
+        executionConfig: config.execution,
+        thinkingSteps: (result as any).steps || [],
+        toolCalls: (result as any).toolCalls || [],
+        securityViolations: [],
+        performanceMetrics: {
+          totalSteps: (result as any).steps?.length || 0,
+          totalToolCalls: (result as any).toolCalls?.length || 0,
+        },
+        startedAt: new Date(startTime),
+        executionTimeMs: Date.now() - startTime,
+      });
+
+      // Structure the output for easy template consumption
+      const processedResult =
+        (result as any).text || (result as any).content || result;
+
+      const output = {
+        success: true,
+        result: processedResult,
+        response: processedResult, // Add 'response' field for {data.response} templates
+        data: processedResult, // Add 'data' field for generic data access
+        output: processedResult, // Add 'output' field for {previousBlock.output} templates
         steps: (result as any).steps || [],
         toolCalls: (result as any).toolCalls || [],
         executionTime: Date.now() - startTime,
         sessionId: session.id,
+        // Additional fields for template consumption
+        text: processedResult,
+        content: processedResult,
+        summary: processedResult,
       };
+
+      this.logger.log(
+        `[AI_AGENT] AI Agent execution completed successfully for node: ${nodeId}`,
+      );
+      this.logger.debug(`[AI_AGENT] Final output structure:`, {
+        success: output.success,
+        hasResponse: !!output.response,
+        hasOutput: !!output.output,
+        hasData: !!output.data,
+        responseLength: output.response?.length || 0,
+        outputKeys: Object.keys(output),
+      });
+
+      return output;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
       this.logger.error(
-        `AI Agent execution failed for node ${nodeId}: ${errorMessage}`,
+        `[AI_AGENT] AI Agent execution failed for node ${nodeId}: ${errorMessage}`,
       );
 
       // Log execution failure
       await this.logExecution(executionId, nodeId, {
         status: 'failed',
-        duration: Date.now() - startTime,
         error: errorMessage,
+        userId,
+        provider: 'unknown',
+        model: 'unknown',
+        agentConfig: {},
+        toolsConfig: [],
+        executionConfig: {},
+        thinkingSteps: [],
+        toolCalls: [],
+        securityViolations: [],
+        performanceMetrics: {},
+        startedAt: new Date(startTime),
+        executionTimeMs: Date.now() - startTime,
       });
 
       return {
@@ -278,9 +376,25 @@ export class AIAgentHandler implements BlockHandler {
     config: AIAgentConfig,
     userId: string,
   ) {
+    this.logger.log(
+      `[AI_AGENT] Starting agent execution with reasoning engine`,
+    );
+    this.logger.debug(`[AI_AGENT] Execution parameters:`, {
+      userPrompt: config.agent.userPrompt.substring(0, 100) + '...',
+      systemPrompt: config.agent.systemPrompt.substring(0, 100) + '...',
+      maxSteps: config.agent.maxSteps,
+      thinkingMode: config.agent.thinkingMode,
+      toolCount: tools.length,
+      sessionId: session.id,
+      timeout: config.execution.timeout,
+    });
+
     // Create timeout promise
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => {
+        this.logger.error(
+          `[AI_AGENT] Execution timeout after ${config.execution.timeout}ms`,
+        );
         reject(
           new Error(
             `AI Agent execution timeout after ${config.execution.timeout}ms`,
@@ -290,6 +404,7 @@ export class AIAgentHandler implements BlockHandler {
     });
 
     // Execute with reasoning engine
+    this.logger.log(`[AI_AGENT] Calling reasoning engine`);
     const executionPromise = this.reasoningEngine.execute({
       prompt: config.agent.userPrompt,
       systemPrompt: config.agent.systemPrompt,
@@ -301,16 +416,69 @@ export class AIAgentHandler implements BlockHandler {
       userId: userId,
     });
 
-    return Promise.race([executionPromise, timeoutPromise]);
+    try {
+      const result = await Promise.race([executionPromise, timeoutPromise]);
+      this.logger.log(
+        `[AI_AGENT] Reasoning engine execution completed successfully`,
+      );
+      this.logger.debug(`[AI_AGENT] Execution result:`, {
+        resultType: typeof result,
+        hasText: !!(result as any).text,
+        hasContent: !!(result as any).content,
+        resultLength:
+          (result as any).text?.length || (result as any).content?.length || 0,
+        resultKeys: Object.keys(result || {}),
+      });
+      return result;
+    } catch (error) {
+      this.logger.error(`[AI_AGENT] Reasoning engine execution failed:`, error);
+      throw error;
+    }
   }
 
   private async logExecution(executionId: string, nodeId: string, data: any) {
     try {
+      // Log to execution logger (existing)
       await this.executionLogger.logExecutionEvent(executionId, {
         level: data.status === 'completed' ? 'info' : 'error',
         message: `AI Agent execution ${data.status}`,
         node_id: nodeId,
         data,
+      });
+
+      // Log to database like EMAIL block does
+      await this.databaseService.prisma.aiAgentExecution.create({
+        data: {
+          executionId,
+          nodeId,
+          userId: data.userId || 'unknown',
+          provider: data.provider || 'unknown',
+          model: data.model || 'unknown',
+          agentConfig: data.agentConfig || {},
+          toolsConfig: data.toolsConfig || {},
+          executionConfig: data.executionConfig || {},
+          thinkingSteps: data.thinkingSteps || [],
+          toolCalls: data.toolCalls || [],
+          securityViolations: data.securityViolations || [],
+          performanceMetrics: data.performanceMetrics || {},
+          status: data.status || 'pending',
+          startedAt: data.startedAt || new Date(),
+          completedAt: data.status === 'completed' ? new Date() : null,
+          totalTokens: data.totalTokens || null,
+          executionTimeMs: data.executionTimeMs || data.duration || null,
+          result: data.result || null,
+          error: data.error || null,
+          errorCode: data.errorCode || null,
+          retryCount: data.retryCount || 0,
+        },
+      });
+
+      this.logger.debug(`[AI_AGENT] Logged execution to database:`, {
+        executionId,
+        nodeId,
+        status: data.status,
+        executionTimeMs: data.executionTimeMs || data.duration,
+        success: data.status === 'completed',
       });
     } catch (error) {
       this.logger.error(
