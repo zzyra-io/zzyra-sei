@@ -1,10 +1,9 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
-  Bot,
   ChevronRight,
   Plus,
   Settings,
@@ -16,18 +15,14 @@ import {
   Search,
   Code,
   MessageSquare,
-  Sparkles,
   Play,
   Pause,
-  RotateCcw,
   CheckCircle,
   AlertCircle,
   Clock,
 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -47,11 +42,13 @@ interface ToolNode {
   name: string;
   description: string;
   category: string;
+  type: "mcp" | "goat" | "builtin";
   icon: React.ReactNode;
   color: string;
   isConnected: boolean;
   isEnabled: boolean;
-  config?: Record<string, any>;
+  disabled?: boolean;
+  config?: Record<string, unknown>;
 }
 
 interface AIAgentData {
@@ -70,25 +67,30 @@ interface AIAgentData {
       maxTokens: number;
     };
     execution: {
-      mode: "autonomous" | "manual";
+      mode: "autonomous" | "interactive";
       timeout: number;
       saveThinking: boolean;
       requireApproval: boolean;
     };
-    selectedTools: string[];
+    selectedTools: Array<{
+      id: string;
+      name: string;
+      type: "mcp" | "goat" | "builtin";
+      config?: Record<string, unknown>;
+    }>;
   };
-  onAddComponent?: (nodeId: string, type: string, component: any) => void;
-  onUpdateConfig?: (config: any) => void;
-  getAvailableComponents?: (type: string) => any[];
+  onAddComponent?: (nodeId: string, type: string, component: unknown) => void;
+  onUpdateConfig?: (config: unknown) => void;
+  getAvailableComponents?: (type: string) => unknown[];
   status?: "idle" | "running" | "completed" | "error";
   executionProgress?: number;
-  thinkingSteps?: any[];
-  toolCalls?: any[];
+  thinkingSteps?: unknown[];
+  toolCalls?: unknown[];
 }
 
 interface AddComponentPopoverProps {
-  items: any[];
-  onSelect: (item: any) => void;
+  items: ToolNode[];
+  onSelect: (item: ToolNode) => void;
   onClose: () => void;
 }
 
@@ -122,40 +124,48 @@ const mockAvailableTools: ToolNode[] = [
     name: "PostgreSQL",
     description: "Database operations and queries",
     category: "database",
+    type: "mcp",
     icon: toolIcons.database,
     color: toolColors.database,
     isConnected: false,
     isEnabled: false,
+    disabled: false,
   },
   {
     id: "brave-search",
     name: "Web Search",
     description: "Search the web for information",
     category: "web",
+    type: "mcp",
     icon: toolIcons.search,
     color: toolColors.search,
     isConnected: false,
     isEnabled: false,
+    disabled: false,
   },
   {
     id: "filesystem",
     name: "File System",
     description: "Read and write files",
     category: "filesystem",
+    type: "mcp",
     icon: toolIcons.filesystem,
     color: toolColors.filesystem,
     isConnected: false,
     isEnabled: false,
+    disabled: false,
   },
   {
     id: "goat-blockchain",
     name: "GOAT Blockchain",
     description: "Blockchain operations and wallet management",
     category: "ai",
+    type: "goat",
     icon: toolIcons.ai,
     color: toolColors.ai,
     isConnected: false,
     isEnabled: false,
+    disabled: false,
   },
 ];
 
@@ -188,7 +198,7 @@ const AddComponentPopover = memo(
               key={item.id}
               onClick={() => onSelect(item)}
               className='w-full text-left p-3 rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-3 disabled:opacity-50 disabled:hover:bg-transparent'
-              disabled={item.disabled}>
+              disabled={item.disabled || false}>
               <div
                 className={cn(
                   "w-8 h-8 rounded-md flex items-center justify-center text-white",
@@ -224,6 +234,8 @@ export function AgentNodeComponent({
   const [connectedTools, setConnectedTools] = useState<ToolNode[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
 
+  const { updateNode } = useReactFlow();
+
   const handleAddClick = (type: string, event: React.MouseEvent) => {
     event.stopPropagation();
     setPopover(popover === type ? null : type);
@@ -233,6 +245,25 @@ export function AgentNodeComponent({
     const newTool = { ...item, isConnected: true, isEnabled: true };
     setConnectedTools((prev) => [...prev, newTool]);
     setPopover(null);
+
+    // Update the selectedTools in the config with the proper format
+    const currentSelectedTools =
+      (data.config?.selectedTools as Array<{
+        id: string;
+        name: string;
+        type: string;
+        config?: any;
+      }>) || [];
+    const newSelectedTool = {
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      config: item.config || {},
+    };
+
+    handleConfigUpdate({
+      selectedTools: [...currentSelectedTools, newSelectedTool],
+    });
   };
 
   const handleToolToggle = (toolId: string, enabled: boolean) => {
@@ -245,6 +276,72 @@ export function AgentNodeComponent({
 
   const handleRemoveTool = (toolId: string) => {
     setConnectedTools((prev) => prev.filter((tool) => tool.id !== toolId));
+
+    // Update the selectedTools in the config
+    const currentSelectedTools =
+      (data.config?.selectedTools as Array<{
+        id: string;
+        name: string;
+        type: string;
+        config?: any;
+      }>) || [];
+    const updatedSelectedTools = currentSelectedTools.filter(
+      (tool) => tool.id !== toolId
+    );
+
+    handleConfigUpdate({
+      selectedTools: updatedSelectedTools,
+    });
+  };
+
+  const handleConfigUpdate = (updates: Record<string, unknown>) => {
+    const currentConfig = (data.config as Record<string, unknown>) || {};
+
+    // Deep merge function to properly handle nested objects
+    const deepMerge = (
+      target: Record<string, unknown>,
+      source: Record<string, unknown>
+    ): Record<string, unknown> => {
+      const result = { ...target };
+
+      for (const [key, value] of Object.entries(source)) {
+        if (
+          value &&
+          typeof value === "object" &&
+          !Array.isArray(value) &&
+          result[key] &&
+          typeof result[key] === "object" &&
+          !Array.isArray(result[key])
+        ) {
+          // Recursively merge nested objects
+          result[key] = deepMerge(
+            result[key] as Record<string, unknown>,
+            value as Record<string, unknown>
+          );
+        } else {
+          // Direct assignment for primitives, arrays, or when target doesn't have the key
+          result[key] = value;
+        }
+      }
+
+      return result;
+    };
+
+    const newConfig = deepMerge(currentConfig, updates);
+
+    // Update the node data directly using React Flow
+    updateNode(id, (node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        config: newConfig,
+      },
+    }));
+
+    // Also call the callback if it exists (for backward compatibility)
+    if (data.onUpdateConfig) {
+      data.onUpdateConfig(newConfig);
+    }
   };
 
   const getStatusIcon = () => {
@@ -368,7 +465,6 @@ export function AgentNodeComponent({
                         onCheckedChange={(enabled) =>
                           handleToolToggle(tool.id, enabled)
                         }
-                        size='sm'
                       />
                       <button
                         onClick={() => handleRemoveTool(tool.id)}
@@ -397,7 +493,7 @@ export function AgentNodeComponent({
                 Thinking Process
               </h4>
               <div className='space-y-1 max-h-20 overflow-y-auto'>
-                {data.thinkingSteps.slice(-3).map((step, index) => (
+                {data.thinkingSteps.slice(-3).map((step: any, index) => (
                   <div
                     key={index}
                     className='text-xs text-gray-600 bg-gray-50 p-2 rounded'>
@@ -437,7 +533,7 @@ export function AgentNodeComponent({
                 <input
                   value={data.config?.agent?.name || ""}
                   onChange={(e) =>
-                    data.onUpdateConfig?.({
+                    handleConfigUpdate({
                       agent: { ...data.config?.agent, name: e.target.value },
                     })
                   }
@@ -451,7 +547,7 @@ export function AgentNodeComponent({
                 <Textarea
                   value={data.config?.agent?.systemPrompt || ""}
                   onChange={(e) =>
-                    data.onUpdateConfig?.({
+                    handleConfigUpdate({
                       agent: {
                         ...data.config?.agent,
                         systemPrompt: e.target.value,
@@ -469,7 +565,7 @@ export function AgentNodeComponent({
                 <Textarea
                   value={data.config?.agent?.userPrompt || ""}
                   onChange={(e) =>
-                    data.onUpdateConfig?.({
+                    handleConfigUpdate({
                       agent: {
                         ...data.config?.agent,
                         userPrompt: e.target.value,
@@ -487,7 +583,7 @@ export function AgentNodeComponent({
                 <Select
                   value={data.config?.agent?.thinkingMode || "deliberate"}
                   onValueChange={(value) =>
-                    data.onUpdateConfig?.({
+                    handleConfigUpdate({
                       agent: { ...data.config?.agent, thinkingMode: value },
                     })
                   }>
@@ -536,7 +632,6 @@ export function AgentNodeComponent({
                           handleRemoveTool(tool.id);
                         }
                       }}
-                      size='sm'
                     />
                   </div>
                 ))}
@@ -549,7 +644,7 @@ export function AgentNodeComponent({
                 <Select
                   value={data.config?.execution?.mode || "autonomous"}
                   onValueChange={(value) =>
-                    data.onUpdateConfig?.({
+                    handleConfigUpdate({
                       execution: { ...data.config?.execution, mode: value },
                     })
                   }>
@@ -558,7 +653,7 @@ export function AgentNodeComponent({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value='autonomous'>Autonomous</SelectItem>
-                    <SelectItem value='manual'>Manual Approval</SelectItem>
+                    <SelectItem value='interactive'>Interactive</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -569,14 +664,13 @@ export function AgentNodeComponent({
                   <Switch
                     checked={data.config?.execution?.saveThinking || false}
                     onCheckedChange={(checked) =>
-                      data.onUpdateConfig?.({
+                      handleConfigUpdate({
                         execution: {
                           ...data.config?.execution,
                           saveThinking: checked,
                         },
                       })
                     }
-                    size='sm'
                   />
                 </div>
 
@@ -585,14 +679,13 @@ export function AgentNodeComponent({
                   <Switch
                     checked={data.config?.execution?.requireApproval || false}
                     onCheckedChange={(checked) =>
-                      data.onUpdateConfig?.({
+                      handleConfigUpdate({
                         execution: {
                           ...data.config?.execution,
                           requireApproval: checked,
                         },
                       })
                     }
-                    size='sm'
                   />
                 </div>
               </div>
@@ -628,20 +721,22 @@ const AgentNode = memo(AgentNodeComponent);
 AgentNode.displayName = "AgentNode";
 
 // --- TOOL NODE COMPONENT ---
-export function ToolNodeComponent({ data }: { data: any }) {
+export function ToolNodeComponent({ data }: { data: Record<string, unknown> }) {
   return (
     <div className='flex flex-col items-center gap-2 group'>
       <div
         className={cn(
           "w-20 h-20 rounded-full bg-white shadow-lg border-2 flex items-center justify-center transition-all group-hover:scale-105",
-          data.color?.replace("bg-", "border-") || "border-gray-300"
+          data.color?.toString().replace("bg-", "border-") || "border-gray-300"
         )}>
         <div className='w-16 h-16 rounded-full bg-white flex items-center justify-center'>
-          {data.icon || <Settings className='w-6 h-6 text-gray-400' />}
+          {(data.icon as React.ReactNode) || (
+            <Settings className='w-6 h-6 text-gray-400' />
+          )}
         </div>
       </div>
       <p className='text-sm font-semibold text-gray-800'>
-        {data.title || "Tool"}
+        {data.title?.toString() || "Tool"}
       </p>
       <Handle
         type='target'
@@ -661,3 +756,460 @@ const ToolNode = memo(ToolNodeComponent);
 ToolNode.displayName = "ToolNode";
 
 export { AgentNode, ToolNode };
+
+// --- AI AGENT CONFIG COMPONENT ---
+export function AIAgentConfig({
+  config,
+  onChange,
+  executionStatus = "idle",
+  onTest,
+}: {
+  config: Record<string, unknown>;
+  onChange: (config: Record<string, unknown>) => void;
+  executionStatus?: "idle" | "running" | "success" | "error" | "warning";
+  executionData?: {
+    startTime?: string;
+    endTime?: string;
+    duration?: number;
+    error?: string;
+    lastResponse?: Record<string, unknown>;
+  };
+  onTest?: () => void;
+}) {
+  const [connectedTools, setConnectedTools] = useState<ToolNode[]>([]);
+  const [popover, setPopover] = useState<string | null>(null);
+
+  const handleAddClick = (type: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setPopover(popover === type ? null : type);
+  };
+
+  const handleSelect = (item: ToolNode) => {
+    const newTool = { ...item, isConnected: true, isEnabled: true };
+    setConnectedTools((prev) => [...prev, newTool]);
+    setPopover(null);
+
+    // Update the selectedTools in the config with the proper format
+    const currentSelectedTools =
+      (config.selectedTools as Array<{
+        id: string;
+        name: string;
+        type: string;
+        config?: any;
+      }>) || [];
+    const newSelectedTool = {
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      config: item.config || {},
+    };
+
+    handleConfigUpdate({
+      selectedTools: [...currentSelectedTools, newSelectedTool],
+    });
+  };
+
+  const handleRemoveTool = (toolId: string) => {
+    setConnectedTools((prev) => prev.filter((tool) => tool.id !== toolId));
+
+    // Update the selectedTools in the config
+    const currentSelectedTools =
+      (config.selectedTools as Array<{
+        id: string;
+        name: string;
+        type: string;
+        config?: any;
+      }>) || [];
+    const updatedSelectedTools = currentSelectedTools.filter(
+      (tool) => tool.id !== toolId
+    );
+
+    handleConfigUpdate({
+      selectedTools: updatedSelectedTools,
+    });
+  };
+
+  const handleConfigUpdate = (updates: Record<string, unknown>) => {
+    // Deep merge function to properly handle nested objects
+    const deepMerge = (
+      target: Record<string, unknown>,
+      source: Record<string, unknown>
+    ): Record<string, unknown> => {
+      const result = { ...target };
+
+      for (const [key, value] of Object.entries(source)) {
+        if (
+          value &&
+          typeof value === "object" &&
+          !Array.isArray(value) &&
+          result[key] &&
+          typeof result[key] === "object" &&
+          !Array.isArray(result[key])
+        ) {
+          // Recursively merge nested objects
+          result[key] = deepMerge(
+            result[key] as Record<string, unknown>,
+            value as Record<string, unknown>
+          );
+        } else {
+          // Direct assignment for primitives, arrays, or when target doesn't have the key
+          result[key] = value;
+        }
+      }
+
+      return result;
+    };
+
+    const newConfig = deepMerge(config, updates);
+    onChange(newConfig);
+  };
+
+  const getStatusIcon = () => {
+    switch (executionStatus) {
+      case "running":
+        return <Play className='w-4 h-4 text-green-500' />;
+      case "success":
+        return <CheckCircle className='w-4 h-4 text-green-500' />;
+      case "error":
+        return <AlertCircle className='w-4 h-4 text-red-500' />;
+      default:
+        return <Clock className='w-4 h-4 text-gray-400' />;
+    }
+  };
+
+  const getStatusText = () => {
+    switch (executionStatus) {
+      case "running":
+        return "Running";
+      case "success":
+        return "Completed";
+      case "error":
+        return "Error";
+      default:
+        return "Idle";
+    }
+  };
+
+  return (
+    <div className='space-y-6'>
+      {/* Status Header */}
+      <div className='flex items-center justify-between p-4 bg-gray-50 rounded-lg'>
+        <div className='flex items-center gap-3'>
+          <div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center'>
+            <Brain className='w-6 h-6 text-white' />
+          </div>
+          <div>
+            <h3 className='font-semibold text-gray-900'>AI Agent</h3>
+            <p className='text-sm text-gray-500'>AI-powered agent with tools</p>
+          </div>
+        </div>
+        <div className='flex items-center gap-2'>
+          <div className='flex items-center gap-1 text-xs text-gray-500'>
+            {getStatusIcon()}
+            <span>{getStatusText()}</span>
+          </div>
+          {onTest && (
+            <Button
+              onClick={onTest}
+              disabled={executionStatus === "running"}
+              size='sm'>
+              {executionStatus === "running" ? (
+                <Pause className='w-4 h-4' />
+              ) : (
+                <Play className='w-4 h-4' />
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Configuration Tabs */}
+      <Tabs defaultValue='agent' className='w-full'>
+        <TabsList className='grid w-full grid-cols-3'>
+          <TabsTrigger value='agent'>Agent</TabsTrigger>
+          <TabsTrigger value='tools'>Tools</TabsTrigger>
+          <TabsTrigger value='execution'>Execution</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value='agent' className='space-y-4'>
+          <div>
+            <Label htmlFor='agent-name' className='text-sm font-medium'>
+              Agent Name
+            </Label>
+            <input
+              id='agent-name'
+              value={
+                ((config.agent as Record<string, unknown>)?.name as string) ||
+                ""
+              }
+              onChange={(e) =>
+                handleConfigUpdate({
+                  agent: {
+                    ...((config.agent as Record<string, unknown>) || {}),
+                    name: e.target.value,
+                  },
+                })
+              }
+              className='w-full text-sm p-2 border border-gray-200 rounded mt-1'
+              placeholder='AI Assistant'
+            />
+          </div>
+
+          <div>
+            <Label htmlFor='system-prompt' className='text-sm font-medium'>
+              System Prompt
+            </Label>
+            <Textarea
+              id='system-prompt'
+              value={
+                ((config.agent as Record<string, unknown>)
+                  ?.systemPrompt as string) || ""
+              }
+              onChange={(e) =>
+                handleConfigUpdate({
+                  agent: {
+                    ...((config.agent as Record<string, unknown>) || {}),
+                    systemPrompt: e.target.value,
+                  },
+                })
+              }
+              className='w-full text-sm mt-1'
+              placeholder='You are a helpful AI assistant...'
+              rows={3}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor='user-prompt' className='text-sm font-medium'>
+              User Prompt
+            </Label>
+            <Textarea
+              id='user-prompt'
+              value={
+                ((config.agent as Record<string, unknown>)
+                  ?.userPrompt as string) || ""
+              }
+              onChange={(e) =>
+                handleConfigUpdate({
+                  agent: {
+                    ...((config.agent as Record<string, unknown>) || {}),
+                    userPrompt: e.target.value,
+                  },
+                })
+              }
+              className='w-full text-sm mt-1'
+              placeholder='What would you like me to help you with?'
+              rows={2}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor='thinking-mode' className='text-sm font-medium'>
+              Thinking Mode
+            </Label>
+            <Select
+              value={
+                ((config.agent as Record<string, unknown>)
+                  ?.thinkingMode as string) || "deliberate"
+              }
+              onValueChange={(value) =>
+                handleConfigUpdate({
+                  agent: {
+                    ...((config.agent as Record<string, unknown>) || {}),
+                    thinkingMode: value,
+                  },
+                })
+              }>
+              <SelectTrigger id='thinking-mode' className='w-full text-sm mt-1'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='fast'>Fast</SelectItem>
+                <SelectItem value='deliberate'>Deliberate</SelectItem>
+                <SelectItem value='collaborative'>Collaborative</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor='max-steps' className='text-sm font-medium'>
+              Max Steps
+            </Label>
+            <input
+              id='max-steps'
+              type='number'
+              value={
+                ((config.agent as Record<string, unknown>)
+                  ?.maxSteps as number) || 10
+              }
+              onChange={(e) =>
+                handleConfigUpdate({
+                  agent: {
+                    ...((config.agent as Record<string, unknown>) || {}),
+                    maxSteps: parseInt(e.target.value),
+                  },
+                })
+              }
+              className='w-full text-sm p-2 border border-gray-200 rounded mt-1'
+              min={1}
+              max={50}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value='tools' className='space-y-4'>
+          <div className='space-y-2'>
+            <div className='flex items-center justify-between'>
+              <h4 className='text-sm font-semibold'>Available Tools</h4>
+              <button
+                onClick={(e) => handleAddClick("tool", e)}
+                className='w-6 h-6 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors'
+                title='Add Tool'>
+                <Plus className='w-3 h-3 text-white' />
+              </button>
+            </div>
+            {mockAvailableTools.map((tool) => (
+              <div
+                key={tool.id}
+                className='flex items-center justify-between p-2 bg-gray-50 rounded'>
+                <div className='flex items-center gap-2'>
+                  <div
+                    className={cn(
+                      "w-6 h-6 rounded flex items-center justify-center",
+                      tool.color
+                    )}>
+                    {tool.icon}
+                  </div>
+                  <div>
+                    <div className='text-sm font-medium'>{tool.name}</div>
+                    <div className='text-xs text-gray-500'>
+                      {tool.description}
+                    </div>
+                  </div>
+                </div>
+                <Switch
+                  checked={connectedTools.some(
+                    (t) => t.id === tool.id && t.isEnabled
+                  )}
+                  onCheckedChange={(enabled) => {
+                    if (enabled) {
+                      handleSelect(tool);
+                    } else {
+                      handleRemoveTool(tool.id);
+                    }
+                  }}
+                />
+              </div>
+            ))}
+            {popover === "tool" && (
+              <AddComponentPopover
+                items={mockAvailableTools}
+                onSelect={handleSelect}
+                onClose={() => setPopover(null)}
+              />
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value='execution' className='space-y-4'>
+          <div>
+            <Label htmlFor='execution-mode' className='text-sm font-medium'>
+              Execution Mode
+            </Label>
+            <Select
+              value={
+                ((config.execution as Record<string, unknown>)
+                  ?.mode as string) || "autonomous"
+              }
+              onValueChange={(value) =>
+                handleConfigUpdate({
+                  execution: {
+                    ...((config.execution as Record<string, unknown>) || {}),
+                    mode: value,
+                  },
+                })
+              }>
+              <SelectTrigger
+                id='execution-mode'
+                className='w-full text-sm mt-1'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='autonomous'>Autonomous</SelectItem>
+                <SelectItem value='interactive'>Interactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className='space-y-2'>
+            <div className='flex items-center justify-between'>
+              <Label htmlFor='save-thinking' className='text-sm font-medium'>
+                Save Thinking Process
+              </Label>
+              <Switch
+                id='save-thinking'
+                checked={
+                  ((config.execution as Record<string, unknown>)
+                    ?.saveThinking as boolean) || false
+                }
+                onCheckedChange={(checked) =>
+                  handleConfigUpdate({
+                    execution: {
+                      ...((config.execution as Record<string, unknown>) || {}),
+                      saveThinking: checked,
+                    },
+                  })
+                }
+              />
+            </div>
+
+            <div className='flex items-center justify-between'>
+              <Label htmlFor='require-approval' className='text-sm font-medium'>
+                Require Approval
+              </Label>
+              <Switch
+                id='require-approval'
+                checked={
+                  ((config.execution as Record<string, unknown>)
+                    ?.requireApproval as boolean) || false
+                }
+                onCheckedChange={(checked) =>
+                  handleConfigUpdate({
+                    execution: {
+                      ...((config.execution as Record<string, unknown>) || {}),
+                      requireApproval: checked,
+                    },
+                  })
+                }
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor='timeout' className='text-sm font-medium'>
+              Timeout (ms)
+            </Label>
+            <input
+              id='timeout'
+              type='number'
+              value={
+                ((config.execution as Record<string, unknown>)
+                  ?.timeout as number) || 120000
+              }
+              onChange={(e) =>
+                handleConfigUpdate({
+                  execution: {
+                    ...((config.execution as Record<string, unknown>) || {}),
+                    timeout: parseInt(e.target.value),
+                  },
+                })
+              }
+              className='w-full text-sm p-2 border border-gray-200 rounded mt-1'
+              min={1000}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

@@ -83,28 +83,28 @@ export function useExecutionWebSocket({
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 3;
 
   useEffect(() => {
-    if (!executionId) return;
-
-    const workerUrl = config.workerUrl;
-
-    // Check if worker URL is available - allow localhost for development
-    if (!workerUrl) {
-      console.warn("Worker URL not configured, skipping WebSocket connection");
-      setConnectionError("Worker service not available");
+    if (!executionId) {
       return;
     }
 
-    // Create socket connection to execution namespace
-    const socketUrl = workerUrl;
-    const socket = io(`${socketUrl}/execution`, {
-      transports: ["websocket", "polling"],
-      timeout: 5000, // Reduced timeout for faster failure detection
-      retries: 2, // Reduced retries for faster fallback
-      forceNew: true, // Force new connection for each execution
-      reconnection: false, // Disable reconnection to fail fast
-      reconnectionAttempts: 0,
+    // Clear any existing reconnection attempts
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    // Reset reconnection attempts for new execution
+    reconnectAttemptsRef.current = 0;
+
+    const socket = io(process.env.NEXT_PUBLIC_WORKER_WS_URL || "ws://localhost:3001", {
+      transports: ["websocket"],
+      timeout: 5000,
+      forceNew: true,
     });
 
     socketRef.current = socket;
@@ -114,6 +114,7 @@ export function useExecutionWebSocket({
       console.log("WebSocket connected for execution monitoring");
       setIsConnected(true);
       setConnectionError(null);
+      reconnectAttemptsRef.current = 0; // Reset attempts on successful connection
 
       // Subscribe to execution updates
       socket.emit("subscribe_execution", { executionId });
@@ -122,9 +123,21 @@ export function useExecutionWebSocket({
     socket.on("disconnect", (reason) => {
       console.log("WebSocket disconnected:", reason);
       setIsConnected(false);
-      if (reason === "io server disconnect") {
-        // Server disconnected, try to reconnect
-        socket.connect();
+      
+      // Only attempt reconnection if we haven't exceeded max attempts
+      if (reason === "io server disconnect" && reconnectAttemptsRef.current < maxReconnectAttempts) {
+        reconnectAttemptsRef.current++;
+        console.log(`Attempting reconnection ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`);
+        
+        // Add delay before reconnecting to prevent rapid reconnection loops
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (socketRef.current) {
+            socketRef.current.connect();
+          }
+        }, 1000 * reconnectAttemptsRef.current); // Exponential backoff
+      } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+        console.log("Max reconnection attempts reached");
+        setConnectionError("Connection lost after multiple reconnection attempts");
       }
     });
 
@@ -198,6 +211,10 @@ export function useExecutionWebSocket({
 
     // Cleanup on unmount or executionId change
     return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
       if (socket) {
         socket.emit("unsubscribe_execution", { executionId });
         socket.disconnect();
@@ -217,6 +234,7 @@ export function useExecutionWebSocket({
   // Method to manually reconnect
   const reconnect = () => {
     if (socketRef.current) {
+      reconnectAttemptsRef.current = 0; // Reset attempts for manual reconnection
       socketRef.current.connect();
     }
   };

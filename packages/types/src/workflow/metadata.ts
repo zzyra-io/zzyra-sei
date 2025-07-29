@@ -34,21 +34,22 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
     icon: "brain",
     defaultConfig: {
       provider: {
-        type: 'openrouter',
-        model: 'openai/gpt-4o-mini',
+        type: "openrouter",
+        model: "openai/gpt-4o-mini",
         temperature: 0.7,
         maxTokens: 2000,
       },
       agent: {
-        name: 'AI Assistant',
-        systemPrompt: 'You are a helpful AI assistant with access to various tools.',
-        userPrompt: '',
+        name: "AI Assistant",
+        systemPrompt:
+          "You are a helpful AI assistant with access to various tools.",
+        userPrompt: "",
         maxSteps: 10,
-        thinkingMode: 'deliberate',
+        thinkingMode: "deliberate",
       },
       selectedTools: [],
       execution: {
-        mode: 'autonomous',
+        mode: "autonomous",
         timeout: 120000,
         requireApproval: false,
         saveThinking: true,
@@ -78,9 +79,9 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
     category: NodeCategory.ACTION,
     icon: "mail",
     defaultConfig: {
-      to: "",
-      subject: "",
-      body: "",
+      to: "recipient@example.com",
+      subject: "Email Notification",
+      body: "This is an email notification from your workflow.",
     },
   },
 

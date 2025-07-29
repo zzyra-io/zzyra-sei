@@ -45,8 +45,8 @@ class LogsService {
   async getExecutionLogs(executionId: string): Promise<UnifiedLog[]> {
     try {
       // Fetch execution details which includes executionLogs
-      const response = await fetch(`/api/executions/${executionId}/complete`);
-      if (!response.ok) {
+      const response = await api.get(`/executions/${executionId}/complete`);
+      if (response.status !== 200) {
         if (response.status === 404) {
           console.warn(`Execution ${executionId} not found`);
           return [];
@@ -54,7 +54,7 @@ class LogsService {
         throw new Error(`Failed to fetch execution: ${response.statusText}`);
       }
 
-      const execution = await response.json();
+      const execution = response.data;
       const executionLogs = execution.executionLogs || [];
       const nodeExecutions = execution.nodeExecutions || [];
 
@@ -118,8 +118,8 @@ class LogsService {
   async getExecutionLevelLogs(executionId: string): Promise<ExecutionLog[]> {
     try {
       // Use the authenticated endpoint instead of public
-      const response = await fetch(`/api/executions/${executionId}/complete`);
-      if (!response.ok) {
+      const response = await api.get(`/executions/${executionId}/complete`);
+      if (response.status !== 200) {
         if (response.status === 404) {
           console.warn(`Execution ${executionId} not found`);
           return [];
@@ -127,7 +127,7 @@ class LogsService {
         throw new Error(`Failed to fetch execution: ${response.statusText}`);
       }
 
-      const execution = await response.json();
+      const execution = response.data;
       const executionLogs = execution.executionLogs || [];
 
       return executionLogs.map((log: ApiLog) => ({

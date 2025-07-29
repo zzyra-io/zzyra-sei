@@ -972,7 +972,6 @@ export default function BuilderPage() {
   );
 
   // Validation (example) - with null check to prevent errors during drag operations
-  console.log("nodes", nodes);
   const hasInvalidConfig = Array.isArray(nodes)
     ? nodes.some((node) => !node.data?.isValid)
     : false;

@@ -480,13 +480,15 @@ export default function CircularNode({ id, data }: NodeProps<NodeData>) {
 
           <Handle
             type='target'
-            position={Position.Top}
-            className='!bg-transparent !border-none w-full !h-1/2 !-top-1/4'
+            position={Position.Left}
+            className='!bg-blue-500 !border-2 !border-white !w-3 !h-3 !-top-1.5 hover:!bg-blue-600 hover:!scale-125 transition-all duration-200'
+            style={{ zIndex: 10 }}
           />
           <Handle
             type='source'
-            position={Position.Bottom}
-            className='!bg-transparent !border-none w-full !h-1/2 !-bottom-1/4'
+            position={Position.Right}
+            className='!bg-green-500 !border-2 !border-white !w-3 !h-3 !-bottom-1.5 hover:!bg-green-600 hover:!scale-125 transition-all duration-200'
+            style={{ zIndex: 10 }}
           />
         </div>
       </HoverCardTrigger>

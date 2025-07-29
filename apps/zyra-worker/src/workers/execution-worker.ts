@@ -27,7 +27,7 @@ export enum ExecutionErrorType {
   CIRCUIT_BREAKER_ERROR = 'circuit_breaker_error',
   RESOURCE_ERROR = 'resource_error',
   QUOTA_EXCEEDED_ERROR = 'quota_exceeded_error',
-  UNKNOWN_ERROR = 'unknown_error'
+  UNKNOWN_ERROR = 'unknown_error',
 }
 
 export class EnhancedExecutionError extends Error {
@@ -41,7 +41,7 @@ export class EnhancedExecutionError extends Error {
     message: string,
     isRetryable = false,
     retryDelay = 1000,
-    context: Record<string, any> = {}
+    context: Record<string, any> = {},
   ) {
     super(message);
     this.type = type;
@@ -97,63 +97,80 @@ export class ExecutionWorker implements OnModuleInit {
    */
   private classifyError(error: any): EnhancedExecutionError {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     // Network errors
-    if (errorMessage.includes('fetch failed') || errorMessage.includes('ENOTFOUND') || 
-        errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ETIMEDOUT')) {
+    if (
+      errorMessage.includes('fetch failed') ||
+      errorMessage.includes('ENOTFOUND') ||
+      errorMessage.includes('ECONNREFUSED') ||
+      errorMessage.includes('ETIMEDOUT')
+    ) {
       return new EnhancedExecutionError(
         ExecutionErrorType.NETWORK_ERROR,
         errorMessage,
         true, // Retryable
         2000, // 2 second delay
-        { originalError: error }
+        { originalError: error },
       );
     }
 
     // Rate limit errors
-    if (errorMessage.includes('rate limit') || errorMessage.includes('429') || 
-        errorMessage.includes('too many requests')) {
+    if (
+      errorMessage.includes('rate limit') ||
+      errorMessage.includes('429') ||
+      errorMessage.includes('too many requests')
+    ) {
       return new EnhancedExecutionError(
         ExecutionErrorType.RATE_LIMIT_ERROR,
         errorMessage,
         true, // Retryable
         5000, // 5 second delay for rate limits
-        { originalError: error }
+        { originalError: error },
       );
     }
 
     // Authentication errors
-    if (errorMessage.includes('unauthorized') || errorMessage.includes('401') || 
-        errorMessage.includes('403') || errorMessage.includes('invalid token')) {
+    if (
+      errorMessage.includes('unauthorized') ||
+      errorMessage.includes('401') ||
+      errorMessage.includes('403') ||
+      errorMessage.includes('invalid token')
+    ) {
       return new EnhancedExecutionError(
         ExecutionErrorType.AUTHENTICATION_ERROR,
         errorMessage,
         false, // Not retryable
         0,
-        { originalError: error }
+        { originalError: error },
       );
     }
 
     // Configuration errors
-    if (errorMessage.includes('missing') || errorMessage.includes('required') || 
-        errorMessage.includes('invalid configuration')) {
+    if (
+      errorMessage.includes('missing') ||
+      errorMessage.includes('required') ||
+      errorMessage.includes('invalid configuration')
+    ) {
       return new EnhancedExecutionError(
         ExecutionErrorType.CONFIGURATION_ERROR,
         errorMessage,
         false, // Not retryable
         0,
-        { originalError: error }
+        { originalError: error },
       );
     }
 
     // Quota exceeded errors
-    if (errorMessage.includes('quota exceeded') || errorMessage.includes('limit exceeded')) {
+    if (
+      errorMessage.includes('quota exceeded') ||
+      errorMessage.includes('limit exceeded')
+    ) {
       return new EnhancedExecutionError(
         ExecutionErrorType.QUOTA_EXCEEDED_ERROR,
         errorMessage,
         false, // Not retryable
         0,
-        { originalError: error }
+        { originalError: error },
       );
     }
 
@@ -164,18 +181,21 @@ export class ExecutionWorker implements OnModuleInit {
         errorMessage,
         true, // Retryable after cooldown
         30000, // 30 second delay
-        { originalError: error }
+        { originalError: error },
       );
     }
 
     // External service errors (5xx status codes)
-    if (errorMessage.includes('HTTP 5') || errorMessage.includes('Internal Server Error')) {
+    if (
+      errorMessage.includes('HTTP 5') ||
+      errorMessage.includes('Internal Server Error')
+    ) {
       return new EnhancedExecutionError(
         ExecutionErrorType.EXTERNAL_SERVICE_ERROR,
         errorMessage,
         true, // Retryable
         3000, // 3 second delay
-        { originalError: error }
+        { originalError: error },
       );
     }
 
@@ -185,7 +205,7 @@ export class ExecutionWorker implements OnModuleInit {
       errorMessage,
       true, // Default to retryable
       1000, // 1 second delay
-      { originalError: error }
+      { originalError: error },
     );
   }
 
@@ -193,39 +213,43 @@ export class ExecutionWorker implements OnModuleInit {
    * Enhanced retry logic with circuit breaker integration
    */
   private async shouldRetryExecution(
-    error: EnhancedExecutionError, 
-    executionId: string, 
-    currentRetryCount: number
+    error: EnhancedExecutionError,
+    executionId: string,
+    currentRetryCount: number,
   ): Promise<{ shouldRetry: boolean; delay: number; reason: string }> {
     const maxRetries = 3;
-    
+
     // Don't retry if max retries exceeded
     if (currentRetryCount >= maxRetries) {
-      return { 
-        shouldRetry: false, 
-        delay: 0, 
-        reason: `Maximum retries (${maxRetries}) exceeded` 
+      return {
+        shouldRetry: false,
+        delay: 0,
+        reason: `Maximum retries (${maxRetries}) exceeded`,
       };
     }
 
     // Don't retry non-retryable errors
     if (!error.isRetryable) {
-      return { 
-        shouldRetry: false, 
-        delay: 0, 
-        reason: `Error type ${error.type} is not retryable` 
+      return {
+        shouldRetry: false,
+        delay: 0,
+        reason: `Error type ${error.type} is not retryable`,
       };
     }
 
     // Check circuit breaker state
-    const circuitId = this.circuitBreakerService.generateCircuitId('execution-worker', 'workflow-execution');
-    const isAllowed = await this.circuitBreakerService.isOperationAllowed(circuitId);
-    
+    const circuitId = this.circuitBreakerService.generateCircuitId(
+      'execution-worker',
+      'workflow-execution',
+    );
+    const isAllowed =
+      await this.circuitBreakerService.isOperationAllowed(circuitId);
+
     if (!isAllowed) {
-      return { 
-        shouldRetry: false, 
-        delay: 0, 
-        reason: 'Circuit breaker is OPEN' 
+      return {
+        shouldRetry: false,
+        delay: 0,
+        reason: 'Circuit breaker is OPEN',
       };
     }
 
@@ -235,10 +259,10 @@ export class ExecutionWorker implements OnModuleInit {
     const jitter = Math.random() * 1000; // Add up to 1 second jitter
     const delay = Math.min(baseDelay * backoffMultiplier + jitter, 30000); // Max 30 seconds
 
-    return { 
-      shouldRetry: true, 
-      delay, 
-      reason: `Retrying ${error.type} after ${delay}ms delay` 
+    return {
+      shouldRetry: true,
+      delay,
+      reason: `Retrying ${error.type} after ${delay}ms delay`,
     };
   }
 
@@ -256,13 +280,16 @@ export class ExecutionWorker implements OnModuleInit {
         this.logger.log(
           `📥 Processing execution message: ${message.executionId}`,
         );
-        
+
         // Record execution attempt in circuit breaker
-        const circuitId = this.circuitBreakerService.generateCircuitId('execution-worker', 'workflow-execution');
-        
+        const circuitId = this.circuitBreakerService.generateCircuitId(
+          'execution-worker',
+          'workflow-execution',
+        );
+
         try {
           await this.processMessageFromQueue(message);
-          
+
           // Record success in circuit breaker
           await this.circuitBreakerService.recordSuccess(circuitId);
           ack(); // Acknowledge successful processing
@@ -272,7 +299,7 @@ export class ExecutionWorker implements OnModuleInit {
       } catch (err) {
         // Classify the error for better handling
         const classifiedError = this.classifyError(err);
-        
+
         this.logger.error(
           `Message processing failed (${classifiedError.type}): ${classifiedError.message}`,
           err instanceof Error ? err.stack : undefined,
@@ -280,17 +307,22 @@ export class ExecutionWorker implements OnModuleInit {
         span.recordException(err as Error);
 
         // Record failure in circuit breaker
-        const circuitId = this.circuitBreakerService.generateCircuitId('execution-worker', 'workflow-execution');
+        const circuitId = this.circuitBreakerService.generateCircuitId(
+          'execution-worker',
+          'workflow-execution',
+        );
         await this.circuitBreakerService.recordFailure(circuitId);
 
         // Enhanced retry logic
         const retryDecision = await this.shouldRetryExecution(
-          classifiedError, 
-          message.executionId, 
-          message.retryCount || 0
+          classifiedError,
+          message.executionId,
+          message.retryCount || 0,
         );
 
-        this.logger.log(`Retry decision for ${message.executionId}: ${retryDecision.reason}`);
+        this.logger.log(
+          `Retry decision for ${message.executionId}: ${retryDecision.reason}`,
+        );
 
         if (retryDecision.shouldRetry) {
           // Update retry count and publish to retry queue
@@ -298,7 +330,10 @@ export class ExecutionWorker implements OnModuleInit {
             ...message,
             retryCount: (message.retryCount || 0) + 1,
           };
-          await this.rabbitmqService.publishRetry(retryMessage, retryDecision.delay);
+          await this.rabbitmqService.publishRetry(
+            retryMessage,
+            retryDecision.delay,
+          );
           ack(); // Ack original message since we've queued retry
         } else {
           // No retry - log detailed failure information
@@ -392,9 +427,9 @@ export class ExecutionWorker implements OnModuleInit {
 
       // Create job object for processing
       const job = {
-        execution_id: executionId,
-        workflow_id: workflowId,
-        user_id: userId,
+        executionId,
+        workflowId,
+        userId,
         id: executionId,
         payload: message.payload || {},
         status: 'processing',
@@ -424,15 +459,10 @@ export class ExecutionWorker implements OnModuleInit {
 
   private async processJob(job: any): Promise<void> {
     try {
-      const {
-        execution_id: executionId,
-        workflow_id: workflowId,
-        user_id: userId,
-        payload,
-      } = job;
-      const isRetry = payload.retried === true;
-      const isResume = payload.resumed === true;
-      const resumeData = isResume ? payload.resumeData || {} : {};
+      const { executionId, workflowId, userId, payload } = job;
+      const isRetry = payload?.retried === true;
+      const isResume = payload?.resumed === true;
+      const resumeData = isResume ? payload?.resumeData || {} : {};
 
       // Get workflow using existing method
       let workflow =
@@ -451,11 +481,11 @@ export class ExecutionWorker implements OnModuleInit {
           'Monthly execution quota exceeded',
           false, // Not retryable
           0,
-          { 
-            userId, 
-            currentCount: profile.monthlyExecutionCount, 
-            quota: profile.monthlyExecutionQuota 
-          }
+          {
+            userId,
+            currentCount: profile.monthlyExecutionCount,
+            quota: profile.monthlyExecutionQuota,
+          },
         );
       }
 
@@ -491,7 +521,7 @@ export class ExecutionWorker implements OnModuleInit {
         edges,
         executionId,
         userId,
-        isResume ? payload.lastCompletedNodeId : undefined,
+        isResume ? payload?.lastCompletedNodeId : undefined,
         resumeData,
       );
 
@@ -505,8 +535,8 @@ export class ExecutionWorker implements OnModuleInit {
     } catch (error) {
       await this.errorHandler.handleJobFailure(
         error instanceof Error ? error : new Error(String(error)),
-        job.execution_id,
-        job.user_id,
+        job.executionId,
+        job.userId,
       );
     }
   }

@@ -13,6 +13,9 @@ import { DataTransformConfig } from "@/components/block-configs/data-transform-c
 import WalletListenerConfig from "@/components/block-configs/wallet-listen-config";
 import { ConditionConfig } from "@/components/block-configs/condition-config";
 
+// AI Agent config import
+import { AIAgentConfig } from "@/components/blocks/ai-agent-block";
+
 // Sei block config imports
 import SeiWalletListenerConfig from "@/components/block-configs/sei/SeiWalletListenerConfig";
 import SeiSmartContractCallConfig from "@/components/block-configs/sei/SeiSmartContractCallConfig";
@@ -69,6 +72,7 @@ blockConfigRegistry.register(BlockType.WEBHOOK, WebhookConfig);
 blockConfigRegistry.register(BlockType.DATA_TRANSFORM, DataTransformConfig);
 blockConfigRegistry.register(BlockType.WALLET_LISTEN, WalletListenerConfig);
 blockConfigRegistry.register(BlockType.CONDITION, ConditionConfig);
+blockConfigRegistry.register(BlockType.AI_AGENT, AIAgentConfig);
 
 // Register Sei blockchain block components
 blockConfigRegistry.register(
