@@ -101,9 +101,9 @@ export function ensureValidWorkflowNode(
       iconName: node.data?.iconName || metadata.iconName,
       isEnabled: node.data?.isEnabled ?? true,
       description: node.data?.description,
-      config: node.data?.config || {},
-      inputs: node.data?.inputs || [],
-      outputs: node.data?.outputs || [],
+      config: node.data?.config !== undefined ? node.data.config : {},
+      inputs: node.data?.inputs !== undefined ? node.data.inputs : [],
+      outputs: node.data?.outputs !== undefined ? node.data.outputs : [],
       // Don't spread node.data here as it might override the required fields
     },
     dragHandle: node.dragHandle || ".custom-drag-handle",

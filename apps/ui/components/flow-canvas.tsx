@@ -160,6 +160,8 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
       if (selectedNode) {
         // Extract the config from the updated data
         const { config, ...otherData } = updatedData;
+        
+        // Use the store's updateNode function directly with the latest config
         const updatedNode = {
           ...selectedNode,
           data: {
@@ -168,6 +170,14 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
             config: config || selectedNode.data.config || {},
           },
         };
+        
+        console.log("handleConfigUpdate - updating node:", {
+          nodeId: selectedNode.id,
+          oldConfig: selectedNode.data.config,
+          newConfig: config,
+          updatedNode: updatedNode
+        });
+        
         updateNode(selectedNode.id, updatedNode);
         setSelectedNode(updatedNode);
 

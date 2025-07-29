@@ -133,29 +133,34 @@ export class WorkflowsService {
       throw new NotFoundException(`Workflow with ID ${id} not found`);
     }
 
-    const workflow = await this.workflowRepository.update(id, {
+    // Update the workflow
+    const updatedWorkflow = await this.workflowRepository.update(id, {
       name: updateWorkflowDto.name,
       description: updateWorkflowDto.description,
-      nodes: updateWorkflowDto.nodes as any, // Type assertion for JSON compatibility
-      edges: updateWorkflowDto.edges as any, // Type assertion for JSON compatibility
+      nodes: updateWorkflowDto.nodes as any,
+      edges: updateWorkflowDto.edges as any,
       isPublic: updateWorkflowDto.isPublic,
-      tags: updateWorkflowDto.tags,
     });
 
-    const statistics = await this.calculateWorkflowStatistics(workflow.id);
+    // Map to DTO format
+    const statistics = await this.calculateWorkflowStatistics(
+      updatedWorkflow.id
+    );
 
     return {
-      id: workflow.id,
-      name: workflow.name,
-      description: workflow.description || undefined,
-      nodes: workflow.nodes as Record<string, unknown>[],
-      edges: workflow.edges as Record<string, unknown>[],
-      userId: workflow.userId,
-      isPublic: workflow.isPublic || false,
-      tags: workflow.tags || [],
-      createdAt: workflow.createdAt?.toISOString() || new Date().toISOString(),
-      updatedAt: workflow.updatedAt?.toISOString() || new Date().toISOString(),
-      version: workflow.version || 1,
+      id: updatedWorkflow.id,
+      name: updatedWorkflow.name,
+      description: updatedWorkflow.description || undefined,
+      nodes: updatedWorkflow.nodes as Record<string, unknown>[],
+      edges: updatedWorkflow.edges as Record<string, unknown>[],
+      userId: updatedWorkflow.userId,
+      isPublic: updatedWorkflow.isPublic || false,
+      tags: updatedWorkflow.tags || [],
+      createdAt:
+        updatedWorkflow.createdAt?.toISOString() || new Date().toISOString(),
+      updatedAt:
+        updatedWorkflow.updatedAt?.toISOString() || new Date().toISOString(),
+      version: updatedWorkflow.version || 1,
       isFavorite: false,
       statistics,
       lastRun: statistics?.lastExecutedAt,

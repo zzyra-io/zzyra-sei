@@ -241,8 +241,11 @@ class WorkflowService {
         updateData.description = workflow.description;
       if (workflow.nodes !== undefined) updateData.nodes = workflow.nodes;
       if (workflow.edges !== undefined) updateData.edges = workflow.edges;
+      if (workflow.is_public !== undefined) updateData.isPublic = workflow.is_public;
 
       const response = await api.put(`/workflows/${id}`, updateData);
+      console.log("updateData", updateData);
+      console.log("response", response);
 
       if (response.status !== 200) {
         const errorData = response.data;
@@ -250,9 +253,9 @@ class WorkflowService {
       }
 
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error updating workflow:", error);
-      throw new Error(`Failed to update workflow: ${error.message}`);
+      throw error;
     }
   }
 

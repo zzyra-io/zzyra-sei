@@ -351,8 +351,10 @@ export default function BuilderPage() {
     if (workflowId && initialId && hasUnsavedChanges && workflowName) {
       const autoSaveTimeoutId = setTimeout(async () => {
         try {
-          console.log("Auto-saving workflow with nodes:", nodes);
-          const apiNodes = prepareWorkflowNodesForApi(nodes);
+          // Get the current nodes directly from the store to ensure we have the latest state
+          const currentNodes = useWorkflowStore.getState().nodes;
+          console.log("Auto-saving workflow with nodes:", currentNodes);
+          const apiNodes = prepareWorkflowNodesForApi(currentNodes);
           console.log("Prepared nodes for API:", apiNodes);
           await workflowService.updateWorkflow(workflowId, {
             name: workflowName,
@@ -380,7 +382,6 @@ export default function BuilderPage() {
     hasUnsavedChanges,
     workflowName,
     workflowDescription,
-    nodes,
     edges,
     prepareWorkflowNodesForApi,
     toast,
@@ -574,7 +575,9 @@ export default function BuilderPage() {
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const apiNodes = prepareWorkflowNodesForApi(nodes);
+        // Get the current nodes directly from the store to ensure we have the latest state
+        const currentNodes = useWorkflowStore.getState().nodes;
+        const apiNodes = prepareWorkflowNodesForApi(currentNodes);
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
@@ -623,7 +626,6 @@ export default function BuilderPage() {
       }
     },
     [
-      nodes,
       edges,
       router,
       toast,
@@ -638,7 +640,9 @@ export default function BuilderPage() {
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const apiNodes = prepareWorkflowNodesForApi(nodes);
+        // Get the current nodes directly from the store to ensure we have the latest state
+        const currentNodes = useWorkflowStore.getState().nodes;
+        const apiNodes = prepareWorkflowNodesForApi(currentNodes);
         if (workflowId && initialId) {
           await workflowService.updateWorkflow(workflowId, {
             name,
@@ -671,7 +675,6 @@ export default function BuilderPage() {
     [
       workflowId,
       initialId,
-      nodes,
       edges,
       toast,
       setHasUnsavedChanges,

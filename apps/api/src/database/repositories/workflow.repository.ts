@@ -84,18 +84,21 @@ export class WorkflowRepository {
       description: string;
       nodes: Record<string, unknown>[];
       edges: Record<string, unknown>[];
+      isPublic: boolean;
     }>
   ): Promise<Workflow> {
-    return this.prisma.client.workflow.update({
+    const workflow = await this.prisma.client.workflow.update({
       where: { id },
       data: {
-        ...(data.name && { name: data.name }),
-        ...(data.description && { description: data.description }),
-        ...(data.nodes && { nodes: data.nodes as any }),
-        ...(data.edges && { edges: data.edges as any }),
-        updatedAt: new Date(),
+        name: data.name,
+        description: data.description,
+        nodes: data.nodes as any,
+        edges: data.edges as any,
+        isPublic: data.isPublic,
       },
     });
+
+    return workflow;
   }
 
   async delete(id: string): Promise<void> {

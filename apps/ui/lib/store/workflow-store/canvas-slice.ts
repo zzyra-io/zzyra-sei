@@ -75,6 +75,7 @@ export const createCanvasSlice: StateCreator<
 
   updateNode: (nodeId: string, updates: Partial<Node>) => {
     const { nodes, addToHistory, edges } = get();
+    
     const newNodes = nodes.map((node) => {
       if (node.id === nodeId) {
         // Deep clone to avoid React Flow immutability issues
