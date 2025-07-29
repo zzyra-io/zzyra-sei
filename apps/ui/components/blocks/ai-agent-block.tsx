@@ -1038,6 +1038,7 @@ export function AIAgentConfig({
             <input
               id='max-steps'
               type='number'
+              title='Maximum number of thinking steps'
               value={
                 ((config.agent as Record<string, unknown>)
                   ?.maxSteps as number) || 10
@@ -1192,6 +1193,7 @@ export function AIAgentConfig({
             <input
               id='timeout'
               type='number'
+              title='Execution timeout in milliseconds'
               value={
                 ((config.execution as Record<string, unknown>)
                   ?.timeout as number) || 120000

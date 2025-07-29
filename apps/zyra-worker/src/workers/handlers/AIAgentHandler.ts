@@ -149,6 +149,16 @@ export class AIAgentHandler implements BlockHandler {
       this.logger.log(
         `[AI_AGENT] Logging execution completion for node: ${nodeId}`,
       );
+
+      // Format toolCalls for logging
+      const formattedToolCallsForLog = ((result as any).toolCalls || []).map(
+        (call: any) => ({
+          name: call.name || call.tool || 'unknown',
+          parameters: call.parameters || call.args || {},
+          result: call.result || call.output || null,
+        }),
+      );
+
       await this.logExecution(executionId, nodeId, {
         status: 'completed',
         result: (result as any).text || (result as any).content,
@@ -160,11 +170,11 @@ export class AIAgentHandler implements BlockHandler {
         toolsConfig: config.selectedTools,
         executionConfig: config.execution,
         thinkingSteps: (result as any).steps || [],
-        toolCalls: (result as any).toolCalls || [],
+        toolCalls: formattedToolCallsForLog,
         securityViolations: [],
         performanceMetrics: {
           totalSteps: (result as any).steps?.length || 0,
-          totalToolCalls: (result as any).toolCalls?.length || 0,
+          totalToolCalls: formattedToolCallsForLog.length,
         },
         startedAt: new Date(startTime),
         executionTimeMs: Date.now() - startTime,
@@ -174,6 +184,15 @@ export class AIAgentHandler implements BlockHandler {
       const processedResult =
         (result as any).text || (result as any).content || result;
 
+      // Format toolCalls to match the expected schema
+      const formattedToolCalls = ((result as any).toolCalls || []).map(
+        (call: any) => ({
+          name: call.name || call.tool || 'unknown',
+          parameters: call.parameters || call.args || {},
+          result: call.result || call.output || null,
+        }),
+      );
+
       const output = {
         success: true,
         result: processedResult,
@@ -181,7 +200,7 @@ export class AIAgentHandler implements BlockHandler {
         data: processedResult, // Add 'data' field for generic data access
         output: processedResult, // Add 'output' field for {previousBlock.output} templates
         steps: (result as any).steps || [],
-        toolCalls: (result as any).toolCalls || [],
+        toolCalls: formattedToolCalls,
         executionTime: Date.now() - startTime,
         sessionId: session.id,
         // Additional fields for template consumption
@@ -222,7 +241,7 @@ export class AIAgentHandler implements BlockHandler {
         toolsConfig: [],
         executionConfig: {},
         thinkingSteps: [],
-        toolCalls: [],
+        toolCalls: [], // Empty array for failed executions
         securityViolations: [],
         performanceMetrics: {},
         startedAt: new Date(startTime),
@@ -234,33 +253,37 @@ export class AIAgentHandler implements BlockHandler {
         error: errorMessage,
         nodeId,
         executionTime: Date.now() - startTime,
+        toolCalls: [], // Ensure error case also has properly formatted toolCalls
       };
     }
   }
 
   private parseConfiguration(data: any): AIAgentConfig | null {
     try {
+      // Handle both direct data and nested config structure from UI
+      const config = data.config || data;
+
       return {
         provider: {
-          type: data.provider?.type || 'openrouter',
-          model: data.provider?.model || 'openai/gpt-4o-mini',
-          temperature: data.provider?.temperature || 0.7,
-          maxTokens: data.provider?.maxTokens || 4000,
+          type: config.provider?.type || 'openrouter',
+          model: config.provider?.model || 'openai/gpt-4o-mini',
+          temperature: config.provider?.temperature || 0.7,
+          maxTokens: config.provider?.maxTokens || 4000,
         },
         agent: {
-          name: data.agent?.name || 'AI Assistant',
+          name: config.agent?.name || 'AI Assistant',
           systemPrompt:
-            data.agent?.systemPrompt || 'You are a helpful AI assistant.',
-          userPrompt: data.agent?.userPrompt || '',
-          maxSteps: data.agent?.maxSteps || 10,
-          thinkingMode: data.agent?.thinkingMode || 'fast',
+            config.agent?.systemPrompt || 'You are a helpful AI assistant.',
+          userPrompt: config.agent?.userPrompt || '',
+          maxSteps: config.agent?.maxSteps || 10,
+          thinkingMode: config.agent?.thinkingMode || 'fast',
         },
-        selectedTools: data.selectedTools || [],
+        selectedTools: config.selectedTools || [],
         execution: {
-          mode: data.execution?.mode || 'autonomous',
-          timeout: data.execution?.timeout || this.maxExecutionTime,
-          requireApproval: data.execution?.requireApproval || false,
-          saveThinking: data.execution?.saveThinking || true,
+          mode: config.execution?.mode || 'autonomous',
+          timeout: config.execution?.timeout || this.maxExecutionTime,
+          requireApproval: config.execution?.requireApproval || false,
+          saveThinking: config.execution?.saveThinking || true,
         },
       };
     } catch (error) {
@@ -312,38 +335,86 @@ export class AIAgentHandler implements BlockHandler {
 
     for (const toolConfig of selectedTools) {
       try {
-        if (toolConfig.type === 'mcp') {
-          // For MCP tools, we need to get all tools from the server
-          this.logger.log(
-            `Loading MCP tools for user ${userId}, tool config: ${toolConfig.id}`,
-          );
-          const servers = await this.mcpServerManager.getUserServers(userId);
-          this.logger.log(`Found ${servers.length} servers for user ${userId}`);
+        this.logger.log(
+          `Loading tool: ${toolConfig.name} (${toolConfig.type}) for user ${userId}`,
+        );
 
-          for (const server of servers) {
-            // Add all tools from this server
+        if (toolConfig.type === 'mcp') {
+          // For MCP tools, we need to discover and connect to the specific server
+          const mcpTools = await this.loadMCPTools(toolConfig, userId);
+          tools.push(...mcpTools);
+        } else if (toolConfig.type === 'goat') {
+          // For GOAT tools, we'll implement this later
+          this.logger.warn(
+            `GOAT tools not yet implemented: ${toolConfig.name}`,
+          );
+        } else if (toolConfig.type === 'builtin') {
+          // For builtin tools, we'll implement this later
+          this.logger.warn(
+            `Builtin tools not yet implemented: ${toolConfig.name}`,
+          );
+        } else {
+          this.logger.warn(
+            `Unknown tool type: ${toolConfig.type} for tool: ${toolConfig.name}`,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Failed to load tool ${toolConfig.name}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    this.logger.log(`Loaded ${tools.length} tools total for user ${userId}`);
+    return tools;
+  }
+
+  private async loadMCPTools(toolConfig: any, userId: string): Promise<any[]> {
+    const tools = [];
+
+    try {
+      // Map tool IDs to MCP server configurations
+      const serverConfigs = this.getMCPServerConfigs(toolConfig.id);
+
+      for (const serverConfig of serverConfigs) {
+        this.logger.log(
+          `Connecting to MCP server: ${serverConfig.name} for tool: ${toolConfig.name}`,
+        );
+
+        try {
+          // Register the server if not already registered
+          const serverId = await this.mcpServerManager.registerServer(
+            serverConfig,
+            userId,
+          );
+
+          // Get the server and its tools
+          const server = await this.mcpServerManager.getServer(serverId);
+          if (server && server.tools) {
+            this.logger.log(
+              `Found ${server.tools.length} tools from server: ${server.name}`,
+            );
+
+            // Convert MCP tools to AI SDK function format
             for (const tool of server.tools) {
-              // Convert MCP tool to AI SDK function format
-              this.logger.log(
-                `Converting tool: ${tool.name}, schema:`,
-                JSON.stringify(tool.inputSchema, null, 2),
-              );
+              this.logger.log(`Converting MCP tool: ${tool.name}`);
+
               const aiTool = {
-                id: tool.name, // Use simple name for now
-                name: tool.name, // Also add name property for consistency
+                id: tool.name,
+                name: tool.name,
                 description: tool.description,
-                inputSchema: tool.inputSchema, // Use inputSchema for parameter extraction
-                parameters: tool.inputSchema, // Keep parameters for backwards compatibility
+                inputSchema: tool.inputSchema,
+                parameters: tool.inputSchema,
                 execute: async (args: any) => {
                   try {
                     this.logger.log(
-                      `Executing tool ${tool.name} with args:`,
+                      `Executing MCP tool ${tool.name} with args:`,
                       args,
                     );
                     return await tool.execute(args);
                   } catch (error) {
                     this.logger.error(
-                      `Tool execution failed for ${tool.name}:`,
+                      `MCP tool execution failed for ${tool.name}:`,
                       error,
                     );
                     throw error;
@@ -352,21 +423,73 @@ export class AIAgentHandler implements BlockHandler {
               };
               tools.push(aiTool);
             }
+          } else {
+            this.logger.warn(
+              `No tools found from MCP server: ${serverConfig.name}`,
+            );
           }
-
-          this.logger.log(
-            `Loaded ${tools.length} MCP tools for user ${userId}`,
+        } catch (error) {
+          this.logger.warn(
+            `Failed to connect to MCP server ${serverConfig.name}: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
-        // Add other tool types (goat, builtin) here later
-      } catch (error) {
-        this.logger.warn(
-          `Failed to load tool ${toolConfig.name}: ${error instanceof Error ? error.message : String(error)}`,
-        );
       }
+    } catch (error) {
+      this.logger.error(
+        `Failed to load MCP tools for ${toolConfig.name}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     return tools;
+  }
+
+  private getMCPServerConfigs(toolId: string): any[] {
+    // Map tool IDs to MCP server configurations
+    const serverConfigs: Record<string, any> = {
+      filesystem: {
+        name: 'filesystem-server',
+        command: 'npx',
+        args: ['@modelcontextprotocol/server-filesystem', process.cwd()],
+        env: {},
+        timeout: 30000,
+      },
+      'brave-search': {
+        name: 'brave-search-server',
+        command: 'npx',
+        args: ['@modelcontextprotocol/server-brave-search'],
+        env: {
+          BRAVE_API_KEY: process.env.BRAVE_API_KEY || 'demo-key',
+        },
+        timeout: 30000,
+      },
+      postgres: {
+        name: 'postgres-server',
+        command: 'npx',
+        args: ['@modelcontextprotocol/server-postgres'],
+        env: {
+          DATABASE_URL:
+            process.env.DATABASE_URL || 'postgresql://localhost/zyra',
+        },
+        timeout: 30000,
+      },
+      git: {
+        name: 'git-server',
+        command: 'npx',
+        args: ['@modelcontextprotocol/server-git'],
+        env: {},
+        timeout: 30000,
+      },
+    };
+
+    const config = serverConfigs[toolId];
+    if (config) {
+      return [config];
+    } else {
+      this.logger.warn(
+        `No MCP server configuration found for tool ID: ${toolId}`,
+      );
+      return [];
+    }
   }
 
   private async executeAgent(

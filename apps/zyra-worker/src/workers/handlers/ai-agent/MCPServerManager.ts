@@ -56,10 +56,25 @@ export class MCPServerManager {
       // Try to save to database, fallback to memory-only storage
       let serverRecord = { id: serverId, name: config.name };
       try {
+        // Use upsert to handle duplicate registrations
         const dbRecord = await (
           this.databaseService.prisma as any
-        ).mcpServer?.create({
-          data: {
+        ).mcpServer?.upsert({
+          where: {
+            userId_name: {
+              userId,
+              name: config.name,
+            },
+          },
+          update: {
+            command: config.command,
+            args: config.args || [],
+            env: config.env || {},
+            tools: [],
+            status: 'connected',
+            lastHealthCheck: new Date(),
+          },
+          create: {
             userId,
             name: config.name,
             command: config.command,
