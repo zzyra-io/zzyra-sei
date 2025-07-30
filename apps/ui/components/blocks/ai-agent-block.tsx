@@ -23,6 +23,7 @@ import {
   Loader2,
   Eye,
   EyeOff,
+  X,
 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { AIAgentAPI } from "@/lib/api/ai-agent";
 import { MCPServerConfig } from "@zyra/types";
+import { useWorkflowStore } from "@/lib/store/workflow-store";
 
 // Types
 interface ToolNode {
@@ -92,6 +94,9 @@ interface AIAgentData {
       name: string;
       type: "mcp" | "goat" | "builtin";
       config?: Record<string, unknown>;
+      description?: string;
+      category?: string;
+      enabled?: boolean;
     }>;
   };
   onAddComponent?: (nodeId: string, type: string, component: unknown) => void;
@@ -182,56 +187,7 @@ const useMCPServers = () => {
         );
 
         // Fallback to static tools if API fails
-        const fallbackTools: ToolNode[] = [
-          {
-            id: "postgres",
-            name: "PostgreSQL",
-            description: "Database operations and queries",
-            category: "database",
-            type: "mcp",
-            icon: toolIcons.database,
-            color: toolColors.database,
-            isConnected: false,
-            isEnabled: false,
-            disabled: false,
-          },
-          {
-            id: "brave-search",
-            name: "Web Search",
-            description: "Search the web for information",
-            category: "web",
-            type: "mcp",
-            icon: toolIcons.search,
-            color: toolColors.search,
-            isConnected: false,
-            isEnabled: false,
-            disabled: false,
-          },
-          {
-            id: "filesystem",
-            name: "File System",
-            description: "Read and write files",
-            category: "filesystem",
-            type: "mcp",
-            icon: toolIcons.filesystem,
-            color: toolColors.filesystem,
-            isConnected: false,
-            isEnabled: false,
-            disabled: false,
-          },
-          {
-            id: "goat-blockchain",
-            name: "GOAT Blockchain",
-            description: "Blockchain operations and wallet management",
-            category: "ai",
-            type: "goat",
-            icon: toolIcons.ai,
-            color: toolColors.ai,
-            isConnected: false,
-            isEnabled: false,
-            disabled: false,
-          },
-        ];
+        const fallbackTools: ToolNode[] = [];
         setAvailableTools(fallbackTools);
       } finally {
         setIsLoading(false);
@@ -332,7 +288,64 @@ export function AgentNodeComponent({
   }>({ isOpen: false, tool: null });
   const { availableTools, isLoading, error } = useMCPServers();
 
-  const { updateNode } = useReactFlow();
+  const { updateNode: reactFlowUpdateNode } = useReactFlow();
+  const { updateNode } = useWorkflowStore();
+
+  // Initialize connectedTools from config data and clean up duplicates
+  useEffect(() => {
+    console.log(
+      "useEffect triggered with selectedTools:",
+      data.config?.selectedTools
+    );
+    const selectedTools = data.config?.selectedTools || [];
+    if (selectedTools.length > 0) {
+      // Remove duplicates from selectedTools
+      const uniqueTools = selectedTools.filter(
+        (tool, index, self) => index === self.findIndex((t) => t.id === tool.id)
+      );
+
+      console.log(
+        "Original tools:",
+        selectedTools.length,
+        "Unique tools:",
+        uniqueTools.length
+      );
+
+      // If duplicates were found, update the config
+      if (uniqueTools.length !== selectedTools.length) {
+        console.log(
+          `Removed ${
+            selectedTools.length - uniqueTools.length
+          } duplicate tools from config`
+        );
+        // Only update if we're not already in the middle of an update
+        setTimeout(() => {
+          handleConfigUpdate({
+            selectedTools: uniqueTools,
+          });
+        }, 0);
+      }
+
+      // Convert selectedTools to ToolNode format
+      const toolsFromConfig = uniqueTools.map((tool) => ({
+        id: tool.id,
+        name: tool.name,
+        description: tool.description || "",
+        category: tool.category || "ai",
+        type: tool.type,
+        icon: toolIcons[tool.category || "ai"] || toolIcons.ai,
+        color: toolColors[tool.category || "ai"] || toolColors.ai,
+        isConnected: true,
+        isEnabled: tool.enabled !== false, // Default to true unless explicitly false
+        config: tool.config || {},
+      }));
+      console.log("Setting connectedTools:", toolsFromConfig);
+      setConnectedTools(toolsFromConfig);
+    } else {
+      console.log("No selectedTools found, clearing connectedTools");
+      setConnectedTools([]);
+    }
+  }, [data.config?.selectedTools]);
 
   const handleAddClick = (type: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -356,6 +369,13 @@ export function AgentNodeComponent({
   };
 
   const addToolToConfig = (tool: ToolNode, config: Record<string, unknown>) => {
+    // Check if tool already exists to prevent duplicates
+    const existingTool = connectedTools.find((t) => t.id === tool.id);
+    if (existingTool) {
+      console.log(`Tool ${tool.name} already exists, skipping duplicate`);
+      return;
+    }
+
     const newTool = { ...tool, isConnected: true, isEnabled: true, config };
     setConnectedTools((prev) => [...prev, newTool]);
 
@@ -366,12 +386,30 @@ export function AgentNodeComponent({
         name: string;
         type: string;
         config?: Record<string, unknown>;
+        description?: string;
+        category?: string;
+        enabled?: boolean;
       }>) || [];
+
+    // Check if tool already exists in config to prevent duplicates
+    const toolExistsInConfig = currentSelectedTools.some(
+      (t) => t.id === tool.id
+    );
+    if (toolExistsInConfig) {
+      console.log(
+        `Tool ${tool.name} already exists in config, skipping duplicate`
+      );
+      return;
+    }
+
     const newSelectedTool = {
       id: tool.id,
       name: tool.name,
       type: tool.type,
       config: config || {},
+      description: tool.description,
+      category: tool.category,
+      enabled: true,
     };
 
     handleConfigUpdate({
@@ -392,15 +430,55 @@ export function AgentNodeComponent({
   };
 
   const handleToolToggle = (toolId: string, enabled: boolean) => {
-    setConnectedTools((prev) =>
-      prev.map((tool) =>
-        tool.id === toolId ? { ...tool, isEnabled: enabled } : tool
-      )
+    console.log(
+      "handleToolToggle called with toolId:",
+      toolId,
+      "enabled:",
+      enabled
     );
+    console.log("Current connectedTools before toggle:", connectedTools);
+
+    setConnectedTools((prev) => {
+      const updated = prev.map((tool) =>
+        tool.id === toolId ? { ...tool, isEnabled: enabled } : tool
+      );
+      console.log("ConnectedTools after toggle:", updated);
+      return updated;
+    });
+
+    // Update the selectedTools in the config to reflect the enabled state
+    const currentSelectedTools =
+      (data.config?.selectedTools as Array<{
+        id: string;
+        name: string;
+        type: string;
+        config?: Record<string, unknown>;
+        enabled?: boolean;
+      }>) || [];
+    console.log(
+      "Current selectedTools in config before toggle:",
+      currentSelectedTools
+    );
+
+    const updatedSelectedTools = currentSelectedTools.map((tool) =>
+      tool.id === toolId ? { ...tool, enabled } : tool
+    );
+    console.log("Updated selectedTools after toggle:", updatedSelectedTools);
+
+    handleConfigUpdate({
+      selectedTools: updatedSelectedTools,
+    });
   };
 
   const handleRemoveTool = (toolId: string) => {
-    setConnectedTools((prev) => prev.filter((tool) => tool.id !== toolId));
+    console.log("handleRemoveTool called with toolId:", toolId);
+    console.log("Current connectedTools before removal:", connectedTools);
+
+    setConnectedTools((prev) => {
+      const filtered = prev.filter((tool) => tool.id !== toolId);
+      console.log("ConnectedTools after filtering:", filtered);
+      return filtered;
+    });
 
     // Update the selectedTools in the config
     const currentSelectedTools =
@@ -409,10 +487,16 @@ export function AgentNodeComponent({
         name: string;
         type: string;
         config?: Record<string, unknown>;
+        description?: string;
+        category?: string;
+        enabled?: boolean;
       }>) || [];
+    console.log("Current selectedTools in config:", currentSelectedTools);
+
     const updatedSelectedTools = currentSelectedTools.filter(
       (tool) => tool.id !== toolId
     );
+    console.log("Updated selectedTools after filtering:", updatedSelectedTools);
 
     handleConfigUpdate({
       selectedTools: updatedSelectedTools,
@@ -422,46 +506,56 @@ export function AgentNodeComponent({
   const handleConfigUpdate = (updates: Record<string, unknown>) => {
     const currentConfig = (data.config as Record<string, unknown>) || {};
 
-    // Deep merge function to properly handle nested objects
-    const deepMerge = (
-      target: Record<string, unknown>,
-      source: Record<string, unknown>
-    ): Record<string, unknown> => {
-      const result = { ...target };
+    // Special handling for selectedTools - always replace, never merge
+    let newConfig: Record<string, unknown>;
 
-      for (const [key, value] of Object.entries(source)) {
-        if (
-          value &&
-          typeof value === "object" &&
-          !Array.isArray(value) &&
-          result[key] &&
-          typeof result[key] === "object" &&
-          !Array.isArray(result[key])
-        ) {
-          // Recursively merge nested objects
-          result[key] = deepMerge(
-            result[key] as Record<string, unknown>,
-            value as Record<string, unknown>
-          );
-        } else {
-          // Direct assignment for primitives, arrays, or when target doesn't have the key
-          result[key] = value;
+    if (updates.selectedTools !== undefined) {
+      // For selectedTools, always replace the entire array
+      newConfig = {
+        ...currentConfig,
+        selectedTools: updates.selectedTools,
+      };
+    } else {
+      // Deep merge function to properly handle nested objects for other properties
+      const deepMerge = (
+        target: Record<string, unknown>,
+        source: Record<string, unknown>
+      ): Record<string, unknown> => {
+        const result = { ...target };
+
+        for (const [key, value] of Object.entries(source)) {
+          if (
+            value &&
+            typeof value === "object" &&
+            !Array.isArray(value) &&
+            result[key] &&
+            typeof result[key] === "object" &&
+            !Array.isArray(result[key])
+          ) {
+            // Recursively merge nested objects
+            result[key] = deepMerge(
+              result[key] as Record<string, unknown>,
+              value as Record<string, unknown>
+            );
+          } else {
+            // Direct assignment for primitives, arrays, or when target doesn't have the key
+            result[key] = value;
+          }
         }
-      }
 
-      return result;
-    };
+        return result;
+      };
 
-    const newConfig = deepMerge(currentConfig, updates);
+      newConfig = deepMerge(currentConfig, updates);
+    }
 
-    // Update the node data directly using React Flow
-    updateNode(id, (node) => ({
-      ...node,
+    // Update the node data directly using Zustand store
+    updateNode(id, {
       data: {
-        ...node.data,
+        ...data,
         config: newConfig,
       },
-    }));
+    });
 
     // Also call the callback if it exists (for backward compatibility)
     if (data.onUpdateConfig) {
@@ -564,42 +658,83 @@ export function AgentNodeComponent({
                 <Plus className='w-3 h-3 text-white' />
               </button>
             </div>
-            <div className='space-y-2'>
+            <div className='space-y-3'>
               {connectedTools.length === 0 ? (
-                <div className='text-xs text-gray-500 italic'>
-                  No tools connected
+                <div className='text-center py-6'>
+                  <div className='text-gray-400 mb-2'>
+                    <Brain className='w-8 h-8 mx-auto' />
+                  </div>
+                  <div className='text-sm text-gray-500 font-medium'>
+                    No tools connected
+                  </div>
+                  <div className='text-xs text-gray-400 mt-1'>
+                    Add tools to enhance your AI assistant
+                  </div>
                 </div>
               ) : (
-                connectedTools.map((tool) => (
-                  <div
-                    key={tool.id}
-                    className='flex items-center justify-between p-2 bg-gray-50 rounded-lg'>
-                    <div className='flex items-center gap-2'>
-                      <div
-                        className={cn(
-                          "w-6 h-6 rounded flex items-center justify-center",
-                          tool.color
-                        )}>
-                        {tool.icon}
+                <div className='space-y-2'>
+                  {connectedTools.map((tool) => (
+                    <div
+                      key={tool.id}
+                      className='group relative flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200'>
+                      <div className='flex items-start gap-3 flex-1 min-w-0'>
+                        <div
+                          className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm",
+                            tool.color
+                          )}>
+                          {tool.icon}
+                        </div>
+                        <div className='flex-1 min-w-0'>
+                          <div className='flex items-center gap-2'>
+                            <div className='text-sm font-semibold text-gray-900'>
+                              {tool.name}
+                            </div>
+                            {tool.isEnabled && (
+                              <div className='flex items-center gap-1'>
+                                <div className='w-1.5 h-1.5 bg-green-500 rounded-full'></div>
+                                <span className='text-xs text-green-600 font-medium'>
+                                  Active
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {tool.description && (
+                            <div className='text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed'>
+                              {tool.description}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <span className='text-sm font-medium'>{tool.name}</span>
+                      <div className='flex items-center gap-3 flex-shrink-0'>
+                        <Switch
+                          checked={tool.isEnabled}
+                          onCheckedChange={(enabled) => {
+                            console.log(
+                              "Switch clicked for tool:",
+                              tool.id,
+                              tool.name,
+                              "enabled:",
+                              enabled
+                            );
+                            handleToolToggle(tool.id, enabled);
+                          }}
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log("Removing tool:", tool.id, tool.name);
+                            handleRemoveTool(tool.id);
+                          }}
+                          className='w-7 h-7 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100'
+                          title='Remove Tool'>
+                          <X className='w-4 h-4' />
+                        </button>
+                      </div>
                     </div>
-                    <div className='flex items-center gap-2'>
-                      <Switch
-                        checked={tool.isEnabled}
-                        onCheckedChange={(enabled) =>
-                          handleToolToggle(tool.id, enabled)
-                        }
-                      />
-                      <button
-                        onClick={() => handleRemoveTool(tool.id)}
-                        className='w-4 h-4 text-gray-400 hover:text-red-500 transition-colors'
-                        title='Remove Tool'>
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
             {popover === "tool" && (
@@ -932,12 +1067,60 @@ export function AIAgentConfig({
   const [popover, setPopover] = useState<string | null>(null);
   const { availableTools, isLoading, error } = useMCPServers();
 
+  // Initialize connectedTools from config data and clean up duplicates
+  useEffect(() => {
+    const selectedTools = (config.selectedTools as Array<any>) || [];
+    if (selectedTools.length > 0) {
+      // Remove duplicates from selectedTools
+      const uniqueTools = selectedTools.filter(
+        (tool: any, index: number, self: any[]) =>
+          index === self.findIndex((t: any) => t.id === tool.id)
+      );
+
+      // If duplicates were found, update the config
+      if (uniqueTools.length !== selectedTools.length) {
+        console.log(
+          `Removed ${
+            selectedTools.length - uniqueTools.length
+          } duplicate tools from config`
+        );
+        onChange({
+          ...config,
+          selectedTools: uniqueTools,
+        });
+      }
+
+      // Convert selectedTools to ToolNode format
+      const toolsFromConfig = uniqueTools.map((tool: any) => ({
+        id: tool.id,
+        name: tool.name,
+        description: tool.description || "",
+        category: tool.category || "ai",
+        type: tool.type,
+        icon: toolIcons[tool.category || "ai"] || toolIcons.ai,
+        color: toolColors[tool.category || "ai"] || toolColors.ai,
+        isConnected: true,
+        isEnabled: tool.enabled !== false, // Default to true unless explicitly false
+        config: tool.config || {},
+      }));
+      setConnectedTools(toolsFromConfig);
+    }
+  }, [config.selectedTools, onChange]);
+
   const handleAddClick = (type: string, event: React.MouseEvent) => {
     event.stopPropagation();
     setPopover(popover === type ? null : type);
   };
 
   const handleSelect = (item: ToolNode) => {
+    // Check if tool already exists to prevent duplicates
+    const existingTool = connectedTools.find((t) => t.id === item.id);
+    if (existingTool) {
+      console.log(`Tool ${item.name} already exists, skipping duplicate`);
+      setPopover(null);
+      return;
+    }
+
     const newTool = { ...item, isConnected: true, isEnabled: true };
     setConnectedTools((prev) => [...prev, newTool]);
     setPopover(null);
@@ -949,12 +1132,30 @@ export function AIAgentConfig({
         name: string;
         type: string;
         config?: Record<string, unknown>;
+        description?: string;
+        category?: string;
+        enabled?: boolean;
       }>) || [];
+
+    // Check if tool already exists in config to prevent duplicates
+    const toolExistsInConfig = currentSelectedTools.some(
+      (t) => t.id === item.id
+    );
+    if (toolExistsInConfig) {
+      console.log(
+        `Tool ${item.name} already exists in config, skipping duplicate`
+      );
+      return;
+    }
+
     const newSelectedTool = {
       id: item.id,
       name: item.name,
       type: item.type,
       config: item.config || {},
+      description: item.description,
+      category: item.category,
+      enabled: true,
     };
 
     handleConfigUpdate({
@@ -963,7 +1164,14 @@ export function AIAgentConfig({
   };
 
   const handleRemoveTool = (toolId: string) => {
-    setConnectedTools((prev) => prev.filter((tool) => tool.id !== toolId));
+    console.log("AIAgentConfig handleRemoveTool called with toolId:", toolId);
+    console.log("Current connectedTools before removal:", connectedTools);
+
+    setConnectedTools((prev) => {
+      const filtered = prev.filter((tool) => tool.id !== toolId);
+      console.log("ConnectedTools after filtering:", filtered);
+      return filtered;
+    });
 
     // Update the selectedTools in the config
     const currentSelectedTools =
@@ -972,10 +1180,16 @@ export function AIAgentConfig({
         name: string;
         type: string;
         config?: Record<string, unknown>;
+        description?: string;
+        category?: string;
+        enabled?: boolean;
       }>) || [];
+    console.log("Current selectedTools in config:", currentSelectedTools);
+
     const updatedSelectedTools = currentSelectedTools.filter(
       (tool) => tool.id !== toolId
     );
+    console.log("Updated selectedTools after filtering:", updatedSelectedTools);
 
     handleConfigUpdate({
       selectedTools: updatedSelectedTools,
@@ -983,37 +1197,49 @@ export function AIAgentConfig({
   };
 
   const handleConfigUpdate = (updates: Record<string, unknown>) => {
-    // Deep merge function to properly handle nested objects
-    const deepMerge = (
-      target: Record<string, unknown>,
-      source: Record<string, unknown>
-    ): Record<string, unknown> => {
-      const result = { ...target };
+    // Special handling for selectedTools - always replace, never merge
+    let newConfig: Record<string, unknown>;
 
-      for (const [key, value] of Object.entries(source)) {
-        if (
-          value &&
-          typeof value === "object" &&
-          !Array.isArray(value) &&
-          result[key] &&
-          typeof result[key] === "object" &&
-          !Array.isArray(result[key])
-        ) {
-          // Recursively merge nested objects
-          result[key] = deepMerge(
-            result[key] as Record<string, unknown>,
-            value as Record<string, unknown>
-          );
-        } else {
-          // Direct assignment for primitives, arrays, or when target doesn't have the key
-          result[key] = value;
+    if (updates.selectedTools !== undefined) {
+      // For selectedTools, always replace the entire array
+      newConfig = {
+        ...config,
+        selectedTools: updates.selectedTools,
+      };
+    } else {
+      // Deep merge function to properly handle nested objects for other properties
+      const deepMerge = (
+        target: Record<string, unknown>,
+        source: Record<string, unknown>
+      ): Record<string, unknown> => {
+        const result = { ...target };
+
+        for (const [key, value] of Object.entries(source)) {
+          if (
+            value &&
+            typeof value === "object" &&
+            !Array.isArray(value) &&
+            result[key] &&
+            typeof result[key] === "object" &&
+            !Array.isArray(result[key])
+          ) {
+            // Recursively merge nested objects
+            result[key] = deepMerge(
+              result[key] as Record<string, unknown>,
+              value as Record<string, unknown>
+            );
+          } else {
+            // Direct assignment for primitives, arrays, or when target doesn't have the key
+            result[key] = value;
+          }
         }
-      }
 
-      return result;
-    };
+        return result;
+      };
 
-    const newConfig = deepMerge(config, updates);
+      newConfig = deepMerge(config, updates);
+    }
+
     onChange(newConfig);
   };
 
@@ -1232,39 +1458,62 @@ export function AIAgentConfig({
                 Failed to load tools: {error}
               </div>
             ) : (
-              availableTools.map((tool) => (
-                <div
-                  key={tool.id}
-                  className='flex items-center justify-between p-2 bg-gray-50 rounded'>
-                  <div className='flex items-center gap-2'>
-                    <div
-                      className={cn(
-                        "w-6 h-6 rounded flex items-center justify-center",
-                        tool.color
-                      )}>
-                      {tool.icon}
-                    </div>
-                    <div>
-                      <div className='text-sm font-medium'>{tool.name}</div>
-                      <div className='text-xs text-gray-500'>
-                        {tool.description}
+              availableTools.map((tool) => {
+                const isConnected = connectedTools.some(
+                  (t) => t.id === tool.id && t.isEnabled
+                );
+                return (
+                  <div
+                    key={tool.id}
+                    className={`group relative flex items-center justify-between p-4 border rounded-xl shadow-sm hover:shadow-md transition-all duration-200 ${
+                      isConnected
+                        ? "bg-white border-green-200 shadow-sm"
+                        : "bg-gray-50 border-gray-200"
+                    }`}>
+                    <div className='flex items-start gap-3 flex-1 min-w-0'>
+                      <div
+                        className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm",
+                          tool.color
+                        )}>
+                        {tool.icon}
+                      </div>
+                      <div className='flex-1 min-w-0'>
+                        <div className='flex items-center gap-2'>
+                          <div className='text-sm font-semibold text-gray-900'>
+                            {tool.name}
+                          </div>
+                          {isConnected && (
+                            <div className='flex items-center gap-1'>
+                              <div className='w-1.5 h-1.5 bg-green-500 rounded-full'></div>
+                              <span className='text-xs text-green-600 font-medium'>
+                                Connected
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {tool.description && (
+                          <div className='text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed'>
+                            {tool.description}
+                          </div>
+                        )}
                       </div>
                     </div>
+                    <div className='flex-shrink-0'>
+                      <Switch
+                        checked={isConnected}
+                        onCheckedChange={(enabled) => {
+                          if (enabled) {
+                            handleSelect(tool);
+                          } else {
+                            handleRemoveTool(tool.id);
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
-                  <Switch
-                    checked={connectedTools.some(
-                      (t) => t.id === tool.id && t.isEnabled
-                    )}
-                    onCheckedChange={(enabled) => {
-                      if (enabled) {
-                        handleSelect(tool);
-                      } else {
-                        handleRemoveTool(tool.id);
-                      }
-                    }}
-                  />
-                </div>
-              ))
+                );
+              })
             )}
             {popover === "tool" && (
               <AddComponentPopover

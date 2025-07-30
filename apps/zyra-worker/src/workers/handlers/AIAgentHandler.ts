@@ -26,6 +26,9 @@ interface AIAgentConfig {
     name: string;
     type: 'mcp' | 'goat' | 'builtin';
     config?: Record<string, any>;
+    description?: string;
+    category?: string;
+    enabled?: boolean;
   }>;
   execution: {
     mode: 'autonomous' | 'supervised' | 'simulation';
@@ -263,6 +266,21 @@ export class AIAgentHandler implements BlockHandler {
       // Handle both direct data and nested config structure from UI
       const config = data.config || data;
 
+      // Filter out disabled tools - only include tools that are enabled
+      const selectedTools = (config.selectedTools || []).filter((tool: any) => {
+        // Include tool if enabled is true or undefined (default to enabled)
+        return tool.enabled !== false;
+      });
+
+      this.logger.debug(`[AI_AGENT] Parsed configuration:`, {
+        totalTools: config.selectedTools?.length || 0,
+        enabledTools: selectedTools.length,
+        toolIds: selectedTools.map((t: any) => t.id),
+        disabledTools: (config.selectedTools || [])
+          .filter((t: any) => t.enabled === false)
+          .map((t: any) => t.id),
+      });
+
       return {
         provider: {
           type: config.provider?.type || 'openrouter',
@@ -278,7 +296,7 @@ export class AIAgentHandler implements BlockHandler {
           maxSteps: config.agent?.maxSteps || 10,
           thinkingMode: config.agent?.thinkingMode || 'fast',
         },
-        selectedTools: config.selectedTools || [],
+        selectedTools: selectedTools,
         execution: {
           mode: config.execution?.mode || 'autonomous',
           timeout: config.execution?.timeout || this.maxExecutionTime,

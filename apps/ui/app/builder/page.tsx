@@ -60,6 +60,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import type { Node, Edge } from "@xyflow/react";
 import { logsService } from "@/lib/services/logs-service";
+import { DraftManager } from "@/lib/utils/draft-manager";
 
 // Simplified save state interface
 interface SaveState {
@@ -133,6 +134,7 @@ export default function BuilderPage() {
   const hasLoadedNodes = useRef(false);
   const nodesLengthRef = useRef(0);
   const justLoadedWorkflow = useRef(false);
+  const hasLoadedWorkflow = useRef(false);
 
   // Add back exit dialog state
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
@@ -142,14 +144,26 @@ export default function BuilderPage() {
     setIsClient(true);
   }, []);
 
+  // Reset workflow loaded flag when component unmounts
+  useEffect(() => {
+    return () => {
+      hasLoadedWorkflow.current = false;
+      hasLoadedNodes.current = false;
+      justLoadedWorkflow.current = false;
+    };
+  }, []);
+
   // Render a fallback during SSR or before client-side mount
 
   // Load workflow on mount if ID is provided
   useEffect(() => {
-    console.log("BuilderPage: initialId changed to:", initialId);
+    // Prevent repeated loading of the same workflow
+    if (hasLoadedWorkflow.current && workflowId === initialId) {
+      console.log("BuilderPage: Workflow already loaded, skipping:", initialId);
+      return;
+    }
 
-    // Check if we have a workflow loaded
-    const hasWorkflowId = workflowId && initialId;
+    console.log("BuilderPage: initialId changed to:", initialId);
 
     if (initialId) {
       (async () => {
@@ -169,7 +183,12 @@ export default function BuilderPage() {
             setEdges((workflow.edges || []) as Edge[]);
             setHasUnsavedChanges(false);
             hasLoadedNodes.current = true; // Mark that we have loaded nodes
+            hasLoadedWorkflow.current = true; // Mark that we have loaded this workflow
             justLoadedWorkflow.current = true; // Mark that we just loaded a workflow
+
+            // Clear any existing draft for this workflow since we loaded from server
+            DraftManager.clearDraft(workflow.id);
+
             toast({
               title: "Workflow loaded",
               description: "Your workflow has been loaded successfully.",
@@ -206,9 +225,6 @@ export default function BuilderPage() {
       );
       // Only reset if we're not in the middle of loading a workflow AND we don't have a workflowId
       // AND we don't have loaded nodes (which would indicate a loaded workflow)
-      // Note: We don't check hasWorkflowId because it depends on initialId which can be cleared
-      // Also check if we have nodes loaded as an additional safeguard
-      // And check if we just loaded a workflow to prevent immediate reset
       if (
         !isLoading &&
         !workflowId &&
@@ -220,6 +236,7 @@ export default function BuilderPage() {
           "BuilderPage: Resetting flow - no loading, no workflowId, no loaded nodes"
         );
         hasLoadedNodes.current = false; // Reset the flag
+        hasLoadedWorkflow.current = false; // Reset the workflow loaded flag
         resetFlow();
       } else {
         console.log(
@@ -227,8 +244,6 @@ export default function BuilderPage() {
           isLoading,
           "workflowId:",
           workflowId,
-          "hasWorkflowId:",
-          hasWorkflowId,
           "hasLoadedNodes:",
           hasLoadedNodes.current,
           "nodesLength:",
@@ -238,18 +253,7 @@ export default function BuilderPage() {
         );
       }
     }
-  }, [
-    initialId,
-    router,
-    toast,
-    setWorkflowId,
-    setWorkflowName,
-    setWorkflowDescription,
-    setNodes,
-    setEdges,
-    setHasUnsavedChanges,
-    setLoading,
-  ]);
+  }, [initialId, isLoading, workflowId]);
 
   // Update nodes length ref when nodes change
   useEffect(() => {
@@ -269,17 +273,15 @@ export default function BuilderPage() {
     }
   }, [searchParams, workflowId, router]);
 
-  // Draft persistence effect (only for new workflows)
+  // Draft persistence effect
   useEffect(() => {
-    if (!workflowId && hasUnsavedChanges) {
-      const draft = {
+    if (hasUnsavedChanges) {
+      DraftManager.saveDraft(workflowId, {
         nodes,
         edges,
         workflowName,
         workflowDescription,
-        lastModified: Date.now(),
-      };
-      localStorage.setItem("workflow_draft", JSON.stringify(draft));
+      });
     }
   }, [
     nodes,
@@ -290,27 +292,45 @@ export default function BuilderPage() {
     workflowId,
   ]);
 
-  // Load draft on mount if no workflowId (only for new workflows)
+  // Load draft on mount
   useEffect(() => {
-    if (!workflowId && !initialId) {
-      const draft = localStorage.getItem("workflow_draft");
+    // Don't load draft if we're currently loading a workflow
+    if (isLoading) {
+      return;
+    }
+
+    // Don't load draft if we have a workflow loaded from server
+    if (hasLoadedNodes.current && workflowId) {
+      console.log(
+        "BuilderPage: Skipping draft load - workflow already loaded from server"
+      );
+      return;
+    }
+
+    // Only load draft for new workflows (no workflowId) or if we don't have loaded nodes
+    if (!workflowId || !hasLoadedNodes.current) {
+      const draft = DraftManager.loadDraft(workflowId);
       if (draft) {
+        console.log("BuilderPage: Loading draft for workflowId:", workflowId);
         const {
           nodes: draftNodes,
           edges: draftEdges,
           workflowName: draftName,
           workflowDescription: draftDesc,
-        } = JSON.parse(draft);
+        } = draft;
+
         setNodes((draftNodes || []) as Node[]);
         setEdges((draftEdges || []) as Edge[]);
         setWorkflowName(draftName || "Untitled Workflow");
         setWorkflowDescription(draftDesc || "");
         setHasUnsavedChanges(true);
+        hasLoadedNodes.current = true; // Mark that we have loaded nodes from draft
       }
     }
   }, [
     workflowId,
     initialId,
+    isLoading,
     setNodes,
     setEdges,
     setWorkflowName,
@@ -463,8 +483,9 @@ export default function BuilderPage() {
 
     try {
       // Use the unified logs service
-      const executionLogs =
-        await logsService.getExecutionLevelLogs(executionId);
+      const executionLogs = await logsService.getExecutionLevelLogs(
+        executionId
+      );
 
       // Transform execution logs to ExecutionLog format
       const logs = executionLogs.map((log) => ({
@@ -594,7 +615,7 @@ export default function BuilderPage() {
           setSaveState((prev) => ({ ...prev, isOpen: false }));
 
           // Clear draft from localStorage
-          localStorage.removeItem("workflow_draft");
+          DraftManager.clearDraft(savedWorkflow.id);
 
           // Show success message
           toast({
@@ -654,6 +675,10 @@ export default function BuilderPage() {
           });
           setHasUnsavedChanges(false);
           setSaveState((prev) => ({ ...prev, isOpen: false }));
+
+          // Clear draft since we've successfully updated the workflow
+          DraftManager.clearDraft(workflowId);
+
           toast({
             title: "Workflow updated",
             description: "Your workflow has been updated successfully.",
@@ -707,7 +732,7 @@ export default function BuilderPage() {
           setSaveState((prev) => ({ ...prev, isOpen: false }));
 
           // Clear draft from localStorage
-          localStorage.removeItem("workflow_draft");
+          DraftManager.clearDraft(savedWorkflow.id);
 
           // Show success message
           toast({

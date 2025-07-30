@@ -440,6 +440,9 @@ const aiAgentConfigSchema = z.object({
       name: z.string(),
       type: z.enum(["mcp", "goat", "builtin"]),
       config: z.record(z.string(), z.any()),
+      description: z.string().optional(),
+      category: z.string().optional(),
+      enabled: z.boolean().optional(),
     })
   ),
   execution: z.object({
