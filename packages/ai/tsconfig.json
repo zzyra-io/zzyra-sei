@@ -9,6 +9,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*", "../ai/src/mcps/available_mcps.ts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

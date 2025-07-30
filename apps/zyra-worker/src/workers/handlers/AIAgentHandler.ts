@@ -6,6 +6,7 @@ import { LLMProviderManager } from './ai-agent/LLMProviderManager';
 import { MCPServerManager } from './ai-agent/MCPServerManager';
 import { SecurityValidator } from './ai-agent/SecurityValidator';
 import { ReasoningEngine } from './ai-agent/ReasoningEngine';
+import { defaultMCPs } from '@zyra/ai';
 
 interface AIAgentConfig {
   provider: {
@@ -527,86 +528,56 @@ export class AIAgentHandler implements BlockHandler {
       `[AI_AGENT] Getting MCP server configs for tool ID: ${toolId}`,
     );
 
-    const serverConfigs: Record<string, any> = {
-      filesystem: {
-        name: 'filesystem-server',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-filesystem', process.cwd()],
-        env: {},
-        timeout: 300000, // 5 minutes
-      },
-      'brave-search': {
-        name: 'brave-search-server',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-brave-search'],
-        env: {
-          BRAVE_API_KEY: process.env.BRAVE_API_KEY || 'demo-key',
-        },
-        timeout: 300000, // 5 minutes
-      },
-      postgres: {
-        name: 'postgres-server',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-postgres'],
-        env: {
-          DATABASE_URL:
-            process.env.DATABASE_URL || 'postgresql://localhost/zyra',
-        },
-        timeout: 300000, // 5 minutes
-      },
-      git: {
-        name: 'git-server',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-git'],
-        env: {},
-        timeout: 300000, // 5 minutes
-      },
-      weather: {
-        name: 'weather-server',
-        command: 'npx',
-        args: ['-y', 'mcp-server-weather'],
-        env: {},
-        timeout: 300000, // 5 minutes
-      },
-      time: {
-        name: 'time-server',
-        command: 'npx',
-        args: ['-y', 'mcp-server-time', '--local-timezone=America/New_York'],
-        env: {},
-        timeout: 300000, // 5 minutes
-      },
-      fetch: {
-        name: 'fetch-server',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-fetch'],
-        env: {},
-        timeout: 300000, // 5 minutes
-      },
-      puppeteer: {
-        name: 'puppeteer-server',
-        command: 'npx',
-        args: ['@modelcontextprotocol/server-puppeteer'],
-        env: {},
-        timeout: 300000, // 5 minutes
-      },
-    };
-
-    const config = serverConfigs[toolId];
-    if (config) {
-      this.logger.log(
-        `[AI_AGENT] Found MCP server config for tool ID: ${toolId}`,
-      );
-      return [config];
-    } else {
+    // Find the configuration dynamically
+    const config = defaultMCPs[toolId as keyof typeof defaultMCPs];
+    if (!config) {
       this.logger.warn(
         `[AI_AGENT] No MCP server configuration found for tool ID: ${toolId}`,
       );
       this.logger.debug(
         `[AI_AGENT] Available tool IDs:`,
-        Object.keys(serverConfigs),
+        Object.keys(defaultMCPs),
       );
       return [];
     }
+
+    // Convert centralized config to server format
+    const serverConfig = {
+      name: `${toolId}-server`,
+      command: config.connection.command,
+      args: config.connection.args,
+      env: this.getEnvironmentForTool(toolId, config),
+      timeout: 300000, // 5 minutes
+    };
+
+    return [serverConfig];
+  }
+
+  private getEnvironmentForTool(
+    toolId: string,
+    config: any,
+  ): Record<string, string> {
+    const baseEnv: Record<string, string> = {};
+
+    // Add environment variables based on tool type
+    switch (toolId) {
+      case 'goat':
+        baseEnv.WALLET_PRIVATE_KEY =
+          process.env.WALLET_PRIVATE_KEY ||
+          '0x0000000000000000000000000000000000000000000000000000000000000001';
+        baseEnv.RPC_PROVIDER_URL =
+          process.env.RPC_PROVIDER_URL || 'https://sepolia.base.org';
+        break;
+      case 'brave-search':
+        baseEnv.BRAVE_API_KEY = process.env.BRAVE_API_KEY || 'demo-key';
+        break;
+      case 'postgres':
+        baseEnv.DATABASE_URL =
+          process.env.DATABASE_URL || 'postgresql://localhost/zyra';
+        break;
+    }
+
+    return baseEnv;
   }
 
   private async executeAgent(

@@ -97,7 +97,8 @@ export class ReasoningEngine {
             params.thinkingMode = 'fast'; // Fallback to fast thinking
           }
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           this.logger.error(`Subscription check failed: ${errorMessage}`);
           params.thinkingMode = 'fast'; // Safe fallback
         }
@@ -318,100 +319,14 @@ export class ReasoningEngine {
 
       if (selectedTools.length > 0) {
         this.logger.log(
-          `Executing selected tools: ${selectedTools.join(', ')}`,
+          `Executing selected tools: ${selectedTools.map((t) => t.name).join(', ')}`,
         );
 
-        // Execute the selected tools with analytics tracking
-        const toolResults = [];
-        for (const toolEntry of selectedTools) {
-          const tool = params.tools.find((t) => t.id === toolEntry.name);
-          if (tool && tool.execute) {
-            const startTime = Date.now();
-            try {
-              this.logger.log(
-                `Executing tool: ${toolEntry.name} with parameters:`,
-                toolEntry.parameters || {},
-              );
-
-              // Check cache first
-              const cacheKey = {
-                toolName: toolEntry.name,
-                parameters: toolEntry.parameters || {},
-                userId: params.userId || 'anonymous',
-              };
-
-              let toolResult =
-                await this.cacheService.getCachedToolResult(cacheKey);
-              const fromCache = !!toolResult;
-
-              if (!toolResult) {
-                toolResult = await tool.execute(toolEntry.parameters || {});
-                // Cache successful results
-                await this.cacheService.cacheToolResult(cacheKey, toolResult);
-              }
-
-              const responseTime = Date.now() - startTime;
-              toolResults.push({
-                tool: toolEntry.name,
-                result: toolResult,
-                fromCache,
-                responseTime,
-              });
-
-              // Record analytics
-              this.toolAnalyticsService.recordToolUsage({
-                toolName: toolEntry.name,
-                userId: params.userId || 'anonymous',
-                sessionId: params.sessionId,
-                executionId: params.sessionId, // Use sessionId as executionId for now
-                parameters: toolEntry.parameters || {},
-                result: toolResult,
-                success: true,
-                responseTime,
-                context: {
-                  provider: 'unknown', // Would be passed from provider
-                  model: 'unknown', // Would be passed from provider
-                  thinkingMode: params.thinkingMode,
-                  promptHash: this.hashString(params.prompt),
-                },
-              });
-            } catch (error) {
-              const responseTime = Date.now() - startTime;
-              const errorMessage =
-                error instanceof Error ? error.message : String(error);
-
-              this.logger.error(
-                `Tool execution failed for ${toolEntry.name}:`,
-                error,
-              );
-
-              toolResults.push({
-                tool: toolEntry.name,
-                error: errorMessage,
-                responseTime,
-              });
-
-              // Record failed analytics
-              this.toolAnalyticsService.recordToolUsage({
-                toolName: toolEntry.name,
-                userId: params.userId || 'anonymous',
-                sessionId: params.sessionId,
-                executionId: params.sessionId,
-                parameters: toolEntry.parameters || {},
-                result: null,
-                success: false,
-                error: errorMessage,
-                responseTime,
-                context: {
-                  provider: 'unknown',
-                  model: 'unknown',
-                  thinkingMode: params.thinkingMode,
-                  promptHash: this.hashString(params.prompt),
-                },
-              });
-            }
-          }
-        }
+        // Execute tools with chaining support
+        const toolResults = await this.executeToolsWithChaining(
+          selectedTools,
+          params,
+        );
 
         // Process tool results and generate final response
         const finalResponse = await this.generateFinalResponse(
@@ -435,6 +350,384 @@ export class ReasoningEngine {
       toolCalls: [],
       steps: result.steps || [],
     };
+  }
+
+  /**
+   * Execute tools with chaining support - use results from previous tools as inputs to subsequent tools
+   */
+  private async executeToolsWithChaining(
+    selectedTools: { name: string; parameters?: any }[],
+    params: ReasoningParams,
+  ): Promise<any[]> {
+    const toolResults = [];
+    const previousResults = new Map<string, any>();
+
+    for (let i = 0; i < selectedTools.length; i++) {
+      const toolEntry = selectedTools[i];
+      const tool = params.tools.find((t) => t.id === toolEntry.name);
+
+      if (!tool || !tool.execute) {
+        this.logger.warn(`Tool not found or not executable: ${toolEntry.name}`);
+        continue;
+      }
+
+      const startTime = Date.now();
+
+      try {
+        // Enhance parameters with results from previous tools
+        const enhancedParameters = this.enhanceParametersWithPreviousResults(
+          toolEntry.parameters || {},
+          previousResults,
+          tool,
+          toolEntry.name,
+        );
+
+        this.logger.log(
+          `Executing tool: ${toolEntry.name} with parameters:`,
+          enhancedParameters,
+        );
+
+        // Check cache first
+        const cacheKey = {
+          toolName: toolEntry.name,
+          parameters: enhancedParameters,
+          userId: params.userId || 'anonymous',
+        };
+
+        let toolResult = await this.cacheService.getCachedToolResult(cacheKey);
+        const fromCache = !!toolResult;
+
+        if (!toolResult) {
+          toolResult = await tool.execute(enhancedParameters);
+          // Cache successful results
+          await this.cacheService.cacheToolResult(cacheKey, toolResult);
+        }
+
+        const responseTime = Date.now() - startTime;
+        const resultEntry = {
+          tool: toolEntry.name,
+          result: toolResult,
+          fromCache,
+          responseTime,
+          parameters: enhancedParameters,
+        };
+
+        toolResults.push(resultEntry);
+
+        // Store result for potential use by subsequent tools
+        previousResults.set(toolEntry.name, toolResult);
+
+        // Record analytics
+        this.toolAnalyticsService.recordToolUsage({
+          toolName: toolEntry.name,
+          userId: params.userId || 'anonymous',
+          sessionId: params.sessionId,
+          executionId: params.sessionId,
+          parameters: enhancedParameters,
+          result: toolResult,
+          success: true,
+          responseTime,
+          context: {
+            provider: 'unknown',
+            model: 'unknown',
+            thinkingMode: params.thinkingMode,
+            promptHash: this.hashString(params.prompt),
+          },
+        });
+      } catch (error) {
+        const responseTime = Date.now() - startTime;
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
+        this.logger.error(
+          `Tool execution failed for ${toolEntry.name}:`,
+          error,
+        );
+
+        toolResults.push({
+          tool: toolEntry.name,
+          error: errorMessage,
+          responseTime,
+          parameters: toolEntry.parameters || {},
+        });
+
+        // Record failed analytics
+        this.toolAnalyticsService.recordToolUsage({
+          toolName: toolEntry.name,
+          userId: params.userId || 'anonymous',
+          sessionId: params.sessionId,
+          executionId: params.sessionId,
+          parameters: toolEntry.parameters || {},
+          result: null,
+          success: false,
+          error: errorMessage,
+          responseTime,
+          context: {
+            provider: 'unknown',
+            model: 'unknown',
+            thinkingMode: params.thinkingMode,
+            promptHash: this.hashString(params.prompt),
+          },
+        });
+      }
+    }
+
+    return toolResults;
+  }
+
+  /**
+   * Enhance parameters with results from previous tool executions
+   */
+  private enhanceParametersWithPreviousResults(
+    originalParameters: any,
+    previousResults: Map<string, any>,
+    tool: any,
+    toolName: string,
+  ): any {
+    const enhancedParameters = { ...originalParameters };
+
+    // If this tool needs parameters that might come from previous tools
+    if (tool.inputSchema?.properties) {
+      for (const [paramName, paramSchema] of Object.entries(
+        tool.inputSchema.properties,
+      )) {
+        const schema = paramSchema as any;
+
+        // Check if the parameter is missing or is an invalid placeholder
+        let needsOverride = false;
+        const currentValue = enhancedParameters[paramName];
+
+        if (!currentValue) {
+          needsOverride = true;
+        } else if (typeof currentValue === 'string') {
+          // Check for invalid placeholders or poor values
+          const invalidPatterns = [
+            /^balance$/i,
+            /^placeholder$/i,
+            /^default$/i,
+            /^\[.*\]$/, // [wallet_address] style placeholders
+            /^\{.*\}$/, // {placeholder} style placeholders
+            /^`.*`$/, // `placeholder` style placeholders
+            /^".*"$/, // "placeholder" style placeholders
+            /^'.*'$/, // 'placeholder' style placeholders
+            /^retrieved_.*$/i, // retrieved_address, retrieved_value, etc.
+            /^\[.*\]`$/, // [retrieved_address]` style
+            /^\{.*\}`$/, // {retrieved_address}` style
+            /^".*"`$/, // "retrieved_address"` style
+            /^'.*'`$/, // 'retrieved_address'` style
+            /^`.*"$/, // `retrieved_address" style
+            /^`.*'$/, // `retrieved_address' style
+            /^".*`$/, // "retrieved_address` style
+            /^'.*`$/, // 'retrieved_address` style
+          ];
+
+          if (invalidPatterns.some((pattern) => pattern.test(currentValue))) {
+            this.logger.log(
+              `Detected invalid parameter value: ${currentValue}, will override`,
+            );
+            needsOverride = true;
+          }
+
+          // Special validation for addresses - but be more lenient with user-provided addresses
+          if (paramName.toLowerCase().includes('address')) {
+            // If it's a valid Ethereum address, don't override
+            if (currentValue.startsWith('0x') && currentValue.length === 42) {
+              this.logger.log(
+                `Respecting user-provided address: ${currentValue}`,
+              );
+              needsOverride = false;
+            } else if (
+              !currentValue.startsWith('0x') ||
+              currentValue.length !== 42
+            ) {
+              this.logger.log(
+                `Invalid address format: ${currentValue}, will override`,
+              );
+              needsOverride = true;
+            }
+          }
+
+          // Special validation for URLs
+          if (
+            paramName.toLowerCase().includes('url') ||
+            paramName.toLowerCase().includes('link')
+          ) {
+            if (!currentValue.startsWith('http')) {
+              needsOverride = true;
+            }
+          }
+
+          // Special validation for emails
+          if (
+            paramName.toLowerCase().includes('email') ||
+            paramName.toLowerCase().includes('mail')
+          ) {
+            if (!currentValue.includes('@')) {
+              needsOverride = true;
+            }
+          }
+        }
+
+        if (needsOverride && previousResults.size > 0) {
+          const extractedValue = this.extractValueFromPreviousResults(
+            paramName,
+            schema,
+            previousResults,
+            toolName,
+          );
+
+          if (extractedValue !== null) {
+            enhancedParameters[paramName] = extractedValue;
+            this.logger.log(
+              `Enhanced parameter ${paramName} with value from previous results: ${extractedValue}`,
+            );
+          } else {
+            // Generate intelligent default if no previous result available
+            const defaultValue = this.generateIntelligentDefault(
+              paramName,
+              schema,
+              '',
+            );
+            if (defaultValue !== null) {
+              enhancedParameters[paramName] = defaultValue;
+              this.logger.log(
+                `Generated intelligent default for ${paramName}: ${defaultValue}`,
+              );
+            }
+          }
+        } else if (needsOverride) {
+          // No previous results available, generate intelligent default
+          const defaultValue = this.generateIntelligentDefault(
+            paramName,
+            schema,
+            '',
+          );
+          if (defaultValue !== null) {
+            enhancedParameters[paramName] = defaultValue;
+            this.logger.log(
+              `Generated intelligent default for ${paramName}: ${defaultValue}`,
+            );
+          }
+        }
+      }
+    }
+
+    return enhancedParameters;
+  }
+
+  /**
+   * Extract value from previous tool results based on parameter name and schema
+   */
+  private extractValueFromPreviousResults(
+    paramName: string,
+    paramSchema: any,
+    previousResults: Map<string, any>,
+    currentToolName: string,
+  ): any {
+    // Enhanced extraction patterns for all common parameter types
+    const extractionPatterns = [
+      // For wallet addresses - look for get_address results
+      {
+        paramName: 'address',
+        sourceTools: ['get_address'],
+        extractionMethod: (result: any) => {
+          if (result?.result?.[0]?.text) {
+            const addressText = result.result[0].text;
+            return addressText.replace(/^"|"$/g, '');
+          }
+          return null;
+        },
+      },
+      // For chain information - look for get_chain results
+      {
+        paramName: 'chain',
+        sourceTools: ['get_chain'],
+        extractionMethod: (result: any) => {
+          if (result?.result?.[0]?.text) {
+            return result.result[0].text.replace(/^"|"$/g, '');
+          }
+          return null;
+        },
+      },
+      // For balance information - look for get_balance results
+      {
+        paramName: 'balance',
+        sourceTools: ['get_balance'],
+        extractionMethod: (result: any) => {
+          if (result?.result?.[0]?.text) {
+            return result.result[0].text.replace(/^"|"$/g, '');
+          }
+          return null;
+        },
+      },
+      // For message parameters - generate intelligent defaults
+      {
+        paramName: 'message',
+        sourceTools: ['*'],
+        extractionMethod: (result: any) => {
+          // Generate a meaningful message based on context
+          return 'Hello, this is a test message for signing.';
+        },
+      },
+      // For text parameters - extract from any tool result
+      {
+        paramName: 'text',
+        sourceTools: ['*'],
+        extractionMethod: (result: any) => {
+          if (result?.result?.[0]?.text) {
+            return result.result[0].text.replace(/^"|"$/g, '');
+          }
+          return null;
+        },
+      },
+      // For any string parameter - try to extract from previous results
+      {
+        paramName: 'string',
+        sourceTools: ['*'],
+        extractionMethod: (result: any) => {
+          if (result?.result?.[0]?.text) {
+            return result.result[0].text.replace(/^"|"$/g, '');
+          }
+          return null;
+        },
+      },
+    ];
+
+    // Find matching extraction pattern
+    for (const pattern of extractionPatterns) {
+      if (
+        pattern.paramName === paramName ||
+        paramName.toLowerCase().includes(pattern.paramName.toLowerCase()) ||
+        (paramSchema?.type === 'string' && pattern.paramName === 'string')
+      ) {
+        // Try to extract from any of the source tools
+        for (const sourceTool of pattern.sourceTools) {
+          for (const [toolName, result] of previousResults.entries()) {
+            if (sourceTool === '*' || toolName === sourceTool) {
+              const extractedValue = pattern.extractionMethod(result);
+              if (extractedValue !== null) {
+                return this.convertValueToType(extractedValue, paramSchema);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Fallback: try to extract any meaningful text from previous results
+    for (const [toolName, result] of previousResults.entries()) {
+      if (result?.result?.[0]?.text) {
+        const text = result.result[0].text.replace(/^"|"$/g, '');
+        if (text && text.length > 0) {
+          // Check if this text is appropriate for the parameter type
+          if (this.isValidParameterValue(text, paramName, paramSchema)) {
+            return this.convertValueToType(text, paramSchema);
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   private async generateFinalResponse(
@@ -830,123 +1123,595 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
     ];
 
     for (const pattern of explicitPatterns) {
-      const match = pattern.exec(toolContext) || pattern.exec(fullReasoning);
-      if (match) {
-        return this.convertValueToType(match[1].trim(), paramSchema);
+      const match = fullReasoning.match(pattern);
+      if (match && match[1]) {
+        const extractedValue = match[1].trim();
+        if (
+          this.isValidParameterValue(extractedValue, paramName, paramSchema)
+        ) {
+          this.logger.log(
+            `✅ Successfully extracted ${paramName}: ${extractedValue}`,
+          );
+          return this.cleanExtractedValue(
+            extractedValue,
+            paramName,
+            paramSchema,
+          );
+        }
       }
     }
 
-    // Strategy 2: Content-based extraction based on parameter name and type
+    // Strategy 2: Look for values in backticks or code blocks
+    const codePatterns = [
+      new RegExp(`\`([^\`]+)\`.*${paramName}`, 'i'),
+      new RegExp(`${paramName}.*\`([^\`]+)\``, 'i'),
+      new RegExp(`\\b${paramName}\\s*[:=]\\s*\`([^\`]+)\``, 'i'),
+    ];
+
+    for (const pattern of codePatterns) {
+      const match = fullReasoning.match(pattern);
+      if (match && match[1]) {
+        const extractedValue = match[1].trim();
+        if (
+          this.isValidParameterValue(extractedValue, paramName, paramSchema)
+        ) {
+          this.logger.log(
+            `✅ Successfully extracted ${paramName} from code: ${extractedValue}`,
+          );
+          return this.cleanExtractedValue(
+            extractedValue,
+            paramName,
+            paramSchema,
+          );
+        }
+      }
+    }
+
+    // Strategy 3: Type-based extraction for common parameter types
+    const paramNameLower = paramName.toLowerCase();
+    const paramType = paramSchema?.type || 'string';
+
+    // For addresses - look for Ethereum addresses
+    if (paramNameLower.includes('address') || paramType === 'string') {
+      const addressPattern = /0x[a-fA-F0-9]{40}/g;
+      const addresses = fullReasoning.match(addressPattern);
+      if (addresses && addresses.length > 0) {
+        const address = addresses[0];
+        if (this.isValidParameterValue(address, paramName, paramSchema)) {
+          this.logger.log(`✅ Successfully extracted ${paramName}: ${address}`);
+          return this.cleanExtractedValue(address, paramName, paramSchema);
+        }
+      }
+    }
+
+    // For URLs - look for URL patterns
+    if (paramNameLower.includes('url') || paramNameLower.includes('endpoint')) {
+      const urlPattern = /https?:\/\/[^\s]+/g;
+      const urls = fullReasoning.match(urlPattern);
+      if (urls && urls.length > 0) {
+        const url = urls[0];
+        if (this.isValidParameterValue(url, paramName, paramSchema)) {
+          this.logger.log(`✅ Successfully extracted ${paramName}: ${url}`);
+          return this.cleanExtractedValue(url, paramName, paramSchema);
+        }
+      }
+    }
+
+    // For messages - look for quoted text
+    if (paramNameLower.includes('message') || paramNameLower.includes('text')) {
+      const messagePattern = /["']([^"']+)["']/g;
+      const messages = fullReasoning.match(messagePattern);
+      if (messages && messages.length > 0) {
+        const message = messages[0].replace(/["']/g, '');
+        if (this.isValidParameterValue(message, paramName, paramSchema)) {
+          this.logger.log(`✅ Successfully extracted ${paramName}: ${message}`);
+          return this.cleanExtractedValue(message, paramName, paramSchema);
+        }
+      }
+    }
+
+    // For numbers - look for numeric values
+    if (paramType === 'number' || paramType === 'integer') {
+      const numberPattern = /\b\d+(\.\d+)?\b/g;
+      const numbers = fullReasoning.match(numberPattern);
+      if (numbers && numbers.length > 0) {
+        const number = parseFloat(numbers[0]);
+        if (
+          !isNaN(number) &&
+          this.isValidParameterValue(number.toString(), paramName, paramSchema)
+        ) {
+          this.logger.log(`✅ Successfully extracted ${paramName}: ${number}`);
+          return number;
+        }
+      }
+    }
+
+    // Strategy 4: Context-based extraction
+    const contextPatterns = [
+      new RegExp(`\\b${paramName}\\s*[:=]\\s*([^\\n,}]+)`, 'i'),
+      new RegExp(`parameter\\s+${paramName}\\s*[:=]\\s*([^\\n,}]+)`, 'i'),
+      new RegExp(`with\\s+${paramName}\\s*[:=]\\s*([^\\n,}]+)`, 'i'),
+    ];
+
+    for (const pattern of contextPatterns) {
+      const match = fullReasoning.match(pattern);
+      if (match && match[1]) {
+        const extractedValue = match[1].trim();
+        if (
+          this.isValidParameterValue(extractedValue, paramName, paramSchema)
+        ) {
+          this.logger.log(
+            `✅ Successfully extracted ${paramName}: ${extractedValue}`,
+          );
+          return this.cleanExtractedValue(
+            extractedValue,
+            paramName,
+            paramSchema,
+          );
+        }
+      }
+    }
+
+    this.logger.warn(`❌ Failed to extract parameter: ${paramName}`);
+    return null;
+  }
+
+  /**
+   * Clean extracted value by removing common artifacts
+   */
+  private cleanExtractedValue(
+    value: string,
+    paramName: string,
+    paramSchema: any,
+  ): any {
+    if (!value) return value;
+
+    let cleanedValue = value.trim();
+
+    // Remove common artifacts
+    cleanedValue = cleanedValue
+      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+      .replace(/^`|`$/g, '') // Remove surrounding backticks
+      .replace(/^\[|\]$/g, '') // Remove surrounding brackets
+      .replace(/^\{|\}$/g, '') // Remove surrounding braces
+      .replace(/^\(|\)$/g, '') // Remove surrounding parentheses
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+
+    // For addresses, ensure it's a valid Ethereum address
     if (
-      paramName.toLowerCase().includes('query') ||
-      paramName.toLowerCase().includes('sql') ||
+      paramName.toLowerCase().includes('address') &&
+      cleanedValue.startsWith('0x')
+    ) {
+      if (cleanedValue.length === 42) {
+        return cleanedValue;
+      } else {
+        this.logger.warn(`Invalid Ethereum address length: ${cleanedValue}`);
+        return null;
+      }
+    }
+
+    // For numbers, convert to appropriate type
+    if (paramSchema?.type === 'number' || paramSchema?.type === 'integer') {
+      const num = parseFloat(cleanedValue);
+      return isNaN(num) ? null : num;
+    }
+
+    return cleanedValue;
+  }
+
+  /**
+   * Extract value based on parameter type and name
+   */
+  private extractValueByType(
+    paramName: string,
+    paramSchema: any,
+    fullReasoning: string,
+    toolContext: string,
+  ): any {
+    const paramType = paramSchema?.type || 'string';
+    const paramNameLower = paramName.toLowerCase();
+
+    // SQL/Query parameters
+    if (
+      paramNameLower.includes('query') ||
+      paramNameLower.includes('sql') ||
       paramName === 'sql'
     ) {
-      // Look for SQL queries in code blocks
-      const codeBlockMatch = fullReasoning.match(
-        /```(?:sql)?\s*(SELECT|INSERT|UPDATE|DELETE|SHOW|DESCRIBE|CREATE|DROP|ALTER)[\s\S]*?```/i,
-      );
-      if (codeBlockMatch) {
-        const sqlQuery = codeBlockMatch[0]
-          .replace(/```(?:sql)?\s*/, '')
-          .replace(/```$/, '')
-          .trim();
-        this.logger.log(`Found SQL in code block: ${sqlQuery}`);
-        return sqlQuery;
-      }
+      return this.extractSQLQuery(fullReasoning);
+    }
 
-      // Look for SQL-like content anywhere in the text (only for SQL parameters)
+    // Address parameters (blockchain, email, etc.)
+    if (paramNameLower.includes('address')) {
+      return this.extractAddress(fullReasoning, paramNameLower);
+    }
+
+    // File/Path parameters
+    if (paramNameLower.includes('path') || paramNameLower.includes('file')) {
+      return this.extractFilePath(fullReasoning);
+    }
+
+    // URL parameters
+    if (paramNameLower.includes('url') || paramNameLower.includes('link')) {
+      return this.extractURL(fullReasoning);
+    }
+
+    // Message/Text parameters
+    if (paramNameLower.includes('message') || paramNameLower.includes('text')) {
+      return this.extractMessage(fullReasoning, paramNameLower);
+    }
+
+    // Number parameters
+    if (paramType === 'number' || paramType === 'integer') {
+      return this.extractNumber(fullReasoning, paramNameLower);
+    }
+
+    // Boolean parameters
+    if (paramType === 'boolean') {
+      return this.extractBoolean(fullReasoning, paramNameLower);
+    }
+
+    // String parameters - look for quoted strings or meaningful text
+    if (paramType === 'string') {
+      return this.extractString(fullReasoning, paramNameLower);
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract SQL query from reasoning text
+   */
+  private extractSQLQuery(fullReasoning: string): string | null {
+    // Look for SQL queries in code blocks
+    const codeBlockMatch = fullReasoning.match(
+      /```(?:sql)?\s*(SELECT|INSERT|UPDATE|DELETE|SHOW|DESCRIBE|CREATE|DROP|ALTER)[\s\S]*?```/i,
+    );
+    if (codeBlockMatch) {
+      const sqlQuery = codeBlockMatch[0]
+        .replace(/```(?:sql)?\s*/, '')
+        .replace(/```$/, '')
+        .trim();
+      this.logger.log(`Found SQL in code block: ${sqlQuery}`);
+      return sqlQuery;
+    }
+
+    // Look for SQL-like content anywhere in the text
+    const sqlMatch = fullReasoning.match(
+      /(SELECT|INSERT|UPDATE|DELETE|SHOW|DESCRIBE|CREATE|DROP|ALTER)[\s\S]*?(?=;|\.|$|```)/i,
+    );
+    if (sqlMatch) {
+      const sqlQuery = sqlMatch[0].trim().replace(/[;.]$/, '');
+      this.logger.log(`Found SQL statement: ${sqlQuery}`);
+      return sqlQuery;
+    }
+
+    // Look for information_schema queries specifically
+    const infoSchemaMatch = fullReasoning.match(
+      /SELECT[\s\S]*?FROM\s+information_schema[\s\S]*?(?=;|\.|$|```)/i,
+    );
+    if (infoSchemaMatch) {
+      const sqlQuery = infoSchemaMatch[0].trim().replace(/[;.]$/, '');
+      this.logger.log(`Found information_schema query: ${sqlQuery}`);
+      return sqlQuery;
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract address (blockchain, email, etc.) from reasoning text
+   */
+  private extractAddress(
+    fullReasoning: string,
+    paramNameLower: string,
+  ): string | null {
+    // Ethereum addresses
+    if (
+      paramNameLower.includes('wallet') ||
+      paramNameLower.includes('eth') ||
+      paramNameLower.includes('blockchain')
+    ) {
+      const ethAddressMatch = fullReasoning.match(/(0x[a-fA-F0-9]{40})/);
+      if (ethAddressMatch) {
+        return ethAddressMatch[1];
+      }
+    }
+
+    // Email addresses
+    if (paramNameLower.includes('email') || paramNameLower.includes('mail')) {
+      const emailMatch = fullReasoning.match(
+        /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/,
+      );
+      if (emailMatch) {
+        return emailMatch[0];
+      }
+    }
+
+    // Generic address extraction
+    const addressMatch = fullReasoning.match(/(0x[a-fA-F0-9]{40})/);
+    if (addressMatch) {
+      return addressMatch[1];
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract file path from reasoning text
+   */
+  private extractFilePath(fullReasoning: string): string | null {
+    const pathMatch = fullReasoning.match(
+      /([\/\w.-]+\.[a-zA-Z]{2,4}|\/[\w\/.-]+)/g,
+    );
+    if (pathMatch) {
+      return pathMatch[0];
+    }
+    return null;
+  }
+
+  /**
+   * Extract URL from reasoning text
+   */
+  private extractURL(fullReasoning: string): string | null {
+    const urlMatch = fullReasoning.match(/(https?:\/\/[^\s"'<>]+)/i);
+    if (urlMatch) {
+      return urlMatch[1];
+    }
+    return null;
+  }
+
+  /**
+   * Extract message/text content from reasoning text
+   */
+  private extractMessage(
+    fullReasoning: string,
+    paramNameLower: string,
+  ): string | null {
+    // Look for quoted messages
+    const quotedMatch = fullReasoning.match(/"([^"]+)"/);
+    if (quotedMatch) {
+      return quotedMatch[1];
+    }
+
+    // Look for meaningful text after "message:" or similar
+    const messageMatch = fullReasoning.match(
+      /(?:message|text)\s*[:=]\s*["']?([^"'\\n,}]+)["']?/i,
+    );
+    if (messageMatch) {
+      return messageMatch[1].trim();
+    }
+
+    // For sign_message, generate a meaningful default
+    if (paramNameLower.includes('sign')) {
+      return 'Hello, this is a test message for signing.';
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract number from reasoning text
+   */
+  private extractNumber(
+    fullReasoning: string,
+    paramNameLower: string,
+  ): number | null {
+    const numberMatch = fullReasoning.match(/\b(\d+(?:\.\d+)?)\b/);
+    if (numberMatch) {
+      return parseFloat(numberMatch[1]);
+    }
+    return null;
+  }
+
+  /**
+   * Extract boolean from reasoning text
+   */
+  private extractBoolean(
+    fullReasoning: string,
+    paramNameLower: string,
+  ): boolean | null {
+    const trueMatch = fullReasoning.match(/\b(true|yes|on|enabled)\b/i);
+    if (trueMatch) {
+      return true;
+    }
+    const falseMatch = fullReasoning.match(/\b(false|no|off|disabled)\b/i);
+    if (falseMatch) {
+      return false;
+    }
+    return null;
+  }
+
+  /**
+   * Extract string from reasoning text
+   */
+  private extractString(
+    fullReasoning: string,
+    paramNameLower: string,
+  ): string | null {
+    // Look for quoted strings
+    const quotedMatch = fullReasoning.match(/"([^"]+)"/);
+    if (quotedMatch) {
+      return quotedMatch[1];
+    }
+
+    // Look for meaningful text patterns
+    const textMatch = fullReasoning.match(/\b([a-zA-Z][a-zA-Z0-9\s]{2,20})\b/);
+    if (textMatch) {
+      return textMatch[1].trim();
+    }
+
+    return null;
+  }
+
+  /**
+   * Generate intelligent default based on parameter type and context
+   */
+  private generateIntelligentDefault(
+    paramName: string,
+    paramSchema: any,
+    fullReasoning: string,
+  ): any {
+    const paramNameLower = paramName.toLowerCase();
+    const paramType = paramSchema?.type || 'string';
+
+    // Message parameters - generate meaningful defaults
+    if (paramNameLower.includes('message') || paramNameLower.includes('text')) {
+      if (paramNameLower.includes('sign')) {
+        return 'Hello, this is a test message for signing.';
+      }
+      return 'Test message';
+    }
+
+    // Address parameters - look for context clues
+    if (paramNameLower.includes('address')) {
+      // Check if there's any mention of wallet or address in the reasoning
       if (
-        paramName.toLowerCase() === 'sql' ||
-        paramName.toLowerCase() === 'query'
+        fullReasoning.includes('wallet') ||
+        fullReasoning.includes('address')
       ) {
-        const sqlMatch = fullReasoning.match(
-          /(SELECT|INSERT|UPDATE|DELETE|SHOW|DESCRIBE|CREATE|DROP|ALTER)[\s\S]*?(?=;|\.|$|```)/i,
-        );
-        if (sqlMatch) {
-          const sqlQuery = sqlMatch[0].trim().replace(/[;.]$/, '');
-          this.logger.log(`Found SQL statement: ${sqlQuery}`);
-          return sqlQuery;
-        }
-      }
-
-      // Look for information_schema queries specifically
-      const infoSchemaMatch = fullReasoning.match(
-        /SELECT[\s\S]*?FROM\s+information_schema[\s\S]*?(?=;|\.|$|```)/i,
-      );
-      if (infoSchemaMatch) {
-        const sqlQuery = infoSchemaMatch[0].trim().replace(/[;.]$/, '');
-        this.logger.log(`Found information_schema query: ${sqlQuery}`);
-        return sqlQuery;
-      }
-
-      // Look for question-like queries as fallback
-      const queryMatch = fullReasoning.match(
-        /(?:find|search|show|get|list|what|how|when|where)[\s\S]*?(?=[.?!]|$)/i,
-      );
-      if (queryMatch) {
-        return queryMatch[0].trim().replace(/[.?!]$/, '');
+        // Return a placeholder that will be filled by tool chaining
+        return '[wallet_address]';
       }
     }
 
-    if (paramName.toLowerCase().includes('address')) {
-      // Look for blockchain addresses
-      const addressMatch = fullReasoning.match(/(0x[a-fA-F0-9]{40})/);
-      if (addressMatch) {
-        return addressMatch[1];
-      }
+    // URL parameters
+    if (paramNameLower.includes('url') || paramNameLower.includes('link')) {
+      return 'https://example.com';
     }
 
-    if (
-      paramName.toLowerCase().includes('path') ||
-      paramName.toLowerCase().includes('file')
-    ) {
-      // Look for file paths
-      const pathMatch = fullReasoning.match(
-        /([\/\w.-]+\.[a-zA-Z]{2,4}|\/[\w\/.-]+)/g,
-      );
-      if (pathMatch) {
-        return pathMatch[0];
-      }
+    // Number parameters
+    if (paramType === 'number' || paramType === 'integer') {
+      return 0;
     }
 
-    if (
-      paramName.toLowerCase().includes('url') ||
-      paramName.toLowerCase().includes('link')
-    ) {
-      // Look for URLs
-      const urlMatch = fullReasoning.match(/(https?:\/\/[^\s"'<>]+)/i);
-      if (urlMatch) {
-        return urlMatch[1];
-      }
+    // Boolean parameters
+    if (paramType === 'boolean') {
+      return false;
     }
 
-    // Strategy 3: Extract from description or context clues
-    if (paramSchema.description) {
-      const descWords = paramSchema.description.toLowerCase().split(/\s+/);
-      for (const word of descWords) {
-        if (word.length > 3 && /^[a-zA-Z]+$/.test(word)) {
-          // Only use alphanumeric words for regex
-          try {
-            const contextMatch = new RegExp(
-              `\\b${this.escapeRegex(word)}\\b[\\s:]*["']?([^"'\\n,}]+)["']?`,
-              'i',
-            ).exec(toolContext);
-            if (contextMatch) {
-              return this.convertValueToType(
-                contextMatch[1].trim(),
-                paramSchema,
-              );
-            }
-          } catch (error) {
-            // Ignore regex errors and continue with next word
-            continue;
-          }
-        }
+    // String parameters
+    if (paramType === 'string') {
+      return 'default_value';
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract common patterns from reasoning text
+   */
+  private extractCommonPatterns(
+    paramName: string,
+    paramSchema: any,
+    fullReasoning: string,
+  ): any {
+    const paramNameLower = paramName.toLowerCase();
+
+    // Look for any word that might match the parameter name
+    const words = fullReasoning.split(/\s+/);
+    for (const word of words) {
+      const cleanWord = word.replace(/[^\w]/g, '');
+      if (
+        cleanWord.length > 2 &&
+        paramNameLower.includes(cleanWord.toLowerCase())
+      ) {
+        return cleanWord;
       }
     }
 
     return null;
+  }
+
+  /**
+   * Validate if a parameter value is appropriate for the parameter
+   */
+  private isValidParameterValue(
+    value: string,
+    paramName: string,
+    paramSchema: any,
+  ): boolean {
+    if (!value || value.trim() === '') {
+      return false;
+    }
+
+    const paramNameLower = paramName.toLowerCase();
+    const paramType = paramSchema?.type || 'string';
+
+    // Check for invalid patterns that indicate poor extraction
+    const invalidPatterns = [
+      /^\[.*\]$/, // [placeholder] style
+      /^\{.*\}$/, // {placeholder} style
+      /^`.*`$/, // `placeholder` style
+      /^".*"$/, // "placeholder" style
+      /^'.*'$/, // 'placeholder' style
+      /^placeholder$/i,
+      /^default$/i,
+      /^balance$/i,
+      /^retrieved_.*$/i, // retrieved_address, retrieved_value, etc.
+      /^\[.*\]`$/, // [retrieved_address]` style
+      /^\{.*\}`$/, // {retrieved_address}` style
+      /^".*"`$/, // "retrieved_address"` style
+      /^'.*'`$/, // 'retrieved_address'` style
+      /^`.*"$/, // `retrieved_address" style
+      /^`.*'$/, // `retrieved_address' style
+      /^".*`$/, // "retrieved_address` style
+      /^'.*`$/, // 'retrieved_address` style
+    ];
+
+    for (const pattern of invalidPatterns) {
+      if (pattern.test(value)) {
+        this.logger.log(
+          `Rejected invalid parameter value: ${value} (matches pattern: ${pattern})`,
+        );
+        return false;
+      }
+    }
+
+    // Validate Ethereum addresses
+    if (
+      paramNameLower.includes('address') &&
+      paramNameLower.includes('wallet')
+    ) {
+      return /^0x[a-fA-F0-9]{40}$/.test(value);
+    }
+
+    // Validate URLs
+    if (paramNameLower.includes('url') || paramNameLower.includes('link')) {
+      return /^https?:\/\/.+/.test(value);
+    }
+
+    // Validate emails
+    if (paramNameLower.includes('email') || paramNameLower.includes('mail')) {
+      return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$/.test(value);
+    }
+
+    // Validate numbers
+    if (paramType === 'number' || paramType === 'integer') {
+      return !isNaN(parseFloat(value));
+    }
+
+    // Validate booleans
+    if (paramType === 'boolean') {
+      return /^(true|false|yes|no|on|off)$/i.test(value);
+    }
+
+    // For strings, check it's not empty and not a placeholder
+    if (paramType === 'string') {
+      return (
+        value.length > 0 &&
+        !value.includes('placeholder') &&
+        !value.includes('default') &&
+        !value.includes('retrieved_') &&
+        !value.includes('[retrieved_') &&
+        !value.includes('{retrieved_') &&
+        !value.includes('"retrieved_') &&
+        !value.includes("'retrieved_") &&
+        !value.includes('`retrieved_')
+      );
+    }
+
+    return true;
   }
 
   /**

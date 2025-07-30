@@ -86,7 +86,35 @@ export const goat = {
   connection: {
     type: "stdio",
     command: "ts-node",
+    args: ["packages/ai/src/mcps/goat/goat-mcp-server.ts"],
   },
+  configSchema: {
+    type: "object",
+    properties: {
+      WALLET_PRIVATE_KEY: {
+        type: "string",
+        description: "Private key for wallet operations",
+        required: true,
+        sensitive: true,
+      },
+      RPC_PROVIDER_URL: {
+        type: "string",
+        description: "RPC provider URL for blockchain operations",
+        required: true,
+      },
+    },
+    required: ["WALLET_PRIVATE_KEY", "RPC_PROVIDER_URL"],
+  },
+  examples: [
+    {
+      name: "Base Sepolia Wallet",
+      description: "Connect to Base Sepolia testnet",
+      configuration: {
+        WALLET_PRIVATE_KEY: "0x...",
+        RPC_PROVIDER_URL: "https://sepolia.base.org",
+      },
+    },
+  ],
 };
 
 export const git = {
