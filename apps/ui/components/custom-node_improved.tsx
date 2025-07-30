@@ -381,7 +381,6 @@ export default function CircularNode({ data }: NodeProps) {
     isLive = false,
   } = nodeData;
 
-
   // Resolve icon with intelligent fallbacks
   const NodeIcon = useMemo(
     () => resolveIcon(iconName, blockType),
@@ -442,7 +441,7 @@ export default function CircularNode({ data }: NodeProps) {
           <div className='relative'>
             <div
               className={cn(
-                "w-20 h-20 rounded-full border-4 bg-card flex items-center justify-center transition-all duration-300 shadow-lg hover:shadow-xl cursor-pointer",
+                "w-20 h-20 rounded-full border-4 bg-card/80 backdrop-blur-sm flex items-center justify-center transition-all duration-300 shadow-lg hover:shadow-xl cursor-pointer",
                 statusStyles,
                 hasValidationErrors &&
                   "border-red-500/50 ring-2 ring-red-500/50"
@@ -476,20 +475,20 @@ export default function CircularNode({ data }: NodeProps) {
             )}
           </div>
 
-          <p className='text-xs font-semibold text-center text-foreground truncate w-full'>
+          <p className='text-xs font-semibold text-center text-foreground/90 truncate w-full'>
             {label}
           </p>
 
           <Handle
             type='target'
             position={Position.Left}
-            className='!bg-blue-500 !border-2 !border-white !w-3 !h-3 !-top-1.5 hover:!bg-blue-600 hover:!scale-125 transition-all duration-200'
+            className='!bg-blue-500 !border-2 !border-background !w-4 !h-4'
             style={{ zIndex: 10 }}
           />
           <Handle
             type='source'
             position={Position.Right}
-            className='!bg-green-500 !border-2 !border-white !w-3 !h-3 !-bottom-1.5 hover:!bg-green-600 hover:!scale-125 transition-all duration-200'
+            className='!bg-green-500 !border-2 !border-background !w-4 !h-4'
             style={{ zIndex: 10 }}
           />
         </div>
@@ -498,7 +497,7 @@ export default function CircularNode({ data }: NodeProps) {
         <div className='flex items-start gap-4 mb-4'>
           <div
             className={cn(
-              "w-12 h-12 rounded-lg bg-card flex items-center justify-center border",
+              "w-12 h-12 rounded-lg bg-card/80 backdrop-blur-sm flex items-center justify-center border border-border",
               statusStyles.replace("border-", "bg-").replace("500", "500/10")
             )}>
             <NodeIcon className='w-6 h-6' />
@@ -548,7 +547,7 @@ export default function CircularNode({ data }: NodeProps) {
             <div className='space-y-2 text-sm'>
               <h4 className='font-semibold mb-2'>Configuration</h4>
               {Object.entries(config).length > 0 ? (
-                <div className='p-2 bg-muted rounded-md font-mono text-xs space-y-1'>
+                <div className='p-2 bg-muted/50 rounded-md border border-border font-mono text-xs space-y-1'>
                   {Object.entries(config).map(([key, value]) => (
                     <div key={key} className='flex justify-between'>
                       <span className='text-muted-foreground'>{key}:</span>
@@ -564,9 +563,8 @@ export default function CircularNode({ data }: NodeProps) {
             </div>
           </TabsContent>
 
-
           <TabsContent value='logs' className='mt-4'>
-            <div className='max-h-60 overflow-y-auto space-y-2 p-2 bg-muted rounded-md'>
+            <div className='max-h-60 overflow-y-auto space-y-2 p-2 bg-muted/50 rounded-md border border-border'>
               {logs.map((log, index) => (
                 <div
                   key={index}
@@ -585,7 +583,7 @@ export default function CircularNode({ data }: NodeProps) {
           </TabsContent>
 
           <TabsContent value='output' className='mt-4'>
-            <div className='max-h-60 overflow-y-auto p-2 bg-muted rounded-md font-mono text-xs'>
+            <div className='max-h-60 overflow-y-auto p-2 bg-muted/50 rounded-md border border-border font-mono text-xs'>
               <pre>{JSON.stringify(executionOutput, null, 2)}</pre>
             </div>
           </TabsContent>

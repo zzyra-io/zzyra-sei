@@ -850,7 +850,7 @@ export function AgentNodeComponent({
 
       <div
         className={cn(
-          "bg-background/90 backdrop-blur-md rounded-2xl shadow-lg border flex transition-all duration-300 ease-in-out relative overflow-hidden",
+          "bg-card/95 backdrop-blur-md rounded-2xl shadow-lg border border-border flex transition-all duration-300 ease-in-out relative",
           isExpanded ? "w-[680px]" : "w-[380px]"
         )}
         style={{
@@ -859,10 +859,14 @@ export function AgentNodeComponent({
           zIndex: 1,
         }}>
         {/* Main content background */}
-        <div className='absolute inset-0.5 rounded-2xl bg-background'></div>
+        <div className='absolute inset-0.5 rounded-2xl bg-card'></div>
 
         {/* Main Node Content */}
-        <div className={cn("w-[380px] flex-shrink-0 relative z-10")}>
+        <div
+          className={cn(
+            "w-[380px] flex-shrink-0 relative z-10",
+            isExpanded && "border-r border-gray-200/80"
+          )}>
           <div className='p-5'>
             {/* Status Bar - Most Prominent */}
             <div className='flex items-center justify-between mb-4'>
@@ -879,7 +883,7 @@ export function AgentNodeComponent({
                     {/* Brain icon */}
                     <Brain className='w-7 h-7 text-white relative z-10' />
                   </div>
-                  <div className='flex items-center gap-1 text-xs text-gray-600 mt-1'>
+                  <div className='flex items-center gap-1 text-xs text-muted-foreground mt-1'>
                     {getStatusIcon()}
                     <span className='font-medium'>{getStatusText()}</span>
                   </div>
@@ -887,10 +891,10 @@ export function AgentNodeComponent({
 
                 {/* Agent Identity */}
                 <div className='flex-1'>
-                  <h3 className='font-bold text-lg text-gray-900'>
+                  <h3 className='font-bold text-lg text-foreground'>
                     {data.config?.agent?.name || "AI Agent"}
                   </h3>
-                  <p className='text-sm text-gray-500'>
+                  <p className='text-sm text-muted-foreground'>
                     {data.config?.agent?.systemPrompt ||
                       "AI-powered agent with tools and reasoning capabilities"}
                   </p>
@@ -898,6 +902,8 @@ export function AgentNodeComponent({
               </div>
 
               <div className='flex items-center gap-2'>
+                {/* Debug indicator */}
+
                 {wsConnected && (
                   <div className='flex items-center gap-1 text-xs'>
                     <div className='w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse'></div>
@@ -907,7 +913,13 @@ export function AgentNodeComponent({
                 <Button
                   variant='ghost'
                   size='sm'
-                  onClick={() => setIsExpanded(!isExpanded)}
+                  onClick={() => {
+                    console.log(
+                      "Configure button clicked, current isExpanded:",
+                      isExpanded
+                    );
+                    setIsExpanded(!isExpanded);
+                  }}
                   className='flex items-center gap-2'
                   aria-label={
                     isExpanded
@@ -958,7 +970,7 @@ export function AgentNodeComponent({
               }
               className='mb-4'>
               <div className='flex items-center justify-between mb-2'>
-                <CollapsibleTrigger className='flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors'>
+                <CollapsibleTrigger className='flex items-center gap-2 text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors'>
                   <ChevronRight
                     className={cn(
                       "w-4 h-4 transition-transform",
@@ -1364,18 +1376,14 @@ export function AgentNodeComponent({
           <Handle
             type='target'
             position={Position.Left}
-            className='!w-3 !h-3 !bg-blue-500 !border-2 !border-white'
-          />
-          <Handle
-            type='source'
-            position={Position.Right}
-            className='!w-3 !h-3 !bg-blue-500 !border-2 !border-white'
+            id={`${id}-target`}
+            className='!w-4 !h-4 !bg-blue-500 !border-2 !border-background'
           />
         </div>
 
         {/* Expanded Configuration Panel */}
         {isExpanded && (
-          <div className='w-[300px] flex-shrink-0 border-l border-gray-200/80'>
+          <div className='w-[300px] flex-shrink-0 bg-muted/50 backdrop-blur-sm border-l border-border'>
             <Tabs defaultValue='config' className='h-full'>
               <TabsList className='grid w-full grid-cols-3'>
                 <TabsTrigger value='config'>Config</TabsTrigger>
@@ -1584,6 +1592,12 @@ export function AgentNodeComponent({
           isOpen={configModal.isOpen}
           onClose={handleConfigModalClose}
           onSave={handleConfigModalSave}
+        />
+        <Handle
+          type='source'
+          position={Position.Right}
+          id={`${id}-source`}
+          className='!w-4 !h-4 !bg-blue-500 !border-2 !border-background'
         />
       </div>
     </>
