@@ -1375,227 +1375,206 @@ export function AgentNodeComponent({
 
         {/* Expanded Configuration Panel */}
         {isExpanded && (
-          <div className='w-[300px] flex-shrink-0 border-l border-gray-200/80 bg-white relative z-20'>
-            <div className='h-full flex flex-col'>
-              <Tabs defaultValue='config' className='h-full flex flex-col'>
-                <TabsList className='grid w-full grid-cols-3'>
-                  <TabsTrigger value='config'>Config</TabsTrigger>
-                  <TabsTrigger value='tools'>Tools</TabsTrigger>
-                  <TabsTrigger value='execution'>Execution</TabsTrigger>
-                </TabsList>
-                <div className='flex-1 overflow-y-auto'>
-                  <TabsContent value='config' className='p-4 space-y-4 h-full'>
-                    <div>
-                      <Label className='text-xs'>Agent Name</Label>
-                      <input
-                        value={data.config?.agent?.name || ""}
-                        onChange={(e) =>
-                          handleConfigUpdate({
-                            agent: {
-                              ...data.config?.agent,
-                              name: e.target.value,
-                            },
-                          })
-                        }
-                        className='w-full text-sm p-2 border border-gray-200 rounded mt-1'
-                        placeholder='AI Assistant'
-                      />
-                    </div>
-                    <div>
-                      <Label className='text-xs'>System Prompt</Label>
-                      <Textarea
-                        value={data.config?.agent?.systemPrompt || ""}
-                        onChange={(e) =>
-                          handleConfigUpdate({
-                            agent: {
-                              ...data.config?.agent,
-                              systemPrompt: e.target.value,
-                            },
-                          })
-                        }
-                        className='w-full text-sm mt-1'
-                        placeholder='You are a helpful AI assistant...'
-                        rows={3}
-                      />
-                    </div>
-                    <div>
-                      <Label className='text-xs'>User Prompt</Label>
-                      <Textarea
-                        value={data.config?.agent?.userPrompt || ""}
-                        onChange={(e) =>
-                          handleConfigUpdate({
-                            agent: {
-                              ...data.config?.agent,
-                              userPrompt: e.target.value,
-                            },
-                          })
-                        }
-                        className='w-full text-sm mt-1'
-                        placeholder='What would you like me to help you with?'
-                        rows={2}
-                      />
-                    </div>
-                    <div>
-                      <Label className='text-xs'>Thinking Mode</Label>
-                      <Select
-                        value={data.config?.agent?.thinkingMode || "deliberate"}
-                        onValueChange={(value) =>
-                          handleConfigUpdate({
-                            agent: {
-                              ...data.config?.agent,
-                              thinkingMode: value,
-                            },
-                          })
-                        }>
-                        <SelectTrigger className='w-full text-sm mt-1'>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value='fast'>Fast</SelectItem>
-                          <SelectItem value='deliberate'>Deliberate</SelectItem>
-                          <SelectItem value='collaborative'>
-                            Collaborative
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value='tools' className='p-4 h-full'>
-                    <div className='space-y-2'>
-                      <h4 className='text-sm font-semibold'>Available Tools</h4>
-                      {isLoading ? (
-                        <div className='flex items-center justify-center p-4'>
-                          <Loader2 className='w-6 h-6 animate-spin mr-2' />
-                          <span className='text-sm text-gray-500'>
-                            Loading tools...
-                          </span>
-                        </div>
-                      ) : error ? (
-                        <div className='p-4 text-center text-sm text-red-500'>
-                          Failed to load tools: {error}
-                        </div>
-                      ) : (
-                        availableTools.map((tool) => (
-                          <div
-                            key={tool.id}
-                            className='flex items-center justify-between p-2 bg-gray-50 rounded'>
-                            <div className='flex items-center gap-2'>
-                              <div
-                                className={cn(
-                                  "w-6 h-6 rounded flex items-center justify-center",
-                                  tool.color
-                                )}>
-                                {tool.icon}
-                              </div>
-                              <div>
-                                <div className='text-sm font-medium'>
-                                  {tool.name}
-                                </div>
-                                <div className='text-xs text-gray-500'>
-                                  {tool.description}
-                                </div>
-                              </div>
-                            </div>
-                            <Switch
-                              checked={connectedTools.some(
-                                (t) => t.id === tool.id && t.isEnabled
-                              )}
-                              onCheckedChange={(enabled) => {
-                                if (enabled) {
-                                  handleSelect(tool);
-                                } else {
-                                  handleRemoveTool(tool.id);
-                                }
-                              }}
-                            />
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </TabsContent>
-                  <TabsContent
-                    value='execution'
-                    className='p-4 space-y-4 h-full'>
-                    <div>
-                      <Label className='text-xs'>Execution Mode</Label>
-                      <Select
-                        value={data.config?.execution?.mode || "autonomous"}
-                        onValueChange={(value) =>
-                          handleConfigUpdate({
-                            execution: {
-                              ...data.config?.execution,
-                              mode: value,
-                            },
-                          })
-                        }>
-                        <SelectTrigger className='w-full text-sm mt-1'>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value='autonomous'>Autonomous</SelectItem>
-                          <SelectItem value='interactive'>
-                            Interactive
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className='space-y-2'>
-                      <div className='flex items-center justify-between'>
-                        <Label className='text-xs'>Save Thinking Process</Label>
-                        <Switch
-                          checked={
-                            data.config?.execution?.saveThinking || false
-                          }
-                          onCheckedChange={(checked) =>
-                            handleConfigUpdate({
-                              execution: {
-                                ...data.config?.execution,
-                                saveThinking: checked,
-                              },
-                            })
-                          }
-                        />
-                      </div>
-                      <div className='flex items-center justify-between'>
-                        <Label className='text-xs'>Require Approval</Label>
-                        <Switch
-                          checked={
-                            data.config?.execution?.requireApproval || false
-                          }
-                          onCheckedChange={(checked) =>
-                            handleConfigUpdate({
-                              execution: {
-                                ...data.config?.execution,
-                                requireApproval: checked,
-                              },
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className='pt-4'>
-                      <Button
-                        className='w-full'
-                        size='sm'
-                        onClick={() => setIsExecuting(!isExecuting)}
-                        disabled={data.status === "running"}>
-                        {data.status === "running" ? (
-                          <>
-                            <Pause className='w-4 h-4 mr-2' />
-                            Pause
-                          </>
-                        ) : (
-                          <>
-                            <Play className='w-4 h-4 mr-2' />
-                            Execute
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </TabsContent>
+          <div className='w-[300px] flex-shrink-0 border-l border-gray-200/80'>
+            <Tabs defaultValue='config' className='h-full'>
+              <TabsList className='grid w-full grid-cols-3'>
+                <TabsTrigger value='config'>Config</TabsTrigger>
+                <TabsTrigger value='tools'>Tools</TabsTrigger>
+                <TabsTrigger value='execution'>Execution</TabsTrigger>
+              </TabsList>
+              <TabsContent value='config' className='p-4 space-y-4'>
+                <div>
+                  <Label className='text-xs'>Agent Name</Label>
+                  <input
+                    value={data.config?.agent?.name || ""}
+                    onChange={(e) =>
+                      handleConfigUpdate({
+                        agent: { ...data.config?.agent, name: e.target.value },
+                      })
+                    }
+                    className='w-full text-sm p-2 border border-gray-200 rounded mt-1'
+                    placeholder='AI Assistant'
+                  />
                 </div>
-              </Tabs>
-            </div>
+                <div>
+                  <Label className='text-xs'>System Prompt</Label>
+                  <Textarea
+                    value={data.config?.agent?.systemPrompt || ""}
+                    onChange={(e) =>
+                      handleConfigUpdate({
+                        agent: {
+                          ...data.config?.agent,
+                          systemPrompt: e.target.value,
+                        },
+                      })
+                    }
+                    className='w-full text-sm mt-1'
+                    placeholder='You are a helpful AI assistant...'
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <Label className='text-xs'>User Prompt</Label>
+                  <Textarea
+                    value={data.config?.agent?.userPrompt || ""}
+                    onChange={(e) =>
+                      handleConfigUpdate({
+                        agent: {
+                          ...data.config?.agent,
+                          userPrompt: e.target.value,
+                        },
+                      })
+                    }
+                    className='w-full text-sm mt-1'
+                    placeholder='What would you like me to help you with?'
+                    rows={2}
+                  />
+                </div>
+                <div>
+                  <Label className='text-xs'>Thinking Mode</Label>
+                  <Select
+                    value={data.config?.agent?.thinkingMode || "deliberate"}
+                    onValueChange={(value) =>
+                      handleConfigUpdate({
+                        agent: { ...data.config?.agent, thinkingMode: value },
+                      })
+                    }>
+                    <SelectTrigger className='w-full text-sm mt-1'>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='fast'>Fast</SelectItem>
+                      <SelectItem value='deliberate'>Deliberate</SelectItem>
+                      <SelectItem value='collaborative'>
+                        Collaborative
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TabsContent>
+              <TabsContent value='tools' className='p-4'>
+                <div className='space-y-2'>
+                  <h4 className='text-sm font-semibold'>Available Tools</h4>
+                  {isLoading ? (
+                    <div className='flex items-center justify-center p-4'>
+                      <Loader2 className='w-6 h-6 animate-spin mr-2' />
+                      <span className='text-sm text-gray-500'>
+                        Loading tools...
+                      </span>
+                    </div>
+                  ) : error ? (
+                    <div className='p-4 text-center text-sm text-red-500'>
+                      Failed to load tools: {error}
+                    </div>
+                  ) : (
+                    availableTools.map((tool) => (
+                      <div
+                        key={tool.id}
+                        className='flex items-center justify-between p-2 bg-gray-50 rounded'>
+                        <div className='flex items-center gap-2'>
+                          <div
+                            className={cn(
+                              "w-6 h-6 rounded flex items-center justify-center",
+                              tool.color
+                            )}>
+                            {tool.icon}
+                          </div>
+                          <div>
+                            <div className='text-sm font-medium'>
+                              {tool.name}
+                            </div>
+                            <div className='text-xs text-gray-500'>
+                              {tool.description}
+                            </div>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={connectedTools.some(
+                            (t) => t.id === tool.id && t.isEnabled
+                          )}
+                          onCheckedChange={(enabled) => {
+                            if (enabled) {
+                              handleSelect(tool);
+                            } else {
+                              handleRemoveTool(tool.id);
+                            }
+                          }}
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </TabsContent>
+              <TabsContent value='execution' className='p-4 space-y-4'>
+                <div>
+                  <Label className='text-xs'>Execution Mode</Label>
+                  <Select
+                    value={data.config?.execution?.mode || "autonomous"}
+                    onValueChange={(value) =>
+                      handleConfigUpdate({
+                        execution: { ...data.config?.execution, mode: value },
+                      })
+                    }>
+                    <SelectTrigger className='w-full text-sm mt-1'>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='autonomous'>Autonomous</SelectItem>
+                      <SelectItem value='interactive'>Interactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className='space-y-2'>
+                  <div className='flex items-center justify-between'>
+                    <Label className='text-xs'>Save Thinking Process</Label>
+                    <Switch
+                      checked={data.config?.execution?.saveThinking || false}
+                      onCheckedChange={(checked) =>
+                        handleConfigUpdate({
+                          execution: {
+                            ...data.config?.execution,
+                            saveThinking: checked,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className='flex items-center justify-between'>
+                    <Label className='text-xs'>Require Approval</Label>
+                    <Switch
+                      checked={data.config?.execution?.requireApproval || false}
+                      onCheckedChange={(checked) =>
+                        handleConfigUpdate({
+                          execution: {
+                            ...data.config?.execution,
+                            requireApproval: checked,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className='pt-4'>
+                  <Button
+                    className='w-full'
+                    size='sm'
+                    onClick={() => setIsExecuting(!isExecuting)}
+                    disabled={data.status === "running"}>
+                    {data.status === "running" ? (
+                      <>
+                        <Pause className='w-4 h-4 mr-2' />
+                        Pause
+                      </>
+                    ) : (
+                      <>
+                        <Play className='w-4 h-4 mr-2' />
+                        Execute
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         )}
 
