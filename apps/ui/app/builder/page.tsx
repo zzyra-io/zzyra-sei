@@ -1215,11 +1215,11 @@ export default function BuilderPage() {
                       | "completed"
                       | "failed"
                       | "skipped") || "pending",
-                  startTime: node.data?.executionStartTime,
-                  endTime: node.data?.executionEndTime,
-                  duration: node.data?.executionDuration,
-                  progress: node.data?.executionProgress,
-                  error: node.data?.executionError,
+                  startTime: node.data?.executionStartTime as Date | undefined,
+                  endTime: node.data?.executionEndTime as Date | undefined,
+                  duration: node.data?.executionDuration as number | undefined,
+                  progress: node.data?.executionProgress as number | undefined,
+                  error: node.data?.executionError as string | undefined,
                 }))}
                 edges={edges.map((edge) => ({
                   source: edge.source,
