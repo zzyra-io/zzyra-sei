@@ -204,6 +204,8 @@ export class AIAgentHandler implements BlockHandler {
         output: processedResult, // Add 'output' field for {previousBlock.output} templates
         steps: (result as any).steps || [],
         toolCalls: formattedToolCalls,
+        thinkingSteps:
+          (result as any).thinkingSteps || (result as any).steps || [],
         executionTime: Date.now() - startTime,
         sessionId: session.id,
         // Additional fields for template consumption
@@ -614,6 +616,8 @@ export class AIAgentHandler implements BlockHandler {
     config: AIAgentConfig,
     userId: string,
   ) {
+    const startTime = Date.now();
+
     this.logger.log(
       `[AI_AGENT] Starting agent execution with reasoning engine`,
     );
@@ -676,11 +680,52 @@ export class AIAgentHandler implements BlockHandler {
           (result as any).text?.length || (result as any).content?.length || 0,
         resultKeys: Object.keys(result || {}),
       });
-      return result;
+
+      // Enhance the result with detailed execution information for UI
+      const enhancedResult = {
+        ...(result as any),
+        success: true,
+        toolCalls: this.enhanceToolCalls((result as any).toolCalls || []),
+        thinkingSteps: (result as any).thinkingSteps || [],
+        totalSteps: (result as any).thinkingSteps?.length || 0,
+        totalToolCalls: (result as any).toolCalls?.length || 0,
+        toolsUsed: tools.map((t) => ({ id: t.id, name: t.name })),
+        executionTime: Date.now() - startTime,
+      };
+
+      this.logger.log(
+        `[AI_AGENT] Enhanced result with ${enhancedResult.totalSteps} thinking steps and ${enhancedResult.totalToolCalls} tool calls`,
+      );
+
+      return enhancedResult;
     } catch (error) {
       this.logger.error(`[AI_AGENT] Reasoning engine execution failed:`, error);
-      throw error;
+
+      // Return error result with enhanced information
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        toolCalls: [],
+        thinkingSteps: [],
+        totalSteps: 0,
+        totalToolCalls: 0,
+        toolsUsed: [],
+        executionTime: Date.now() - startTime,
+      };
     }
+  }
+
+  private enhanceToolCalls(toolCalls: any[]): any[] {
+    return toolCalls.map((call, index) => ({
+      ...call,
+      id: call.id || `tool-call-${index}`,
+      timestamp: call.timestamp || Date.now(),
+      duration: call.duration || 0,
+      status: call.status || 'completed',
+      parameters: call.parameters || {},
+      result: call.result || null,
+      error: call.error || null,
+    }));
   }
 
   private async logExecution(executionId: string, nodeId: string, data: any) {
@@ -731,6 +776,27 @@ export class AIAgentHandler implements BlockHandler {
       this.logger.error(
         `Failed to log execution: ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+  }
+
+  private emitRealTimeUpdate(update: {
+    type: 'thinking_step' | 'tool_call' | 'execution_status';
+    data: any;
+    timestamp: Date;
+  }) {
+    try {
+      // Emit real-time update via WebSocket if available
+      // This would typically be done through a WebSocket service
+      this.logger.debug(`[AI_AGENT] Real-time update:`, update);
+
+      // TODO: Implement WebSocket emission
+      // For now, we'll just log the update
+      this.logger.log(`[AI_AGENT] Real-time update [${update.type}]:`, {
+        timestamp: update.timestamp.toISOString(),
+        data: update.data,
+      });
+    } catch (error) {
+      this.logger.error(`[AI_AGENT] Failed to emit real-time update:`, error);
     }
   }
 }

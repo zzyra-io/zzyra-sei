@@ -100,7 +100,11 @@ const configValidationSchema = {
       useValue: configValidationSchema,
     },
     ExecutionGateway,
-    ExecutionMonitorService,
+    // Custom provider to inject ExecutionGateway into ExecutionMonitorService
+    {
+      provide: 'EXECUTION_GATEWAY',
+      useExisting: ExecutionGateway,
+    },
   ],
   exports: [RabbitMQService, 'CONFIG'],
 })

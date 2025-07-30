@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 
 import { DatabaseService } from './database.service';
 
@@ -96,7 +96,12 @@ export class ExecutionMonitorService {
   // Track execution metrics
   private executionMetrics = new Map<string, ExecutionMetrics>();
 
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    @Optional()
+    @Inject('EXECUTION_GATEWAY')
+    private readonly executionGateway?: any, // Optional injection for WebSocket emissions
+  ) {}
 
   /**
    * Start tracking an execution
@@ -294,7 +299,19 @@ export class ExecutionMonitorService {
       nodeLabel,
     });
 
-    // Note: WebSocket emissions are handled by the gateway separately
+    // Emit WebSocket updates if gateway is available
+    if (this.executionGateway) {
+      try {
+        this.executionGateway.emitNodeExecutionUpdate(executionId, update);
+        this.logger.debug(
+          `Emitted WebSocket update for node ${nodeId} in execution ${executionId}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to emit WebSocket update for node ${nodeId}: ${error}`,
+        );
+      }
+    }
 
     this.logger.log(`Node ${nodeId} in execution ${executionId}: ${status}`);
   }
@@ -319,7 +336,23 @@ export class ExecutionMonitorService {
       duration: execution.endTime.getTime() - execution.startTime.getTime(),
     });
 
-    // Note: WebSocket emissions are handled by the gateway separately
+    // Emit WebSocket completion update if gateway is available
+    if (this.executionGateway) {
+      try {
+        this.executionGateway.emitExecutionCompleted(executionId, {
+          executionId,
+          results,
+          duration: execution.endTime.getTime() - execution.startTime.getTime(),
+        });
+        this.logger.debug(
+          `Emitted WebSocket completion for execution ${executionId}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to emit WebSocket completion for execution ${executionId}: ${error}`,
+        );
+      }
+    }
 
     // Clean up after 5 minutes
     setTimeout(
@@ -359,7 +392,23 @@ export class ExecutionMonitorService {
       },
     );
 
-    // Note: WebSocket emissions are handled by the gateway separately
+    // Emit WebSocket failure update if gateway is available
+    if (this.executionGateway) {
+      try {
+        this.executionGateway.emitExecutionFailed(executionId, {
+          executionId,
+          error,
+          duration: execution.endTime.getTime() - execution.startTime.getTime(),
+        });
+        this.logger.debug(
+          `Emitted WebSocket failure for execution ${executionId}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to emit WebSocket failure for execution ${executionId}: ${error}`,
+        );
+      }
+    }
 
     // Clean up after 5 minutes
     setTimeout(

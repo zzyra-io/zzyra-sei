@@ -101,11 +101,18 @@ export function useExecutionWebSocket({
     // Reset reconnection attempts for new execution
     reconnectAttemptsRef.current = 0;
 
-    const socket = io(process.env.NEXT_PUBLIC_WORKER_WS_URL || "ws://localhost:3001", {
-      transports: ["websocket"],
-      timeout: 5000,
-      forceNew: true,
-    });
+    const socket = io(
+      process.env.NEXT_PUBLIC_WORKER_WS_URL || "ws://localhost:3009/execution",
+      {
+        transports: ["websocket"],
+        timeout: 10000,
+        forceNew: false,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+      }
+    );
 
     socketRef.current = socket;
 
@@ -117,18 +124,28 @@ export function useExecutionWebSocket({
       reconnectAttemptsRef.current = 0; // Reset attempts on successful connection
 
       // Subscribe to execution updates
-      socket.emit("subscribe_execution", { executionId });
+      if (executionId) {
+        console.log(`Subscribing to execution: ${executionId}`);
+        socket.emit("subscribe_execution", { executionId });
+      } else {
+        console.log("No executionId provided, skipping subscription");
+      }
     });
 
     socket.on("disconnect", (reason) => {
       console.log("WebSocket disconnected:", reason);
       setIsConnected(false);
-      
+
       // Only attempt reconnection if we haven't exceeded max attempts
-      if (reason === "io server disconnect" && reconnectAttemptsRef.current < maxReconnectAttempts) {
+      if (
+        reason === "io server disconnect" &&
+        reconnectAttemptsRef.current < maxReconnectAttempts
+      ) {
         reconnectAttemptsRef.current++;
-        console.log(`Attempting reconnection ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`);
-        
+        console.log(
+          `Attempting reconnection ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`
+        );
+
         // Add delay before reconnecting to prevent rapid reconnection loops
         reconnectTimeoutRef.current = setTimeout(() => {
           if (socketRef.current) {
@@ -137,7 +154,9 @@ export function useExecutionWebSocket({
         }, 1000 * reconnectAttemptsRef.current); // Exponential backoff
       } else if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
         console.log("Max reconnection attempts reached");
-        setConnectionError("Connection lost after multiple reconnection attempts");
+        setConnectionError(
+          "Connection lost after multiple reconnection attempts"
+        );
       }
     });
 
@@ -162,6 +181,11 @@ export function useExecutionWebSocket({
       console.error("WebSocket connection timeout");
       setConnectionError("Connection timeout");
       setIsConnected(false);
+    });
+
+    // Handle subscription confirmation
+    socket.on("connected", (data) => {
+      console.log("WebSocket subscription confirmed:", data);
     });
 
     // Execution event handlers

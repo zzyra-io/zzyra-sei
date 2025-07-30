@@ -25,7 +25,7 @@ import {
   EyeOff,
   X,
 } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -51,6 +51,11 @@ import { Input } from "@/components/ui/input";
 import { AIAgentAPI } from "@/lib/api/ai-agent";
 import { MCPServerConfig } from "@zyra/types";
 import { useWorkflowStore } from "@/lib/store/workflow-store";
+import {
+  useExecutionWebSocket,
+  NodeExecutionUpdate,
+  ExecutionLog,
+} from "@/hooks/use-execution-websocket";
 
 // Types
 interface ToolNode {
@@ -106,6 +111,18 @@ interface AIAgentData {
   executionProgress?: number;
   thinkingSteps?: unknown[];
   toolCalls?: unknown[];
+  executionId?: string;
+  executionStartTime?: Date;
+  executionEndTime?: Date;
+  executionDuration?: number;
+  executionOutput?: unknown;
+  executionError?: string;
+  logs?: Array<{
+    level: "info" | "warn" | "error" | "debug";
+    message: string;
+    timestamp: string;
+    metadata?: Record<string, unknown>;
+  }>;
 }
 
 interface AddComponentPopoverProps {
@@ -293,6 +310,72 @@ export function AgentNodeComponent({
 
   const { updateNode: reactFlowUpdateNode } = useReactFlow();
   const { updateNode } = useWorkflowStore();
+
+  // Real-time execution monitoring
+  const { isConnected: wsConnected } = useExecutionWebSocket({
+    executionId: data.executionId,
+    onNodeUpdate: useCallback(
+      (update: NodeExecutionUpdate) => {
+        if (update.nodeId === id) {
+          console.log(`AI Agent real-time update:`, update);
+          console.log(`AI Agent output:`, update.output);
+          console.log(`AI Agent thinkingSteps:`, update.output?.thinkingSteps);
+          console.log(`AI Agent steps:`, update.output?.steps);
+
+          // Update node with real-time execution data
+          updateNode(id, {
+            data: {
+              status: update.status,
+              executionProgress: update.progress,
+              executionStartTime: update.startTime,
+              executionEndTime: update.endTime,
+              executionDuration: update.duration,
+              executionOutput: update.output,
+              executionError: update.error,
+              // Add real-time thinking steps and tool calls if available
+              thinkingSteps:
+                update.output?.thinkingSteps || update.output?.steps,
+              toolCalls: update.output?.toolCalls,
+              logs: [
+                {
+                  level:
+                    update.status === "failed" ? "error" : ("info" as const),
+                  message: `Node ${update.status}${
+                    update.error ? `: ${update.error}` : ""
+                  }`,
+                  timestamp: new Date().toISOString(),
+                  metadata: { update },
+                },
+              ],
+            },
+          });
+        }
+      },
+      [id, updateNode]
+    ),
+    onExecutionLog: useCallback(
+      (log: ExecutionLog) => {
+        if (log.nodeId === id) {
+          console.log(`AI Agent execution log:`, log);
+
+          // Add log to node data
+          updateNode(id, {
+            data: {
+              logs: [
+                {
+                  level: log.level,
+                  message: log.message,
+                  timestamp: log.timestamp.toISOString(),
+                  metadata: log.metadata,
+                },
+              ],
+            },
+          });
+        }
+      },
+      [id, updateNode]
+    ),
+  });
 
   // Initialize connectedTools from config data and clean up duplicates
   useEffect(() => {
@@ -599,11 +682,19 @@ export function AgentNodeComponent({
         isExpanded ? "w-[680px]" : "w-[380px]"
       )}>
       {/* Main Node Content */}
-      <div className='w-[380px] flex-shrink-0'>
+      <div
+        className={cn(
+          "w-[380px] flex-shrink-0",
+          data.status === "running" && "animate-pulse"
+        )}>
         <div className='p-5'>
           <div className='flex items-center justify-between mb-4'>
             <div className='flex items-center gap-4'>
-              <div className='w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg'>
+              <div
+                className={cn(
+                  "w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg",
+                  data.status === "running" && "animate-pulse"
+                )}>
                 <Brain className='w-7 h-7 text-white' />
               </div>
               <div>
@@ -620,6 +711,12 @@ export function AgentNodeComponent({
               <div className='flex items-center gap-1 text-xs text-gray-500'>
                 {getStatusIcon()}
                 <span>{getStatusText()}</span>
+                {wsConnected && (
+                  <div className='flex items-center gap-1'>
+                    <div className='w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse'></div>
+                    <span className='text-green-600'>Live</span>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -750,27 +847,201 @@ export function AgentNodeComponent({
             )}
           </div>
 
-          {/* Thinking Steps Preview */}
-          {data.thinkingSteps && data.thinkingSteps.length > 0 && (
-            <div className='mb-4'>
-              <h4 className='text-sm font-semibold text-gray-700 mb-2'>
-                Thinking Process
-              </h4>
-              <div className='space-y-1 max-h-20 overflow-y-auto'>
-                {data.thinkingSteps.slice(-3).map((step, index) => {
-                  const stepData = step as Record<string, unknown>;
-                  return (
-                    <div
-                      key={index}
-                      className='text-xs text-gray-600 bg-gray-50 p-2 rounded'>
-                      <span className='font-medium'>
-                        {stepData.type as string}:
-                      </span>{" "}
-                      {(stepData.reasoning as string)?.substring(0, 50)}...
+          {/* Enhanced Execution Details */}
+          {(data.status === "running" || data.status === "completed") && (
+            <div className='mb-4 space-y-4'>
+              {/* Thinking Process */}
+              {data.thinkingSteps && data.thinkingSteps.length > 0 && (
+                <div>
+                  <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
+                    <Brain className='w-4 h-4' />
+                    Thinking Process
+                    <span className='text-xs text-gray-500'>
+                      ({data.thinkingSteps.length} steps)
+                    </span>
+                  </h4>
+                  <div className='space-y-2 max-h-32 overflow-y-auto bg-gray-50 rounded-lg p-3'>
+                    {data.thinkingSteps.map((step, index) => {
+                      const stepData = step as Record<string, unknown>;
+                      return (
+                        <div
+                          key={index}
+                          className='text-xs bg-white p-2 rounded border border-gray-200'>
+                          <div className='flex items-center gap-2 mb-1'>
+                            <span className='font-medium text-blue-600'>
+                              {stepData.type as string}
+                            </span>
+                            <span className='text-gray-400'>•</span>
+                            <span className='text-gray-500'>
+                              Step {index + 1}
+                            </span>
+                          </div>
+                          <div className='text-gray-700 leading-relaxed'>
+                            {stepData.reasoning as string}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Tool Calls */}
+              {data.toolCalls && data.toolCalls.length > 0 && (
+                <div>
+                  <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
+                    <Zap className='w-4 h-4' />
+                    Tool Calls
+                    <span className='text-xs text-gray-500'>
+                      ({data.toolCalls.length} calls)
+                    </span>
+                  </h4>
+                  <div className='space-y-2 max-h-32 overflow-y-auto bg-gray-50 rounded-lg p-3'>
+                    {data.toolCalls.map((call, index) => {
+                      const callData = call as Record<string, unknown>;
+                      return (
+                        <div
+                          key={index}
+                          className='text-xs bg-white p-2 rounded border border-gray-200'>
+                          <div className='flex items-center gap-2 mb-1'>
+                            <span className='font-medium text-green-600'>
+                              {callData.tool as string}
+                            </span>
+                            <span className='text-gray-400'>•</span>
+                            <span className='text-gray-500'>
+                              Call {index + 1}
+                            </span>
+                            {callData.status && (
+                              <>
+                                <span className='text-gray-400'>•</span>
+                                <span
+                                  className={`text-xs px-1 rounded ${
+                                    callData.status === "success"
+                                      ? "bg-green-100 text-green-700"
+                                      : callData.status === "error"
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-yellow-100 text-yellow-700"
+                                  }`}>
+                                  {callData.status as string}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          {callData.parameters && (
+                            <div className='text-gray-600 mb-1'>
+                              <span className='font-medium'>Parameters:</span>{" "}
+                              {JSON.stringify(callData.parameters)}
+                            </div>
+                          )}
+                          {callData.result && (
+                            <div className='text-gray-600'>
+                              <span className='font-medium'>Result:</span>{" "}
+                              {typeof callData.result === "string"
+                                ? callData.result
+                                : JSON.stringify(callData.result)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Execution Details */}
+              {data.status === "completed" && (
+                <div>
+                  <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
+                    <CheckCircle className='w-4 h-4' />
+                    Execution Summary
+                  </h4>
+                  <div className='bg-green-50 border border-green-200 rounded-lg p-3'>
+                    <div className='text-xs text-green-700'>
+                      <div className='flex items-center gap-2 mb-1'>
+                        <CheckCircle className='w-3 h-3' />
+                        <span className='font-medium'>
+                          Execution completed successfully
+                        </span>
+                      </div>
+                      {data.executionProgress && (
+                        <div className='text-gray-600'>
+                          Progress: {Math.round(data.executionProgress)}%
+                        </div>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Details */}
+              {data.status === "error" && (
+                <div>
+                  <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
+                    <AlertCircle className='w-4 h-4' />
+                    Error Details
+                  </h4>
+                  <div className='bg-red-50 border border-red-200 rounded-lg p-3'>
+                    <div className='text-xs text-red-700'>
+                      <div className='flex items-center gap-2 mb-1'>
+                        <AlertCircle className='w-3 h-3' />
+                        <span className='font-medium'>Execution failed</span>
+                      </div>
+                      {data.executionError && (
+                        <div className='text-red-600 mt-1'>
+                          {data.executionError}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Real-time Execution Logs */}
+              {data.logs && data.logs.length > 0 && (
+                <div>
+                  <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
+                    <Clock className='w-4 h-4' />
+                    Execution Logs
+                    <span className='text-xs text-gray-500'>
+                      ({data.logs.length} entries)
+                    </span>
+                  </h4>
+                  <div className='space-y-1 max-h-32 overflow-y-auto bg-gray-50 rounded-lg p-3'>
+                    {data.logs.slice(-10).map((log, index) => (
+                      <div
+                        key={index}
+                        className={`text-xs p-2 rounded border ${
+                          log.level === "error"
+                            ? "bg-red-50 border-red-200 text-red-700"
+                            : log.level === "warn"
+                            ? "bg-yellow-50 border-yellow-200 text-yellow-700"
+                            : "bg-white border-gray-200 text-gray-700"
+                        }`}>
+                        <div className='flex items-center gap-2 mb-1'>
+                          <span className='font-medium'>
+                            {log.timestamp.split("T")[1]?.split(".")[0] ||
+                              log.timestamp}
+                          </span>
+                          <span className='text-gray-400'>•</span>
+                          <span
+                            className={`text-xs px-1 rounded ${
+                              log.level === "error"
+                                ? "bg-red-100 text-red-700"
+                                : log.level === "warn"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`}>
+                            {log.level.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className='text-gray-600 leading-relaxed'>
+                          {log.message}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

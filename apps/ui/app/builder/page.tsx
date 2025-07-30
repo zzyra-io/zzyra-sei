@@ -30,8 +30,10 @@ import { useSaveAndExecute } from "@/hooks/use-save-and-execute";
 import { useCreateCustomBlock } from "@/hooks/use-custom-blocks";
 import { useWorkflowExecution } from "@/hooks/use-workflow-execution";
 import { useExecutionWebSocket } from "@/hooks/use-execution-websocket";
-import { ExecutionMetricsPanel } from "@/components/execution-metrics-panel";
-import { ExecutionHistoryPanel } from "@/components/execution-history-panel";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
+import { CheckCircle2, Clock, XCircle, AlertCircle, Zap } from "lucide-react";
 import { generateFlow } from "@/lib/api";
 import { refineWorkflow } from "@/lib/api/workflow-generation";
 import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
@@ -46,15 +48,7 @@ import {
   prepareNodesForApi,
   prepareEdgesForApi,
 } from "@zyra/types";
-import {
-  ArrowLeft,
-  Loader2,
-  Play,
-  RefreshCw,
-  Save,
-  XCircle,
-  AlertCircle,
-} from "lucide-react";
+import { ArrowLeft, Loader2, Play, RefreshCw, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -76,6 +70,7 @@ export default function BuilderPage() {
     addNode,
     setNodes,
     setEdges,
+    updateNode,
     workflowId,
     workflowName,
     workflowDescription,
@@ -460,22 +455,17 @@ export default function BuilderPage() {
     isRealTimeConnected,
     connectionError,
     executionId,
+    executionLogs,
   } = useWorkflowExecution();
 
   // State to control execution panel visibility
   const [showExecutionPanel, setShowExecutionPanel] = useState(false);
-  const [executionLogs, setExecutionLogs] = useState<any[]>([]);
   const [workerConnectionStatus, setWorkerConnectionStatus] = useState<
     "connected" | "disconnected" | "connecting"
   >("disconnected");
 
-  // Enhanced WebSocket connection for collecting logs
-  useExecutionWebSocket({
-    executionId: executionId || undefined,
-    onExecutionLog: (log) => {
-      setExecutionLogs((prev) => [...prev.slice(-49), log]); // Keep last 50 logs
-    },
-  });
+  // WebSocket connection handled by useWorkflowExecution hook
+  // Logs are collected via API fallback
 
   // Fallback: Fetch logs from API when WebSocket fails or execution is completed
   const fetchLogsFromAPI = useCallback(async () => {
@@ -499,7 +489,8 @@ export default function BuilderPage() {
 
       // Update logs if we have any, or if current logs are empty
       if (logs.length > 0 || executionLogs.length === 0) {
-        setExecutionLogs(logs);
+        // Logs are now managed by useWorkflowExecution hook
+        console.log("API logs fetched:", logs.length);
       }
     } catch (error) {
       console.error("Failed to fetch logs from API:", error);
@@ -517,25 +508,8 @@ export default function BuilderPage() {
   // Add a fallback to create mock logs for testing when no real logs are available
   const createMockLogs = useCallback(() => {
     if (executionLogs.length === 0 && executionId) {
-      const mockLogs = [
-        {
-          id: "mock-1",
-          timestamp: new Date(),
-          level: "info" as const,
-          message: "Execution started",
-          nodeId: "system",
-          metadata: { executionId },
-        },
-        {
-          id: "mock-2",
-          timestamp: new Date(Date.now() - 1000),
-          level: "info" as const,
-          message: "Initializing workflow components",
-          nodeId: "system",
-          metadata: { executionId },
-        },
-      ];
-      setExecutionLogs(mockLogs);
+      console.log("Creating mock logs for testing");
+      // Mock logs are now handled by useWorkflowExecution hook
     }
   }, [executionLogs.length, executionId]);
 
@@ -548,7 +522,7 @@ export default function BuilderPage() {
   // Reset logs when starting a new execution
   useEffect(() => {
     if (executionId) {
-      setExecutionLogs([]);
+      console.log("New execution started, logs will be reset by hook");
     }
   }, [executionId]);
 
@@ -1237,167 +1211,256 @@ export default function BuilderPage() {
               )}
             </ResizablePanel>
 
-            {/* Enhanced Execution Monitoring Panels */}
+            {/* Horizontal Execution Timeline at Bottom */}
             {(showExecutionPanel || isExecutionPending || executionId) && (
-              <>
-                <ResizableHandle />
-                <ResizablePanel
-                  defaultSize={35}
-                  minSize={30}
-                  maxSize={45}
-                  className='h-full bg-background border-l'>
-                  <div className='h-full flex flex-col p-4 space-y-4'>
-                    {/* Panel Header */}
-                    <div className='flex items-center justify-between pb-2 border-b'>
-                      <div>
-                        <h3 className='text-lg font-semibold'>
-                          Execution Monitor
-                        </h3>
-                        <p className='text-sm text-muted-foreground'>
-                          Real-time execution monitoring and logs
-                        </p>
-                      </div>
+              <div className='absolute bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50'>
+                <div className='p-4'>
+                  <div className='flex items-center justify-between mb-3'>
+                    <div className='flex items-center gap-2'>
+                      <Zap className='w-4 h-4 text-blue-500' />
+                      <span className='text-sm font-medium'>
+                        Execution Timeline
+                      </span>
+                      {(isExecutionPending ||
+                        executionStatus?.status === "running") && (
+                        <Badge variant='secondary' className='animate-pulse'>
+                          <Loader2 className='w-3 h-3 mr-1 animate-spin' />
+                          Running
+                        </Badge>
+                      )}
+                    </div>
+                    <div className='flex items-center gap-2'>
+                      <span className='text-xs text-muted-foreground'>
+                        {Math.round(
+                          executionStatus?.node_statuses
+                            ? (Object.values(
+                                executionStatus.node_statuses
+                              ).filter((status) => status === "completed")
+                                .length /
+                                Object.keys(executionStatus.node_statuses)
+                                  .length) *
+                                100
+                            : 0
+                        )}
+                        % Complete
+                      </span>
                       <Button
                         variant='ghost'
                         size='sm'
                         onClick={() => setShowExecutionPanel(false)}
-                        className='h-8 w-8 p-0'>
-                        <XCircle className='w-4 h-4' />
+                        className='h-6 w-6 p-0'>
+                        <XCircle className='w-3 h-3' />
                       </Button>
                     </div>
+                  </div>
 
-                    {/* Real-time Execution Metrics */}
-                    <div className='flex-shrink-0'>
-                      <ExecutionMetricsPanel
-                        metrics={executionMetrics}
-                        isConnected={isRealTimeConnected}
-                      />
-                    </div>
+                  {/* Horizontal Timeline */}
+                  <div className='relative'>
+                    {/* Timeline Line */}
+                    <div className='absolute top-6 left-0 right-0 h-0.5 bg-gray-200' />
 
-                    {/* Execution History and Logs */}
-                    <div className='flex-1 min-h-0'>
-                      <ExecutionHistoryPanel
-                        logs={executionLogs}
-                        isConnected={isRealTimeConnected}
-                        executionId={executionId || undefined}
-                        onRefresh={fetchLogsFromAPI}
-                        isExecuting={
-                          isExecutionPending ||
-                          executionStatus?.status === "running"
-                        }
-                        onCreateMockLogs={createMockLogs}
-                      />
-                    </div>
+                    {/* Nodes */}
+                    <div className='flex gap-4 overflow-x-auto pb-4'>
+                      {(() => {
+                        // Sort nodes according to workflow execution order (topological sort)
+                        const sortedNodes = [...nodes];
 
-                    {/* Connection Status Indicator */}
-                    {connectionError && (
-                      <div className='flex-shrink-0 p-3 bg-amber-50 border border-amber-200 rounded-lg'>
-                        <div className='flex items-center gap-2 text-amber-700'>
-                          <AlertCircle className='w-4 h-4' />
-                          <div className='text-sm'>
-                            <p className='font-medium'>Development Mode</p>
-                            <p className='text-xs'>{connectionError}</p>
-                            <p className='text-xs mt-1'>
-                              Worker service not running. Real-time updates
-                              disabled.
-                            </p>
-                            <div className='flex gap-2 mt-2'>
-                              <Button
-                                size='sm'
-                                className='text-xs'
-                                onClick={() => {
-                                  // Create test logs for development
-                                  const mockLogs = [
-                                    {
-                                      id: "dev-1",
-                                      timestamp: new Date(),
-                                      level: "info" as const,
-                                      message:
-                                        "Development mode - worker service not running",
-                                      nodeId: "system",
-                                      metadata: { mode: "development" },
-                                    },
-                                    {
-                                      id: "dev-2",
-                                      timestamp: new Date(Date.now() - 1000),
-                                      level: "info" as const,
-                                      message:
-                                        "Using fallback API for execution data",
-                                      nodeId: "system",
-                                      metadata: { mode: "development" },
-                                    },
-                                    {
-                                      id: "dev-3",
-                                      timestamp: new Date(Date.now() - 2000),
-                                      level: "warn" as const,
-                                      message:
-                                        "Real-time updates disabled - using API fallback",
-                                      nodeId: "system",
-                                      metadata: { mode: "development" },
-                                    },
-                                  ];
-                                  setExecutionLogs(mockLogs);
-                                }}>
-                                <Play className='w-3 h-3 mr-1' />
-                                Create Test Logs
-                              </Button>
-                              <Button
-                                variant='outline'
-                                size='sm'
-                                className='text-xs'
-                                onClick={() => window.location.reload()}>
-                                <RefreshCw className='w-3 h-3 mr-1' />
-                                Retry
-                              </Button>
+                        // Simple topological sort based on edges
+                        const nodeOrder = new Map<string, number>();
+                        const visited = new Set<string>();
+
+                        // Find nodes with no incoming edges (start nodes)
+                        const startNodes = nodes.filter(
+                          (node) =>
+                            !edges.some((edge) => edge.target === node.id)
+                        );
+
+                        let order = 0;
+                        const processNode = (nodeId: string) => {
+                          if (visited.has(nodeId)) return;
+                          visited.add(nodeId);
+                          nodeOrder.set(nodeId, order++);
+
+                          // Process connected nodes
+                          edges
+                            .filter((edge) => edge.source === nodeId)
+                            .forEach((edge) => processNode(edge.target));
+                        };
+
+                        // Process all start nodes
+                        startNodes.forEach((node) => processNode(node.id));
+
+                        // Process remaining nodes
+                        nodes.forEach((node) => {
+                          if (!visited.has(node.id)) {
+                            processNode(node.id);
+                          }
+                        });
+
+                        // Sort nodes by their execution order
+                        sortedNodes.sort((a, b) => {
+                          const orderA = nodeOrder.get(a.id) ?? 999;
+                          const orderB = nodeOrder.get(b.id) ?? 999;
+                          return orderA - orderB;
+                        });
+
+                        return sortedNodes.map((node) => {
+                          const isCurrent = node.data?.status === "running";
+                          const isCompleted = node.data?.status === "completed";
+                          const isFailed = node.data?.status === "failed";
+
+                          return (
+                            <div
+                              key={node.id}
+                              className={cn(
+                                "relative flex flex-col items-center gap-2 p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-sm min-w-[120px]",
+                                isCurrent
+                                  ? "border-blue-500 bg-blue-50 animate-pulse"
+                                  : isCompleted
+                                  ? "border-green-300 bg-green-50"
+                                  : isFailed
+                                  ? "border-red-300 bg-red-50"
+                                  : "border-gray-300 bg-gray-50"
+                              )}
+                              onClick={() => {
+                                // Focus on the node in the canvas
+                                console.log("Focus on node:", node.id);
+                              }}>
+                              {/* Node Icon */}
+                              <div className='relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-white border-2 border-current'>
+                                {isCurrent ? (
+                                  <div className='relative'>
+                                    <Loader2 className='w-4 h-4 animate-spin text-blue-500' />
+                                    <div className='absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse' />
+                                  </div>
+                                ) : isCompleted ? (
+                                  <CheckCircle2 className='w-4 h-4 text-green-500' />
+                                ) : isFailed ? (
+                                  <XCircle className='w-4 h-4 text-red-500' />
+                                ) : (
+                                  <Clock className='w-4 h-4 text-gray-400' />
+                                )}
+                              </div>
+
+                              {/* Node Info */}
+                              <div className='flex flex-col items-center gap-1 text-center'>
+                                <span className='text-xs font-medium truncate w-full'>
+                                  {node.data?.label ||
+                                    node.data?.name ||
+                                    node.id}
+                                </span>
+                                <Badge variant='outline' className='text-xs'>
+                                  {node.data?.type || node.type || "unknown"}
+                                </Badge>
+                                {isCurrent && (
+                                  <Badge
+                                    variant='secondary'
+                                    className='text-xs animate-pulse'>
+                                    <Loader2 className='w-3 h-3 mr-1 animate-spin' />
+                                    Active
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {/* Progress Bar for Running Nodes */}
+                              {isCurrent &&
+                                node.data?.executionProgress !== undefined && (
+                                  <div className='w-full'>
+                                    <div className='flex items-center justify-between text-xs text-muted-foreground mb-1'>
+                                      <span>Progress</span>
+                                      <span>
+                                        {Math.round(
+                                          node.data.executionProgress
+                                        )}
+                                        %
+                                      </span>
+                                    </div>
+                                    <Progress
+                                      value={node.data.executionProgress}
+                                      className='h-1.5'
+                                    />
+                                  </div>
+                                )}
+
+                              {/* Duration for Completed Nodes */}
+                              {isCompleted && node.data?.executionDuration && (
+                                <div className='text-xs text-muted-foreground'>
+                                  {node.data.executionDuration}ms
+                                </div>
+                              )}
+
+                              {/* Error for Failed Nodes */}
+                              {isFailed && node.data?.executionError && (
+                                <div className='text-xs text-red-600 flex items-center gap-1'>
+                                  <AlertCircle className='w-3 h-3' />
+                                  Error
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Connection Status */}
+                  <div className='flex items-center justify-between text-xs text-muted-foreground mt-2'>
+                    <div className='flex items-center gap-4'>
+                      <div className='flex items-center gap-1'>
+                        <CheckCircle2 className='w-3 h-3 text-green-500' />
+                        <span>
+                          {
+                            nodes.filter((n) => n.data?.status === "completed")
+                              .length
+                          }{" "}
+                          completed
+                        </span>
+                      </div>
+                      <div className='flex items-center gap-1'>
+                        <XCircle className='w-3 h-3 text-red-500' />
+                        <span>
+                          {
+                            nodes.filter((n) => n.data?.status === "failed")
+                              .length
+                          }{" "}
+                          failed
+                        </span>
+                      </div>
+                      <div className='flex items-center gap-1'>
+                        <Clock className='w-3 h-3 text-gray-500' />
+                        <span>
+                          {
+                            nodes.filter((n) => n.data?.status === "pending")
+                              .length
+                          }{" "}
+                          pending
+                        </span>
+                      </div>
+                    </div>
+                    {connectionError && (
+                      <div className='flex items-center gap-1 text-amber-600'>
+                        <AlertCircle className='w-3 h-3' />
+                        <span>
+                          Worker unavailable - Check WebSocket connection to
+                          port 3009
+                        </span>
                       </div>
                     )}
-
-                    {/* Connection Status for No Error */}
                     {!connectionError && !isRealTimeConnected && (
-                      <div className='flex-shrink-0 p-3 bg-yellow-50 border border-yellow-200 rounded-lg'>
-                        <div className='flex items-center gap-2 text-yellow-700'>
-                          <AlertCircle className='w-4 h-4' />
-                          <div className='text-sm'>
-                            <p className='font-medium'>Limited Connectivity</p>
-                            <p className='text-xs'>
-                              Real-time updates may not be available
-                            </p>
-                            <p className='text-xs mt-1'>
-                              Using fallback API calls for execution data
-                            </p>
-                            <Button
-                              variant='outline'
-                              size='sm'
-                              className='mt-2 text-xs'
-                              onClick={() => window.location.reload()}>
-                              <RefreshCw className='w-3 h-3 mr-1' />
-                              Retry Connection
-                            </Button>
-                          </div>
-                        </div>
+                      <div className='flex items-center gap-1 text-yellow-600'>
+                        <AlertCircle className='w-3 h-3' />
+                        <span>Limited connectivity</span>
                       </div>
                     )}
-
-                    {/* Connected Status */}
                     {isRealTimeConnected && (
-                      <div className='flex-shrink-0 p-3 bg-green-50 border border-green-200 rounded-lg'>
-                        <div className='flex items-center gap-2 text-green-700'>
-                          <div className='w-3 h-3 bg-green-500 rounded-full animate-pulse' />
-                          <div className='text-sm'>
-                            <p className='font-medium'>Connected</p>
-                            <p className='text-xs'>
-                              Real-time execution monitoring active
-                            </p>
-                          </div>
-                        </div>
+                      <div className='flex items-center gap-1 text-green-600'>
+                        <div className='w-2 h-2 bg-green-500 rounded-full animate-pulse' />
+                        <span>Connected</span>
                       </div>
                     )}
                   </div>
-                </ResizablePanel>
-              </>
+                </div>
+              </div>
             )}
           </ResizablePanelGroup>
 

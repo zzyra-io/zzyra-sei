@@ -390,7 +390,7 @@ export default function CircularNode({ id, data }: NodeProps<NodeData>) {
   const statusStyles = useMemo(() => {
     switch (executionStatus) {
       case "running":
-        return "border-blue-500 shadow-blue-500/30";
+        return "border-blue-500 shadow-blue-500/30 animate-pulse ring-2 ring-blue-500/50 scale-105";
       case "completed":
         return "border-green-500 shadow-green-500/20";
       case "failed":
@@ -572,8 +572,8 @@ export default function CircularNode({ id, data }: NodeProps<NodeData>) {
                     log.level === "error"
                       ? "text-red-500"
                       : log.level === "warn"
-                        ? "text-amber-500"
-                        : "text-foreground/80"
+                      ? "text-amber-500"
+                      : "text-foreground/80"
                   )}>
                   {log.message}
                 </div>

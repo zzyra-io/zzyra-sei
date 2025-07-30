@@ -137,7 +137,10 @@ export function RealtimeExecutionMonitor({
     if (!executionId) return;
 
     const socket = io(
-      `${config.workerUrl || "http://localhost:3009"}/execution`,
+      `${config.workerUrl || "http://localhost:3009"}/execution`.replace(
+        "http://",
+        "ws://"
+      ),
       {
         transports: ["websocket"],
         forceNew: true,
@@ -237,7 +240,9 @@ export function RealtimeExecutionMonitor({
           ? JSON.stringify(update.output).length
           : 0;
         console.log(
-          `✅ Node ${update.nodeLabel || update.nodeId} completed (${outputSize} bytes output)`
+          `✅ Node ${
+            update.nodeLabel || update.nodeId
+          } completed (${outputSize} bytes output)`
         );
       } else if (update.status === "failed") {
         // Log failure with error details
@@ -381,7 +386,9 @@ export function RealtimeExecutionMonitor({
 
               {/* Connection Status */}
               <div
-                className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
+                className={`w-2 h-2 rounded-full ${
+                  isConnected ? "bg-green-500" : "bg-red-500"
+                }`}
               />
             </div>
 
@@ -501,8 +508,8 @@ export function RealtimeExecutionMonitor({
                                 log.level === "error"
                                   ? "bg-red-50 text-red-800"
                                   : log.level === "warn"
-                                    ? "bg-yellow-50 text-yellow-800"
-                                    : "bg-gray-50 text-gray-800"
+                                  ? "bg-yellow-50 text-yellow-800"
+                                  : "bg-gray-50 text-gray-800"
                               }`}>
                               <div className='flex items-start space-x-2'>
                                 <span className='text-gray-500 shrink-0'>
@@ -610,10 +617,10 @@ export function RealtimeExecutionMonitor({
                                 update.status === "running"
                                   ? "border-blue-300 bg-blue-50"
                                   : update.status === "completed"
-                                    ? "border-green-300 bg-green-50"
-                                    : update.status === "failed"
-                                      ? "border-red-300 bg-red-50"
-                                      : "border-gray-300 bg-gray-50"
+                                  ? "border-green-300 bg-green-50"
+                                  : update.status === "failed"
+                                  ? "border-red-300 bg-red-50"
+                                  : "border-gray-300 bg-gray-50"
                               }`}>
                               <div className='flex items-center justify-between'>
                                 <span className='font-medium truncate'>
