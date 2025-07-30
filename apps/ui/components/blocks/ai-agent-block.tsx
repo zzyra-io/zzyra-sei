@@ -1,6 +1,7 @@
 "use client";
-
 import { cn } from "@/lib/utils";
+import type React from "react";
+
 import { Handle, Position, useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -54,12 +55,12 @@ import {
 } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { AIAgentAPI } from "@/lib/api/ai-agent";
-import { MCPServerConfig } from "@zyra/types";
+import type { MCPServerConfig } from "@zyra/types";
 import { useWorkflowStore } from "@/lib/store/workflow-store";
 import {
   useExecutionWebSocket,
-  NodeExecutionUpdate,
-  ExecutionLog,
+  type NodeExecutionUpdate,
+  type ExecutionLog,
 } from "@/hooks/use-execution-websocket";
 import LiveThinkingPanel from "./live-thinking-panel";
 
@@ -201,17 +202,14 @@ const useMCPServers = () => {
       try {
         setIsLoading(true);
         setError(null);
-
         const servers = await AIAgentAPI.getMCPServers();
         const toolNodes = servers.map(convertMCPServerToToolNode);
-
         setAvailableTools(toolNodes);
       } catch (err) {
         console.error("Failed to fetch MCP servers:", err);
         setError(
           err instanceof Error ? err.message : "Failed to load MCP servers"
         );
-
         // Fallback to static tools if API fails
         const fallbackTools: ToolNode[] = [];
         setAvailableTools(fallbackTools);
@@ -245,6 +243,7 @@ const AddComponentPopover = memo(
           onClose();
         }
       };
+
       document.addEventListener("mousedown", handleClickOutside);
       return () =>
         document.removeEventListener("mousedown", handleClickOutside);
@@ -312,15 +311,15 @@ export function AgentNodeComponent({
     isOpen: boolean;
     tool: ToolNode | null;
   }>({ isOpen: false, tool: null });
-  
+
   // Collapsible section states
   const [sectionsOpen, setSectionsOpen] = useState({
     connectedTools: true,
     executionDetails: true,
     liveThinking: true,
   });
-  const { availableTools, isLoading, error } = useMCPServers();
 
+  const { availableTools, isLoading, error } = useMCPServers();
   const { updateNode: reactFlowUpdateNode } = useReactFlow();
   const { updateNode } = useWorkflowStore();
 
@@ -370,7 +369,6 @@ export function AgentNodeComponent({
       (log: ExecutionLog) => {
         if (log.nodeId === id) {
           console.log(`AI Agent execution log:`, log);
-
           // Add log to node data
           updateNode(id, {
             data: {
@@ -402,7 +400,6 @@ export function AgentNodeComponent({
       const uniqueTools = selectedTools.filter(
         (tool, index, self) => index === self.findIndex((t) => t.id === tool.id)
       );
-
       console.log(
         "Original tools:",
         selectedTools.length,
@@ -438,6 +435,7 @@ export function AgentNodeComponent({
         isEnabled: tool.enabled !== false, // Default to true unless explicitly false
         config: tool.config || {},
       }));
+
       console.log("Setting connectedTools:", toolsFromConfig);
       setConnectedTools(toolsFromConfig);
     } else {
@@ -494,6 +492,7 @@ export function AgentNodeComponent({
     const toolExistsInConfig = currentSelectedTools.some(
       (t) => t.id === tool.id
     );
+
     if (toolExistsInConfig) {
       console.log(
         `Tool ${tool.name} already exists in config, skipping duplicate`
@@ -554,6 +553,7 @@ export function AgentNodeComponent({
         config?: Record<string, unknown>;
         enabled?: boolean;
       }>) || [];
+
     console.log(
       "Current selectedTools in config before toggle:",
       currentSelectedTools
@@ -562,6 +562,7 @@ export function AgentNodeComponent({
     const updatedSelectedTools = currentSelectedTools.map((tool) =>
       tool.id === toolId ? { ...tool, enabled } : tool
     );
+
     console.log("Updated selectedTools after toggle:", updatedSelectedTools);
 
     handleConfigUpdate({
@@ -590,11 +591,13 @@ export function AgentNodeComponent({
         category?: string;
         enabled?: boolean;
       }>) || [];
+
     console.log("Current selectedTools in config:", currentSelectedTools);
 
     const updatedSelectedTools = currentSelectedTools.filter(
       (tool) => tool.id !== toolId
     );
+
     console.log("Updated selectedTools after filtering:", updatedSelectedTools);
 
     handleConfigUpdate({
@@ -607,7 +610,6 @@ export function AgentNodeComponent({
 
     // Special handling for selectedTools - always replace, never merge
     let newConfig: Record<string, unknown>;
-
     if (updates.selectedTools !== undefined) {
       // For selectedTools, always replace the entire array
       newConfig = {
@@ -621,7 +623,6 @@ export function AgentNodeComponent({
         source: Record<string, unknown>
       ): Record<string, unknown> => {
         const result = { ...target };
-
         for (const [key, value] of Object.entries(source)) {
           if (
             value &&
@@ -641,7 +642,6 @@ export function AgentNodeComponent({
             result[key] = value;
           }
         }
-
         return result;
       };
 
@@ -659,6 +659,60 @@ export function AgentNodeComponent({
     // Also call the callback if it exists (for backward compatibility)
     if (data.onUpdateConfig) {
       data.onUpdateConfig(newConfig);
+    }
+  };
+
+  // Get status-specific animations and styles
+  const getStatusAnimations = () => {
+    switch (data.status) {
+      case "running":
+        return {
+          containerClass: "thinking-glow",
+          containerStyle: {
+            animation: "thinking-glow 4s ease-in-out infinite",
+            willChange: "box-shadow",
+          },
+          backgroundGlow: null,
+          iconEffects: (
+            <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-blue-400/10 to-purple-400/10'></div>
+          ),
+        };
+      case "completed":
+        return {
+          containerClass: "success-glow",
+          containerStyle: {
+            animation: "success-glow 3s ease-in-out",
+            willChange: "box-shadow",
+          },
+          backgroundGlow: null,
+          iconEffects: (
+            <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-green-400/15 to-emerald-400/15'></div>
+          ),
+        };
+      case "error":
+        return {
+          containerClass: "error-glow",
+          containerStyle: {
+            animation: "error-glow 2s ease-in-out infinite",
+            willChange: "box-shadow",
+          },
+          backgroundGlow: null,
+          iconEffects: (
+            <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-red-400/15 to-orange-400/15'></div>
+          ),
+        };
+      default: // idle
+        return {
+          containerClass: "idle-glow",
+          containerStyle: {
+            animation: "idle-glow 6s ease-in-out infinite",
+            willChange: "auto",
+          },
+          backgroundGlow: null,
+          iconEffects: (
+            <div className='absolute inset-0 rounded-lg bg-gradient-to-r from-gray-200/10 to-slate-200/10'></div>
+          ),
+        };
     }
   };
 
@@ -688,699 +742,872 @@ export function AgentNodeComponent({
     }
   };
 
+  // Get status-specific animations and styles
+  const statusAnimations = getStatusAnimations();
+
   return (
-    <div
-      className={cn(
-        "bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/80 flex transition-all duration-300 ease-in-out",
-        isExpanded ? "w-[680px]" : "w-[380px]"
-      )}>
-      {/* Main Node Content */}
+    <>
+      {/* Custom CSS animations */}
+      <style jsx global>{`
+        .thinking-glow {
+          box-shadow: 0 0 20px rgba(59, 130, 246, 0.4),
+            0 0 40px rgba(147, 51, 234, 0.3), 0 0 60px rgba(59, 130, 246, 0.2) !important;
+          animation: thinking-glow 4s ease-in-out infinite !important;
+        }
+
+        .success-glow {
+          box-shadow: 0 0 20px rgba(34, 197, 94, 0.5),
+            0 0 40px rgba(34, 197, 94, 0.3) !important;
+          animation: success-glow 3s ease-in-out !important;
+        }
+
+        .error-glow {
+          box-shadow: 0 0 20px rgba(239, 68, 68, 0.5),
+            0 0 40px rgba(239, 68, 68, 0.3) !important;
+          animation: error-glow 2s ease-in-out infinite !important;
+        }
+
+        .idle-glow {
+          box-shadow: 0 0 15px rgba(156, 163, 175, 0.3) !important;
+          animation: idle-glow 6s ease-in-out infinite !important;
+        }
+
+        @keyframes thinking-glow {
+          0%,
+          100% {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4),
+              0 0 40px rgba(147, 51, 234, 0.3), 0 0 60px rgba(59, 130, 246, 0.2);
+          }
+          50% {
+            box-shadow: 0 0 35px rgba(59, 130, 246, 0.6),
+              0 0 70px rgba(147, 51, 234, 0.4),
+              0 0 100px rgba(59, 130, 246, 0.3);
+          }
+        }
+
+        @keyframes success-glow {
+          0% {
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.3),
+              0 0 30px rgba(34, 197, 94, 0.2);
+          }
+          50% {
+            box-shadow: 0 0 25px rgba(34, 197, 94, 0.6),
+              0 0 50px rgba(34, 197, 94, 0.4);
+          }
+          100% {
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.4),
+              0 0 40px rgba(34, 197, 94, 0.3);
+          }
+        }
+
+        @keyframes error-glow {
+          0%,
+          100% {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5),
+              0 0 40px rgba(239, 68, 68, 0.3);
+          }
+          50% {
+            box-shadow: 0 0 30px rgba(239, 68, 68, 0.7),
+              0 0 60px rgba(239, 68, 68, 0.4);
+          }
+        }
+
+        @keyframes idle-glow {
+          0%,
+          100% {
+            box-shadow: 0 0 10px rgba(156, 163, 175, 0.2);
+          }
+          50% {
+            box-shadow: 0 0 20px rgba(156, 163, 175, 0.4);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .thinking-glow,
+          .success-glow,
+          .error-glow,
+          .idle-glow {
+            animation: none !important;
+          }
+
+          .thinking-glow {
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.5) !important;
+          }
+
+          .success-glow {
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.5) !important;
+          }
+
+          .error-glow {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5) !important;
+          }
+
+          .idle-glow {
+            box-shadow: 0 0 15px rgba(156, 163, 175, 0.3) !important;
+          }
+        }
+      `}</style>
+
       <div
         className={cn(
-          "w-[380px] flex-shrink-0",
-          data.status === "running" && "animate-pulse"
-        )}>
-        <div className='p-5'>
-          <div className='flex items-center justify-between mb-4'>
-            <div className='flex items-center gap-4'>
-              <div
-                className={cn(
-                  "w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg",
-                  data.status === "running" && "animate-pulse"
-                )}>
-                <Brain className='w-7 h-7 text-white' />
-              </div>
-              <div>
-                <h3 className='font-bold text-lg text-gray-900'>
-                  {data.config?.agent?.name || "AI Agent"}
-                </h3>
-                <p className='text-sm text-gray-500'>
-                  {data.config?.agent?.systemPrompt ||
-                    "AI-powered agent with tools and reasoning capabilities"}
-                </p>
-              </div>
-            </div>
-            <div className='flex items-center gap-2'>
-              <div className='flex items-center gap-1 text-xs text-gray-500'>
-                {getStatusIcon()}
-                <span>{getStatusText()}</span>
-                {wsConnected && (
-                  <div className='flex items-center gap-1'>
-                    <div className='w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse'></div>
-                    <span className='text-green-600'>Live</span>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className='flex items-center gap-1 px-2 py-2 bg-gray-100/80 hover:bg-gray-200/80 rounded-lg transition-colors'
-                title={isExpanded ? "Collapse" : "Expand"}>
-                <ChevronRight
-                  className={cn(
-                    "w-4 h-4 text-gray-500 transition-transform",
-                    isExpanded && "rotate-180"
-                  )}
-                />
-                <Plus className='w-5 h-5 text-gray-600' />
-              </button>
-            </div>
-          </div>
-
-          {/* Execution Progress */}
-          {data.status === "running" &&
-            data.executionProgress !== undefined && (
-              <div className='mb-4'>
-                <div className='flex items-center justify-between text-xs text-gray-600 mb-1'>
-                  <span>Execution Progress</span>
-                  <span>{Math.round(data.executionProgress)}%</span>
-                </div>
-                <Progress value={data.executionProgress} className='h-2' />
-              </div>
-            )}
-
-          {/* Connected Tools */}
-          <Collapsible
-            open={sectionsOpen.connectedTools}
-            onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, connectedTools: open }))}
-            className='mb-4'
-          >
-            <div className='flex items-center justify-between mb-2'>
-              <CollapsibleTrigger className='flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors'>
-                <ChevronRight
-                  className={cn(
-                    "w-4 h-4 transition-transform",
-                    sectionsOpen.connectedTools && "rotate-90"
-                  )}
-                />
-                Connected Tools
-              </CollapsibleTrigger>
-              <button
-                onClick={(e) => handleAddClick("tool", e)}
-                className='w-6 h-6 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors'
-                title='Add Tool'>
-                <Plus className='w-3 h-3 text-white' />
-              </button>
-            </div>
-            <CollapsibleContent>
-            <div className='space-y-3'>
-              {connectedTools.length === 0 ? (
-                <div className='text-center py-6'>
-                  <div className='text-gray-400 mb-2'>
-                    <Brain className='w-8 h-8 mx-auto' />
-                  </div>
-                  <div className='text-sm text-gray-500 font-medium'>
-                    No tools connected
-                  </div>
-                  <div className='text-xs text-gray-400 mt-1'>
-                    Add tools to enhance your AI assistant
-                  </div>
-                </div>
-              ) : (
-                <div className='space-y-2'>
-                  {connectedTools.map((tool) => (
-                    <div
-                      key={tool.id}
-                      className='group relative flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200'>
-                      <div className='flex items-start gap-3 flex-1 min-w-0'>
-                        <div
-                          className={cn(
-                            "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm",
-                            tool.color
-                          )}>
-                          {tool.icon}
-                        </div>
-                        <div className='flex-1 min-w-0'>
-                          <div className='flex items-center gap-2'>
-                            <div className='text-sm font-semibold text-gray-900'>
-                              {tool.name}
-                            </div>
-                            {tool.isEnabled && (
-                              <div className='flex items-center gap-1'>
-                                <div className='w-1.5 h-1.5 bg-green-500 rounded-full'></div>
-                                <span className='text-xs text-green-600 font-medium'>
-                                  Active
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          {tool.description && (
-                            <div className='text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed'>
-                              {tool.description}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className='flex items-center gap-3 flex-shrink-0'>
-                        <Switch
-                          checked={tool.isEnabled}
-                          onCheckedChange={(enabled) => {
-                            console.log(
-                              "Switch clicked for tool:",
-                              tool.id,
-                              tool.name,
-                              "enabled:",
-                              enabled
-                            );
-                            handleToolToggle(tool.id, enabled);
-                          }}
-                        />
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            console.log("Removing tool:", tool.id, tool.name);
-                            handleRemoveTool(tool.id);
-                          }}
-                          className='w-7 h-7 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100'
-                          title='Remove Tool'>
-                          <X className='w-4 h-4' />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {popover === "tool" && (
-              <AddComponentPopover
-                items={availableTools}
-                onSelect={handleSelect}
-                onClose={() => setPopover(null)}
-                isLoading={isLoading}
-              />
-            )}
-            </CollapsibleContent>
-          </Collapsible>
-
-          {/* Enhanced Execution Details */}
-          {(data.status === "running" || data.status === "completed" || data.status === "error") && (
-            <Collapsible
-              open={sectionsOpen.executionDetails}
-              onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, executionDetails: open }))}
-              className='mb-4'
-            >
-              <CollapsibleTrigger className='flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors mb-2'>
-                <ChevronRight
-                  className={cn(
-                    "w-4 h-4 transition-transform",
-                    sectionsOpen.executionDetails && "rotate-90"
-                  )}
-                />
-                Execution Details
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className='space-y-4'>
-              {/* Thinking Process */}
-              {data.thinkingSteps && data.thinkingSteps.length > 0 && (
-                <div>
-                  <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
-                    <Brain className='w-4 h-4' />
-                    Thinking Process
-                    <span className='text-xs text-gray-500'>
-                      ({data.thinkingSteps.length} steps)
-                    </span>
-                  </h4>
-                  <div className='space-y-2 max-h-32 overflow-y-auto bg-gray-50 rounded-lg p-3'>
-                    {data.thinkingSteps.map((step, index) => {
-                      const stepData = step as Record<string, unknown>;
-                      return (
-                        <div
-                          key={index}
-                          className='text-xs bg-white p-2 rounded border border-gray-200'>
-                          <div className='flex items-center gap-2 mb-1'>
-                            <span className='font-medium text-blue-600'>
-                              {stepData.type as string}
-                            </span>
-                            <span className='text-gray-400'>•</span>
-                            <span className='text-gray-500'>
-                              Step {index + 1}
-                            </span>
-                          </div>
-                          <div className='text-gray-700 leading-relaxed'>
-                            {stepData.reasoning as string || stepData.content as string}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Tool Calls */}
-              {data.toolCalls && data.toolCalls.length > 0 && (
-                <div>
-                  <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
-                    <Zap className='w-4 h-4' />
-                    Tool Calls
-                    <span className='text-xs text-gray-500'>
-                      ({data.toolCalls.length} calls)
-                    </span>
-                  </h4>
-                  <div className='space-y-2 max-h-32 overflow-y-auto bg-gray-50 rounded-lg p-3'>
-                    {data.toolCalls.map((call, index) => {
-                      const callData = call as Record<string, unknown>;
-                      return (
-                        <div
-                          key={index}
-                          className='text-xs bg-white p-2 rounded border border-gray-200'>
-                          <div className='flex items-center gap-2 mb-1'>
-                            <span className='font-medium text-green-600'>
-                              {callData.tool as string}
-                            </span>
-                            <span className='text-gray-400'>•</span>
-                            <span className='text-gray-500'>
-                              Call {index + 1}
-                            </span>
-                            {callData.status && (
-                              <>
-                                <span className='text-gray-400'>•</span>
-                                <span
-                                  className={`text-xs px-1 rounded ${
-                                    callData.status === "success"
-                                      ? "bg-green-100 text-green-700"
-                                      : callData.status === "error"
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-yellow-100 text-yellow-700"
-                                  }`}>
-                                  {callData.status as string}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          {callData.parameters && (
-                            <div className='text-gray-600 mb-1'>
-                              <span className='font-medium'>Parameters:</span>{" "}
-                              {JSON.stringify(callData.parameters)}
-                            </div>
-                          )}
-                          {callData.result && (
-                            <div className='text-gray-600'>
-                              <span className='font-medium'>Result:</span>{" "}
-                              {typeof callData.result === "string"
-                                ? callData.result
-                                : JSON.stringify(callData.result)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Execution Details */}
-              {data.status === "completed" && (
-                <div>
-                  <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
-                    <CheckCircle className='w-4 h-4' />
-                    Execution Summary
-                  </h4>
-                  <div className='bg-green-50 border border-green-200 rounded-lg p-3'>
-                    <div className='text-xs text-green-700'>
-                      <div className='flex items-center gap-2 mb-1'>
-                        <CheckCircle className='w-3 h-3' />
-                        <span className='font-medium'>
-                          Execution completed successfully
-                        </span>
-                      </div>
-                      {data.executionProgress && (
-                        <div className='text-gray-600'>
-                          Progress: {Math.round(data.executionProgress)}%
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Error Details */}
-              {data.status === "error" && (
-                <div>
-                  <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
-                    <AlertCircle className='w-4 h-4' />
-                    Error Details
-                  </h4>
-                  <div className='bg-red-50 border border-red-200 rounded-lg p-3'>
-                    <div className='text-xs text-red-700'>
-                      <div className='flex items-center gap-2 mb-1'>
-                        <AlertCircle className='w-3 h-3' />
-                        <span className='font-medium'>Execution failed</span>
-                      </div>
-                      {data.executionError && (
-                        <div className='text-red-600 mt-1'>
-                          {data.executionError}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Real-time Execution Logs */}
-              {data.logs && data.logs.length > 0 && (
-                <div>
-                  <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
-                    <Clock className='w-4 h-4' />
-                    Execution Logs
-                    <span className='text-xs text-gray-500'>
-                      ({data.logs.length} entries)
-                    </span>
-                  </h4>
-                  <div className='space-y-1 max-h-32 overflow-y-auto bg-gray-50 rounded-lg p-3'>
-                    {data.logs.slice(-10).map((log, index) => (
-                      <div
-                        key={index}
-                        className={`text-xs p-2 rounded border ${
-                          log.level === "error"
-                            ? "bg-red-50 border-red-200 text-red-700"
-                            : log.level === "warn"
-                            ? "bg-yellow-50 border-yellow-200 text-yellow-700"
-                            : "bg-white border-gray-200 text-gray-700"
-                        }`}>
-                        <div className='flex items-center gap-2 mb-1'>
-                          <span className='font-medium'>
-                            {log.timestamp.split("T")[1]?.split(".")[0] ||
-                              log.timestamp}
-                          </span>
-                          <span className='text-gray-400'>•</span>
-                          <span
-                            className={`text-xs px-1 rounded ${
-                              log.level === "error"
-                                ? "bg-red-100 text-red-700"
-                                : log.level === "warn"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-blue-100 text-blue-700"
-                            }`}>
-                            {log.level.toUpperCase()}
-                          </span>
-                        </div>
-                        <div className='text-gray-600 leading-relaxed'>
-                          {log.message}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          )}
-        </div>
-
-        {/* Live Thinking Panel */}
-        {(data.status === "running" || data.status === "completed" || data.status === "error") && (
-          <Collapsible
-            open={sectionsOpen.liveThinking}
-            onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, liveThinking: open }))}
-            className='mb-4'
-          >
-            <CollapsibleTrigger className='flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors mb-2'>
-              <ChevronRight
-                className={cn(
-                  "w-4 h-4 transition-transform",
-                  sectionsOpen.liveThinking && "rotate-90"
-                )}
-              />
-              Live AI Thinking
-              {data.status === "running" && (
-                <Loader2 className='w-3 h-3 animate-spin text-blue-500 ml-1' />
-              )}
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-            <LiveThinkingPanel
-              nodeId={id}
-              thinkingSteps={(data.thinkingSteps as any[])?.map((step, index) => ({
-                id: step.id || `step-${index}`,
-                type: step.type || "reasoning",
-                content: step.content || step.reasoning || "",
-                timestamp: step.timestamp || new Date().toISOString(),
-                reasoning: step.reasoning,
-                tool: step.tool,
-                parameters: step.parameters,
-                result: step.result,
-                status: step.status,
-                duration: step.duration,
-              })) || []}
-              toolCalls={(data.toolCalls as any[])?.map((call, index) => ({
-                id: call.id || `tool-${index}`,
-                tool: call.tool || call.name || "unknown",
-                parameters: call.parameters || call.args || {},
-                result: call.result,
-                status: call.status || "completed",
-                timestamp: call.timestamp || new Date().toISOString(),
-                duration: call.duration,
-                error: call.error,
-              })) || []}
-              logs={(data.logs as any[])?.map((log, index) => ({
-                id: log.id || `log-${index}`,
-                timestamp: log.timestamp || new Date().toISOString(),
-                level: log.level || "info",
-                message: log.message || "",
-                nodeId: id,
-                context: log.metadata,
-              })) || []}
-              isThinking={data.status === "running"}
-              executionStatus={data.status === "error" ? "failed" : data.status}
-              defaultExpanded={sectionsOpen.liveThinking}
-              showTimestamps={true}
-              maxHeight="300px"
-              className="border-0 bg-transparent"
-            />
-            </CollapsibleContent>
-          </Collapsible>
+          "bg-background/90 backdrop-blur-md rounded-2xl shadow-lg border flex transition-all duration-300 ease-in-out relative overflow-hidden",
+          isExpanded ? "w-[680px]" : "w-[380px]"
         )}
+        style={{
+          ...statusAnimations.containerStyle,
+          position: "relative",
+          zIndex: 1,
+        }}>
+        {/* Main content background */}
+        <div className='absolute inset-0.5 rounded-2xl bg-background'></div>
 
-        <Handle
-          type='target'
-          position={Position.Left}
-          className='!w-3 !h-3 !bg-blue-500 !border-2 !border-white'
-        />
-        <Handle
-          type='source'
-          position={Position.Right}
-          className='!w-3 !h-3 !bg-blue-500 !border-2 !border-white'
-        />
-      </div>
+        {/* Main Node Content */}
+        <div className={cn("w-[380px] flex-shrink-0 relative z-10")}>
+          <div className='p-5'>
+            {/* Status Bar - Most Prominent */}
+            <div className='flex items-center justify-between mb-4'>
+              <div className='flex items-center gap-4'>
+                {/* Status-first approach */}
+                <div className='flex flex-col items-center'>
+                  <div
+                    className={cn(
+                      "w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg relative"
+                    )}>
+                    {/* Status-specific icon effects */}
+                    {statusAnimations.iconEffects}
 
-      {/* Expanded Configuration Panel */}
-      {isExpanded && (
-        <div className='w-[300px] flex-shrink-0 border-l border-gray-200/80'>
-          <Tabs defaultValue='config' className='h-full'>
-            <TabsList className='grid w-full grid-cols-3'>
-              <TabsTrigger value='config'>Config</TabsTrigger>
-              <TabsTrigger value='tools'>Tools</TabsTrigger>
-              <TabsTrigger value='execution'>Execution</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value='config' className='p-4 space-y-4'>
-              <div>
-                <Label className='text-xs'>Agent Name</Label>
-                <input
-                  value={data.config?.agent?.name || ""}
-                  onChange={(e) =>
-                    handleConfigUpdate({
-                      agent: { ...data.config?.agent, name: e.target.value },
-                    })
-                  }
-                  className='w-full text-sm p-2 border border-gray-200 rounded mt-1'
-                  placeholder='AI Assistant'
-                />
-              </div>
-
-              <div>
-                <Label className='text-xs'>System Prompt</Label>
-                <Textarea
-                  value={data.config?.agent?.systemPrompt || ""}
-                  onChange={(e) =>
-                    handleConfigUpdate({
-                      agent: {
-                        ...data.config?.agent,
-                        systemPrompt: e.target.value,
-                      },
-                    })
-                  }
-                  className='w-full text-sm mt-1'
-                  placeholder='You are a helpful AI assistant...'
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <Label className='text-xs'>User Prompt</Label>
-                <Textarea
-                  value={data.config?.agent?.userPrompt || ""}
-                  onChange={(e) =>
-                    handleConfigUpdate({
-                      agent: {
-                        ...data.config?.agent,
-                        userPrompt: e.target.value,
-                      },
-                    })
-                  }
-                  className='w-full text-sm mt-1'
-                  placeholder='What would you like me to help you with?'
-                  rows={2}
-                />
-              </div>
-
-              <div>
-                <Label className='text-xs'>Thinking Mode</Label>
-                <Select
-                  value={data.config?.agent?.thinkingMode || "deliberate"}
-                  onValueChange={(value) =>
-                    handleConfigUpdate({
-                      agent: { ...data.config?.agent, thinkingMode: value },
-                    })
-                  }>
-                  <SelectTrigger className='w-full text-sm mt-1'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='fast'>Fast</SelectItem>
-                    <SelectItem value='deliberate'>Deliberate</SelectItem>
-                    <SelectItem value='collaborative'>Collaborative</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </TabsContent>
-
-            <TabsContent value='tools' className='p-4'>
-              <div className='space-y-2'>
-                <h4 className='text-sm font-semibold'>Available Tools</h4>
-                {isLoading ? (
-                  <div className='flex items-center justify-center p-4'>
-                    <Loader2 className='w-6 h-6 animate-spin mr-2' />
-                    <span className='text-sm text-gray-500'>
-                      Loading tools...
-                    </span>
+                    {/* Brain icon */}
+                    <Brain className='w-7 h-7 text-white relative z-10' />
                   </div>
-                ) : error ? (
-                  <div className='p-4 text-center text-sm text-red-500'>
-                    Failed to load tools: {error}
+                  <div className='flex items-center gap-1 text-xs text-gray-600 mt-1'>
+                    {getStatusIcon()}
+                    <span className='font-medium'>{getStatusText()}</span>
                   </div>
-                ) : (
-                  availableTools.map((tool) => (
-                    <div
-                      key={tool.id}
-                      className='flex items-center justify-between p-2 bg-gray-50 rounded'>
-                      <div className='flex items-center gap-2'>
-                        <div
-                          className={cn(
-                            "w-6 h-6 rounded flex items-center justify-center",
-                            tool.color
-                          )}>
-                          {tool.icon}
-                        </div>
-                        <div>
-                          <div className='text-sm font-medium'>{tool.name}</div>
-                          <div className='text-xs text-gray-500'>
-                            {tool.description}
-                          </div>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={connectedTools.some(
-                          (t) => t.id === tool.id && t.isEnabled
-                        )}
-                        onCheckedChange={(enabled) => {
-                          if (enabled) {
-                            handleSelect(tool);
-                          } else {
-                            handleRemoveTool(tool.id);
-                          }
-                        }}
-                      />
-                    </div>
-                  ))
+                </div>
+
+                {/* Agent Identity */}
+                <div className='flex-1'>
+                  <h3 className='font-bold text-lg text-gray-900'>
+                    {data.config?.agent?.name || "AI Agent"}
+                  </h3>
+                  <p className='text-sm text-gray-500'>
+                    {data.config?.agent?.systemPrompt ||
+                      "AI-powered agent with tools and reasoning capabilities"}
+                  </p>
+                </div>
+              </div>
+
+              <div className='flex items-center gap-2'>
+                {wsConnected && (
+                  <div className='flex items-center gap-1 text-xs'>
+                    <div className='w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse'></div>
+                    <span className='text-green-600 font-medium'>Live</span>
+                  </div>
                 )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value='execution' className='p-4 space-y-4'>
-              <div>
-                <Label className='text-xs'>Execution Mode</Label>
-                <Select
-                  value={data.config?.execution?.mode || "autonomous"}
-                  onValueChange={(value) =>
-                    handleConfigUpdate({
-                      execution: { ...data.config?.execution, mode: value },
-                    })
-                  }>
-                  <SelectTrigger className='w-full text-sm mt-1'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='autonomous'>Autonomous</SelectItem>
-                    <SelectItem value='interactive'>Interactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className='space-y-2'>
-                <div className='flex items-center justify-between'>
-                  <Label className='text-xs'>Save Thinking Process</Label>
-                  <Switch
-                    checked={data.config?.execution?.saveThinking || false}
-                    onCheckedChange={(checked) =>
-                      handleConfigUpdate({
-                        execution: {
-                          ...data.config?.execution,
-                          saveThinking: checked,
-                        },
-                      })
-                    }
-                  />
-                </div>
-
-                <div className='flex items-center justify-between'>
-                  <Label className='text-xs'>Require Approval</Label>
-                  <Switch
-                    checked={data.config?.execution?.requireApproval || false}
-                    onCheckedChange={(checked) =>
-                      handleConfigUpdate({
-                        execution: {
-                          ...data.config?.execution,
-                          requireApproval: checked,
-                        },
-                      })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className='pt-4'>
                 <Button
-                  className='w-full'
+                  variant='ghost'
                   size='sm'
-                  onClick={() => setIsExecuting(!isExecuting)}
-                  disabled={data.status === "running"}>
-                  {data.status === "running" ? (
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className='flex items-center gap-2'
+                  aria-label={
+                    isExpanded
+                      ? "Collapse configuration"
+                      : "Expand configuration"
+                  }>
+                  {isExpanded ? (
                     <>
-                      <Pause className='w-4 h-4 mr-2' />
-                      Pause
+                      <ChevronRight className='w-4 h-4 rotate-180' />
+                      <span className='text-xs'>Collapse</span>
                     </>
                   ) : (
                     <>
-                      <Play className='w-4 h-4 mr-2' />
-                      Execute
+                      <Settings className='w-4 h-4' />
+                      <span className='text-xs'>Configure</span>
                     </>
                   )}
                 </Button>
               </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      )}
+            </div>
 
-      {/* Tool Configuration Modal */}
-      <ToolConfigModal
-        tool={configModal.tool}
-        isOpen={configModal.isOpen}
-        onClose={handleConfigModalClose}
-        onSave={handleConfigModalSave}
-      />
-    </div>
+            {/* Live region for screen readers */}
+            <div aria-live='polite' aria-atomic='true' className='sr-only'>
+              Agent status: {getStatusText()}
+              {data.executionProgress &&
+                `, Progress: ${Math.round(data.executionProgress)}%`}
+            </div>
+
+            {/* Execution Progress */}
+            {data.status === "running" &&
+              data.executionProgress !== undefined && (
+                <div className='mb-4'>
+                  <div className='flex items-center justify-between text-xs text-gray-600 mb-1'>
+                    <span className='font-medium'>Execution Progress</span>
+                    <span className='font-bold'>
+                      {Math.round(data.executionProgress)}%
+                    </span>
+                  </div>
+                  <Progress value={data.executionProgress} className='h-2' />
+                </div>
+              )}
+
+            {/* Active Tools Summary */}
+            <Collapsible
+              open={sectionsOpen.connectedTools}
+              onOpenChange={(open) =>
+                setSectionsOpen((prev) => ({ ...prev, connectedTools: open }))
+              }
+              className='mb-4'>
+              <div className='flex items-center justify-between mb-2'>
+                <CollapsibleTrigger className='flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors'>
+                  <ChevronRight
+                    className={cn(
+                      "w-4 h-4 transition-transform",
+                      sectionsOpen.connectedTools && "rotate-90"
+                    )}
+                  />
+                  <Zap className='w-4 h-4' />
+                  Connected Tools ({connectedTools.length})
+                </CollapsibleTrigger>
+                <Button
+                  size='sm'
+                  variant='outline'
+                  onClick={(e) => handleAddClick("tool", e)}
+                  className='flex items-center gap-1'>
+                  <Plus className='w-3 h-3' />
+                  Add Tool
+                </Button>
+              </div>
+              <CollapsibleContent>
+                <div className='space-y-3'>
+                  {connectedTools.length === 0 ? (
+                    <div className='text-center py-6'>
+                      <div className='text-gray-400 mb-2'>
+                        <Zap className='w-8 h-8 mx-auto' />
+                      </div>
+                      <div className='text-sm text-gray-500 font-medium'>
+                        No tools connected
+                      </div>
+                      <div className='text-xs text-gray-400 mt-1'>
+                        Add tools to enhance your AI assistant
+                      </div>
+                    </div>
+                  ) : (
+                    <div className='space-y-2'>
+                      {connectedTools.map((tool) => (
+                        <div
+                          key={tool.id}
+                          className='group relative flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200'>
+                          <div className='flex items-start gap-3 flex-1 min-w-0'>
+                            <div
+                              className={cn(
+                                "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm",
+                                tool.color
+                              )}>
+                              {tool.icon}
+                            </div>
+                            <div className='flex-1 min-w-0'>
+                              <div className='flex items-center gap-2'>
+                                <div className='text-sm font-semibold text-gray-900'>
+                                  {tool.name}
+                                </div>
+                                {tool.isEnabled && (
+                                  <div className='flex items-center gap-1'>
+                                    <div className='w-1.5 h-1.5 bg-green-500 rounded-full'></div>
+                                    <span className='text-xs text-green-600 font-medium'>
+                                      Active
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              {tool.description && (
+                                <div className='text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed'>
+                                  {tool.description}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className='flex items-center gap-3 flex-shrink-0'>
+                            <Switch
+                              checked={tool.isEnabled}
+                              onCheckedChange={(enabled) => {
+                                console.log(
+                                  "Switch clicked for tool:",
+                                  tool.id,
+                                  tool.name,
+                                  "enabled:",
+                                  enabled
+                                );
+                                handleToolToggle(tool.id, enabled);
+                              }}
+                            />
+                            <Button
+                              variant='ghost'
+                              size='sm'
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log(
+                                  "Removing tool:",
+                                  tool.id,
+                                  tool.name
+                                );
+                                handleRemoveTool(tool.id);
+                              }}
+                              className='w-7 h-7 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100'
+                              title='Remove Tool'>
+                              <X className='w-4 h-4' />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {popover === "tool" && (
+                  <AddComponentPopover
+                    items={availableTools}
+                    onSelect={handleSelect}
+                    onClose={() => setPopover(null)}
+                    isLoading={isLoading}
+                  />
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Enhanced Execution Details */}
+            {(data.status === "running" ||
+              data.status === "completed" ||
+              data.status === "error") && (
+              <Collapsible
+                open={sectionsOpen.executionDetails}
+                onOpenChange={(open) =>
+                  setSectionsOpen((prev) => ({
+                    ...prev,
+                    executionDetails: open,
+                  }))
+                }
+                className='mb-4'>
+                <CollapsibleTrigger className='flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors mb-2'>
+                  <ChevronRight
+                    className={cn(
+                      "w-4 h-4 transition-transform",
+                      sectionsOpen.executionDetails && "rotate-90"
+                    )}
+                  />
+                  Execution Details
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className='space-y-4'>
+                    {/* Thinking Process */}
+                    {data.thinkingSteps && data.thinkingSteps.length > 0 && (
+                      <div>
+                        <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
+                          <Brain className='w-4 h-4' />
+                          Thinking Process
+                          <span className='text-xs text-gray-500'>
+                            ({data.thinkingSteps.length} steps)
+                          </span>
+                        </h4>
+                        <div className='space-y-2 max-h-32 overflow-y-auto bg-gray-50 rounded-lg p-3'>
+                          {data.thinkingSteps.map((step, index) => {
+                            const stepData = step as Record<string, unknown>;
+                            return (
+                              <div
+                                key={index}
+                                className='text-xs bg-white p-2 rounded border border-gray-200'>
+                                <div className='flex items-center gap-2 mb-1'>
+                                  <span className='font-medium text-blue-600'>
+                                    {stepData.type as string}
+                                  </span>
+                                  <span className='text-gray-400'>•</span>
+                                  <span className='text-gray-500'>
+                                    Step {index + 1}
+                                  </span>
+                                </div>
+                                <div className='text-gray-700 leading-relaxed'>
+                                  {(stepData.reasoning as string) ||
+                                    (stepData.content as string)}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tool Calls */}
+                    {data.toolCalls && data.toolCalls.length > 0 && (
+                      <div>
+                        <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
+                          <Zap className='w-4 h-4' />
+                          Tool Calls
+                          <span className='text-xs text-gray-500'>
+                            ({data.toolCalls.length} calls)
+                          </span>
+                        </h4>
+                        <div className='space-y-2 max-h-32 overflow-y-auto bg-gray-50 rounded-lg p-3'>
+                          {data.toolCalls.map((call, index) => {
+                            const callData = call as Record<string, unknown>;
+                            return (
+                              <div
+                                key={index}
+                                className='text-xs bg-white p-2 rounded border border-gray-200'>
+                                <div className='flex items-center gap-2 mb-1'>
+                                  <span className='font-medium text-green-600'>
+                                    {callData.tool as string}
+                                  </span>
+                                  <span className='text-gray-400'>•</span>
+                                  <span className='text-gray-500'>
+                                    Call {index + 1}
+                                  </span>
+                                  {callData.status && (
+                                    <>
+                                      <span className='text-gray-400'>•</span>
+                                      <span
+                                        className={`text-xs px-1 rounded ${
+                                          callData.status === "success"
+                                            ? "bg-green-100 text-green-700"
+                                            : callData.status === "error"
+                                            ? "bg-red-100 text-red-700"
+                                            : "bg-yellow-100 text-yellow-700"
+                                        }`}>
+                                        {callData.status as string}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                                {callData.parameters && (
+                                  <div className='text-gray-600 mb-1'>
+                                    <span className='font-medium'>
+                                      Parameters:
+                                    </span>{" "}
+                                    {JSON.stringify(callData.parameters)}
+                                  </div>
+                                )}
+                                {callData.result && (
+                                  <div className='text-gray-600'>
+                                    <span className='font-medium'>Result:</span>{" "}
+                                    {typeof callData.result === "string"
+                                      ? callData.result
+                                      : JSON.stringify(callData.result)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Execution Details */}
+                    {data.status === "completed" && (
+                      <div>
+                        <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
+                          <CheckCircle className='w-4 h-4' />
+                          Execution Summary
+                        </h4>
+                        <div className='bg-green-50 border border-green-200 rounded-lg p-3'>
+                          <div className='text-xs text-green-700'>
+                            <div className='flex items-center gap-2 mb-1'>
+                              <CheckCircle className='w-3 h-3' />
+                              <span className='font-medium'>
+                                Execution completed successfully
+                              </span>
+                            </div>
+                            {data.executionProgress && (
+                              <div className='text-gray-600'>
+                                Progress: {Math.round(data.executionProgress)}%
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Error Details */}
+                    {data.status === "error" && (
+                      <div>
+                        <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
+                          <AlertCircle className='w-4 h-4' />
+                          Error Details
+                        </h4>
+                        <div className='bg-red-50 border border-red-200 rounded-lg p-3'>
+                          <div className='text-xs text-red-700'>
+                            <div className='flex items-center gap-2 mb-1'>
+                              <AlertCircle className='w-3 h-3' />
+                              <span className='font-medium'>
+                                Execution failed
+                              </span>
+                            </div>
+                            {data.executionError && (
+                              <div className='text-red-600 mt-1'>
+                                {data.executionError}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Real-time Execution Logs */}
+                    {data.logs && data.logs.length > 0 && (
+                      <div>
+                        <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
+                          <Clock className='w-4 h-4' />
+                          Execution Logs
+                          <span className='text-xs text-gray-500'>
+                            ({data.logs.length} entries)
+                          </span>
+                        </h4>
+                        <div className='space-y-1 max-h-32 overflow-y-auto bg-gray-50 rounded-lg p-3'>
+                          {data.logs.slice(-10).map((log, index) => (
+                            <div
+                              key={index}
+                              className={`text-xs p-2 rounded border ${
+                                log.level === "error"
+                                  ? "bg-red-50 border-red-200 text-red-700"
+                                  : log.level === "warn"
+                                  ? "bg-yellow-50 border-yellow-200 text-yellow-700"
+                                  : "bg-white border-gray-200 text-gray-700"
+                              }`}>
+                              <div className='flex items-center gap-2 mb-1'>
+                                <span className='font-medium'>
+                                  {log.timestamp.split("T")[1]?.split(".")[0] ||
+                                    log.timestamp}
+                                </span>
+                                <span className='text-gray-400'>•</span>
+                                <span
+                                  className={`text-xs px-1 rounded ${
+                                    log.level === "error"
+                                      ? "bg-red-100 text-red-700"
+                                      : log.level === "warn"
+                                      ? "bg-yellow-100 text-yellow-700"
+                                      : "bg-blue-100 text-blue-700"
+                                  }`}>
+                                  {log.level.toUpperCase()}
+                                </span>
+                              </div>
+                              <div className='text-gray-600 leading-relaxed'>
+                                {log.message}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+          </div>
+
+          {/* Live Thinking Panel */}
+          {(data.status === "running" ||
+            data.status === "completed" ||
+            data.status === "error") && (
+            <Collapsible
+              open={sectionsOpen.liveThinking}
+              onOpenChange={(open) =>
+                setSectionsOpen((prev) => ({ ...prev, liveThinking: open }))
+              }
+              className='mb-4'>
+              <LiveThinkingPanel
+                nodeId={id}
+                thinkingSteps={
+                  (data.thinkingSteps as any[])?.map((step, index) => ({
+                    id: step.id || `step-${index}`,
+                    type: step.type || "reasoning",
+                    content: step.content || step.reasoning || "",
+                    timestamp: step.timestamp || new Date().toISOString(),
+                    reasoning: step.reasoning,
+                    tool: step.tool,
+                    parameters: step.parameters,
+                    result: step.result,
+                    status: step.status,
+                    duration: step.duration,
+                  })) || []
+                }
+                toolCalls={
+                  (data.toolCalls as any[])?.map((call, index) => ({
+                    id: call.id || `tool-${index}`,
+                    tool: call.tool || call.name || "unknown",
+                    parameters: call.parameters || call.args || {},
+                    result: call.result,
+                    status: call.status || "completed",
+                    timestamp: call.timestamp || new Date().toISOString(),
+                    duration: call.duration,
+                    error: call.error,
+                  })) || []
+                }
+                logs={
+                  (data.logs as any[])?.map((log, index) => ({
+                    id: log.id || `log-${index}`,
+                    timestamp: log.timestamp || new Date().toISOString(),
+                    level: log.level || "info",
+                    message: log.message || "",
+                    nodeId: id,
+                    context: log.metadata,
+                  })) || []
+                }
+                isThinking={data.status === "running"}
+                executionStatus={
+                  data.status === "error" ? "failed" : data.status
+                }
+                defaultExpanded={sectionsOpen.liveThinking}
+                showTimestamps={true}
+                maxHeight='300px'
+                className='border-0 bg-transparent'
+              />
+            </Collapsible>
+          )}
+
+          <Handle
+            type='target'
+            position={Position.Left}
+            className='!w-3 !h-3 !bg-blue-500 !border-2 !border-white'
+          />
+          <Handle
+            type='source'
+            position={Position.Right}
+            className='!w-3 !h-3 !bg-blue-500 !border-2 !border-white'
+          />
+        </div>
+
+        {/* Expanded Configuration Panel */}
+        {isExpanded && (
+          <div className='w-[300px] flex-shrink-0 border-l border-gray-200/80 bg-white relative z-20'>
+            <div className='h-full flex flex-col'>
+              <Tabs defaultValue='config' className='h-full flex flex-col'>
+                <TabsList className='grid w-full grid-cols-3'>
+                  <TabsTrigger value='config'>Config</TabsTrigger>
+                  <TabsTrigger value='tools'>Tools</TabsTrigger>
+                  <TabsTrigger value='execution'>Execution</TabsTrigger>
+                </TabsList>
+                <div className='flex-1 overflow-y-auto'>
+                  <TabsContent value='config' className='p-4 space-y-4 h-full'>
+                    <div>
+                      <Label className='text-xs'>Agent Name</Label>
+                      <input
+                        value={data.config?.agent?.name || ""}
+                        onChange={(e) =>
+                          handleConfigUpdate({
+                            agent: {
+                              ...data.config?.agent,
+                              name: e.target.value,
+                            },
+                          })
+                        }
+                        className='w-full text-sm p-2 border border-gray-200 rounded mt-1'
+                        placeholder='AI Assistant'
+                      />
+                    </div>
+                    <div>
+                      <Label className='text-xs'>System Prompt</Label>
+                      <Textarea
+                        value={data.config?.agent?.systemPrompt || ""}
+                        onChange={(e) =>
+                          handleConfigUpdate({
+                            agent: {
+                              ...data.config?.agent,
+                              systemPrompt: e.target.value,
+                            },
+                          })
+                        }
+                        className='w-full text-sm mt-1'
+                        placeholder='You are a helpful AI assistant...'
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <Label className='text-xs'>User Prompt</Label>
+                      <Textarea
+                        value={data.config?.agent?.userPrompt || ""}
+                        onChange={(e) =>
+                          handleConfigUpdate({
+                            agent: {
+                              ...data.config?.agent,
+                              userPrompt: e.target.value,
+                            },
+                          })
+                        }
+                        className='w-full text-sm mt-1'
+                        placeholder='What would you like me to help you with?'
+                        rows={2}
+                      />
+                    </div>
+                    <div>
+                      <Label className='text-xs'>Thinking Mode</Label>
+                      <Select
+                        value={data.config?.agent?.thinkingMode || "deliberate"}
+                        onValueChange={(value) =>
+                          handleConfigUpdate({
+                            agent: {
+                              ...data.config?.agent,
+                              thinkingMode: value,
+                            },
+                          })
+                        }>
+                        <SelectTrigger className='w-full text-sm mt-1'>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='fast'>Fast</SelectItem>
+                          <SelectItem value='deliberate'>Deliberate</SelectItem>
+                          <SelectItem value='collaborative'>
+                            Collaborative
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value='tools' className='p-4 h-full'>
+                    <div className='space-y-2'>
+                      <h4 className='text-sm font-semibold'>Available Tools</h4>
+                      {isLoading ? (
+                        <div className='flex items-center justify-center p-4'>
+                          <Loader2 className='w-6 h-6 animate-spin mr-2' />
+                          <span className='text-sm text-gray-500'>
+                            Loading tools...
+                          </span>
+                        </div>
+                      ) : error ? (
+                        <div className='p-4 text-center text-sm text-red-500'>
+                          Failed to load tools: {error}
+                        </div>
+                      ) : (
+                        availableTools.map((tool) => (
+                          <div
+                            key={tool.id}
+                            className='flex items-center justify-between p-2 bg-gray-50 rounded'>
+                            <div className='flex items-center gap-2'>
+                              <div
+                                className={cn(
+                                  "w-6 h-6 rounded flex items-center justify-center",
+                                  tool.color
+                                )}>
+                                {tool.icon}
+                              </div>
+                              <div>
+                                <div className='text-sm font-medium'>
+                                  {tool.name}
+                                </div>
+                                <div className='text-xs text-gray-500'>
+                                  {tool.description}
+                                </div>
+                              </div>
+                            </div>
+                            <Switch
+                              checked={connectedTools.some(
+                                (t) => t.id === tool.id && t.isEnabled
+                              )}
+                              onCheckedChange={(enabled) => {
+                                if (enabled) {
+                                  handleSelect(tool);
+                                } else {
+                                  handleRemoveTool(tool.id);
+                                }
+                              }}
+                            />
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </TabsContent>
+                  <TabsContent
+                    value='execution'
+                    className='p-4 space-y-4 h-full'>
+                    <div>
+                      <Label className='text-xs'>Execution Mode</Label>
+                      <Select
+                        value={data.config?.execution?.mode || "autonomous"}
+                        onValueChange={(value) =>
+                          handleConfigUpdate({
+                            execution: {
+                              ...data.config?.execution,
+                              mode: value,
+                            },
+                          })
+                        }>
+                        <SelectTrigger className='w-full text-sm mt-1'>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='autonomous'>Autonomous</SelectItem>
+                          <SelectItem value='interactive'>
+                            Interactive
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className='space-y-2'>
+                      <div className='flex items-center justify-between'>
+                        <Label className='text-xs'>Save Thinking Process</Label>
+                        <Switch
+                          checked={
+                            data.config?.execution?.saveThinking || false
+                          }
+                          onCheckedChange={(checked) =>
+                            handleConfigUpdate({
+                              execution: {
+                                ...data.config?.execution,
+                                saveThinking: checked,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <Label className='text-xs'>Require Approval</Label>
+                        <Switch
+                          checked={
+                            data.config?.execution?.requireApproval || false
+                          }
+                          onCheckedChange={(checked) =>
+                            handleConfigUpdate({
+                              execution: {
+                                ...data.config?.execution,
+                                requireApproval: checked,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className='pt-4'>
+                      <Button
+                        className='w-full'
+                        size='sm'
+                        onClick={() => setIsExecuting(!isExecuting)}
+                        disabled={data.status === "running"}>
+                        {data.status === "running" ? (
+                          <>
+                            <Pause className='w-4 h-4 mr-2' />
+                            Pause
+                          </>
+                        ) : (
+                          <>
+                            <Play className='w-4 h-4 mr-2' />
+                            Execute
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </div>
+              </Tabs>
+            </div>
+          </div>
+        )}
+
+        {/* Tool Configuration Modal */}
+        <ToolConfigModal
+          tool={configModal.tool}
+          isOpen={configModal.isOpen}
+          onClose={handleConfigModalClose}
+          onSave={handleConfigModalSave}
+        />
+      </div>
+    </>
   );
 }
 
@@ -1483,6 +1710,7 @@ export function AIAgentConfig({
         isEnabled: tool.enabled !== false, // Default to true unless explicitly false
         config: tool.config || {},
       }));
+
       setConnectedTools(toolsFromConfig);
     }
   }, [config.selectedTools, onChange]);
@@ -1521,6 +1749,7 @@ export function AIAgentConfig({
     const toolExistsInConfig = currentSelectedTools.some(
       (t) => t.id === item.id
     );
+
     if (toolExistsInConfig) {
       console.log(
         `Tool ${item.name} already exists in config, skipping duplicate`
@@ -1564,11 +1793,13 @@ export function AIAgentConfig({
         category?: string;
         enabled?: boolean;
       }>) || [];
+
     console.log("Current selectedTools in config:", currentSelectedTools);
 
     const updatedSelectedTools = currentSelectedTools.filter(
       (tool) => tool.id !== toolId
     );
+
     console.log("Updated selectedTools after filtering:", updatedSelectedTools);
 
     handleConfigUpdate({
@@ -1579,7 +1810,6 @@ export function AIAgentConfig({
   const handleConfigUpdate = (updates: Record<string, unknown>) => {
     // Special handling for selectedTools - always replace, never merge
     let newConfig: Record<string, unknown>;
-
     if (updates.selectedTools !== undefined) {
       // For selectedTools, always replace the entire array
       newConfig = {
@@ -1593,7 +1823,6 @@ export function AIAgentConfig({
         source: Record<string, unknown>
       ): Record<string, unknown> => {
         const result = { ...target };
-
         for (const [key, value] of Object.entries(source)) {
           if (
             value &&
@@ -1613,7 +1842,6 @@ export function AIAgentConfig({
             result[key] = value;
           }
         }
-
         return result;
       };
 
@@ -1713,7 +1941,6 @@ export function AIAgentConfig({
               placeholder='AI Assistant'
             />
           </div>
-
           <div>
             <Label htmlFor='system-prompt' className='text-sm font-medium'>
               System Prompt
@@ -1737,7 +1964,6 @@ export function AIAgentConfig({
               rows={3}
             />
           </div>
-
           <div>
             <Label htmlFor='user-prompt' className='text-sm font-medium'>
               User Prompt
@@ -1761,7 +1987,6 @@ export function AIAgentConfig({
               rows={2}
             />
           </div>
-
           <div>
             <Label htmlFor='thinking-mode' className='text-sm font-medium'>
               Thinking Mode
@@ -1789,7 +2014,6 @@ export function AIAgentConfig({
               </SelectContent>
             </Select>
           </div>
-
           <div>
             <Label htmlFor='max-steps' className='text-sm font-medium'>
               Max Steps
@@ -1806,7 +2030,7 @@ export function AIAgentConfig({
                 handleConfigUpdate({
                   agent: {
                     ...((config.agent as Record<string, unknown>) || {}),
-                    maxSteps: parseInt(e.target.value),
+                    maxSteps: Number.parseInt(e.target.value),
                   },
                 })
               }
@@ -1935,7 +2159,6 @@ export function AIAgentConfig({
               </SelectContent>
             </Select>
           </div>
-
           <div className='space-y-2'>
             <div className='flex items-center justify-between'>
               <Label htmlFor='save-thinking' className='text-sm font-medium'>
@@ -1957,7 +2180,6 @@ export function AIAgentConfig({
                 }
               />
             </div>
-
             <div className='flex items-center justify-between'>
               <Label htmlFor='require-approval' className='text-sm font-medium'>
                 Require Approval
@@ -1979,7 +2201,6 @@ export function AIAgentConfig({
               />
             </div>
           </div>
-
           <div>
             <Label htmlFor='timeout' className='text-sm font-medium'>
               Timeout (ms)
@@ -1996,7 +2217,7 @@ export function AIAgentConfig({
                 handleConfigUpdate({
                   execution: {
                     ...((config.execution as Record<string, unknown>) || {}),
-                    timeout: parseInt(e.target.value),
+                    timeout: Number.parseInt(e.target.value),
                   },
                 })
               }
@@ -2138,7 +2359,6 @@ const ToolConfigModal = ({
           <DialogTitle>Configure {tool.name}</DialogTitle>
           <DialogDescription>{String(tool.description)}</DialogDescription>
         </DialogHeader>
-
         <div className='space-y-4'>
           {hasConfigSchema ? (
             Object.entries(tool.configSchema!.properties).map(([key, prop]) =>
@@ -2150,7 +2370,6 @@ const ToolConfigModal = ({
             </p>
           )}
         </div>
-
         <DialogFooter>
           <Button variant='outline' onClick={onClose}>
             Cancel

@@ -1221,6 +1221,10 @@ export default function BuilderPage() {
                   progress: node.data?.executionProgress,
                   error: node.data?.executionError,
                 }))}
+                edges={edges.map((edge) => ({
+                  source: edge.source,
+                  target: edge.target,
+                }))}
                 isExecuting={
                   isExecutionPending || executionStatus?.status === "running"
                 }

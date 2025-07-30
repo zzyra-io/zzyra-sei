@@ -76,9 +76,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings:
-      "rlig" 1,
-      "calt" 1;
+    font-feature-settings: "rlig" 1, "calt" 1;
     font-family: "Montserrat", sans-serif;
   }
 }
@@ -149,11 +147,8 @@
 
 /* Smooth transitions */
 .theme-transition {
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease,
-    border-color 0.3s ease,
-    box-shadow 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease,
+    border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* Premium card styles */
@@ -316,15 +311,21 @@
 /* Add this to the end of your globals.css file */
 
 .bg-grid-pattern {
-  background-image:
-    linear-gradient(to right, rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+  background-image: linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.1) 1px,
+      transparent 1px
+    ),
     linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
 .dark .bg-grid-pattern {
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+  background-image: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px
+    ),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
 }
 
@@ -361,9 +362,7 @@
 
 /* Button Animations */
 .interactive-btn-hover {
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .interactive-btn-hover:hover {
@@ -414,21 +413,17 @@
 
 /* Subtle hover effect for cards */
 .card-hover-effect {
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .card-hover-effect:hover {
   transform: translateY(-4px);
-  box-shadow:
-    0 10px 25px -5px rgba(0, 0, 0, 0.1),
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
     0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
 .dark .card-hover-effect:hover {
-  box-shadow:
-    0 10px 25px -5px rgba(0, 0, 0, 0.3),
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3),
     0 8px 10px -6px rgba(0, 0, 0, 0.2);
 }
 
@@ -454,10 +449,22 @@
 
 @keyframes loading-bar {
   0% {
-    left: -30%;
+    width: 0%;
   }
   100% {
-    left: 100%;
+    width: 100%;
+  }
+}
+
+@keyframes breathing {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.02);
   }
 }
 
@@ -470,9 +477,7 @@
 .page-enter-active {
   opacity: 1;
   transform: translateY(0);
-  transition:
-    opacity 300ms,
-    transform 300ms;
+  transition: opacity 300ms, transform 300ms;
 }
 
 .page-exit {
@@ -483,7 +488,5 @@
 .page-exit-active {
   opacity: 0;
   transform: translateY(-10px);
-  transition:
-    opacity 300ms,
-    transform 300ms;
+  transition: opacity 300ms, transform 300ms;
 }

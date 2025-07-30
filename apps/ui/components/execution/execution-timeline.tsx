@@ -35,6 +35,10 @@ interface ExecutionTimelineProps {
     progress?: number;
     error?: string;
   }>;
+  edges?: Array<{
+    source: string;
+    target: string;
+  }>;
   isExecuting: boolean;
   totalProgress: number;
   currentExecutionId?: string;
@@ -44,6 +48,7 @@ interface ExecutionTimelineProps {
 
 export function ExecutionTimeline({
   nodes,
+  edges = [],
   isExecuting,
   totalProgress,
   currentExecutionId,
@@ -51,18 +56,82 @@ export function ExecutionTimeline({
   onClose,
 }: ExecutionTimelineProps) {
   const sortedNodes = useMemo(() => {
-    return [...nodes].sort((a, b) => {
-      // Sort by execution order (pending -> running -> completed/failed)
-      const statusOrder = {
-        pending: 0,
-        running: 1,
-        completed: 2,
-        failed: 3,
-        skipped: 4,
-      };
-      return statusOrder[a.status] - statusOrder[b.status];
+    // Create a map of node dependencies based on edges
+    const nodeDependencies = new Map<string, Set<string>>();
+    const nodeReverseDependencies = new Map<string, Set<string>>();
+
+    // Initialize maps
+    nodes.forEach((node) => {
+      nodeDependencies.set(node.id, new Set());
+      nodeReverseDependencies.set(node.id, new Set());
     });
-  }, [nodes]);
+
+    // Build dependency graph from edges
+    edges.forEach((edge) => {
+      const sourceDeps = nodeDependencies.get(edge.source) || new Set();
+      sourceDeps.add(edge.target);
+      nodeDependencies.set(edge.source, sourceDeps);
+
+      const targetReverseDeps =
+        nodeReverseDependencies.get(edge.target) || new Set();
+      targetReverseDeps.add(edge.source);
+      nodeReverseDependencies.set(edge.target, targetReverseDeps);
+    });
+
+    // Topological sort using Kahn's algorithm
+    const inDegree = new Map<string, number>();
+    const queue: string[] = [];
+    const result: string[] = [];
+
+    // Initialize in-degree counts
+    nodes.forEach((node) => {
+      inDegree.set(node.id, 0);
+    });
+
+    // Calculate in-degrees based on dependencies
+    nodes.forEach((node) => {
+      const dependencies = nodeDependencies.get(node.id) || new Set();
+      dependencies.forEach((depId) => {
+        inDegree.set(depId, (inDegree.get(depId) || 0) + 1);
+      });
+    });
+
+    // Add nodes with no dependencies to queue
+    nodes.forEach((node) => {
+      if ((inDegree.get(node.id) || 0) === 0) {
+        queue.push(node.id);
+      }
+    });
+
+    // Process queue
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      result.push(currentId);
+
+      // Reduce in-degree for dependent nodes
+      const reverseDeps = nodeReverseDependencies.get(currentId) || new Set();
+      reverseDeps.forEach((depId) => {
+        const currentInDegree = inDegree.get(depId) || 0;
+        inDegree.set(depId, currentInDegree - 1);
+        if (currentInDegree - 1 === 0) {
+          queue.push(depId);
+        }
+      });
+    }
+
+    // If we have a cycle or incomplete sort, fall back to original order
+    if (result.length !== nodes.length) {
+      console.warn("Topological sort incomplete, using original order");
+      return [...nodes];
+    }
+
+    // Sort nodes based on topological order
+    return nodes.sort((a, b) => {
+      const aIndex = result.indexOf(a.id);
+      const bIndex = result.indexOf(b.id);
+      return aIndex - bIndex;
+    });
+  }, [nodes, edges]);
 
   const getStatusIcon = (status: string, isCurrent: boolean = false) => {
     switch (status) {
