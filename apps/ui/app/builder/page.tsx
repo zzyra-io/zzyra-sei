@@ -1198,17 +1198,6 @@ export default function BuilderPage() {
                   </div>
                 </div>
               )}
-
-              {/* Execution Status Panel - displays when a workflow is being executed */}
-              {showExecutionPanel && (
-                <div className='absolute bottom-4 right-4 z-30 w-96'>
-                  <ExecutionStatusPanel
-                    executionStatus={executionStatus || undefined}
-                    isLoadingStatus={isLoadingStatus}
-                    onClose={() => setShowExecutionPanel(false)}
-                  />
-                </div>
-              )}
             </ResizablePanel>
 
             {/* Horizontal Execution Timeline at Bottom */}

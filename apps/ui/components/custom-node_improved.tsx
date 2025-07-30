@@ -100,7 +100,7 @@ export interface NodeData {
   isExecuting?: boolean;
   executionProgress?: number;
   executionDuration?: number;
-  executionOutput?: any;
+  executionOutput?: unknown;
   executionError?: string;
   config?: Record<string, unknown>;
   logs?: Array<{ level: "info" | "warn" | "error"; message: string }>;
@@ -361,24 +361,26 @@ const StatusDisplay = ({
   );
 };
 
-export default function CircularNode({ id, data }: NodeProps<NodeData>) {
+export default function CircularNode({ data }: NodeProps) {
+  // Cast data to NodeData type with proper defaults
+  const nodeData = data as unknown as NodeData;
   const {
-    label,
-    iconName,
-    blockType,
-    description,
+    label = "Untitled",
+    iconName = "info",
+    blockType = "unknown",
+    description = "",
     isEnabled = true,
     executionStatus = "idle",
-    isExecuting,
-    executionProgress,
-    executionDuration,
-    executionOutput,
-    executionError,
+    executionProgress = 0,
+    executionDuration = 0,
+    executionOutput = null,
+    executionError = "",
     config = {},
     logs = [],
     validationErrors = [],
-    isLive,
-  } = data;
+    isLive = false,
+  } = nodeData;
+
 
   // Resolve icon with intelligent fallbacks
   const NodeIcon = useMemo(
@@ -561,6 +563,7 @@ export default function CircularNode({ id, data }: NodeProps<NodeData>) {
               )}
             </div>
           </TabsContent>
+
 
           <TabsContent value='logs' className='mt-4'>
             <div className='max-h-60 overflow-y-auto space-y-2 p-2 bg-muted rounded-md'>

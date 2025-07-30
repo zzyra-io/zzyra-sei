@@ -160,7 +160,7 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
       if (selectedNode) {
         // Extract the config from the updated data
         const { config, ...otherData } = updatedData;
-        
+
         // Use the store's updateNode function directly with the latest config
         const updatedNode = {
           ...selectedNode,
@@ -170,14 +170,14 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
             config: config || selectedNode.data.config || {},
           },
         };
-        
+
         console.log("handleConfigUpdate - updating node:", {
           nodeId: selectedNode.id,
           oldConfig: selectedNode.data.config,
           newConfig: config,
-          updatedNode: updatedNode
+          updatedNode: updatedNode,
         });
-        
+
         updateNode(selectedNode.id, updatedNode);
         setSelectedNode(updatedNode);
 
@@ -485,8 +485,8 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
             console.log("node", node);
             console.log("event", event);
             setSelectedNode(node);
-            setShowConfigPanel(true);
-            setShowEdgeConfigPanel(false);
+            // setShowConfigPanel(true);
+            // setShowEdgeConfigPanel(false);
           }}
           onNodeDoubleClick={(event, node) => {
             setSelectedNode(node);
@@ -582,8 +582,8 @@ function FlowContent({ toolbarRef }: FlowCanvasProps) {
                     ? "#3b82f6"
                     : "#2563eb"
                   : isDark
-                    ? "#374151"
-                    : "#e5e7eb";
+                  ? "#374151"
+                  : "#e5e7eb";
               }}
             />
           )}

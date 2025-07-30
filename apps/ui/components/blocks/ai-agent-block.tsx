@@ -56,6 +56,7 @@ import {
   NodeExecutionUpdate,
   ExecutionLog,
 } from "@/hooks/use-execution-websocket";
+import LiveThinkingPanel from "./live-thinking-panel";
 
 // Types
 interface ToolNode {
@@ -1045,6 +1046,51 @@ export function AgentNodeComponent({
             </div>
           )}
         </div>
+
+        {/* Live Thinking Panel */}
+        {(data.status === "running" || data.status === "completed") && (
+          <div className="mt-4">
+            <LiveThinkingPanel
+              nodeId={id}
+              thinkingSteps={(data.thinkingSteps as any[])?.map((step, index) => ({
+                id: step.id || `step-${index}`,
+                type: step.type || "reasoning",
+                content: step.content || step.reasoning || "",
+                timestamp: step.timestamp || new Date().toISOString(),
+                reasoning: step.reasoning,
+                tool: step.tool,
+                parameters: step.parameters,
+                result: step.result,
+                status: step.status,
+                duration: step.duration,
+              })) || []}
+              toolCalls={(data.toolCalls as any[])?.map((call, index) => ({
+                id: call.id || `tool-${index}`,
+                tool: call.tool || call.name || "unknown",
+                parameters: call.parameters || call.args || {},
+                result: call.result,
+                status: call.status || "completed",
+                timestamp: call.timestamp || new Date().toISOString(),
+                duration: call.duration,
+                error: call.error,
+              })) || []}
+              logs={(data.logs as any[])?.map((log, index) => ({
+                id: log.id || `log-${index}`,
+                timestamp: log.timestamp || new Date().toISOString(),
+                level: log.level || "info",
+                message: log.message || "",
+                nodeId: id,
+                context: log.metadata,
+              })) || []}
+              isThinking={data.status === "running"}
+              executionStatus={data.status}
+              defaultExpanded={data.status === "running"}
+              showTimestamps={true}
+              maxHeight="300px"
+            />
+          </div>
+        )}
+
         <Handle
           type='target'
           position={Position.Left}
