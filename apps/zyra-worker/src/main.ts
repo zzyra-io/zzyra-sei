@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -46,6 +47,9 @@ async function bootstrap() {
       abortOnError: false, // Don't exit immediately on errors during startup
     });
 
+    logger.log('🔌 Configuring WebSocket adapter...');
+    app.useWebSocketAdapter(new IoAdapter(app));
+
     logger.log('🔧 Configuring global pipes and interceptors...');
     // app.useGlobalPipes(
     //   new ValidationPipe({
@@ -72,6 +76,7 @@ async function bootstrap() {
     await app.listen(port);
 
     logger.log('🔄 Worker is ready to process tasks');
+    logger.log(`🔌 WebSocket server running on ws://localhost:${port}/execution`);
 
     // Health check endpoint info
     logger.log(`🏥 Health check available at: http://localhost:${port}/health`);

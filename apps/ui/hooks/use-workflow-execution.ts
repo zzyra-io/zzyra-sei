@@ -61,18 +61,51 @@ export function useWorkflowExecution() {
     onNodeUpdate: (update: NodeExecutionUpdate) => {
       console.log("Real-time node update:", update);
 
-      // Map execution node ID to UI node ID
-      // Execution node IDs have timestamps like "AI_AGENT-1753815752813"
-      // UI node IDs are like "AI_AGENT"
       const executionNodeId = update.nodeId;
-      const uiNodeId = executionNodeId.split("-")[0]; // Extract the base node ID
-
-      console.log(
-        `Mapping execution node ID ${executionNodeId} to UI node ID ${uiNodeId}`
-      );
-
-      // Find the UI node by the base ID
-      const uiNode = nodes.find((n) => n.id === uiNodeId);
+      
+      // Multiple strategies to map execution node ID to UI node ID
+      let uiNode = null;
+      let uiNodeId = "";
+      
+      // Strategy 1: Direct match (execution ID equals UI ID)
+      uiNode = nodes.find((n) => n.id === executionNodeId);
+      if (uiNode) {
+        uiNodeId = executionNodeId;
+        console.log(`Direct match found: ${executionNodeId}`);
+      } else {
+        // Strategy 2: Extract base ID by splitting on "-" (for timestamped IDs)
+        const baseId = executionNodeId.split("-")[0];
+        uiNode = nodes.find((n) => n.id === baseId);
+        if (uiNode) {
+          uiNodeId = baseId;
+          console.log(`Base ID match found: ${executionNodeId} -> ${baseId}`);
+        } else {
+          // Strategy 3: Find by node type/blockType if available
+          if (update.nodeType) {
+            uiNode = nodes.find((n) => 
+              n.data?.blockType === update.nodeType || 
+              n.data?.type === update.nodeType ||
+              n.type === update.nodeType
+            );
+            if (uiNode) {
+              uiNodeId = uiNode.id;
+              console.log(`Type match found: ${executionNodeId} -> ${uiNodeId} (type: ${update.nodeType})`);
+            }
+          }
+          
+          // Strategy 4: Find by node label if available
+          if (!uiNode && update.nodeLabel) {
+            uiNode = nodes.find((n) => 
+              n.data?.label === update.nodeLabel ||
+              n.data?.name === update.nodeLabel
+            );
+            if (uiNode) {
+              uiNodeId = uiNode.id;
+              console.log(`Label match found: ${executionNodeId} -> ${uiNodeId} (label: ${update.nodeLabel})`);
+            }
+          }
+        }
+      }
 
       if (uiNode) {
         // Update node with real-time status and enhanced visualization
@@ -108,7 +141,8 @@ export function useWorkflowExecution() {
         });
       } else {
         console.warn(
-          `UI node not found for execution node ID: ${executionNodeId} -> ${uiNodeId}`
+          `UI node not found for execution node ID: ${executionNodeId}. Tried strategies: direct match, base ID extraction, type matching, and label matching. Available nodes:`,
+          nodes.map(n => ({ id: n.id, type: n.type, blockType: n.data?.blockType, label: n.data?.label }))
         );
       }
     },
@@ -320,12 +354,41 @@ export function useWorkflowExecution() {
     if (executionStatus && nodes.length > 0) {
       console.log("Updating node statuses with:", executionStatus);
 
-      // Get node status map from execution status
-      const nodeStatusMap = executionStatus.node_statuses || {};
+      // Build node status map from nodeExecutions array
+      const nodeStatusMap: Record<string, string> = {};
+      
+      if (executionStatus.nodeExecutions) {
+        executionStatus.nodeExecutions.forEach((nodeExecution: any) => {
+          nodeStatusMap[nodeExecution.nodeId] = nodeExecution.status;
+        });
+      }
+
+      console.log("Built node status map:", nodeStatusMap);
 
       // Update each node with its execution status and enhanced data
       nodes.forEach((node) => {
-        const nodeStatus = nodeStatusMap[node.id];
+        // Try multiple strategies to find the execution status for this UI node
+        let nodeStatus = nodeStatusMap[node.id]; // Direct match first
+        let matchingExecutionNodeId = node.id;
+        
+        // If no direct match, try to find by checking execution node IDs that might map to this UI node
+        if (!nodeStatus) {
+          // Look for execution node IDs that could map to this UI node
+          for (const executionNodeId of Object.keys(nodeStatusMap)) {
+            const status = nodeStatusMap[executionNodeId];
+            // Check if this execution node maps to our UI node using same strategies as WebSocket
+            const baseId = executionNodeId.split("-")[0];
+            if (baseId === node.id || 
+                executionNodeId === node.id ||
+                (node.data?.blockType && executionNodeId.includes(node.data.blockType)) ||
+                (node.data?.type && executionNodeId.includes(node.data.type))) {
+              nodeStatus = status;
+              matchingExecutionNodeId = executionNodeId;
+              console.log(`Mapped execution node ${executionNodeId} to UI node ${node.id} with status ${status}`);
+              break;
+            }
+          }
+        }
 
         // Only update if status has changed
         if (nodeStatus && node.data?.status !== nodeStatus) {

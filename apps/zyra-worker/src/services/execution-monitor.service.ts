@@ -302,15 +302,22 @@ export class ExecutionMonitorService {
     // Emit WebSocket updates if gateway is available
     if (this.executionGateway) {
       try {
+        this.logger.log(
+          `🔥 WEBSOCKET: Emitting node update for node ${nodeId} status ${status} in execution ${executionId}`,
+        );
         this.executionGateway.emitNodeExecutionUpdate(executionId, update);
-        this.logger.debug(
-          `Emitted WebSocket update for node ${nodeId} in execution ${executionId}`,
+        this.logger.log(
+          `✅ WEBSOCKET: Successfully emitted update for node ${nodeId}`,
         );
       } catch (error) {
         this.logger.error(
-          `Failed to emit WebSocket update for node ${nodeId}: ${error}`,
+          `❌ WEBSOCKET: Failed to emit WebSocket update for node ${nodeId}: ${error}`,
         );
       }
+    } else {
+      this.logger.warn(
+        `⚠️ WEBSOCKET: ExecutionGateway not available for node ${nodeId} update`,
+      );
     }
 
     this.logger.log(`Node ${nodeId} in execution ${executionId}: ${status}`);

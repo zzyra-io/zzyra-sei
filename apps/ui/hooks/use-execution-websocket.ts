@@ -87,6 +87,28 @@ export function useExecutionWebSocket({
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 3;
 
+  // Store event handlers in refs to prevent stale closures and unnecessary reconnections
+  const handlersRef = useRef({
+    onNodeUpdate,
+    onEdgeFlow,
+    onExecutionComplete,
+    onExecutionFailed,
+    onExecutionLog,
+    onMetricsUpdate,
+  });
+
+  // Update handlers ref when props change
+  useEffect(() => {
+    handlersRef.current = {
+      onNodeUpdate,
+      onEdgeFlow,
+      onExecutionComplete,
+      onExecutionFailed,
+      onExecutionLog,
+      onMetricsUpdate,
+    };
+  }, [onNodeUpdate, onEdgeFlow, onExecutionComplete, onExecutionFailed, onExecutionLog, onMetricsUpdate]);
+
   useEffect(() => {
     if (!executionId) {
       return;
@@ -188,44 +210,45 @@ export function useExecutionWebSocket({
       console.log("WebSocket subscription confirmed:", data);
     });
 
-    // Execution event handlers
+
+    // Execution event handlers using current handlers from ref
     socket.on("execution_started", (data) => {
       console.log("Execution started:", data);
     });
 
     socket.on("node_execution_update", (update: NodeExecutionUpdate) => {
       console.log("Node execution update:", update);
-      onNodeUpdate?.(update);
+      handlersRef.current.onNodeUpdate?.(update);
     });
 
     socket.on("edge_flow_update", (update: EdgeFlowUpdate) => {
       console.log("Edge flow update:", update);
-      onEdgeFlow?.(update);
+      handlersRef.current.onEdgeFlow?.(update);
     });
 
     socket.on("execution_completed", (data) => {
       console.log("Execution completed:", data);
-      onExecutionComplete?.(data);
+      handlersRef.current.onExecutionComplete?.(data);
     });
 
     socket.on("execution_failed", (data) => {
       console.log("Execution failed:", data);
-      onExecutionFailed?.(data);
+      handlersRef.current.onExecutionFailed?.(data);
     });
 
     socket.on("execution_log", (log: ExecutionLog) => {
       console.log("Execution log:", log);
-      onExecutionLog?.(log);
+      handlersRef.current.onExecutionLog?.(log);
     });
 
     socket.on("execution_metrics_update", (metrics: ExecutionMetrics) => {
       console.log("Execution metrics update:", metrics);
-      onMetricsUpdate?.(metrics);
+      handlersRef.current.onMetricsUpdate?.(metrics);
     });
 
     socket.on("execution_metrics", (metrics: ExecutionMetrics) => {
       console.log("Final execution metrics:", metrics);
-      onMetricsUpdate?.(metrics);
+      handlersRef.current.onMetricsUpdate?.(metrics);
     });
 
     socket.on("error", (error) => {
@@ -245,15 +268,7 @@ export function useExecutionWebSocket({
       }
       socketRef.current = null;
     };
-  }, [
-    executionId,
-    onNodeUpdate,
-    onEdgeFlow,
-    onExecutionComplete,
-    onExecutionFailed,
-    onExecutionLog,
-    onMetricsUpdate,
-  ]);
+  }, [executionId]); // Only depend on executionId to prevent unnecessary reconnections
 
   // Method to manually reconnect
   const reconnect = () => {

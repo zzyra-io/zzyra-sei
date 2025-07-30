@@ -117,9 +117,16 @@ export class ExecutionGateway
   }
 
   emitNodeExecutionUpdate(executionId: string, update: any) {
+    if (!this.server) {
+      this.logger.error(`❌ WEBSOCKET SERVER: Server not available for execution ${executionId}`);
+      return;
+    }
+    
+    this.logger.log(`🚀 WEBSOCKET EMIT: Sending node update to room execution:${executionId}`, update);
     this.server
       .to(`execution:${executionId}`)
       .emit('node_execution_update', update);
+    this.logger.log(`✅ WEBSOCKET EMIT: Node update sent successfully`);
   }
 
   emitExecutionCompleted(executionId: string, result: any) {
