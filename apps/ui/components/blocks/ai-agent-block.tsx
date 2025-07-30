@@ -159,7 +159,10 @@ const convertMCPServerToToolNode = (server: MCPServerConfig): ToolNode => {
     isConnected: false,
     isEnabled: false,
     disabled: false,
-    config: {},
+    config: {
+      connection: server.connection,
+      configSchema: server.configSchema,
+    },
     configSchema: server.configSchema,
   };
 };

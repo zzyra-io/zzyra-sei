@@ -266,13 +266,25 @@ export class AIAgentHandler implements BlockHandler {
       // Handle both direct data and nested config structure from UI
       const config = data.config || data;
 
+      this.logger.log(`[AI_AGENT] Raw configuration data:`, {
+        hasConfig: !!config,
+        hasSelectedTools: !!config.selectedTools,
+        selectedToolsCount: config.selectedTools?.length || 0,
+        allToolIds:
+          config.selectedTools?.map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            enabled: t.enabled,
+          })) || [],
+      });
+
       // Filter out disabled tools - only include tools that are enabled
       const selectedTools = (config.selectedTools || []).filter((tool: any) => {
         // Include tool if enabled is true or undefined (default to enabled)
         return tool.enabled !== false;
       });
 
-      this.logger.debug(`[AI_AGENT] Parsed configuration:`, {
+      this.logger.log(`[AI_AGENT] Parsed configuration:`, {
         totalTools: config.selectedTools?.length || 0,
         enabledTools: selectedTools.length,
         toolIds: selectedTools.map((t: any) => t.id),
@@ -351,10 +363,23 @@ export class AIAgentHandler implements BlockHandler {
   ) {
     const tools = [];
 
+    this.logger.log(
+      `[AI_AGENT] Loading ${selectedTools.length} tools for user ${userId}`,
+    );
+    this.logger.debug(
+      `[AI_AGENT] Selected tools:`,
+      selectedTools.map((t) => ({
+        id: t.id,
+        name: t.name,
+        type: t.type,
+        enabled: t.enabled,
+      })),
+    );
+
     for (const toolConfig of selectedTools) {
       try {
         this.logger.log(
-          `Loading tool: ${toolConfig.name} (${toolConfig.type}) for user ${userId}`,
+          `[AI_AGENT] Loading tool: ${toolConfig.name} (${toolConfig.type}) for user ${userId}`,
         );
 
         if (toolConfig.type === 'mcp') {
@@ -391,12 +416,46 @@ export class AIAgentHandler implements BlockHandler {
     const tools = [];
 
     try {
-      // Map tool IDs to MCP server configurations
-      const serverConfigs = this.getMCPServerConfigs(toolConfig.id);
+      this.logger.log(`[AI_AGENT] Loading MCP tools for tool config:`, {
+        id: toolConfig.id,
+        name: toolConfig.name,
+        type: toolConfig.type,
+        enabled: toolConfig.enabled,
+        hasConfig: !!toolConfig.config,
+      });
+
+      // Use the connection details from the UI configuration if available
+      let serverConfigs = [];
+
+      if (toolConfig.config && toolConfig.config.connection) {
+        // Use connection details from UI configuration
+        this.logger.log(
+          `[AI_AGENT] Using connection details from UI config for tool ${toolConfig.id}`,
+        );
+        serverConfigs = [
+          {
+            name: `${toolConfig.id}-server`,
+            command: toolConfig.config.connection.command,
+            args: toolConfig.config.connection.args || [],
+            env: toolConfig.config.connection.env || {},
+            timeout: 300000, // 5 minutes
+          },
+        ];
+      } else {
+        // Fallback to hardcoded configurations
+        this.logger.log(
+          `[AI_AGENT] Using fallback server configs for tool ${toolConfig.id}`,
+        );
+        serverConfigs = this.getMCPServerConfigs(toolConfig.id);
+      }
+
+      this.logger.log(
+        `[AI_AGENT] Found ${serverConfigs.length} server configs for tool ${toolConfig.id}`,
+      );
 
       for (const serverConfig of serverConfigs) {
         this.logger.log(
-          `Connecting to MCP server: ${serverConfig.name} for tool: ${toolConfig.name}`,
+          `[AI_AGENT] Connecting to MCP server: ${serverConfig.name} for tool: ${toolConfig.name}`,
         );
 
         try {
@@ -462,6 +521,10 @@ export class AIAgentHandler implements BlockHandler {
   }
 
   private getMCPServerConfigs(toolId: string): any[] {
+    this.logger.log(
+      `[AI_AGENT] Getting MCP server configs for tool ID: ${toolId}`,
+    );
+
     const serverConfigs: Record<string, any> = {
       filesystem: {
         name: 'filesystem-server',
@@ -496,14 +559,49 @@ export class AIAgentHandler implements BlockHandler {
         env: {},
         timeout: 300000, // 5 minutes
       },
+      weather: {
+        name: 'weather-server',
+        command: 'npx',
+        args: ['-y', 'mcp-server-weather'],
+        env: {},
+        timeout: 300000, // 5 minutes
+      },
+      time: {
+        name: 'time-server',
+        command: 'npx',
+        args: ['-y', 'mcp-server-time', '--local-timezone=America/New_York'],
+        env: {},
+        timeout: 300000, // 5 minutes
+      },
+      fetch: {
+        name: 'fetch-server',
+        command: 'npx',
+        args: ['@modelcontextprotocol/server-fetch'],
+        env: {},
+        timeout: 300000, // 5 minutes
+      },
+      puppeteer: {
+        name: 'puppeteer-server',
+        command: 'npx',
+        args: ['@modelcontextprotocol/server-puppeteer'],
+        env: {},
+        timeout: 300000, // 5 minutes
+      },
     };
 
     const config = serverConfigs[toolId];
     if (config) {
+      this.logger.log(
+        `[AI_AGENT] Found MCP server config for tool ID: ${toolId}`,
+      );
       return [config];
     } else {
       this.logger.warn(
-        `No MCP server configuration found for tool ID: ${toolId}`,
+        `[AI_AGENT] No MCP server configuration found for tool ID: ${toolId}`,
+      );
+      this.logger.debug(
+        `[AI_AGENT] Available tool IDs:`,
+        Object.keys(serverConfigs),
       );
       return [];
     }
@@ -528,6 +626,15 @@ export class AIAgentHandler implements BlockHandler {
       sessionId: session.id,
       timeout: config.execution.timeout,
     });
+
+    this.logger.log(
+      `[AI_AGENT] Tools available for execution:`,
+      tools.map((t) => ({
+        id: t.id,
+        name: t.name,
+        description: t.description?.substring(0, 50) + '...',
+      })),
+    );
 
     // Create timeout promise
     const timeoutPromise = new Promise((_, reject) => {

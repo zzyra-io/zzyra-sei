@@ -168,8 +168,8 @@ export const time = {
   icon: "🕒",
   connection: {
     type: "stdio",
-    command: "uvx",
-    args: ["mcp-server-time", "--local-timezone=America/New_York"],
+    command: "npx",
+    args: ["-y", "mcp-server-time", "--local-timezone=America/New_York"],
   },
 };
 
@@ -182,8 +182,8 @@ export const weather = {
   icon: "🌤️",
   connection: {
     type: "stdio",
-    command: "uvx",
-    args: ["mcp-server-weather"],
+    command: "npx",
+    args: ["-y", "mcp-server-weather"],
   },
 };
 
