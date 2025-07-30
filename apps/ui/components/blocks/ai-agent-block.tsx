@@ -47,6 +47,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { AIAgentAPI } from "@/lib/api/ai-agent";
 import { MCPServerConfig } from "@zyra/types";
@@ -307,6 +312,13 @@ export function AgentNodeComponent({
     isOpen: boolean;
     tool: ToolNode | null;
   }>({ isOpen: false, tool: null });
+  
+  // Collapsible section states
+  const [sectionsOpen, setSectionsOpen] = useState({
+    connectedTools: true,
+    executionDetails: true,
+    liveThinking: true,
+  });
   const { availableTools, isLoading, error } = useMCPServers();
 
   const { updateNode: reactFlowUpdateNode } = useReactFlow();
@@ -747,11 +759,21 @@ export function AgentNodeComponent({
             )}
 
           {/* Connected Tools */}
-          <div className='mb-4'>
+          <Collapsible
+            open={sectionsOpen.connectedTools}
+            onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, connectedTools: open }))}
+            className='mb-4'
+          >
             <div className='flex items-center justify-between mb-2'>
-              <h4 className='text-sm font-semibold text-gray-700'>
+              <CollapsibleTrigger className='flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors'>
+                <ChevronRight
+                  className={cn(
+                    "w-4 h-4 transition-transform",
+                    sectionsOpen.connectedTools && "rotate-90"
+                  )}
+                />
                 Connected Tools
-              </h4>
+              </CollapsibleTrigger>
               <button
                 onClick={(e) => handleAddClick("tool", e)}
                 className='w-6 h-6 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center transition-colors'
@@ -759,6 +781,7 @@ export function AgentNodeComponent({
                 <Plus className='w-3 h-3 text-white' />
               </button>
             </div>
+            <CollapsibleContent>
             <div className='space-y-3'>
               {connectedTools.length === 0 ? (
                 <div className='text-center py-6'>
@@ -846,11 +869,27 @@ export function AgentNodeComponent({
                 isLoading={isLoading}
               />
             )}
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Enhanced Execution Details */}
-          {(data.status === "running" || data.status === "completed") && (
-            <div className='mb-4 space-y-4'>
+          {(data.status === "running" || data.status === "completed" || data.status === "error") && (
+            <Collapsible
+              open={sectionsOpen.executionDetails}
+              onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, executionDetails: open }))}
+              className='mb-4'
+            >
+              <CollapsibleTrigger className='flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors mb-2'>
+                <ChevronRight
+                  className={cn(
+                    "w-4 h-4 transition-transform",
+                    sectionsOpen.executionDetails && "rotate-90"
+                  )}
+                />
+                Execution Details
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className='space-y-4'>
               {/* Thinking Process */}
               {data.thinkingSteps && data.thinkingSteps.length > 0 && (
                 <div>
@@ -878,7 +917,7 @@ export function AgentNodeComponent({
                             </span>
                           </div>
                           <div className='text-gray-700 leading-relaxed'>
-                            {stepData.reasoning as string}
+                            {stepData.reasoning as string || stepData.content as string}
                           </div>
                         </div>
                       );
@@ -1043,13 +1082,32 @@ export function AgentNodeComponent({
                   </div>
                 </div>
               )}
-            </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </div>
 
         {/* Live Thinking Panel */}
-        {(data.status === "running" || data.status === "completed") && (
-          <div className="mt-4">
+        {(data.status === "running" || data.status === "completed" || data.status === "error") && (
+          <Collapsible
+            open={sectionsOpen.liveThinking}
+            onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, liveThinking: open }))}
+            className='mb-4'
+          >
+            <CollapsibleTrigger className='flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors mb-2'>
+              <ChevronRight
+                className={cn(
+                  "w-4 h-4 transition-transform",
+                  sectionsOpen.liveThinking && "rotate-90"
+                )}
+              />
+              Live AI Thinking
+              {data.status === "running" && (
+                <Loader2 className='w-3 h-3 animate-spin text-blue-500 ml-1' />
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
             <LiveThinkingPanel
               nodeId={id}
               thinkingSteps={(data.thinkingSteps as any[])?.map((step, index) => ({
@@ -1083,12 +1141,14 @@ export function AgentNodeComponent({
                 context: log.metadata,
               })) || []}
               isThinking={data.status === "running"}
-              executionStatus={data.status}
-              defaultExpanded={data.status === "running"}
+              executionStatus={data.status === "error" ? "failed" : data.status}
+              defaultExpanded={sectionsOpen.liveThinking}
               showTimestamps={true}
               maxHeight="300px"
+              className="border-0 bg-transparent"
             />
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         <Handle

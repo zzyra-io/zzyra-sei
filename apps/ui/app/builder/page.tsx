@@ -55,6 +55,7 @@ import { useHotkeys } from "react-hotkeys-hook";
 import type { Node, Edge } from "@xyflow/react";
 import { logsService } from "@/lib/services/logs-service";
 import { DraftManager } from "@/lib/utils/draft-manager";
+import { ExecutionTimeline } from "@/components/execution/execution-timeline";
 
 // Simplified save state interface
 interface SaveState {
@@ -1200,256 +1201,44 @@ export default function BuilderPage() {
               )}
             </ResizablePanel>
 
-            {/* Horizontal Execution Timeline at Bottom */}
+            {/* Floating Execution Timeline */}
             {(showExecutionPanel || isExecutionPending || executionId) && (
-              <div className='absolute bottom-0 left-0 right-0 bg-background border-t shadow-lg z-50'>
-                <div className='p-4'>
-                  <div className='flex items-center justify-between mb-3'>
-                    <div className='flex items-center gap-2'>
-                      <Zap className='w-4 h-4 text-blue-500' />
-                      <span className='text-sm font-medium'>
-                        Execution Timeline
-                      </span>
-                      {(isExecutionPending ||
-                        executionStatus?.status === "running") && (
-                        <Badge variant='secondary' className='animate-pulse'>
-                          <Loader2 className='w-3 h-3 mr-1 animate-spin' />
-                          Running
-                        </Badge>
-                      )}
-                    </div>
-                    <div className='flex items-center gap-2'>
-                      <span className='text-xs text-muted-foreground'>
-                        {Math.round(
-                          executionStatus?.node_statuses
-                            ? (Object.values(
-                                executionStatus.node_statuses
-                              ).filter((status) => status === "completed")
-                                .length /
-                                Object.keys(executionStatus.node_statuses)
-                                  .length) *
-                                100
-                            : 0
-                        )}
-                        % Complete
-                      </span>
-                      <Button
-                        variant='ghost'
-                        size='sm'
-                        onClick={() => setShowExecutionPanel(false)}
-                        className='h-6 w-6 p-0'>
-                        <XCircle className='w-3 h-3' />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Horizontal Timeline */}
-                  <div className='relative'>
-                    {/* Timeline Line */}
-                    <div className='absolute top-6 left-0 right-0 h-0.5 bg-gray-200' />
-
-                    {/* Nodes */}
-                    <div className='flex gap-4 overflow-x-auto pb-4'>
-                      {(() => {
-                        // Sort nodes according to workflow execution order (topological sort)
-                        const sortedNodes = [...nodes];
-
-                        // Simple topological sort based on edges
-                        const nodeOrder = new Map<string, number>();
-                        const visited = new Set<string>();
-
-                        // Find nodes with no incoming edges (start nodes)
-                        const startNodes = nodes.filter(
-                          (node) =>
-                            !edges.some((edge) => edge.target === node.id)
-                        );
-
-                        let order = 0;
-                        const processNode = (nodeId: string) => {
-                          if (visited.has(nodeId)) return;
-                          visited.add(nodeId);
-                          nodeOrder.set(nodeId, order++);
-
-                          // Process connected nodes
-                          edges
-                            .filter((edge) => edge.source === nodeId)
-                            .forEach((edge) => processNode(edge.target));
-                        };
-
-                        // Process all start nodes
-                        startNodes.forEach((node) => processNode(node.id));
-
-                        // Process remaining nodes
-                        nodes.forEach((node) => {
-                          if (!visited.has(node.id)) {
-                            processNode(node.id);
-                          }
-                        });
-
-                        // Sort nodes by their execution order
-                        sortedNodes.sort((a, b) => {
-                          const orderA = nodeOrder.get(a.id) ?? 999;
-                          const orderB = nodeOrder.get(b.id) ?? 999;
-                          return orderA - orderB;
-                        });
-
-                        return sortedNodes.map((node) => {
-                          const isCurrent = node.data?.status === "running";
-                          const isCompleted = node.data?.status === "completed";
-                          const isFailed = node.data?.status === "failed";
-
-                          return (
-                            <div
-                              key={node.id}
-                              className={cn(
-                                "relative flex flex-col items-center gap-2 p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-sm min-w-[120px]",
-                                isCurrent
-                                  ? "border-blue-500 bg-blue-50 animate-pulse"
-                                  : isCompleted
-                                  ? "border-green-300 bg-green-50"
-                                  : isFailed
-                                  ? "border-red-300 bg-red-50"
-                                  : "border-gray-300 bg-gray-50"
-                              )}
-                              onClick={() => {
-                                // Focus on the node in the canvas
-                                console.log("Focus on node:", node.id);
-                              }}>
-                              {/* Node Icon */}
-                              <div className='relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-white border-2 border-current'>
-                                {isCurrent ? (
-                                  <div className='relative'>
-                                    <Loader2 className='w-4 h-4 animate-spin text-blue-500' />
-                                    <div className='absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse' />
-                                  </div>
-                                ) : isCompleted ? (
-                                  <CheckCircle2 className='w-4 h-4 text-green-500' />
-                                ) : isFailed ? (
-                                  <XCircle className='w-4 h-4 text-red-500' />
-                                ) : (
-                                  <Clock className='w-4 h-4 text-gray-400' />
-                                )}
-                              </div>
-
-                              {/* Node Info */}
-                              <div className='flex flex-col items-center gap-1 text-center'>
-                                <span className='text-xs font-medium truncate w-full'>
-                                  {node.data?.label ||
-                                    node.data?.name ||
-                                    node.id}
-                                </span>
-                                <Badge variant='outline' className='text-xs'>
-                                  {node.data?.type || node.type || "unknown"}
-                                </Badge>
-                                {isCurrent && (
-                                  <Badge
-                                    variant='secondary'
-                                    className='text-xs animate-pulse'>
-                                    <Loader2 className='w-3 h-3 mr-1 animate-spin' />
-                                    Active
-                                  </Badge>
-                                )}
-                              </div>
-
-                              {/* Progress Bar for Running Nodes */}
-                              {isCurrent &&
-                                node.data?.executionProgress !== undefined && (
-                                  <div className='w-full'>
-                                    <div className='flex items-center justify-between text-xs text-muted-foreground mb-1'>
-                                      <span>Progress</span>
-                                      <span>
-                                        {Math.round(
-                                          node.data.executionProgress
-                                        )}
-                                        %
-                                      </span>
-                                    </div>
-                                    <Progress
-                                      value={node.data.executionProgress}
-                                      className='h-1.5'
-                                    />
-                                  </div>
-                                )}
-
-                              {/* Duration for Completed Nodes */}
-                              {isCompleted && node.data?.executionDuration && (
-                                <div className='text-xs text-muted-foreground'>
-                                  {node.data.executionDuration}ms
-                                </div>
-                              )}
-
-                              {/* Error for Failed Nodes */}
-                              {isFailed && node.data?.executionError && (
-                                <div className='text-xs text-red-600 flex items-center gap-1'>
-                                  <AlertCircle className='w-3 h-3' />
-                                  Error
-                                </div>
-                              )}
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Connection Status */}
-                  <div className='flex items-center justify-between text-xs text-muted-foreground mt-2'>
-                    <div className='flex items-center gap-4'>
-                      <div className='flex items-center gap-1'>
-                        <CheckCircle2 className='w-3 h-3 text-green-500' />
-                        <span>
-                          {
-                            nodes.filter((n) => n.data?.status === "completed")
-                              .length
-                          }{" "}
-                          completed
-                        </span>
-                      </div>
-                      <div className='flex items-center gap-1'>
-                        <XCircle className='w-3 h-3 text-red-500' />
-                        <span>
-                          {
-                            nodes.filter((n) => n.data?.status === "failed")
-                              .length
-                          }{" "}
-                          failed
-                        </span>
-                      </div>
-                      <div className='flex items-center gap-1'>
-                        <Clock className='w-3 h-3 text-gray-500' />
-                        <span>
-                          {
-                            nodes.filter((n) => n.data?.status === "pending")
-                              .length
-                          }{" "}
-                          pending
-                        </span>
-                      </div>
-                    </div>
-                    {connectionError && (
-                      <div className='flex items-center gap-1 text-amber-600'>
-                        <AlertCircle className='w-3 h-3' />
-                        <span>
-                          Worker unavailable - Check WebSocket connection to
-                          port 3009
-                        </span>
-                      </div>
-                    )}
-                    {!connectionError && !isRealTimeConnected && (
-                      <div className='flex items-center gap-1 text-yellow-600'>
-                        <AlertCircle className='w-3 h-3' />
-                        <span>Limited connectivity</span>
-                      </div>
-                    )}
-                    {isRealTimeConnected && (
-                      <div className='flex items-center gap-1 text-green-600'>
-                        <div className='w-2 h-2 bg-green-500 rounded-full animate-pulse' />
-                        <span>Connected</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <ExecutionTimeline
+                nodes={nodes.map((node) => ({
+                  id: node.id,
+                  label: String(node.data?.label || node.data?.name || node.id),
+                  type: String(node.data?.type || node.type || "unknown"),
+                  status:
+                    (node.data?.status as
+                      | "pending"
+                      | "running"
+                      | "completed"
+                      | "failed"
+                      | "skipped") || "pending",
+                  startTime: node.data?.executionStartTime,
+                  endTime: node.data?.executionEndTime,
+                  duration: node.data?.executionDuration,
+                  progress: node.data?.executionProgress,
+                  error: node.data?.executionError,
+                }))}
+                isExecuting={
+                  isExecutionPending || executionStatus?.status === "running"
+                }
+                totalProgress={Math.round(
+                  executionStatus?.node_statuses
+                    ? (Object.values(executionStatus.node_statuses).filter(
+                        (status) => status === "completed"
+                      ).length /
+                        Object.keys(executionStatus.node_statuses).length) *
+                        100
+                    : 0
+                )}
+                currentExecutionId={executionId || undefined}
+                onNodeClick={(nodeId: string) => {
+                  console.log("Focus on node:", nodeId);
+                }}
+                onClose={() => setShowExecutionPanel(false)}
+              />
             )}
           </ResizablePanelGroup>
 
