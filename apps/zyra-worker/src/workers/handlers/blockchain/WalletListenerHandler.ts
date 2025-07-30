@@ -94,7 +94,9 @@ export class WalletListenerHandler {
     try {
       const result = walletListenerSchema.configSchema.safeParse(node.config);
       if (!result.success) {
-        throw new Error(`Configuration validation failed: ${result.error.message}`);
+        throw new Error(
+          `Configuration validation failed: ${result.error.message}`,
+        );
       }
       return result.data as WalletListenerConfig;
     } catch (error) {

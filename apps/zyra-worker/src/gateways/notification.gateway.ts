@@ -76,7 +76,7 @@ export class NotificationGateway
 
     // Start polling for new notifications for this user
     if (!this.pollingIntervals.has(userId)) {
-      let lastTimestamp = new Date(Date.now() - 1000 * 60 * 60).toISOString(); // 1 hour ago
+      const lastTimestamp = new Date(Date.now() - 1000 * 60 * 60).toISOString(); // 1 hour ago
       this.lastNotificationTimestamps.set(userId, lastTimestamp);
       const interval = setInterval(async () => {
         try {

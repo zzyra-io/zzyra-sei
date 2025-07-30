@@ -305,7 +305,7 @@ export class AiBlockchain implements BlockHandler {
         'NETWORK_ID',
         blockchain,
       );
-      let walletData = await this.getWalletData(userId, networkId);
+      const walletData = await this.getWalletData(userId, networkId);
 
       if (!walletData) {
         this.logger.log(

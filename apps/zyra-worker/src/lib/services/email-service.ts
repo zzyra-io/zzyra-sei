@@ -6,7 +6,9 @@ export interface EmailOptions {
   body: string;
 }
 
-export async function sendEmail(options: EmailOptions): Promise<{ messageId: string }> {
+export async function sendEmail(
+  options: EmailOptions,
+): Promise<{ messageId: string }> {
   // Primary transport
   let transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,

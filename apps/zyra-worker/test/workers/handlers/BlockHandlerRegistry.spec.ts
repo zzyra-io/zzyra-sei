@@ -6,7 +6,6 @@ import { BlockHandlerRegistry } from '../../../src/workers/handlers/BlockHandler
 import { Logger } from '@nestjs/common';
 import { BlockType, BlockHandler } from '@zyra/types';
 
-
 describe('BlockHandlerRegistry', () => {
   let blockHandlerRegistry: BlockHandlerRegistry;
   let mockLogger: jest.Mocked<Logger>;
@@ -20,7 +19,7 @@ describe('BlockHandlerRegistry', () => {
       debug: jest.fn(),
       verbose: jest.fn(),
     } as unknown as jest.Mocked<Logger>;
-    
+
     // Create the BlockHandlerRegistry instance
     blockHandlerRegistry = new BlockHandlerRegistry(mockLogger);
   });
@@ -33,7 +32,7 @@ describe('BlockHandlerRegistry', () => {
     it('should return handlers for all block types', () => {
       // Get all handlers
       const handlers = blockHandlerRegistry.getAllHandlers();
-      
+
       // Verify that handlers exist for all block types
       expect(handlers[BlockType.EMAIL]).toBeDefined();
       expect(handlers[BlockType.AI_BLOCKCHAIN]).toBeDefined();
@@ -41,9 +40,9 @@ describe('BlockHandlerRegistry', () => {
       expect(handlers[BlockType.CUSTOM]).toBeDefined();
       expect(handlers[BlockType.WEBHOOK]).toBeDefined();
       expect(handlers[BlockType.EMAIL]).toBeDefined();
-      
+
       // Verify that each handler has the required methods
-      Object.values(handlers).forEach(handler => {
+      Object.values(handlers).forEach((handler) => {
         expect(handler.execute).toBeDefined();
         expect(typeof handler.execute).toBe('function');
         // Some handlers may not have validate method, so we check it conditionally
@@ -52,11 +51,11 @@ describe('BlockHandlerRegistry', () => {
         }
       });
     });
-    
+
     it('should log initialization of handlers', () => {
       // Get all handlers
       blockHandlerRegistry.getAllHandlers();
-      
+
       // Verify that initialization was logged
       expect(mockLogger.log).toHaveBeenCalled();
     });
@@ -66,13 +65,13 @@ describe('BlockHandlerRegistry', () => {
     it('should return the correct handler for a block type', () => {
       // Get a specific handler
       const emailHandler = blockHandlerRegistry.getHandler(BlockType.EMAIL);
-      
+
       // Verify that the correct handler was returned
       expect(emailHandler).toBeDefined();
       expect(emailHandler.execute).toBeDefined();
       expect((emailHandler as any).validate).toBeDefined();
     });
-    
+
     it('should throw an error for an unknown block type', () => {
       // Attempt to get a handler for an unknown block type
       expect(() => {

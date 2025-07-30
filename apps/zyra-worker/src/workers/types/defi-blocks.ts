@@ -15,7 +15,7 @@ export enum DefiBlockType {
   LIQUIDITY = 'liquidity',
   YIELD = 'yield',
   REBALANCE = 'rebalance',
-  ALERT = 'alert'
+  ALERT = 'alert',
 }
 
 export interface DefiBlockConfig {
@@ -51,7 +51,7 @@ export interface DefiWorkflowConfig {
     [key: string]: {
       type: DefiBlockType;
       config: DefiBlockConfig;
-    }
+    };
   };
   edges: {
     from: string;

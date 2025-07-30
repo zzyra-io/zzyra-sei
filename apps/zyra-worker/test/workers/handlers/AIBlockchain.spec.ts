@@ -9,8 +9,6 @@ import * as serviceClient from '../../../src/lib/supabase/serviceClient';
 import * as fs from 'fs';
 import * as path from 'path';
 
-
-
 // Mock the createServiceClient function
 jest.mock('../../../src/lib/supabase/serviceClient', () => ({
   createServiceClient: jest.fn(),
@@ -21,7 +19,12 @@ jest.mock('fs', () => ({
   promises: {
     mkdir: jest.fn().mockResolvedValue(undefined as any),
     writeFile: jest.fn().mockResolvedValue(undefined as any),
-    readFile: jest.fn().mockResolvedValue(JSON.stringify({ address: '0x123456789', privateKey: 'test-private-key' })),
+    readFile: jest.fn().mockResolvedValue(
+      JSON.stringify({
+        address: '0x123456789',
+        privateKey: 'test-private-key',
+      }),
+    ),
     access: jest.fn().mockImplementation((path: string, mode: number) => {
       if (path.includes('existing')) {
         return Promise.resolve();
@@ -47,14 +50,22 @@ jest.mock('path', () => ({
 // Mock the ethers library
 jest.mock('ethers', () => {
   const mockProvider = {
-    getBalance: jest.fn().mockResolvedValue({ toString: () => '1000000000000000000' } as any),
-    getGasPrice: jest.fn().mockResolvedValue({ toString: () => '20000000000' } as any),
+    getBalance: jest
+      .fn()
+      .mockResolvedValue({ toString: () => '1000000000000000000' } as any),
+    getGasPrice: jest
+      .fn()
+      .mockResolvedValue({ toString: () => '20000000000' } as any),
     getTransactionCount: jest.fn().mockResolvedValue(5 as any),
-    estimateGas: jest.fn().mockResolvedValue({ toString: () => '21000' } as any),
-    getNetwork: jest.fn().mockResolvedValue({ name: 'testnet', chainId: 1 } as any),
+    estimateGas: jest
+      .fn()
+      .mockResolvedValue({ toString: () => '21000' } as any),
+    getNetwork: jest
+      .fn()
+      .mockResolvedValue({ name: 'testnet', chainId: 1 } as any),
     getBlock: jest.fn().mockResolvedValue({ number: 12345 }),
   };
-  
+
   const mockWallet = {
     address: '0x123456789',
     privateKey: 'test-private-key',
@@ -67,16 +78,24 @@ jest.mock('ethers', () => {
       }),
     }),
   };
-  
+
   return {
     providers: {
       JsonRpcProvider: jest.fn().mockReturnValue(mockProvider),
     },
     Wallet: jest.fn().mockReturnValue(mockWallet),
     utils: {
-      parseEther: jest.fn().mockImplementation((value) => ({ toString: () => value + '000000000000000000' })),
-      formatEther: jest.fn().mockImplementation((value) => value.toString().replace('000000000000000000', '')),
-      isAddress: jest.fn().mockImplementation((address) => address.startsWith('0x')),
+      parseEther: jest.fn().mockImplementation((value) => ({
+        toString: () => value + '000000000000000000',
+      })),
+      formatEther: jest
+        .fn()
+        .mockImplementation((value) =>
+          value.toString().replace('000000000000000000', ''),
+        ),
+      isAddress: jest
+        .fn()
+        .mockImplementation((address) => address.startsWith('0x')),
     },
   };
 });
@@ -92,7 +111,7 @@ jest.mock('openai', () => {
       },
     ],
   };
-  
+
   return {
     OpenAI: jest.fn().mockImplementation(() => ({
       chat: {
@@ -119,25 +138,27 @@ describe('AiBlockchain', () => {
       debug: jest.fn(),
       verbose: jest.fn(),
     } as unknown as jest.Mocked<Logger>;
-    
+
     // Mock the createServiceClient function to return our mock Supabase client
-    (serviceClient.createServiceClient as jest.Mock).mockReturnValue(mockSupabase.client);
-    
+    (serviceClient.createServiceClient as jest.Mock).mockReturnValue(
+      mockSupabase.client,
+    );
+
     // Set up environment variables for testing
     process.env.OPENAI_API_KEY = 'test-openai-key';
     process.env.WALLET_STORAGE_PATH = '/tmp/wallets';
     process.env.ETHEREUM_RPC_URL = 'https://eth-testnet.example.com';
-    
+
     // Create the testing module
     const moduleRef = await Test.createTestingModule({
       providers: [
         {
           provide: AiBlockchain,
-          useFactory: () => new AiBlockchain(mockLogger)
+          useFactory: () => new AiBlockchain(mockLogger),
         },
       ],
     }).compile();
-    
+
     // Get the service instance
     aiBlockchainHandler = moduleRef.get<AiBlockchain>(AiBlockchain);
   });
@@ -169,10 +190,10 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Execute the block
       const result = await aiBlockchainHandler.execute(context, context);
-      
+
       // Verify that the AI query was successful
       expect(result.aiResponse).toBeTruthy();
       expect(result.metadata).toBeTruthy();
@@ -181,7 +202,7 @@ describe('AiBlockchain', () => {
       expect(result.metadata).toMatchObject({
         response: 'This is a mock AI response',
       });
-      
+
       // Verify that OpenAI was called with the correct parameters
       const OpenAI = require('openai').OpenAI;
       const openaiInstance = new OpenAI();
@@ -189,13 +210,15 @@ describe('AiBlockchain', () => {
         expect.objectContaining({
           messages: expect.arrayContaining([
             expect.objectContaining({
-              content: expect.stringContaining('What is the current price of Ethereum?'),
+              content: expect.stringContaining(
+                'What is the current price of Ethereum?',
+              ),
             }),
           ]),
-        })
+        }),
       );
     });
-    
+
     it('should execute a wallet creation operation successfully', async () => {
       // Create a mock execution context for wallet creation
       const context: TestBlockExecutionContext = {
@@ -214,10 +237,10 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Execute the block
       const result = await aiBlockchainHandler.execute(context, context);
-      
+
       // Verify that the wallet creation was successful
       expect(result.aiResponse).toBeTruthy();
       expect(result.metadata).toBeTruthy();
@@ -227,12 +250,12 @@ describe('AiBlockchain', () => {
         walletAddress: '0x123456789',
         walletName: 'test-wallet',
       });
-      
+
       // Verify that the wallet was created and saved
       expect(fs.promises.mkdir).toHaveBeenCalled();
       expect(fs.promises.writeFile).toHaveBeenCalled();
     });
-    
+
     it('should execute a wallet balance check operation successfully', async () => {
       // Create a mock execution context for balance check
       const context: TestBlockExecutionContext = {
@@ -251,10 +274,10 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Execute the block
       const result = await aiBlockchainHandler.execute(context, context);
-      
+
       // Verify that the balance check was successful
       expect(result.aiResponse).toBeTruthy();
       expect(result.metadata).toBeTruthy();
@@ -265,14 +288,14 @@ describe('AiBlockchain', () => {
         walletAddress: '0x123456789',
         walletName: 'existing-wallet',
       });
-      
+
       // Verify that the wallet was loaded and the balance was checked
       expect(fs.promises.readFile).toHaveBeenCalled();
       const ethers = require('ethers');
       const provider = new ethers.providers.JsonRpcProvider();
       expect(provider.getBalance).toHaveBeenCalled();
     });
-    
+
     it('should execute a transaction operation successfully', async () => {
       // Create a mock execution context for transaction
       const context: TestBlockExecutionContext = {
@@ -293,10 +316,10 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Execute the block
       const result = await aiBlockchainHandler.execute(context, context);
-      
+
       // Verify that the transaction was successful
       expect(result.aiResponse).toBeTruthy();
       expect(result.metadata).toBeTruthy();
@@ -309,7 +332,7 @@ describe('AiBlockchain', () => {
         amount: '0.1',
         status: 'confirmed',
       });
-      
+
       // Verify that the wallet was loaded and the transaction was sent
       expect(fs.promises.readFile).toHaveBeenCalled();
       const ethers = require('ethers');
@@ -317,11 +340,11 @@ describe('AiBlockchain', () => {
       const connectedWallet = wallet.connect();
       expect(connectedWallet.sendTransaction).toHaveBeenCalled();
     });
-    
+
     it('should handle missing OpenAI API key', async () => {
       // Clear the OpenAI API key
       delete process.env.OPENAI_API_KEY;
-      
+
       // Create a mock execution context for AI query
       const context: TestBlockExecutionContext = {
         executionId: 'test-execution-id',
@@ -339,15 +362,17 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Execute the block and expect it to throw
-      await expect(aiBlockchainHandler.execute(context, context)).rejects.toThrow('OpenAI API key is not configured');
+      await expect(
+        aiBlockchainHandler.execute(context, context),
+      ).rejects.toThrow('OpenAI API key is not configured');
     });
-    
+
     it('should handle missing Ethereum RPC URL', async () => {
       // Clear the Ethereum RPC URL
       delete process.env.ETHEREUM_RPC_URL;
-      
+
       // Create a mock execution context for balance check
       const context: TestBlockExecutionContext = {
         executionId: 'test-execution-id',
@@ -365,11 +390,13 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Execute the block and expect it to throw
-      await expect(aiBlockchainHandler.execute(context, context)).rejects.toThrow('Ethereum RPC URL is not configured');
+      await expect(
+        aiBlockchainHandler.execute(context, context),
+      ).rejects.toThrow('Ethereum RPC URL is not configured');
     });
-    
+
     it('should handle wallet not found', async () => {
       // Create a mock execution context for a non-existent wallet
       const context: TestBlockExecutionContext = {
@@ -388,14 +415,18 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Mock fs.access to throw for non-existent wallet
-      fs.promises.access = jest.fn().mockRejectedValue(new Error('File not found'));
-      
+      fs.promises.access = jest
+        .fn()
+        .mockRejectedValue(new Error('File not found'));
+
       // Execute the block and expect it to throw
-      await expect(aiBlockchainHandler.execute(context, context)).rejects.toThrow('Wallet not found');
+      await expect(
+        aiBlockchainHandler.execute(context, context),
+      ).rejects.toThrow('Wallet not found');
     });
-    
+
     it('should handle transaction failures', async () => {
       // Create a mock execution context for transaction
       const context: TestBlockExecutionContext = {
@@ -416,17 +447,21 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Mock the sendTransaction method to throw an error
       const ethers = require('ethers');
       const wallet = new ethers.Wallet();
       const connectedWallet = wallet.connect();
-      connectedWallet.sendTransaction.mockRejectedValueOnce(new Error('Transaction failed'));
-      
+      connectedWallet.sendTransaction.mockRejectedValueOnce(
+        new Error('Transaction failed'),
+      );
+
       // Execute the block and expect it to throw
-      await expect(aiBlockchainHandler.execute(context, context)).rejects.toThrow('Transaction failed');
+      await expect(
+        aiBlockchainHandler.execute(context, context),
+      ).rejects.toThrow('Transaction failed');
     });
-    
+
     it('should handle invalid wallet names', async () => {
       // Create a mock execution context with an invalid wallet name
       const context: TestBlockExecutionContext = {
@@ -445,11 +480,13 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Execute the block and expect it to throw
-      await expect(aiBlockchainHandler.execute(context, context)).rejects.toThrow('Invalid wallet name');
+      await expect(
+        aiBlockchainHandler.execute(context, context),
+      ).rejects.toThrow('Invalid wallet name');
     });
-    
+
     it('should handle invalid addresses', async () => {
       // Create a mock execution context with an invalid address
       const context: TestBlockExecutionContext = {
@@ -470,15 +507,17 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Mock the isAddress method to return false for invalid addresses
       const ethers = require('ethers');
       ethers.utils.isAddress.mockReturnValueOnce(false);
-      
+
       // Execute the block and expect it to throw
-      await expect(aiBlockchainHandler.execute(context, context)).rejects.toThrow('Invalid Ethereum address');
+      await expect(
+        aiBlockchainHandler.execute(context, context),
+      ).rejects.toThrow('Invalid Ethereum address');
     });
-    
+
     it('should handle invalid amounts', async () => {
       // Create a mock execution context with an invalid amount
       const context: TestBlockExecutionContext = {
@@ -499,17 +538,19 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Mock the parseEther method to throw for invalid amounts
       const ethers = require('ethers');
       ethers.utils.parseEther.mockImplementationOnce(() => {
         throw new Error('Invalid amount');
       });
-      
+
       // Execute the block and expect it to throw
-      await expect(aiBlockchainHandler.execute(context, context)).rejects.toThrow('Invalid amount');
+      await expect(
+        aiBlockchainHandler.execute(context, context),
+      ).rejects.toThrow('Invalid amount');
     });
-    
+
     it('should handle insufficient funds', async () => {
       // Create a mock execution context for transaction
       const context: TestBlockExecutionContext = {
@@ -530,14 +571,18 @@ describe('AiBlockchain', () => {
         },
         inputs: {},
       };
-      
+
       // Mock the getBalance method to return a small balance
       const ethers = require('ethers');
       const provider = new ethers.providers.JsonRpcProvider();
-      provider.getBalance.mockResolvedValueOnce({ toString: () => '100000000000000' }); // Small balance
-      
+      provider.getBalance.mockResolvedValueOnce({
+        toString: () => '100000000000000',
+      }); // Small balance
+
       // Execute the block and expect it to throw
-      await expect(aiBlockchainHandler.execute(context, context)).rejects.toThrow('Insufficient funds');
+      await expect(
+        aiBlockchainHandler.execute(context, context),
+      ).rejects.toThrow('Insufficient funds');
     });
   });
 
@@ -550,15 +595,15 @@ describe('AiBlockchain', () => {
           prompt: 'What is the current price of Ethereum?',
         },
       };
-      
+
       // Validate the data
       const result = (aiBlockchainHandler as any).validate(data);
-      
+
       // Verify that the validation passed
       expect(result.valid).toBe(true);
       expect(result.errors).toBeUndefined();
     });
-    
+
     it('should validate valid wallet creation data', () => {
       // Create valid wallet creation data
       const data = {
@@ -567,15 +612,15 @@ describe('AiBlockchain', () => {
           walletName: 'test-wallet',
         },
       };
-      
+
       // Validate the data
       const result = (aiBlockchainHandler as any).validate(data);
-      
+
       // Verify that the validation passed
       expect(result.valid).toBe(true);
       expect(result.errors).toBeUndefined();
     });
-    
+
     it('should validate valid balance check data', () => {
       // Create valid balance check data
       const data = {
@@ -584,15 +629,15 @@ describe('AiBlockchain', () => {
           walletName: 'test-wallet',
         },
       };
-      
+
       // Validate the data
       const result = (aiBlockchainHandler as any).validate(data);
-      
+
       // Verify that the validation passed
       expect(result.valid).toBe(true);
       expect(result.errors).toBeUndefined();
     });
-    
+
     it('should validate valid transaction data', () => {
       // Create valid transaction data
       const data = {
@@ -603,15 +648,15 @@ describe('AiBlockchain', () => {
           amount: '0.1',
         },
       };
-      
+
       // Validate the data
       const result = (aiBlockchainHandler as any).validate(data);
-      
+
       // Verify that the validation passed
       expect(result.valid).toBe(true);
       expect(result.errors).toBeUndefined();
     });
-    
+
     it('should invalidate missing operation', () => {
       // Create data with missing operation
       const data = {
@@ -619,60 +664,60 @@ describe('AiBlockchain', () => {
           prompt: 'What is the current price of Ethereum?',
         },
       };
-      
+
       // Validate the data
       const result = (aiBlockchainHandler as any).validate(data);
-      
+
       // Verify that the validation failed
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Operation is required');
     });
-    
+
     it('should invalidate unknown operation', () => {
       // Create data with an unknown operation
       const data = {
         operation: 'unknown_operation',
         parameters: {},
       };
-      
+
       // Validate the data
       const result = (aiBlockchainHandler as any).validate(data);
-      
+
       // Verify that the validation failed
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Unknown operation: unknown_operation');
     });
-    
+
     it('should invalidate missing prompt for query operation', () => {
       // Create data with missing prompt
       const data = {
         operation: 'query',
         parameters: {},
       };
-      
+
       // Validate the data
       const result = (aiBlockchainHandler as any).validate(data);
-      
+
       // Verify that the validation failed
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Prompt is required for query operation');
     });
-    
+
     it('should invalidate missing wallet name for wallet operations', () => {
       // Create data with missing wallet name
       const data = {
         operation: 'create_wallet',
         parameters: {},
       };
-      
+
       // Validate the data
       const result = (aiBlockchainHandler as any).validate(data);
-      
+
       // Verify that the validation failed
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Wallet name is required');
     });
-    
+
     it('should invalidate missing parameters for transaction', () => {
       // Create data with missing transaction parameters
       const data = {
@@ -682,10 +727,10 @@ describe('AiBlockchain', () => {
           // Missing toAddress and amount
         },
       };
-      
+
       // Validate the data
       const result = (aiBlockchainHandler as any).validate(data);
-      
+
       // Verify that the validation failed
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('To address is required for transaction');

@@ -5,7 +5,7 @@ import { ethers } from 'ethers';
 
 /**
  * Service for generating and executing code for DeFi blocks using AI
- * 
+ *
  * This service handles:
  * 1. Generating code for DeFi block execution using AI
  * 2. Validating and sanitizing generated code
@@ -21,19 +21,25 @@ export class CodeGenerationService {
 
   /**
    * Generate code for a DeFi block operation using AI
-   * 
+   *
    * @param blockType The type of DeFi block
    * @param description Natural language description of what the block should do
    * @param config Configuration parameters for the block
    * @returns Generated code as a string
    */
-  async generateCode(blockType: string, description: string, config: any): Promise<string> {
+  async generateCode(
+    blockType: string,
+    description: string,
+    config: any,
+  ): Promise<string> {
     try {
       // In production, this would call OpenAI/OpenRouter API
       // For now, we'll use a simple template-based approach
-      
-      this.logger.log(`Generating code for ${blockType} with description: ${description}`);
-      
+
+      this.logger.log(
+        `Generating code for ${blockType} with description: ${description}`,
+      );
+
       const prompt = `
 You are an AI assistant that generates secure, well-structured TypeScript code for DeFi operations.
 You're generating code for a block of type: ${blockType}
@@ -53,10 +59,10 @@ Return ONLY the code without any markdown formatting or explanation, starting wi
 
       // In production, this would be an API call to OpenAI or similar
       // For demonstration purposes, I'm including some template code based on block type
-      
+
       let generatedCode: string;
-      
-      switch(blockType) {
+
+      switch (blockType) {
         case 'DEFI_PRICE_MONITOR':
           generatedCode = this.getPriceMonitorTemplate(config);
           break;
@@ -69,60 +75,66 @@ Return ONLY the code without any markdown formatting or explanation, starting wi
         default:
           generatedCode = this.getDefaultTemplate(blockType, config);
       }
-      
+
       return generatedCode;
     } catch (error) {
-      this.logger.error(`Error generating code for ${blockType}: ${error instanceof Error ? error.message : String(error)}`);
-      throw new Error(`Failed to generate code: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `Error generating code for ${blockType}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new Error(
+        `Failed to generate code: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
-  
+
   /**
    * Validate generated code for security issues
-   * 
+   *
    * @param code Code to validate
    * @returns Validation result and any detected issues
    */
   validateCode(code: string): { isValid: boolean; issues: string[] } {
     const issues: string[] = [];
-    
+
     // Check for potentially dangerous operations
     const dangerousPatterns = [
-      /eval\s*\(/,                          // Direct eval
-      /Function\s*\(/,                      // Function constructor
-      /process\.env/,                       // Accessing environment variables
-      /require\s*\(/,                       // Dynamic requires
-      /import\s*\(/,                        // Dynamic imports
-      /fs\./,                               // File system operations
-      /child_process/,                      // Child process operations
-      /http\.createServer/,                 // Creating servers
-      /net\./,                              // Network operations
-      /crypto\.randomBytes/,                // Random bytes generation (could be crypto mining)
+      /eval\s*\(/, // Direct eval
+      /Function\s*\(/, // Function constructor
+      /process\.env/, // Accessing environment variables
+      /require\s*\(/, // Dynamic requires
+      /import\s*\(/, // Dynamic imports
+      /fs\./, // File system operations
+      /child_process/, // Child process operations
+      /http\.createServer/, // Creating servers
+      /net\./, // Network operations
+      /crypto\.randomBytes/, // Random bytes generation (could be crypto mining)
     ];
-    
+
     for (const pattern of dangerousPatterns) {
       if (pattern.test(code)) {
         issues.push(`Dangerous code pattern detected: ${pattern}`);
       }
     }
-    
+
     // Basic syntax check
     try {
       // Try to parse the code
       new Function(code);
     } catch (error) {
-      issues.push(`Syntax error: ${error instanceof Error ? error.message : String(error)}`);
+      issues.push(
+        `Syntax error: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-    
+
     return {
       isValid: issues.length === 0,
-      issues
+      issues,
     };
   }
-  
+
   /**
    * Execute generated code in a sandboxed environment
-   * 
+   *
    * @param code Code to execute
    * @param inputs Block inputs
    * @param context Block execution context
@@ -132,15 +144,18 @@ Return ONLY the code without any markdown formatting or explanation, starting wi
     // First validate the code
     const validation = this.validateCode(code);
     if (!validation.isValid) {
-      throw new Error(`Code validation failed: ${validation.issues.join(', ')}`);
+      throw new Error(
+        `Code validation failed: ${validation.issues.join(', ')}`,
+      );
     }
-    
+
     try {
       // Create a safe context with only allowed libraries and functions
       const sandbox: any = {
         console: {
           log: (message: string, ...args: any[]) => this.logger.log(message),
-          error: (message: string, ...args: any[]) => this.logger.error(message),
+          error: (message: string, ...args: any[]) =>
+            this.logger.error(message),
           warn: (message: string, ...args: any[]) => this.logger.warn(message),
         },
         setTimeout,
@@ -152,9 +167,9 @@ Return ONLY the code without any markdown formatting or explanation, starting wi
         fetch: async (url: string, options?: any) => {
           return await axios.get(url, options);
         },
-        result: null
+        result: null,
       };
-      
+
       // Create the script with the function wrapper
       const script = new vm.Script(`
         try {
@@ -170,53 +185,67 @@ Return ONLY the code without any markdown formatting or explanation, starting wi
           result = Promise.resolve({ error: error.message });
         }
       `);
-      
+
       // Create context for script execution
       const vmContext = vm.createContext(sandbox);
-      
+
       // Execute with timeout
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Code execution timed out')), this.TIMEOUT_MS);
+        setTimeout(
+          () => reject(new Error('Code execution timed out')),
+          this.TIMEOUT_MS,
+        );
       });
-      
+
       // Run the script
       script.runInContext(vmContext);
-      
+
       // Wait for the result with timeout
       const result = await Promise.race([sandbox.result, timeoutPromise]);
-      
+
       // Check for errors in the result
       if (result && result.error) {
         throw new Error(`Execution error: ${result.error}`);
       }
-      
+
       return result;
     } catch (error) {
-      this.logger.error(`Error executing code: ${error instanceof Error ? error.message : String(error)}`);
-      throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `Error executing code: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new Error(
+        `Code execution failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
-  
+
   /**
    * Learn from successful code executions
-   * 
+   *
    * @param blockType The type of DeFi block
    * @param code The code that was executed
    * @param result The result of the execution
    * @param executionTime Time taken to execute in ms
    */
-  learnFromExecution(blockType: string, code: string, result: any, executionTime: number): void {
+  learnFromExecution(
+    blockType: string,
+    code: string,
+    result: any,
+    executionTime: number,
+  ): void {
     // In a real implementation, this would record successful code patterns to improve future generation
     // For now, just log it
-    this.logger.log(`Learning from ${blockType} execution (${executionTime}ms): ${JSON.stringify(result).substring(0, 100)}...`);
-    
+    this.logger.log(
+      `Learning from ${blockType} execution (${executionTime}ms): ${JSON.stringify(result).substring(0, 100)}...`,
+    );
+
     // Here would be logic to:
     // 1. Store successful code patterns
     // 2. Associate configurations with successful implementations
     // 3. Track performance metrics
     // 4. Update model weights or databases
   }
-  
+
   // Template generation helpers
   private getPriceMonitorTemplate(config: any): string {
     return `async function execute(inputs, context) {
@@ -270,7 +299,7 @@ Return ONLY the code without any markdown formatting or explanation, starting wi
   }
 }`;
   }
-  
+
   private getSwapTemplate(config: any): string {
     return `async function execute(inputs, context) {
   try {
@@ -327,7 +356,7 @@ Return ONLY the code without any markdown formatting or explanation, starting wi
   }
 }`;
   }
-  
+
   private getYieldStrategyTemplate(config: any): string {
     return `async function execute(inputs, context) {
   try {
@@ -450,7 +479,7 @@ Return ONLY the code without any markdown formatting or explanation, starting wi
   }
 }`;
   }
-  
+
   private getDefaultTemplate(blockType: string, config: any): string {
     return `async function execute(inputs, context) {
   try {

@@ -459,7 +459,7 @@ export class ZyraTemplateProcessor implements TemplateProcessor {
       if (path.startsWith('json.')) return match;
 
       // First try to get from current data
-      let value = this.getNestedValue(data, path);
+      const value = this.getNestedValue(data, path);
 
       // If not found and it looks like a data.field pattern, check previous outputs
       if (value === undefined && path.startsWith('data.')) {

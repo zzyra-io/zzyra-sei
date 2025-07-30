@@ -4,7 +4,7 @@ import { CodeGenerationService } from '../services/ai/code-generation.service';
 
 /**
  * AI module for handling code generation and AI-driven features
- * 
+ *
  * This module manages services related to AI capabilities:
  * - Code generation for dynamic execution of DeFi blocks
  * - Learning from successful execution patterns
@@ -14,7 +14,7 @@ import { CodeGenerationService } from '../services/ai/code-generation.service';
   providers: [
     // Core logger
     { provide: Logger, useValue: new Logger('AIModule') },
-    
+
     // AI services
     CodeGenerationService,
   ],

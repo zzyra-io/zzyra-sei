@@ -51,13 +51,13 @@ export interface DataDependency {
 @Injectable()
 export class DataStateService {
   private readonly logger = new Logger(DataStateService.name);
-  
+
   // In-memory cache for frequently accessed data
   private dataCache = new Map<string, DataCacheEntry>();
-  
+
   // Track data dependencies between nodes
   private dataDependencies = new Map<string, DataDependency>();
-  
+
   // Track data versioning for rollback capability
   private dataVersions = new Map<string, DataState[]>();
 
@@ -73,14 +73,15 @@ export class DataStateService {
     executionId: string,
     nodeId: string,
     data: any,
-    metadata?: { tags?: string[] }
+    metadata?: { tags?: string[] },
   ): Promise<DataState> {
     const dataSize = JSON.stringify(data).length;
     const checksum = this.calculateChecksum(data);
-    
+
     try {
       // Get workflow ID from execution
-      const execution = await this.databaseService.executions.findById(executionId);
+      const execution =
+        await this.databaseService.executions.findById(executionId);
       if (!execution) {
         throw new Error(`Execution ${executionId} not found`);
       }
@@ -127,7 +128,7 @@ export class DataStateService {
             // Only update completedAt if status is completed/failed
             ...(dataState.metadata?.tags?.includes('completed') && {
               completedAt: currentTimestamp,
-              status: 'completed'
+              status: 'completed',
             }),
           },
         });
@@ -141,7 +142,7 @@ export class DataStateService {
           outputData: {
             ...dataState.data,
             _metadata: dataState.metadata,
-            _version: dataState.version
+            _version: dataState.version,
           },
         },
       });
@@ -152,9 +153,10 @@ export class DataStateService {
       // Cache frequently accessed data
       await this.cacheData(`${executionId}:${nodeId}`, data, metadata?.tags);
 
-      this.logger.log(`Saved data state for node ${nodeId} in execution ${executionId}`);
+      this.logger.log(
+        `Saved data state for node ${nodeId} in execution ${executionId}`,
+      );
       return dataState;
-
     } catch (error) {
       this.logger.error(`Failed to save data state:`, error);
       throw error;
@@ -167,10 +169,10 @@ export class DataStateService {
   async getDataState(
     executionId: string,
     nodeId: string,
-    version?: number
+    version?: number,
   ): Promise<DataState | null> {
     const cacheKey = `${executionId}:${nodeId}`;
-    
+
     // Check cache first
     if (!version) {
       const cached = this.dataCache.get(cacheKey);
@@ -191,13 +193,15 @@ export class DataStateService {
 
     try {
       // Query database using NodeOutput table
-      const nodeOutput = await this.databaseService.prisma.nodeOutput.findFirst({
-        where: {
-          executionId,
-          nodeId,
+      const nodeOutput = await this.databaseService.prisma.nodeOutput.findFirst(
+        {
+          where: {
+            executionId,
+            nodeId,
+          },
+          orderBy: { createdAt: 'desc' },
         },
-        orderBy: { createdAt: 'desc' },
-      });
+      );
 
       if (!nodeOutput || !nodeOutput.outputData) {
         return null;
@@ -206,7 +210,7 @@ export class DataStateService {
       const outputData = nodeOutput.outputData as any;
       const metadata = outputData._metadata || {};
       const dataVersion = outputData._version || 1;
-      
+
       // Remove metadata from data
       const { _metadata, _version, ...data } = outputData;
 
@@ -228,7 +232,6 @@ export class DataStateService {
       }
 
       return result;
-
     } catch (error) {
       this.logger.error(`Failed to get data state:`, error);
       return null;
@@ -238,17 +241,22 @@ export class DataStateService {
   /**
    * Get all data states for an execution
    */
-  async getExecutionDataStates(executionId: string): Promise<Record<string, DataState>> {
+  async getExecutionDataStates(
+    executionId: string,
+  ): Promise<Record<string, DataState>> {
     try {
       // First, get the execution to retrieve workflowId
-      const execution = await this.databaseService.executions.findById(executionId);
+      const execution =
+        await this.databaseService.executions.findById(executionId);
       const workflowId = execution?.workflowId || 'unknown';
 
       // Get node outputs with proper ordering for latest versions
-      const nodeOutputs = await this.databaseService.prisma.nodeOutput.findMany({
-        where: { executionId },
-        orderBy: [{ nodeId: 'asc' }, { createdAt: 'desc' }],
-      });
+      const nodeOutputs = await this.databaseService.prisma.nodeOutput.findMany(
+        {
+          where: { executionId },
+          orderBy: [{ nodeId: 'asc' }, { createdAt: 'desc' }],
+        },
+      );
 
       // Use Map for better performance and data integrity
       const nodeDataMap = new Map<string, DataState>();
@@ -261,16 +269,19 @@ export class DataStateService {
 
         try {
           const outputData = nodeOutput.outputData as any;
-          
+
           // Ensure outputData exists and is valid
           if (!outputData || typeof outputData !== 'object') {
-            this.logger.warn(`Invalid output data for node ${nodeOutput.nodeId} in execution ${executionId}`);
+            this.logger.warn(
+              `Invalid output data for node ${nodeOutput.nodeId} in execution ${executionId}`,
+            );
             continue;
           }
 
           const metadata = outputData._metadata || {};
-          const dataVersion = typeof outputData._version === 'number' ? outputData._version : 1;
-          
+          const dataVersion =
+            typeof outputData._version === 'number' ? outputData._version : 1;
+
           // Safely extract data, preserving null/undefined values
           const { _metadata, _version, ...data } = outputData;
 
@@ -294,7 +305,10 @@ export class DataStateService {
 
           nodeDataMap.set(nodeOutput.nodeId, dataState);
         } catch (nodeError) {
-          this.logger.error(`Failed to process node output ${nodeOutput.id}:`, nodeError);
+          this.logger.error(
+            `Failed to process node output ${nodeOutput.id}:`,
+            nodeError,
+          );
           // Continue processing other nodes
         }
       }
@@ -305,9 +319,10 @@ export class DataStateService {
         result[nodeId] = dataState;
       }
 
-      this.logger.debug(`Retrieved ${Object.keys(result).length} node data states for execution ${executionId}`);
+      this.logger.debug(
+        `Retrieved ${Object.keys(result).length} node data states for execution ${executionId}`,
+      );
       return result;
-
     } catch (error) {
       this.logger.error(`Failed to get execution data states:`, error);
       return {};
@@ -319,23 +334,28 @@ export class DataStateService {
    */
   async createSnapshot(
     executionId: string,
-    reason: 'manual' | 'checkpoint' | 'error' | 'pause' = 'manual'
+    reason: 'manual' | 'checkpoint' | 'error' | 'pause' = 'manual',
   ): Promise<DataStateSnapshot> {
     try {
       const nodeStates = await this.getExecutionDataStates(executionId);
       const globalState = await this.getGlobalExecutionData(executionId);
-      
+
       const snapshot: DataStateSnapshot = {
         id: `snapshot-${executionId}-${Date.now()}`,
         executionId,
         snapshotTime: new Date(),
         nodeStates: Object.fromEntries(
-          Object.entries(nodeStates).map(([nodeId, state]) => [nodeId, state.data])
+          Object.entries(nodeStates).map(([nodeId, state]) => [
+            nodeId,
+            state.data,
+          ]),
         ),
         globalState,
         metadata: {
           totalNodes: Object.keys(nodeStates).length,
-          completedNodes: Object.values(nodeStates).filter(s => s.data !== null).length,
+          completedNodes: Object.values(nodeStates).filter(
+            (s) => s.data !== null,
+          ).length,
           snapshotReason: reason,
         },
       };
@@ -353,9 +373,10 @@ export class DataStateService {
         },
       });
 
-      this.logger.log(`Created snapshot ${snapshot.id} for execution ${executionId}`);
+      this.logger.log(
+        `Created snapshot ${snapshot.id} for execution ${executionId}`,
+      );
       return snapshot;
-
     } catch (error) {
       this.logger.error(`Failed to create snapshot:`, error);
       throw error;
@@ -367,9 +388,10 @@ export class DataStateService {
    */
   async restoreFromSnapshot(snapshotId: string): Promise<boolean> {
     try {
-      const snapshot = await this.databaseService.prisma.workflowStateSnapshot.findUnique({
-        where: { id: snapshotId },
-      });
+      const snapshot =
+        await this.databaseService.prisma.workflowStateSnapshot.findUnique({
+          where: { id: snapshotId },
+        });
 
       if (!snapshot) {
         throw new Error(`Snapshot ${snapshotId} not found`);
@@ -379,17 +401,21 @@ export class DataStateService {
       const nodeStates = snapshot.nodeStates as Record<string, any>;
       for (const [nodeId, data] of Object.entries(nodeStates || {})) {
         await this.saveDataState(snapshot.executionId, nodeId, data, {
-          tags: ['restored', 'snapshot']
+          tags: ['restored', 'snapshot'],
         });
       }
 
-      // Restore global state  
+      // Restore global state
       const globalState = snapshot.state as Record<string, any>;
-      await this.saveGlobalExecutionData(snapshot.executionId, globalState || {});
+      await this.saveGlobalExecutionData(
+        snapshot.executionId,
+        globalState || {},
+      );
 
-      this.logger.log(`Restored execution ${snapshot.executionId} from snapshot ${snapshotId}`);
+      this.logger.log(
+        `Restored execution ${snapshot.executionId} from snapshot ${snapshotId}`,
+      );
       return true;
-
     } catch (error) {
       this.logger.error(`Failed to restore from snapshot:`, error);
       return false;
@@ -402,7 +428,7 @@ export class DataStateService {
   async trackDataDependency(
     nodeId: string,
     dependsOn: string[],
-    dataKeys: string[] = []
+    dataKeys: string[] = [],
   ): Promise<void> {
     const dependency: DataDependency = {
       nodeId,
@@ -413,14 +439,18 @@ export class DataStateService {
     };
 
     this.dataDependencies.set(nodeId, dependency);
-    
-    this.logger.debug(`Tracked data dependency for node ${nodeId}: depends on [${dependsOn.join(', ')}]`);
+
+    this.logger.debug(
+      `Tracked data dependency for node ${nodeId}: depends on [${dependsOn.join(', ')}]`,
+    );
   }
 
   /**
    * Check if data is stale based on dependencies
    */
-  async checkDataFreshness(nodeId: string): Promise<{ isFresh: boolean; staleDependencies: string[] }> {
+  async checkDataFreshness(
+    nodeId: string,
+  ): Promise<{ isFresh: boolean; staleDependencies: string[] }> {
     const dependency = this.dataDependencies.get(nodeId);
     if (!dependency) {
       return { isFresh: true, staleDependencies: [] };
@@ -436,10 +466,12 @@ export class DataStateService {
     }
 
     const isFresh = staleDependencies.length === 0;
-    
+
     if (!isFresh) {
       dependency.isStale = true;
-      this.logger.warn(`Data for node ${nodeId} is stale due to dependencies: [${staleDependencies.join(', ')}]`);
+      this.logger.warn(
+        `Data for node ${nodeId} is stale due to dependencies: [${staleDependencies.join(', ')}]`,
+      );
     }
 
     return { isFresh, staleDependencies };
@@ -448,7 +480,11 @@ export class DataStateService {
   /**
    * Cache data for faster access
    */
-  private async cacheData(key: string, data: any, tags: string[] = []): Promise<void> {
+  private async cacheData(
+    key: string,
+    data: any,
+    tags: string[] = [],
+  ): Promise<void> {
     const expiry = new Date();
     expiry.setMinutes(expiry.getMinutes() + 30); // 30 minutes cache
 
@@ -478,7 +514,7 @@ export class DataStateService {
     if (!cached || cached.expiry <= new Date()) {
       return null;
     }
-    
+
     cached.hits++;
     return cached.data;
   }
@@ -488,7 +524,7 @@ export class DataStateService {
    */
   invalidateCache(tags: string[]): void {
     for (const [key, entry] of this.dataCache.entries()) {
-      const hasMatchingTag = entry.tags.some(tag => tags.includes(tag));
+      const hasMatchingTag = entry.tags.some((tag) => tags.includes(tag));
       if (hasMatchingTag) {
         this.dataCache.delete(key);
       }
@@ -526,8 +562,8 @@ export class DataStateService {
       }
     }
 
-    expired.forEach(key => this.dataCache.delete(key));
-    
+    expired.forEach((key) => this.dataCache.delete(key));
+
     if (expired.length > 0) {
       this.logger.log(`Cleaned up ${expired.length} expired cache entries`);
     }
@@ -536,7 +572,10 @@ export class DataStateService {
   /**
    * Get next version number for data state
    */
-  private async getNextVersion(executionId: string, nodeId: string): Promise<number> {
+  private async getNextVersion(
+    executionId: string,
+    nodeId: string,
+  ): Promise<number> {
     try {
       const outputs = await this.databaseService.prisma.nodeOutput.findMany({
         where: { executionId, nodeId },
@@ -548,7 +587,7 @@ export class DataStateService {
         const outputData = outputs[0].outputData as any;
         return (outputData?._version || 0) + 1;
       }
-      
+
       return 1;
     } catch (error) {
       this.logger.warn(`Failed to get next version, defaulting to 1:`, error);
@@ -559,16 +598,20 @@ export class DataStateService {
   /**
    * Update version history in memory
    */
-  private updateVersionHistory(executionId: string, nodeId: string, dataState: DataState): void {
+  private updateVersionHistory(
+    executionId: string,
+    nodeId: string,
+    dataState: DataState,
+  ): void {
     const key = `${executionId}:${nodeId}`;
     const versions = this.dataVersions.get(key) || [];
     versions.push(dataState);
-    
+
     // Keep only last 10 versions in memory
     if (versions.length > 10) {
       versions.splice(0, versions.length - 10);
     }
-    
+
     this.dataVersions.set(key, versions);
   }
 
@@ -590,7 +633,7 @@ export class DataStateService {
     let hash = 0;
     for (let i = 0; i < jsonString.length; i++) {
       const char = jsonString.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash).toString(16);
@@ -599,10 +642,13 @@ export class DataStateService {
   /**
    * Get global execution data (shared across all nodes)
    */
-  private async getGlobalExecutionData(executionId: string): Promise<Record<string, any>> {
+  private async getGlobalExecutionData(
+    executionId: string,
+  ): Promise<Record<string, any>> {
     try {
-      const execution = await this.databaseService.executions.findById(executionId);
-      return execution?.metadata as Record<string, any> || {};
+      const execution =
+        await this.databaseService.executions.findById(executionId);
+      return (execution?.metadata as Record<string, any>) || {};
     } catch (error) {
       this.logger.error(`Failed to get global execution data:`, error);
       return {};
@@ -612,7 +658,10 @@ export class DataStateService {
   /**
    * Save global execution data
    */
-  private async saveGlobalExecutionData(executionId: string, data: Record<string, any>): Promise<void> {
+  private async saveGlobalExecutionData(
+    executionId: string,
+    data: Record<string, any>,
+  ): Promise<void> {
     try {
       await this.databaseService.prisma.workflowExecution.update({
         where: { id: executionId },

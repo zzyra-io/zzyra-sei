@@ -111,9 +111,10 @@ export function validateTerminals(nodes: Node[], edges: Edge[]): void {
         // Convert nodeType to uppercase for comparison
         const nodeTypeCategory = n.data.nodeType.toUpperCase() as NodeCategory;
         // Convert allowed categories to uppercase when comparing
-        const allowedCategoriesUpper = Array.from(TERMINAL_ALLOWED_CATEGORIES)
-          .map(cat => typeof cat === 'string' ? cat.toUpperCase() : cat);
-        
+        const allowedCategoriesUpper = Array.from(
+          TERMINAL_ALLOWED_CATEGORIES,
+        ).map((cat) => (typeof cat === 'string' ? cat.toUpperCase() : cat));
+
         if (allowedCategoriesUpper.includes(nodeTypeCategory)) {
           return; // Node type is valid, allow it
         }

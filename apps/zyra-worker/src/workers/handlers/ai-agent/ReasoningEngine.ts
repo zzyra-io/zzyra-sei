@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../services/database.service';
 import { SubscriptionService } from './SubscriptionService';
+import { ToolAnalyticsService } from './ToolAnalyticsService';
+import { CacheService } from './CacheService';
 
 interface ThinkingStep {
   step: number;
@@ -34,6 +36,7 @@ interface ReasoningResult {
   toolCalls: any[];
   confidence: number;
   executionPath: string[];
+  error?: string;
 }
 
 @Injectable()
@@ -43,6 +46,8 @@ export class ReasoningEngine {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly toolAnalyticsService: ToolAnalyticsService,
+    private readonly cacheService: CacheService,
   ) {}
 
   async execute(params: ReasoningParams): Promise<ReasoningResult> {
@@ -50,16 +55,51 @@ export class ReasoningEngine {
     const toolCalls: any[] = [];
     let currentStep = 1;
 
+    // Input validation and sanitization
+    if (!params) {
+      throw new Error('ReasoningParams is required');
+    }
+
+    if (!params.prompt || typeof params.prompt !== 'string') {
+      throw new Error('Valid prompt is required');
+    }
+
+    if (!params.provider) {
+      throw new Error('LLM provider is required');
+    }
+
+    // Sanitize user prompt to prevent injection
+    params.prompt = this.sanitizePrompt(params.prompt);
+
+    // Set safe defaults
+    params.thinkingMode = params.thinkingMode || 'fast';
+    params.maxSteps = Math.min(params.maxSteps || 10, 50); // Cap at 50 steps
+    params.tools = Array.isArray(params.tools) ? params.tools.slice(0, 20) : []; // Limit tools
+
     try {
-      // Check subscription for advanced thinking modes
+      // Check subscription for advanced thinking modes with timeout
       if (params.userId && params.thinkingMode !== 'fast') {
-        const canUseAdvanced =
-          await this.subscriptionService.canUseAdvancedThinking(params.userId);
-        if (!canUseAdvanced) {
-          this.logger.warn(
-            `User ${params.userId} attempted to use ${params.thinkingMode} thinking without subscription`,
-          );
-          params.thinkingMode = 'fast'; // Fallback to fast thinking
+        try {
+          const canUseAdvanced = await Promise.race([
+            this.subscriptionService.canUseAdvancedThinking(params.userId),
+            new Promise<boolean>((_, reject) =>
+              setTimeout(
+                () => reject(new Error('Subscription check timeout')),
+                5000,
+              ),
+            ),
+          ]);
+
+          if (!canUseAdvanced) {
+            this.logger.warn(
+              `User ${params.userId} attempted to use ${params.thinkingMode} thinking without subscription`,
+            );
+            params.thinkingMode = 'fast'; // Fallback to fast thinking
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          this.logger.error(`Subscription check failed: ${errorMessage}`);
+          params.thinkingMode = 'fast'; // Safe fallback
         }
       }
 
@@ -104,7 +144,10 @@ export class ReasoningEngine {
       await this.saveThinkingProcess(params.sessionId, steps);
 
       return {
-        text: executionResult.text || executionResult.content,
+        text:
+          executionResult.text ||
+          executionResult.content ||
+          'No response generated',
         steps,
         toolCalls,
         confidence: this.calculateOverallConfidence(steps),
@@ -113,17 +156,39 @@ export class ReasoningEngine {
     } catch (error) {
       this.logger.error('Reasoning engine execution failed:', error);
 
-      // Add error step
+      // Add error step with safe error message
+      const errorMessage =
+        error instanceof Error
+          ? error.message.slice(0, 500) // Limit error message length
+          : 'Unknown execution error';
+
       steps.push({
         step: currentStep,
         type: 'execution',
-        reasoning: `Execution failed: ${error instanceof Error ? error.message : String(error)}`,
+        reasoning: `Execution failed: ${errorMessage}`,
         confidence: 0,
         timestamp: new Date().toISOString(),
       });
 
-      await this.saveThinkingProcess(params.sessionId, steps);
-      throw error;
+      // Save thinking process even on failure
+      try {
+        await this.saveThinkingProcess(params.sessionId, steps);
+      } catch (saveError) {
+        this.logger.error(
+          'Failed to save thinking process on error:',
+          saveError,
+        );
+      }
+
+      // Return graceful failure instead of throwing
+      return {
+        text: `I encountered an error while processing your request: ${errorMessage}`,
+        steps,
+        toolCalls,
+        confidence: 0,
+        executionPath: steps.map((s) => s.type),
+        error: errorMessage,
+      };
     }
   }
 
@@ -256,26 +321,93 @@ export class ReasoningEngine {
           `Executing selected tools: ${selectedTools.join(', ')}`,
         );
 
-        // Execute the selected tools
+        // Execute the selected tools with analytics tracking
         const toolResults = [];
         for (const toolEntry of selectedTools) {
           const tool = params.tools.find((t) => t.id === toolEntry.name);
           if (tool && tool.execute) {
+            const startTime = Date.now();
             try {
               this.logger.log(
                 `Executing tool: ${toolEntry.name} with parameters:`,
                 toolEntry.parameters || {},
               );
-              const toolResult = await tool.execute(toolEntry.parameters || {});
-              toolResults.push({ tool: toolEntry.name, result: toolResult });
+
+              // Check cache first
+              const cacheKey = {
+                toolName: toolEntry.name,
+                parameters: toolEntry.parameters || {},
+                userId: params.userId || 'anonymous',
+              };
+
+              let toolResult =
+                await this.cacheService.getCachedToolResult(cacheKey);
+              const fromCache = !!toolResult;
+
+              if (!toolResult) {
+                toolResult = await tool.execute(toolEntry.parameters || {});
+                // Cache successful results
+                await this.cacheService.cacheToolResult(cacheKey, toolResult);
+              }
+
+              const responseTime = Date.now() - startTime;
+              toolResults.push({
+                tool: toolEntry.name,
+                result: toolResult,
+                fromCache,
+                responseTime,
+              });
+
+              // Record analytics
+              this.toolAnalyticsService.recordToolUsage({
+                toolName: toolEntry.name,
+                userId: params.userId || 'anonymous',
+                sessionId: params.sessionId,
+                executionId: params.sessionId, // Use sessionId as executionId for now
+                parameters: toolEntry.parameters || {},
+                result: toolResult,
+                success: true,
+                responseTime,
+                context: {
+                  provider: 'unknown', // Would be passed from provider
+                  model: 'unknown', // Would be passed from provider
+                  thinkingMode: params.thinkingMode,
+                  promptHash: this.hashString(params.prompt),
+                },
+              });
             } catch (error) {
+              const responseTime = Date.now() - startTime;
+              const errorMessage =
+                error instanceof Error ? error.message : String(error);
+
               this.logger.error(
                 `Tool execution failed for ${toolEntry.name}:`,
                 error,
               );
+
               toolResults.push({
                 tool: toolEntry.name,
-                error: error instanceof Error ? error.message : String(error),
+                error: errorMessage,
+                responseTime,
+              });
+
+              // Record failed analytics
+              this.toolAnalyticsService.recordToolUsage({
+                toolName: toolEntry.name,
+                userId: params.userId || 'anonymous',
+                sessionId: params.sessionId,
+                executionId: params.sessionId,
+                parameters: toolEntry.parameters || {},
+                result: null,
+                success: false,
+                error: errorMessage,
+                responseTime,
+                context: {
+                  provider: 'unknown',
+                  model: 'unknown',
+                  thinkingMode: params.thinkingMode,
+                  promptHash: this.hashString(params.prompt),
+                },
               });
             }
           }
@@ -921,6 +1053,17 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  private hashString(input: string): string {
+    // Simple hash function for analytics
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+      const char = input.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(36);
+  }
+
   private assessPlanConfidence(plan: string): number {
     // Simple heuristic based on plan structure
     const hasSteps = /\d+\.|\d+\)/.test(plan);
@@ -988,14 +1131,41 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
     return reasoning;
   }
 
+  private sanitizePrompt(prompt: string): string {
+    if (!prompt || typeof prompt !== 'string') {
+      return '';
+    }
+
+    return prompt
+      .trim()
+      .slice(0, 10000) // Limit length to prevent DoS
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
+      .replace(/javascript:/gi, '') // Remove javascript protocol
+      .replace(/data:/gi, '') // Remove data protocol
+      .replace(/vbscript:/gi, '') // Remove vbscript protocol
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
+      .replace(/on\w+\s*=\s*["'][^"']*["']/gi, ''); // Remove event handlers
+  }
+
   private calculateOverallConfidence(steps: ThinkingStep[]): number {
     if (steps.length === 0) return 0.5;
 
-    const totalConfidence = steps.reduce(
-      (sum, step) => sum + step.confidence,
+    const validSteps = steps.filter(
+      (step) =>
+        typeof step.confidence === 'number' &&
+        !isNaN(step.confidence) &&
+        isFinite(step.confidence),
+    );
+
+    if (validSteps.length === 0) return 0.5;
+
+    const totalConfidence = validSteps.reduce(
+      (sum, step) => sum + Math.max(0, Math.min(1, step.confidence)), // Clamp between 0 and 1
       0,
     );
-    return totalConfidence / steps.length;
+
+    const avgConfidence = totalConfidence / validSteps.length;
+    return Math.round(avgConfidence * 100) / 100; // Round to 2 decimal places
   }
 
   private async saveThinkingProcess(

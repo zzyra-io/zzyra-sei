@@ -37,7 +37,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
   ) {
     const severity = this.getErrorSeverity(exception.code);
 
-    let errorContext = {
+    const errorContext = {
       timestamp: new Date().toISOString(),
       type: 'PrismaKnownRequestError',
       code: exception.code,

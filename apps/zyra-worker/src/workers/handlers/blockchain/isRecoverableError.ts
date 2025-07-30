@@ -3,13 +3,14 @@
  */
 export function isRecoverableError(error: any): boolean {
   // Extract error message
-  const errorMessage = (error instanceof Error) ? 
-    error.message.toLowerCase() : 
-    String(error).toLowerCase();
-  
+  const errorMessage =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error).toLowerCase();
+
   // List of common recoverable errors
   const recoverableErrors = [
-    'timeout', 
+    'timeout',
     'network error',
     'connection refused',
     'server responded with a status of 429',
@@ -23,9 +24,9 @@ export function isRecoverableError(error: any): boolean {
     'connection reset',
     'not found',
     'gateway timeout',
-    'unknown transaction'   
+    'unknown transaction',
   ];
-  
+
   // Check if error message contains any recoverable patterns
-  return recoverableErrors.some(pattern => errorMessage.includes(pattern));
+  return recoverableErrors.some((pattern) => errorMessage.includes(pattern));
 }

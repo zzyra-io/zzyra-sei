@@ -73,7 +73,7 @@ export class SecurityValidator {
   async validateExecution(
     config: AIAgentConfig,
     userId: string,
-    executionId: string
+    executionId: string,
   ): Promise<SecurityValidationResult> {
     const violations: SecurityViolation[] = [];
 
@@ -82,13 +82,16 @@ export class SecurityValidator {
     violations.push(...promptViolations);
 
     // Validate selected tools
-    const toolViolations = await this.validateTools(config.selectedTools, userId);
+    const toolViolations = await this.validateTools(
+      config.selectedTools,
+      userId,
+    );
     violations.push(...toolViolations);
 
     // Check user permissions
     const permissionViolations = await this.validateUserPermissions(
       userId,
-      config.selectedTools
+      config.selectedTools,
     );
     violations.push(...permissionViolations);
 
@@ -100,7 +103,10 @@ export class SecurityValidator {
     const riskScore = this.calculateRiskScore(violations);
 
     return {
-      isValid: violations.filter(v => v.severity === 'high' || v.severity === 'critical').length === 0,
+      isValid:
+        violations.filter(
+          (v) => v.severity === 'high' || v.severity === 'critical',
+        ).length === 0,
       violations,
       riskScore,
     };
@@ -108,26 +114,30 @@ export class SecurityValidator {
 
   private validatePrompts(
     agent: AIAgentConfig['agent'],
-    userId: string
+    userId: string,
   ): SecurityViolation[] {
     const violations: SecurityViolation[] = [];
     const timestamp = new Date().toISOString();
 
     // Check system prompt
-    violations.push(...this.checkPromptSecurity(
-      agent.systemPrompt,
-      'system_prompt',
-      userId,
-      timestamp
-    ));
+    violations.push(
+      ...this.checkPromptSecurity(
+        agent.systemPrompt,
+        'system_prompt',
+        userId,
+        timestamp,
+      ),
+    );
 
     // Check user prompt
-    violations.push(...this.checkPromptSecurity(
-      agent.userPrompt,
-      'user_prompt',
-      userId,
-      timestamp
-    ));
+    violations.push(
+      ...this.checkPromptSecurity(
+        agent.userPrompt,
+        'user_prompt',
+        userId,
+        timestamp,
+      ),
+    );
 
     return violations;
   }
@@ -136,7 +146,7 @@ export class SecurityValidator {
     prompt: string,
     promptType: string,
     userId: string,
-    timestamp: string
+    timestamp: string,
   ): SecurityViolation[] {
     const violations: SecurityViolation[] = [];
 
@@ -152,8 +162,8 @@ export class SecurityValidator {
           blockedAction: `${promptType} execution`,
           userId,
           timestamp,
-          evidence: { 
-            pattern: pattern.source, 
+          evidence: {
+            pattern: pattern.source,
             matched: pattern.exec(prompt)?.[0],
             promptType,
           },
@@ -186,7 +196,7 @@ export class SecurityValidator {
           blockedAction: `${promptType} execution`,
           userId,
           timestamp,
-          evidence: { 
+          evidence: {
             pattern: pattern.source,
             promptType,
           },
@@ -199,7 +209,7 @@ export class SecurityValidator {
 
   private async validateTools(
     selectedTools: AIAgentConfig['selectedTools'],
-    userId: string
+    userId: string,
   ): Promise<SecurityViolation[]> {
     const violations: SecurityViolation[] = [];
     const timestamp = new Date().toISOString();
@@ -219,7 +229,11 @@ export class SecurityValidator {
       }
 
       // Check tool-specific security rules
-      const toolViolations = await this.validateSpecificTool(tool, userId, timestamp);
+      const toolViolations = await this.validateSpecificTool(
+        tool,
+        userId,
+        timestamp,
+      );
       violations.push(...toolViolations);
     }
 
@@ -229,13 +243,16 @@ export class SecurityValidator {
   private async validateSpecificTool(
     tool: AIAgentConfig['selectedTools'][0],
     userId: string,
-    timestamp: string
+    timestamp: string,
   ): Promise<SecurityViolation[]> {
     const violations: SecurityViolation[] = [];
 
     // Blockchain tools security
     if (tool.type === 'goat' && tool.id.includes('wallet')) {
-      const hasWalletPermission = await this.checkPermission(userId, 'WALLET_ACCESS');
+      const hasWalletPermission = await this.checkPermission(
+        userId,
+        'WALLET_ACCESS',
+      );
       if (!hasWalletPermission) {
         violations.push({
           type: 'INSUFFICIENT_PERMISSIONS',
@@ -251,7 +268,10 @@ export class SecurityValidator {
 
     // Database tools security
     if (tool.type === 'mcp' && tool.id.includes('database')) {
-      const hasDatabasePermission = await this.checkPermission(userId, 'DATABASE_ACCESS');
+      const hasDatabasePermission = await this.checkPermission(
+        userId,
+        'DATABASE_ACCESS',
+      );
       if (!hasDatabasePermission) {
         violations.push({
           type: 'INSUFFICIENT_PERMISSIONS',
@@ -270,14 +290,17 @@ export class SecurityValidator {
 
   private async validateUserPermissions(
     userId: string,
-    selectedTools: AIAgentConfig['selectedTools']
+    selectedTools: AIAgentConfig['selectedTools'],
   ): Promise<SecurityViolation[]> {
     const violations: SecurityViolation[] = [];
     const timestamp = new Date().toISOString();
 
     try {
       // Check if user has AI_AGENT permission
-      const hasAIAgentPermission = await this.checkPermission(userId, 'AI_AGENT');
+      const hasAIAgentPermission = await this.checkPermission(
+        userId,
+        'AI_AGENT',
+      );
       if (!hasAIAgentPermission) {
         violations.push({
           type: 'INSUFFICIENT_PERMISSIONS',
@@ -294,7 +317,10 @@ export class SecurityValidator {
       for (const tool of selectedTools) {
         const requiredPermission = this.getRequiredPermission(tool);
         if (requiredPermission) {
-          const hasPermission = await this.checkPermission(userId, requiredPermission);
+          const hasPermission = await this.checkPermission(
+            userId,
+            requiredPermission,
+          );
           if (!hasPermission) {
             violations.push({
               type: 'INSUFFICIENT_PERMISSIONS',
@@ -303,17 +329,19 @@ export class SecurityValidator {
               blockedAction: `Tool access: ${tool.id}`,
               userId,
               timestamp,
-              evidence: { 
-                toolId: tool.id, 
+              evidence: {
+                toolId: tool.id,
                 requiredPermission,
               },
             });
           }
         }
       }
-
     } catch (error) {
-      this.logger.error(`Permission validation error for user ${userId}:`, error);
+      this.logger.error(
+        `Permission validation error for user ${userId}:`,
+        error,
+      );
       violations.push({
         type: 'PERMISSION_CHECK_FAILED',
         severity: 'medium',
@@ -321,14 +349,19 @@ export class SecurityValidator {
         blockedAction: 'Permission validation',
         userId,
         timestamp,
-        evidence: { error: error instanceof Error ? error.message : String(error) },
+        evidence: {
+          error: error instanceof Error ? error.message : String(error),
+        },
       });
     }
 
     return violations;
   }
 
-  private async checkPermission(userId: string, permission: string): Promise<boolean> {
+  private async checkPermission(
+    userId: string,
+    permission: string,
+  ): Promise<boolean> {
     try {
       // Check user permissions from database
       // This is a placeholder - implement based on your permission system
@@ -339,9 +372,8 @@ export class SecurityValidator {
 
       // Basic permission checks - for now, allow all authenticated users
       if (user && permission === 'AI_AGENT') return true;
-      
-      return false;
 
+      return false;
     } catch (error) {
       this.logger.error(`Permission check failed for ${userId}:`, error);
       // Fallback to allowing permission for demo purposes
@@ -349,13 +381,15 @@ export class SecurityValidator {
     }
   }
 
-  private getRequiredPermission(tool: AIAgentConfig['selectedTools'][0]): string | null {
+  private getRequiredPermission(
+    tool: AIAgentConfig['selectedTools'][0],
+  ): string | null {
     const permissionMap = {
-      'wallet': 'WALLET_ACCESS',
-      'database': 'DATABASE_ACCESS',
-      'file': 'FILE_ACCESS',
-      'network': 'NETWORK_ACCESS',
-      'system': 'SYSTEM_ACCESS',
+      wallet: 'WALLET_ACCESS',
+      database: 'DATABASE_ACCESS',
+      file: 'FILE_ACCESS',
+      network: 'NETWORK_ACCESS',
+      system: 'SYSTEM_ACCESS',
     };
 
     for (const [keyword, permission] of Object.entries(permissionMap)) {
@@ -382,7 +416,7 @@ export class SecurityValidator {
 
   private async logSecurityEvents(
     violations: SecurityViolation[],
-    executionId: string
+    executionId: string,
   ): Promise<void> {
     try {
       for (const violation of violations) {

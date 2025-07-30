@@ -31,7 +31,13 @@ export const emailConfigSchema = z.object({
 export const nodeConfigSchema = z.union([
   z.object({ blockType: z.literal('schedule'), config: scheduleConfigSchema }),
   z.object({ blockType: z.literal('database'), config: databaseConfigSchema }),
-  z.object({ blockType: z.literal('notification'), config: notificationConfigSchema }),
-  z.object({ blockType: z.literal('price-monitor'), config: priceMonitorConfigSchema }),
+  z.object({
+    blockType: z.literal('notification'),
+    config: notificationConfigSchema,
+  }),
+  z.object({
+    blockType: z.literal('price-monitor'),
+    config: priceMonitorConfigSchema,
+  }),
   z.object({ blockType: z.literal('email'), config: emailConfigSchema }),
 ]);

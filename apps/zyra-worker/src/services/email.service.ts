@@ -27,7 +27,9 @@ export class EmailService {
     const from = this.configService.get<string>('EMAIL_FROM');
 
     if (!host || !port || !user || !pass || !from) {
-      this.logger.warn('Email configuration is incomplete. Email sending will be disabled.');
+      this.logger.warn(
+        'Email configuration is incomplete. Email sending will be disabled.',
+      );
       return;
     }
 
@@ -45,12 +47,14 @@ export class EmailService {
   async sendEmail(options: EmailOptions): Promise<void> {
     try {
       if (!this.transporter) {
-        this.logger.warn('Email transporter not initialized. Email will not be sent.');
+        this.logger.warn(
+          'Email transporter not initialized. Email will not be sent.',
+        );
         return;
       }
 
       const from = this.configService.get<string>('EMAIL_FROM');
-      
+
       await this.transporter.sendMail({
         from,
         to: options.to,

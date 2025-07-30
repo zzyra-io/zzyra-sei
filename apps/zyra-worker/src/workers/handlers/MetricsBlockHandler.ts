@@ -1,9 +1,7 @@
-
 import { getOrCreateHistogram, getOrCreateCounter } from '../../lib/prometheus';
 import type { Histogram, Counter } from 'prom-client';
 
-import { BlockExecutionContext, BlockType, BlockHandler  } from '@zyra/types';
-
+import { BlockExecutionContext, BlockType, BlockHandler } from '@zyra/types';
 
 export class MetricsBlockHandler implements BlockHandler {
   private duration: Histogram<string>;

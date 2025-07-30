@@ -1,20 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  BlockHandler,
-  BlockExecutionContext,
-} from '@zyra/types';
+import { BlockHandler, BlockExecutionContext } from '@zyra/types';
 
 @Injectable()
 export class EdgeTransformHandler implements BlockHandler {
   private readonly logger = new Logger(EdgeTransformHandler.name);
 
-  async execute(node: any, context: BlockExecutionContext): Promise<Record<string, any>> {
+  async execute(
+    node: any,
+    context: BlockExecutionContext,
+  ): Promise<Record<string, any>> {
     const { inputs, config, nodeId: executionId } = context;
     const data = inputs;
     const startTime = Date.now();
 
     try {
-      this.logger.debug(`Executing edge transform for execution ${executionId}`);
+      this.logger.debug(
+        `Executing edge transform for execution ${executionId}`,
+      );
 
       // Validate configuration
       if (!config.fieldMappings || config.fieldMappings.length === 0) {
@@ -22,18 +24,27 @@ export class EdgeTransformHandler implements BlockHandler {
       }
 
       // Apply field mappings
-      const transformedData = await this.applyFieldMappings(data, config.fieldMappings);
+      const transformedData = await this.applyFieldMappings(
+        data,
+        config.fieldMappings,
+      );
 
       // Apply conditional logic if configured
-      const finalData = config.conditions && config.conditions.length > 0
-        ? await this.applyConditions(transformedData, config.conditions)
-        : transformedData;
+      const finalData =
+        config.conditions && config.conditions.length > 0
+          ? await this.applyConditions(transformedData, config.conditions)
+          : transformedData;
 
       // Validate output if rules are configured
       if (config.validationRules && config.validationRules.length > 0) {
-        const validationResult = this.validateOutput(finalData, config.validationRules);
+        const validationResult = this.validateOutput(
+          finalData,
+          config.validationRules,
+        );
         if (!validationResult.valid) {
-          throw new Error(`Validation failed: ${validationResult.errors.join(', ')}`);
+          throw new Error(
+            `Validation failed: ${validationResult.errors.join(', ')}`,
+          );
         }
       }
 
@@ -45,9 +56,11 @@ export class EdgeTransformHandler implements BlockHandler {
           compatibilityScore: config.compatibilityScore,
         },
       };
-
     } catch (error) {
-      this.logger.error(`Edge transformation failed for execution ${executionId}:`, error);
+      this.logger.error(
+        `Edge transformation failed for execution ${executionId}:`,
+        error,
+      );
       throw error instanceof Error ? error : new Error(String(error));
     }
   }
@@ -58,7 +71,7 @@ export class EdgeTransformHandler implements BlockHandler {
     for (const mapping of mappings) {
       try {
         const sourceValue = this.getNestedValue(data, mapping.sourceField);
-        
+
         if (sourceValue !== undefined) {
           let transformedValue = sourceValue;
 
@@ -68,20 +81,32 @@ export class EdgeTransformHandler implements BlockHandler {
               transformedValue = sourceValue;
               break;
             case 'format':
-              transformedValue = await this.formatValue(sourceValue, mapping.transformConfig);
+              transformedValue = await this.formatValue(
+                sourceValue,
+                mapping.transformConfig,
+              );
               break;
             case 'calculate':
-              transformedValue = await this.calculateValue(sourceValue, mapping.transformConfig);
+              transformedValue = await this.calculateValue(
+                sourceValue,
+                mapping.transformConfig,
+              );
               break;
             case 'conditional':
-              transformedValue = await this.conditionalValue(sourceValue, mapping.transformConfig);
+              transformedValue = await this.conditionalValue(
+                sourceValue,
+                mapping.transformConfig,
+              );
               break;
           }
 
           this.setNestedValue(result, mapping.targetField, transformedValue);
         }
       } catch (error) {
-        this.logger.warn(`Field mapping failed for ${mapping.sourceField} -> ${mapping.targetField}:`, error);
+        this.logger.warn(
+          `Field mapping failed for ${mapping.sourceField} -> ${mapping.targetField}:`,
+          error,
+        );
         // Continue with other mappings
       }
     }
@@ -107,7 +132,8 @@ export class EdgeTransformHandler implements BlockHandler {
         return String(value);
       case 'parse_boolean':
         if (typeof value === 'boolean') return value;
-        if (typeof value === 'string') return value.toLowerCase() === 'true' || value === '1';
+        if (typeof value === 'string')
+          return value.toLowerCase() === 'true' || value === '1';
         return Boolean(value);
       case 'parse_json':
         try {
@@ -129,14 +155,18 @@ export class EdgeTransformHandler implements BlockHandler {
       case 'multiply':
         return typeof config.value === 'number' ? value * config.value : value;
       case 'divide':
-        return typeof config.value === 'number' && config.value !== 0 ? value / config.value : value;
+        return typeof config.value === 'number' && config.value !== 0
+          ? value / config.value
+          : value;
       case 'add':
         return typeof config.value === 'number' ? value + config.value : value;
       case 'subtract':
         return typeof config.value === 'number' ? value - config.value : value;
       case 'round':
         const decimals = config.decimals || 0;
-        return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
+        return (
+          Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals)
+        );
       default:
         return value;
     }
@@ -149,7 +179,9 @@ export class EdgeTransformHandler implements BlockHandler {
 
     try {
       const conditionMet = this.evaluateCondition(value, config.condition);
-      return conditionMet ? (config.trueValue || value) : (config.falseValue || value);
+      return conditionMet
+        ? config.trueValue || value
+        : config.falseValue || value;
     } catch (error) {
       this.logger.warn(`Conditional evaluation failed:`, error);
       return value;
@@ -162,7 +194,7 @@ export class EdgeTransformHandler implements BlockHandler {
     for (const condition of conditions) {
       const value = this.getNestedValue(data, condition.field);
       const conditionMet = this.evaluateCondition(value, condition);
-      
+
       if (!conditionMet) {
         this.logger.debug(`Condition not met for field ${condition.field}`);
         // For now, we'll still return the data but log the failure
@@ -192,12 +224,15 @@ export class EdgeTransformHandler implements BlockHandler {
     }
   }
 
-  private validateOutput(data: any, rules: any[]): { valid: boolean; errors: string[] } {
+  private validateOutput(
+    data: any,
+    rules: any[],
+  ): { valid: boolean; errors: string[] } {
     const errors = [];
 
     for (const rule of rules) {
       const value = this.getNestedValue(data, rule.field);
-      
+
       switch (rule.rule) {
         case 'required':
           if (value === undefined || value === null || value === '') {
@@ -208,24 +243,32 @@ export class EdgeTransformHandler implements BlockHandler {
           const expectedType = rule.config.type;
           const actualType = typeof value;
           if (value !== undefined && actualType !== expectedType) {
-            errors.push(`Field '${rule.field}' should be of type '${expectedType}', got '${actualType}'`);
+            errors.push(
+              `Field '${rule.field}' should be of type '${expectedType}', got '${actualType}'`,
+            );
           }
           break;
         case 'format':
           if (rule.config.pattern && typeof value === 'string') {
             const regex = new RegExp(rule.config.pattern);
             if (!regex.test(value)) {
-              errors.push(`Field '${rule.field}' does not match required format`);
+              errors.push(
+                `Field '${rule.field}' does not match required format`,
+              );
             }
           }
           break;
         case 'range':
           if (typeof value === 'number') {
             if (rule.config.min !== undefined && value < rule.config.min) {
-              errors.push(`Field '${rule.field}' must be at least ${rule.config.min}`);
+              errors.push(
+                `Field '${rule.field}' must be at least ${rule.config.min}`,
+              );
             }
             if (rule.config.max !== undefined && value > rule.config.max) {
-              errors.push(`Field '${rule.field}' must be at most ${rule.config.max}`);
+              errors.push(
+                `Field '${rule.field}' must be at most ${rule.config.max}`,
+              );
             }
           }
           break;

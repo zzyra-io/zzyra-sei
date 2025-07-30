@@ -66,26 +66,26 @@ export interface LiquidityPoolData {
 @Injectable()
 export class BlockchainDataSyncService {
   private readonly logger = new Logger(BlockchainDataSyncService.name);
-  
+
   // Track active event listeners
   private activeListeners = new Map<string, BlockchainEventListener>();
-  
+
   // Track chain sync status
   private chainSyncStatus = new Map<number, ChainDataSync>();
-  
+
   // Cache for price feeds
   private priceFeeds = new Map<string, DeFiPriceFeed>();
-  
+
   // Cache for liquidity pool data
   private liquidityPools = new Map<string, LiquidityPoolData>();
-  
+
   // WebSocket connections for real-time data
   private wsConnections = new Map<number, any>();
 
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly dataStateService: DataStateService,
-    private readonly executionMonitorService: ExecutionMonitorService
+    private readonly executionMonitorService: ExecutionMonitorService,
   ) {
     // Initialize supported chains
     this.initializeSupportedChains();
@@ -103,10 +103,10 @@ export class BlockchainDataSyncService {
       contractAddress?: string;
       eventSignature?: string;
       filterCriteria?: Record<string, any>;
-    }
+    },
   ): Promise<string> {
     const listenerId = `${executionId}-${nodeId}-${Date.now()}`;
-    
+
     const listener: BlockchainEventListener = {
       id: listenerId,
       chainId: config.chainId,
@@ -121,11 +121,13 @@ export class BlockchainDataSyncService {
     };
 
     this.activeListeners.set(listenerId, listener);
-    
+
     // Start the actual listening process
     await this.setupEventListening(listener);
-    
-    this.logger.log(`Started blockchain event listener ${listenerId} for chain ${config.chainId}`);
+
+    this.logger.log(
+      `Started blockchain event listener ${listenerId} for chain ${config.chainId}`,
+    );
     return listenerId;
   }
 
@@ -140,7 +142,7 @@ export class BlockchainDataSyncService {
 
     listener.isActive = false;
     this.activeListeners.delete(listenerId);
-    
+
     this.logger.log(`Stopped blockchain event listener ${listenerId}`);
     return true;
   }
@@ -151,19 +153,20 @@ export class BlockchainDataSyncService {
   async getPriceData(
     symbol: string,
     chainId: number,
-    source: 'chainlink' | 'uniswap' | 'coingecko' | 'binance' = 'chainlink'
+    source: 'chainlink' | 'uniswap' | 'coingecko' | 'binance' = 'chainlink',
   ): Promise<DeFiPriceFeed | null> {
     const cacheKey = `${symbol}-${chainId}-${source}`;
-    
+
     // Check cache first
     const cached = this.priceFeeds.get(cacheKey);
-    if (cached && this.isFreshData(cached.lastUpdated, 60)) { // 60 seconds freshness
+    if (cached && this.isFreshData(cached.lastUpdated, 60)) {
+      // 60 seconds freshness
       return cached;
     }
 
     try {
       let priceData: DeFiPriceFeed;
-      
+
       switch (source) {
         case 'chainlink':
           priceData = await this.fetchChainlinkPrice(symbol, chainId);
@@ -183,10 +186,9 @@ export class BlockchainDataSyncService {
 
       // Cache the result
       this.priceFeeds.set(cacheKey, priceData);
-      
+
       this.logger.debug(`Fetched price for ${symbol}: $${priceData.price}`);
       return priceData;
-
     } catch (error) {
       this.logger.error(`Failed to fetch price for ${symbol}:`, error);
       return cached || null; // Return stale data if available
@@ -198,27 +200,30 @@ export class BlockchainDataSyncService {
    */
   async getLiquidityPoolData(
     poolAddress: string,
-    chainId: number
+    chainId: number,
   ): Promise<LiquidityPoolData | null> {
     const cacheKey = `${poolAddress}-${chainId}`;
-    
+
     // Check cache first
     const cached = this.liquidityPools.get(cacheKey);
-    if (cached && this.isFreshData(cached.lastUpdated, 300)) { // 5 minutes freshness
+    if (cached && this.isFreshData(cached.lastUpdated, 300)) {
+      // 5 minutes freshness
       return cached;
     }
 
     try {
       const poolData = await this.fetchLiquidityPoolData(poolAddress, chainId);
-      
+
       // Cache the result
       this.liquidityPools.set(cacheKey, poolData);
-      
+
       this.logger.debug(`Fetched liquidity pool data for ${poolAddress}`);
       return poolData;
-
     } catch (error) {
-      this.logger.error(`Failed to fetch liquidity pool data for ${poolAddress}:`, error);
+      this.logger.error(
+        `Failed to fetch liquidity pool data for ${poolAddress}:`,
+        error,
+      );
       return cached || null;
     }
   }
@@ -235,15 +240,20 @@ export class BlockchainDataSyncService {
       condition: 'above' | 'below' | 'change';
       targetPrice?: number;
       changeThreshold?: number; // percentage
-    }>
+    }>,
   ): Promise<void> {
-    this.logger.log(`Starting price monitoring for ${priceTargets.length} targets`);
+    this.logger.log(
+      `Starting price monitoring for ${priceTargets.length} targets`,
+    );
 
     // Set up monitoring intervals for each target
     for (const target of priceTargets) {
       const intervalId = setInterval(async () => {
         try {
-          const priceData = await this.getPriceData(target.symbol, target.chainId);
+          const priceData = await this.getPriceData(
+            target.symbol,
+            target.chainId,
+          );
           if (!priceData) return;
 
           let triggered = false;
@@ -264,9 +274,14 @@ export class BlockchainDataSyncService {
               break;
             case 'change':
               // Implement change detection logic
-              const previousPrice = await this.getPreviousPrice(target.symbol, target.chainId);
+              const previousPrice = await this.getPreviousPrice(
+                target.symbol,
+                target.chainId,
+              );
               if (previousPrice && target.changeThreshold) {
-                const changePercent = Math.abs((priceData.price - previousPrice) / previousPrice) * 100;
+                const changePercent =
+                  Math.abs((priceData.price - previousPrice) / previousPrice) *
+                  100;
                 if (changePercent >= target.changeThreshold) {
                   triggered = true;
                   conditionMet = `price changed by ${changePercent.toFixed(2)}%`;
@@ -277,11 +292,19 @@ export class BlockchainDataSyncService {
 
           if (triggered) {
             // Notify the workflow execution
-            await this.triggerPriceAlert(executionId, nodeId, target, priceData, conditionMet);
+            await this.triggerPriceAlert(
+              executionId,
+              nodeId,
+              target,
+              priceData,
+              conditionMet,
+            );
           }
-
         } catch (error) {
-          this.logger.error(`Error monitoring price for ${target.symbol}:`, error);
+          this.logger.error(
+            `Error monitoring price for ${target.symbol}:`,
+            error,
+          );
         }
       }, 10000); // Check every 10 seconds
 
@@ -296,7 +319,7 @@ export class BlockchainDataSyncService {
   async getTransactionData(
     txHash: string,
     chainId: number,
-    waitForConfirmations: number = 1
+    waitForConfirmations: number = 1,
   ): Promise<{
     hash: string;
     blockNumber: number;
@@ -315,14 +338,14 @@ export class BlockchainDataSyncService {
 
       // Simulate transaction fetch (replace with actual RPC call)
       const txData = await this.fetchTransactionFromRPC(txHash, chainId);
-      
+
       if (!txData) {
         return null;
       }
 
       const currentBlock = await this.getCurrentBlockNumber(chainId);
       const confirmations = currentBlock - txData.blockNumber + 1;
-      
+
       return {
         hash: txData.hash,
         blockNumber: txData.blockNumber,
@@ -332,7 +355,6 @@ export class BlockchainDataSyncService {
         effectiveGasPrice: txData.effectiveGasPrice,
         logs: txData.logs || [],
       };
-
     } catch (error) {
       this.logger.error(`Failed to get transaction data for ${txHash}:`, error);
       return null;
@@ -345,21 +367,33 @@ export class BlockchainDataSyncService {
   async getPortfolioBalance(
     walletAddress: string,
     chainIds: number[],
-    tokenAddresses?: string[]
-  ): Promise<Record<number, Array<{ 
-    token: string; 
-    symbol: string; 
-    balance: string; 
-    usdValue?: number 
-  }>>> {
+    tokenAddresses?: string[],
+  ): Promise<
+    Record<
+      number,
+      Array<{
+        token: string;
+        symbol: string;
+        balance: string;
+        usdValue?: number;
+      }>
+    >
+  > {
     const portfolio: Record<number, any[]> = {};
 
     for (const chainId of chainIds) {
       try {
-        const balances = await this.getChainBalances(walletAddress, chainId, tokenAddresses);
+        const balances = await this.getChainBalances(
+          walletAddress,
+          chainId,
+          tokenAddresses,
+        );
         portfolio[chainId] = balances;
       } catch (error) {
-        this.logger.error(`Failed to get balances for chain ${chainId}:`, error);
+        this.logger.error(
+          `Failed to get balances for chain ${chainId}:`,
+          error,
+        );
         portfolio[chainId] = [];
       }
     }
@@ -372,10 +406,30 @@ export class BlockchainDataSyncService {
    */
   private async initializeSupportedChains(): Promise<void> {
     const supportedChains = [
-      { chainId: 1, name: 'Ethereum', rpcUrl: process.env.ETH_RPC_URL, confirmations: 12 },
-      { chainId: 56, name: 'BSC', rpcUrl: process.env.BSC_RPC_URL, confirmations: 3 },
-      { chainId: 137, name: 'Polygon', rpcUrl: process.env.POLYGON_RPC_URL, confirmations: 5 },
-      { chainId: 1313, name: 'Sei', rpcUrl: process.env.SEI_RPC_URL, confirmations: 1 },
+      {
+        chainId: 1,
+        name: 'Ethereum',
+        rpcUrl: process.env.ETH_RPC_URL,
+        confirmations: 12,
+      },
+      {
+        chainId: 56,
+        name: 'BSC',
+        rpcUrl: process.env.BSC_RPC_URL,
+        confirmations: 3,
+      },
+      {
+        chainId: 137,
+        name: 'Polygon',
+        rpcUrl: process.env.POLYGON_RPC_URL,
+        confirmations: 5,
+      },
+      {
+        chainId: 1313,
+        name: 'Sei',
+        rpcUrl: process.env.SEI_RPC_URL,
+        confirmations: 1,
+      },
     ];
 
     for (const chain of supportedChains) {
@@ -392,14 +446,18 @@ export class BlockchainDataSyncService {
       }
     }
 
-    this.logger.log(`Initialized ${this.chainSyncStatus.size} blockchain connections`);
+    this.logger.log(
+      `Initialized ${this.chainSyncStatus.size} blockchain connections`,
+    );
   }
 
-  private async setupEventListening(listener: BlockchainEventListener): Promise<void> {
+  private async setupEventListening(
+    listener: BlockchainEventListener,
+  ): Promise<void> {
     // This would set up WebSocket or polling for blockchain events
     // Implementation depends on the blockchain library used (ethers, web3, etc.)
     this.logger.debug(`Setting up event listening for ${listener.id}`);
-    
+
     // Simulate event listening setup
     setTimeout(async () => {
       if (listener.isActive) {
@@ -408,12 +466,14 @@ export class BlockchainDataSyncService {
     }, 5000);
   }
 
-  private async simulateBlockchainEvent(listener: BlockchainEventListener): Promise<void> {
+  private async simulateBlockchainEvent(
+    listener: BlockchainEventListener,
+  ): Promise<void> {
     // Simulate receiving a blockchain event
     const event: BlockchainEvent = {
       id: `event-${Date.now()}`,
       chainId: listener.chainId,
-      blockNumber: await this.getCurrentBlockNumber(listener.chainId) + 1,
+      blockNumber: (await this.getCurrentBlockNumber(listener.chainId)) + 1,
       transactionHash: `0x${'a'.repeat(64)}`,
       contractAddress: listener.contractAddress || `0x${'1'.repeat(40)}`,
       eventName: 'Transfer',
@@ -432,7 +492,7 @@ export class BlockchainDataSyncService {
 
   private async processBlockchainEvent(
     listener: BlockchainEventListener,
-    event: BlockchainEvent
+    event: BlockchainEvent,
   ): Promise<void> {
     try {
       // Save event data to workflow state
@@ -441,7 +501,7 @@ export class BlockchainDataSyncService {
           listener.executionId,
           listener.nodeId,
           event,
-          { tags: ['blockchain', 'event', `chain-${event.chainId}`] }
+          { tags: ['blockchain', 'event', `chain-${event.chainId}`] },
         );
 
         // Notify execution monitor
@@ -455,8 +515,9 @@ export class BlockchainDataSyncService {
         });
       }
 
-      this.logger.log(`Processed blockchain event ${event.id} for listener ${listener.id}`);
-
+      this.logger.log(
+        `Processed blockchain event ${event.id} for listener ${listener.id}`,
+      );
     } catch (error) {
       this.logger.error(`Failed to process blockchain event:`, error);
     }
@@ -473,7 +534,10 @@ export class BlockchainDataSyncService {
     return Math.floor(Date.now() / 12000); // Simulate block every 12 seconds
   }
 
-  private async fetchChainlinkPrice(symbol: string, chainId: number): Promise<DeFiPriceFeed> {
+  private async fetchChainlinkPrice(
+    symbol: string,
+    chainId: number,
+  ): Promise<DeFiPriceFeed> {
     // Simulate Chainlink price fetch
     return {
       symbol,
@@ -486,7 +550,10 @@ export class BlockchainDataSyncService {
     };
   }
 
-  private async fetchUniswapPrice(symbol: string, chainId: number): Promise<DeFiPriceFeed> {
+  private async fetchUniswapPrice(
+    symbol: string,
+    chainId: number,
+  ): Promise<DeFiPriceFeed> {
     // Simulate Uniswap price fetch
     return {
       symbol,
@@ -495,7 +562,7 @@ export class BlockchainDataSyncService {
       price: Math.random() * 1000 + 100,
       lastUpdated: new Date(),
       source: 'uniswap',
-      confidence: 0.90,
+      confidence: 0.9,
     };
   }
 
@@ -521,13 +588,13 @@ export class BlockchainDataSyncService {
       price: Math.random() * 1000 + 100,
       lastUpdated: new Date(),
       source: 'binance',
-      confidence: 0.90,
+      confidence: 0.9,
     };
   }
 
   private async fetchLiquidityPoolData(
     poolAddress: string,
-    chainId: number
+    chainId: number,
   ): Promise<LiquidityPoolData> {
     // Simulate liquidity pool data fetch
     return {
@@ -545,7 +612,10 @@ export class BlockchainDataSyncService {
     };
   }
 
-  private async fetchTransactionFromRPC(txHash: string, chainId: number): Promise<any> {
+  private async fetchTransactionFromRPC(
+    txHash: string,
+    chainId: number,
+  ): Promise<any> {
     // Simulate RPC transaction fetch
     return {
       hash: txHash,
@@ -559,8 +629,10 @@ export class BlockchainDataSyncService {
   private async getChainBalances(
     walletAddress: string,
     chainId: number,
-    tokenAddresses?: string[]
-  ): Promise<Array<{ token: string; symbol: string; balance: string; usdValue?: number }>> {
+    tokenAddresses?: string[],
+  ): Promise<
+    Array<{ token: string; symbol: string; balance: string; usdValue?: number }>
+  > {
     // Simulate balance fetching
     return [
       {
@@ -578,7 +650,10 @@ export class BlockchainDataSyncService {
     ];
   }
 
-  private async getPreviousPrice(symbol: string, chainId: number): Promise<number | null> {
+  private async getPreviousPrice(
+    symbol: string,
+    chainId: number,
+  ): Promise<number | null> {
     // This would fetch previous price from database or cache
     // For simulation, return a slightly different price
     const current = this.priceFeeds.get(`${symbol}-${chainId}-chainlink`);
@@ -590,7 +665,7 @@ export class BlockchainDataSyncService {
     nodeId: string,
     target: any,
     priceData: DeFiPriceFeed,
-    conditionMet: string
+    conditionMet: string,
   ): Promise<void> {
     const alertData = {
       symbol: target.symbol,
@@ -602,12 +677,9 @@ export class BlockchainDataSyncService {
     };
 
     // Save alert to workflow state
-    await this.dataStateService.saveDataState(
-      executionId,
-      nodeId,
-      alertData,
-      { tags: ['price-alert', 'triggered'] }
-    );
+    await this.dataStateService.saveDataState(executionId, nodeId, alertData, {
+      tags: ['price-alert', 'triggered'],
+    });
 
     // Update execution monitor
     await this.executionMonitorService.updateNodeExecution({
@@ -619,7 +691,9 @@ export class BlockchainDataSyncService {
       nodeLabel: `Price Alert - ${target.symbol}`,
     });
 
-    this.logger.log(`Price alert triggered for ${target.symbol}: ${conditionMet}`);
+    this.logger.log(
+      `Price alert triggered for ${target.symbol}: ${conditionMet}`,
+    );
   }
 
   private isFreshData(lastUpdated: Date, maxAgeSeconds: number): boolean {

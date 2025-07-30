@@ -3,7 +3,7 @@
 /**
  * AI Agent Demo Script
  * Usage: OPENROUTER_API_KEY=your_key ts-node src/scripts/ai-agent-demo.ts
- * 
+ *
  * This script demonstrates real AI Agent execution with configurable prompts and tools
  */
 
@@ -18,6 +18,8 @@ import { MCPServerManager } from '../workers/handlers/ai-agent/MCPServerManager'
 import { SecurityValidator } from '../workers/handlers/ai-agent/SecurityValidator';
 import { ReasoningEngine } from '../workers/handlers/ai-agent/ReasoningEngine';
 import { SubscriptionService } from '../workers/handlers/ai-agent/SubscriptionService';
+import { CacheService } from '../workers/handlers/ai-agent/CacheService';
+import { ToolAnalyticsService } from '../workers/handlers/ai-agent/ToolAnalyticsService';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 
@@ -43,15 +45,18 @@ const DEMO_CONFIGS: Record<string, DemoConfig> = {
   'code-assistant': {
     provider: 'openrouter',
     model: 'anthropic/claude-3.5-sonnet',
-    systemPrompt: 'You are a senior software engineer. Provide clean, well-documented code.',
-    prompt: 'Write a TypeScript function to find the longest common subsequence of two strings.',
+    systemPrompt:
+      'You are a senior software engineer. Provide clean, well-documented code.',
+    prompt:
+      'Write a TypeScript function to find the longest common subsequence of two strings.',
     thinkingMode: 'deliberate',
     maxSteps: 8,
   },
   'creative-writer': {
     provider: 'openrouter',
     model: 'anthropic/claude-3.5-sonnet',
-    systemPrompt: 'You are a creative writer. Write engaging, original content.',
+    systemPrompt:
+      'You are a creative writer. Write engaging, original content.',
     prompt: 'Write a short story about a robot who discovers they can dream.',
     thinkingMode: 'collaborative',
     maxSteps: 10,
@@ -59,15 +64,18 @@ const DEMO_CONFIGS: Record<string, DemoConfig> = {
   'business-analyst': {
     provider: 'openrouter',
     model: 'anthropic/claude-3.5-sonnet',
-    systemPrompt: 'You are a business analyst. Provide data-driven insights and recommendations.',
-    prompt: 'Analyze the pros and cons of implementing AI chatbots for customer service in a small e-commerce business.',
+    systemPrompt:
+      'You are a business analyst. Provide data-driven insights and recommendations.',
+    prompt:
+      'Analyze the pros and cons of implementing AI chatbots for customer service in a small e-commerce business.',
     thinkingMode: 'deliberate',
     maxSteps: 12,
   },
   'quick-question': {
     provider: 'openrouter',
     model: 'anthropic/claude-3.5-sonnet',
-    systemPrompt: 'You are a helpful assistant. Provide concise, accurate answers.',
+    systemPrompt:
+      'You are a helpful assistant. Provide concise, accurate answers.',
     prompt: 'What are the key differences between REST and GraphQL APIs?',
     thinkingMode: 'fast',
     maxSteps: 3,
@@ -84,7 +92,7 @@ class AIAgentDemo {
 
   async initialize() {
     this.logger.log('🚀 Initializing AI Agent Demo...');
-    
+
     // Create NestJS application context
     this.app = await NestFactory.createApplicationContext(AppModule, {
       logger: ['error', 'warn', 'log'],
@@ -96,11 +104,27 @@ class AIAgentDemo {
     this.configService = this.app.get(ConfigService);
 
     // Create AI Agent components
-    const llmProviderManager = new LLMProviderManager(this.configService);
-    const mcpServerManager = new MCPServerManager(this.databaseService);
+    const cacheService = new CacheService(this.configService);
+    const llmProviderManager = new LLMProviderManager(
+      this.configService,
+      cacheService,
+    );
+    const toolAnalyticsService = new ToolAnalyticsService(
+      this.databaseService,
+      cacheService,
+    );
+    const mcpServerManager = new MCPServerManager(
+      this.databaseService,
+      cacheService,
+    );
     const securityValidator = new SecurityValidator(this.databaseService);
     const subscriptionService = new SubscriptionService();
-    const reasoningEngine = new ReasoningEngine(this.databaseService, subscriptionService);
+    const reasoningEngine = new ReasoningEngine(
+      this.databaseService,
+      subscriptionService,
+      toolAnalyticsService,
+      cacheService,
+    );
 
     // Create AI Agent handler
     this.aiAgentHandler = new AIAgentHandler(
@@ -118,7 +142,9 @@ class AIAgentDemo {
   async runDemo(configName: string, customPrompt?: string) {
     const config = DEMO_CONFIGS[configName];
     if (!config) {
-      throw new Error(`Demo config '${configName}' not found. Available: ${Object.keys(DEMO_CONFIGS).join(', ')}`);
+      throw new Error(
+        `Demo config '${configName}' not found. Available: ${Object.keys(DEMO_CONFIGS).join(', ')}`,
+      );
     }
 
     this.logger.log(`\n📋 Running demo: ${configName}`);
@@ -128,9 +154,13 @@ class AIAgentDemo {
     this.logger.log(`Prompt: ${customPrompt || config.prompt}\n`);
 
     // Check API key
-    const apiKeyEnvVar = config.provider === 'openrouter' ? 'OPENROUTER_API_KEY' : 
-                        config.provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY';
-    
+    const apiKeyEnvVar =
+      config.provider === 'openrouter'
+        ? 'OPENROUTER_API_KEY'
+        : config.provider === 'openai'
+          ? 'OPENAI_API_KEY'
+          : 'ANTHROPIC_API_KEY';
+
     if (!process.env[apiKeyEnvVar]) {
       throw new Error(`Please set ${apiKeyEnvVar} environment variable`);
     }
@@ -146,13 +176,18 @@ class AIAgentDemo {
       data: {
         provider: {
           type: config.provider,
-          model: config.model || (config.provider === 'openrouter' ? 'anthropic/claude-3.5-sonnet' : 'default'),
+          model:
+            config.model ||
+            (config.provider === 'openrouter'
+              ? 'anthropic/claude-3.5-sonnet'
+              : 'default'),
           temperature: 0.7,
           maxTokens: 2000,
         },
         agent: {
           name: `Demo ${configName}`,
-          systemPrompt: config.systemPrompt || 'You are a helpful AI assistant.',
+          systemPrompt:
+            config.systemPrompt || 'You are a helpful AI assistant.',
           userPrompt: customPrompt || config.prompt,
           maxSteps: config.maxSteps || 5,
           thinkingMode: config.thinkingMode,
@@ -178,10 +213,12 @@ class AIAgentDemo {
       previousOutputs: {},
       logger: {
         log: (message: string, data?: any) => this.logger.log(message, data),
-        debug: (message: string, data?: any) => this.logger.debug(message, data),
+        debug: (message: string, data?: any) =>
+          this.logger.debug(message, data),
         info: (message: string, data?: any) => this.logger.log(message, data),
         warn: (message: string, data?: any) => this.logger.warn(message, data),
-        error: (message: string, data?: any) => this.logger.error(message, data),
+        error: (message: string, data?: any) =>
+          this.logger.error(message, data),
       },
       workflowData: {
         nodeId: aiAgentNode.id,
@@ -195,23 +232,32 @@ class AIAgentDemo {
     const startTime = Date.now();
 
     try {
-      const result = await this.aiAgentHandler.execute(aiAgentNode, executionContext);
+      const result = await this.aiAgentHandler.execute(
+        aiAgentNode,
+        executionContext,
+      );
       const executionTime = Date.now() - startTime;
 
       this.logger.log(`\n✅ Execution completed in ${executionTime}ms`);
       this.logger.log('📊 Results:');
       this.logger.log('─'.repeat(80));
-      
+
       if (result.success) {
         this.logger.log(`\n📝 Response:\n${result.result}\n`);
-        
+
         if (result.steps && result.steps.length > 0) {
-          this.logger.log(`🧠 Thinking Process (${result.steps.length} steps):`);
+          this.logger.log(
+            `🧠 Thinking Process (${result.steps.length} steps):`,
+          );
           result.steps.forEach((step: any, index: number) => {
             this.logger.log(`\nStep ${index + 1}: ${step.type}`);
-            this.logger.log(`Reasoning: ${step.reasoning?.substring(0, 200)}...`);
+            this.logger.log(
+              `Reasoning: ${step.reasoning?.substring(0, 200)}...`,
+            );
             if (step.confidence) {
-              this.logger.log(`Confidence: ${Math.round(step.confidence * 100)}%`);
+              this.logger.log(
+                `Confidence: ${Math.round(step.confidence * 100)}%`,
+              );
             }
           });
         }
@@ -219,22 +265,24 @@ class AIAgentDemo {
         if (result.toolCalls && result.toolCalls.length > 0) {
           this.logger.log(`\n🔧 Tool Calls: ${result.toolCalls.length}`);
           result.toolCalls.forEach((call: any, index: number) => {
-            this.logger.log(`${index + 1}. ${call.name}: ${JSON.stringify(call.parameters)}`);
+            this.logger.log(
+              `${index + 1}. ${call.name}: ${JSON.stringify(call.parameters)}`,
+            );
           });
         }
 
         this.logger.log(`\n⏱️  Total execution time: ${executionTime}ms`);
         this.logger.log(`💾 Session ID: ${result.sessionId}`);
-        
       } else {
         this.logger.error(`\n❌ Execution failed: ${result.error}`);
         if (result.error?.includes('Security violations')) {
-          this.logger.warn('🔒 This failure was due to security validation - this is expected behavior for malicious content');
+          this.logger.warn(
+            '🔒 This failure was due to security validation - this is expected behavior for malicious content',
+          );
         }
       }
 
       return result;
-
     } catch (error) {
       const executionTime = Date.now() - startTime;
       this.logger.error(`\n💥 Execution failed after ${executionTime}ms:`);
@@ -246,7 +294,7 @@ class AIAgentDemo {
   private async createDemoUser(): Promise<string> {
     // For demo purposes, create or use existing demo user
     const demoUserId = 'demo-user-' + Date.now();
-    
+
     try {
       await this.databaseService.prisma.user.create({
         data: {
@@ -265,7 +313,7 @@ class AIAgentDemo {
 
   private async createDemoExecution(userId: string): Promise<string> {
     const executionId = randomUUID();
-    
+
     try {
       // Create a demo workflow first
       const workflowId = randomUUID();
@@ -309,7 +357,7 @@ class AIAgentDemo {
   listDemos() {
     this.logger.log('\n📚 Available Demo Configurations:');
     this.logger.log('─'.repeat(50));
-    
+
     Object.entries(DEMO_CONFIGS).forEach(([name, config]) => {
       this.logger.log(`\n${name}:`);
       this.logger.log(`  Provider: ${config.provider}`);
@@ -317,17 +365,21 @@ class AIAgentDemo {
       this.logger.log(`  Prompt: ${config.prompt.substring(0, 80)}...`);
     });
 
-    this.logger.log('\nUsage: ts-node src/scripts/ai-agent-demo.ts <demo-name> [custom-prompt]');
-    this.logger.log('Example: ts-node src/scripts/ai-agent-demo.ts math-solver "What is 15% of 240?"');
+    this.logger.log(
+      '\nUsage: ts-node src/scripts/ai-agent-demo.ts <demo-name> [custom-prompt]',
+    );
+    this.logger.log(
+      'Example: ts-node src/scripts/ai-agent-demo.ts math-solver "What is 15% of 240?"',
+    );
   }
 }
 
 async function main() {
   const demo = new AIAgentDemo();
-  
+
   try {
     const args = process.argv.slice(2);
-    
+
     if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
       demo.listDemos();
       return;
@@ -338,17 +390,19 @@ async function main() {
 
     await demo.initialize();
     await demo.runDemo(configName, customPrompt);
-    
   } catch (error) {
-    console.error('\n💥 Demo failed:', error instanceof Error ? error.message : String(error));
-    
+    console.error(
+      '\n💥 Demo failed:',
+      error instanceof Error ? error.message : String(error),
+    );
+
     if (error instanceof Error && error.message.includes('API_KEY')) {
       console.log('\n💡 Tip: Set your API key environment variable:');
       console.log('   export OPENROUTER_API_KEY=your_key_here');
       console.log('   export OPENAI_API_KEY=your_key_here');
       console.log('   export ANTHROPIC_API_KEY=your_key_here');
     }
-    
+
     process.exit(1);
   } finally {
     await demo.cleanup();

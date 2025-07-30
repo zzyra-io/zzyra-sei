@@ -1,7 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 export interface SchemaDefinition {
-  type: 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null' | 'unknown';
+  type:
+    | 'object'
+    | 'array'
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'null'
+    | 'unknown';
   properties?: Record<string, SchemaProperty>;
   items?: SchemaDefinition;
   confidence: number;
@@ -30,7 +37,11 @@ export interface CompatibilityResult {
 }
 
 export interface CompatibilityIssue {
-  type: 'missing_field' | 'type_mismatch' | 'format_mismatch' | 'validation_error';
+  type:
+    | 'missing_field'
+    | 'type_mismatch'
+    | 'format_mismatch'
+    | 'validation_error';
   field: string;
   severity: 'error' | 'warning' | 'info';
   message: string;
@@ -51,21 +62,27 @@ export class SchemaInferenceService {
   private readonly logger = new Logger(SchemaInferenceService.name);
 
   inferSchema(data: any, samples: any[] = []): SchemaDefinition {
-    const allSamples = [data, ...samples].filter(s => s !== undefined && s !== null);
-    
+    const allSamples = [data, ...samples].filter(
+      (s) => s !== undefined && s !== null,
+    );
+
     if (allSamples.length === 0) {
       return { type: 'null', confidence: 1.0 };
     }
 
     // Determine the primary type
-    const types = allSamples.map(sample => this.getValueType(sample));
+    const types = allSamples.map((sample) => this.getValueType(sample));
     const primaryType = this.getMostCommonType(types);
 
     switch (primaryType) {
       case 'array':
-        return this.inferArraySchema(allSamples.filter(s => Array.isArray(s)));
+        return this.inferArraySchema(
+          allSamples.filter((s) => Array.isArray(s)),
+        );
       case 'object':
-        return this.inferObjectSchema(allSamples.filter(s => this.isPlainObject(s)));
+        return this.inferObjectSchema(
+          allSamples.filter((s) => this.isPlainObject(s)),
+        );
       default:
         return this.inferPrimitiveSchema(allSamples, primaryType);
     }
@@ -73,7 +90,7 @@ export class SchemaInferenceService {
 
   async analyzeCompatibility(
     sourceSchema: SchemaDefinition,
-    targetSchema: SchemaDefinition
+    targetSchema: SchemaDefinition,
   ): Promise<CompatibilityResult> {
     const issues: CompatibilityIssue[] = [];
     const suggestions: TransformationSuggestion[] = [];
@@ -90,21 +107,22 @@ export class SchemaInferenceService {
         score: Math.max(0, Math.min(1, score)),
         issues,
         suggestions,
-        autoFixable: suggestions.length > 0
+        autoFixable: suggestions.length > 0,
       };
-
     } catch (error) {
       this.logger.error('Compatibility analysis failed:', error);
       return {
         score: 0,
-        issues: [{
-          type: 'validation_error',
-          field: 'root',
-          severity: 'error',
-          message: 'Compatibility analysis failed'
-        }],
+        issues: [
+          {
+            type: 'validation_error',
+            field: 'root',
+            severity: 'error',
+            message: 'Compatibility analysis failed',
+          },
+        ],
         suggestions: [],
-        autoFixable: false
+        autoFixable: false,
       };
     }
   }
@@ -116,15 +134,16 @@ export class SchemaInferenceService {
 
     // Analyze all items in all arrays
     const allItems = arrays.flat();
-    const itemSchema: SchemaDefinition = allItems.length > 0 
-      ? this.inferSchema(allItems[0], allItems.slice(1))
-      : { type: 'unknown' as const, confidence: 0.5 };
+    const itemSchema: SchemaDefinition =
+      allItems.length > 0
+        ? this.inferSchema(allItems[0], allItems.slice(1))
+        : { type: 'unknown' as const, confidence: 0.5 };
 
     return {
       type: 'array',
       items: itemSchema,
       confidence: this.calculateConfidence(arrays),
-      examples: arrays.slice(0, 3)
+      examples: arrays.slice(0, 3),
     };
   }
 
@@ -137,21 +156,26 @@ export class SchemaInferenceService {
     const allKeys = new Set<string>();
 
     // Collect all possible keys
-    objects.forEach(obj => {
-      Object.keys(obj).forEach(key => allKeys.add(key));
+    objects.forEach((obj) => {
+      Object.keys(obj).forEach((key) => allKeys.add(key));
     });
 
     // Analyze each property
     for (const key of allKeys) {
-      const values = objects.map(obj => obj[key]).filter(v => v !== undefined);
+      const values = objects
+        .map((obj) => obj[key])
+        .filter((v) => v !== undefined);
       const requiredCount = values.length;
       const totalCount = objects.length;
-      
+
       properties[key] = {
-        type: this.getMostCommonType(values.map(v => this.getValueType(v))),
+        type: this.getMostCommonType(values.map((v) => this.getValueType(v))),
         required: requiredCount / totalCount > 0.8, // Consider required if present in 80%+ of samples
-        schema: values.length > 0 ? this.inferSchema(values[0], values.slice(1)) : undefined,
-        format: this.inferFormat(values)
+        schema:
+          values.length > 0
+            ? this.inferSchema(values[0], values.slice(1))
+            : undefined,
+        format: this.inferFormat(values),
       };
     }
 
@@ -159,22 +183,34 @@ export class SchemaInferenceService {
       type: 'object',
       properties,
       confidence: this.calculateConfidence(objects),
-      examples: objects.slice(0, 3)
+      examples: objects.slice(0, 3),
     };
   }
 
-  private inferPrimitiveSchema(values: any[], type: 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null' | 'unknown'): SchemaDefinition {
+  private inferPrimitiveSchema(
+    values: any[],
+    type:
+      | 'object'
+      | 'array'
+      | 'string'
+      | 'number'
+      | 'boolean'
+      | 'null'
+      | 'unknown',
+  ): SchemaDefinition {
     const schema: SchemaDefinition = {
       type: type,
       confidence: this.calculateConfidence(values),
-      examples: values.slice(0, 3)
+      examples: values.slice(0, 3),
     };
 
     // Add type-specific metadata
     if (type === 'string') {
-      schema.pattern = this.inferPattern(values.filter(v => typeof v === 'string'));
+      schema.pattern = this.inferPattern(
+        values.filter((v) => typeof v === 'string'),
+      );
     } else if (type === 'number') {
-      const numbers = values.filter(v => typeof v === 'number');
+      const numbers = values.filter((v) => typeof v === 'number');
       if (numbers.length > 0) {
         schema.minimum = Math.min(...numbers);
         schema.maximum = Math.max(...numbers);
@@ -187,16 +223,23 @@ export class SchemaInferenceService {
   private compareSchemas(
     source: SchemaDefinition,
     target: SchemaDefinition,
-    path: string
-  ): { score: number; issues: CompatibilityIssue[]; suggestions: TransformationSuggestion[] } {
+    path: string,
+  ): {
+    score: number;
+    issues: CompatibilityIssue[];
+    suggestions: TransformationSuggestion[];
+  } {
     const issues: CompatibilityIssue[] = [];
     const suggestions: TransformationSuggestion[] = [];
     let score = 1.0;
 
     // Type compatibility
     if (source.type !== target.type) {
-      const conversionPossible = this.isConversionPossible(source.type, target.type);
-      
+      const conversionPossible = this.isConversionPossible(
+        source.type,
+        target.type,
+      );
+
       if (conversionPossible) {
         score -= 0.2;
         issues.push({
@@ -205,7 +248,7 @@ export class SchemaInferenceService {
           severity: 'warning',
           message: `Type mismatch: ${source.type} -> ${target.type}`,
           sourceType: source.type,
-          targetType: target.type
+          targetType: target.type,
         });
 
         suggestions.push({
@@ -215,8 +258,8 @@ export class SchemaInferenceService {
           description: `Convert ${source.type} to ${target.type}`,
           transformation: {
             type: 'format',
-            operation: this.getConversionOperation(source.type, target.type)
-          }
+            operation: this.getConversionOperation(source.type, target.type),
+          },
         });
       } else {
         score -= 0.5;
@@ -226,7 +269,7 @@ export class SchemaInferenceService {
           severity: 'error',
           message: `Incompatible types: ${source.type} -> ${target.type}`,
           sourceType: source.type,
-          targetType: target.type
+          targetType: target.type,
         });
       }
     }
@@ -240,9 +283,18 @@ export class SchemaInferenceService {
     }
 
     // Array item compatibility
-    if (source.type === 'array' && target.type === 'array' && source.items && target.items) {
+    if (
+      source.type === 'array' &&
+      target.type === 'array' &&
+      source.items &&
+      target.items
+    ) {
       const itemPath = path ? `${path}[]` : '[]';
-      const itemAnalysis = this.compareSchemas(source.items, target.items, itemPath);
+      const itemAnalysis = this.compareSchemas(
+        source.items,
+        target.items,
+        itemPath,
+      );
       issues.push(...itemAnalysis.issues);
       suggestions.push(...itemAnalysis.suggestions);
       score = Math.min(score, itemAnalysis.score);
@@ -254,8 +306,12 @@ export class SchemaInferenceService {
   private compareObjectProperties(
     source: SchemaDefinition,
     target: SchemaDefinition,
-    basePath: string
-  ): { score: number; issues: CompatibilityIssue[]; suggestions: TransformationSuggestion[] } {
+    basePath: string,
+  ): {
+    score: number;
+    issues: CompatibilityIssue[];
+    suggestions: TransformationSuggestion[];
+  } {
     const issues: CompatibilityIssue[] = [];
     const suggestions: TransformationSuggestion[] = [];
     let score = 1.0;
@@ -266,7 +322,7 @@ export class SchemaInferenceService {
     // Check each target property
     for (const [targetProp, targetSpec] of Object.entries(targetProps)) {
       const path = basePath ? `${basePath}.${targetProp}` : targetProp;
-      
+
       // Find matching source property (exact match first, then fuzzy)
       const sourceProp = this.findMatchingProperty(sourceProps, targetProp);
 
@@ -277,7 +333,7 @@ export class SchemaInferenceService {
             type: 'missing_field',
             field: path,
             severity: 'error',
-            message: `Required field '${targetProp}' is missing`
+            message: `Required field '${targetProp}' is missing`,
           });
         } else {
           score -= 0.1;
@@ -285,14 +341,18 @@ export class SchemaInferenceService {
             type: 'missing_field',
             field: path,
             severity: 'warning',
-            message: `Optional field '${targetProp}' is missing`
+            message: `Optional field '${targetProp}' is missing`,
           });
         }
       } else {
         // Compare property schemas recursively
         const sourceSpec = sourceProps[sourceProp];
         if (sourceSpec.schema && targetSpec.schema) {
-          const propAnalysis = this.compareSchemas(sourceSpec.schema, targetSpec.schema, path);
+          const propAnalysis = this.compareSchemas(
+            sourceSpec.schema,
+            targetSpec.schema,
+            path,
+          );
           issues.push(...propAnalysis.issues);
           suggestions.push(...propAnalysis.suggestions);
           score = Math.min(score, propAnalysis.score);
@@ -308,8 +368,8 @@ export class SchemaInferenceService {
             transformation: {
               type: 'map',
               sourceField: sourceProp,
-              targetField: targetProp
-            }
+              targetField: targetProp,
+            },
           });
         }
       }
@@ -318,7 +378,10 @@ export class SchemaInferenceService {
     return { score, issues, suggestions };
   }
 
-  private findMatchingProperty(properties: Record<string, SchemaProperty>, targetProp: string): string | null {
+  private findMatchingProperty(
+    properties: Record<string, SchemaProperty>,
+    targetProp: string,
+  ): string | null {
     // Exact match
     if (properties[targetProp]) {
       return targetProp;
@@ -326,7 +389,7 @@ export class SchemaInferenceService {
 
     // Case-insensitive match
     const caseInsensitiveMatch = Object.keys(properties).find(
-      key => key.toLowerCase() === targetProp.toLowerCase()
+      (key) => key.toLowerCase() === targetProp.toLowerCase(),
     );
     if (caseInsensitiveMatch) {
       return caseInsensitiveMatch;
@@ -334,7 +397,7 @@ export class SchemaInferenceService {
 
     // Partial match (contains or is contained)
     const partialMatch = Object.keys(properties).find(
-      key => key.includes(targetProp) || targetProp.includes(key)
+      (key) => key.includes(targetProp) || targetProp.includes(key),
     );
     if (partialMatch) {
       return partialMatch;
@@ -350,14 +413,21 @@ export class SchemaInferenceService {
     return typeof value;
   }
 
-  private getMostCommonType(types: string[]): 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null' | 'unknown' {
-    const counts = types.reduce((acc, type) => {
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+  private getMostCommonType(
+    types: string[],
+  ): 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null' | 'unknown' {
+    const counts = types.reduce(
+      (acc, type) => {
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
-    const mostCommon = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-    
+    const mostCommon = Object.keys(counts).reduce((a, b) =>
+      counts[a] > counts[b] ? a : b,
+    );
+
     // Ensure we return a valid type from the union
     switch (mostCommon) {
       case 'object':
@@ -373,7 +443,12 @@ export class SchemaInferenceService {
   }
 
   private isPlainObject(value: any): boolean {
-    return value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
+    return (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      !(value instanceof Date)
+    );
   }
 
   private calculateConfidence(samples: any[]): number {
@@ -384,7 +459,7 @@ export class SchemaInferenceService {
   }
 
   private inferFormat(values: any[]): string | undefined {
-    const strings = values.filter(v => typeof v === 'string');
+    const strings = values.filter((v) => typeof v === 'string');
     if (strings.length === 0) return undefined;
 
     // Check common formats
@@ -392,9 +467,9 @@ export class SchemaInferenceService {
     const urlRegex = /^https?:\/\/.+/;
     const dateRegex = /^\d{4}-\d{2}-\d{2}/;
 
-    if (strings.every(s => emailRegex.test(s))) return 'email';
-    if (strings.every(s => urlRegex.test(s))) return 'url';
-    if (strings.every(s => dateRegex.test(s))) return 'date';
+    if (strings.every((s) => emailRegex.test(s))) return 'email';
+    if (strings.every((s) => urlRegex.test(s))) return 'url';
+    if (strings.every((s) => dateRegex.test(s))) return 'date';
 
     return undefined;
   }
@@ -403,9 +478,9 @@ export class SchemaInferenceService {
     if (strings.length === 0) return undefined;
 
     // Simple pattern inference - could be enhanced
-    const lengths = strings.map(s => s.length);
+    const lengths = strings.map((s) => s.length);
     const uniqueLengths = new Set(lengths);
-    
+
     if (uniqueLengths.size === 1) {
       return `^.{${lengths[0]}}$`; // Fixed length
     }
@@ -413,19 +488,25 @@ export class SchemaInferenceService {
     return undefined;
   }
 
-  private isConversionPossible(sourceType: string, targetType: string): boolean {
+  private isConversionPossible(
+    sourceType: string,
+    targetType: string,
+  ): boolean {
     const conversions = {
-      'string': ['number', 'boolean', 'object'],
-      'number': ['string', 'boolean'],
-      'boolean': ['string', 'number'],
-      'object': ['string'],
-      'array': ['string']
+      string: ['number', 'boolean', 'object'],
+      number: ['string', 'boolean'],
+      boolean: ['string', 'number'],
+      object: ['string'],
+      array: ['string'],
     };
 
     return conversions[sourceType]?.includes(targetType) || false;
   }
 
-  private getConversionOperation(sourceType: string, targetType: string): string {
+  private getConversionOperation(
+    sourceType: string,
+    targetType: string,
+  ): string {
     const operations = {
       'string->number': 'parse_number',
       'string->boolean': 'parse_boolean',
@@ -435,7 +516,7 @@ export class SchemaInferenceService {
       'boolean->string': 'to_string',
       'boolean->number': 'to_number',
       'object->string': 'json_stringify',
-      'array->string': 'json_stringify'
+      'array->string': 'json_stringify',
     };
 
     return operations[`${sourceType}->${targetType}`] || 'identity';

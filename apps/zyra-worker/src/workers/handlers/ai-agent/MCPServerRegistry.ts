@@ -6,7 +6,13 @@ interface MCPServerTemplate {
   id: string;
   name: string;
   description: string;
-  category: 'development' | 'data' | 'automation' | 'integration' | 'ai' | 'blockchain';
+  category:
+    | 'development'
+    | 'data'
+    | 'automation'
+    | 'integration'
+    | 'ai'
+    | 'blockchain';
   command: string;
   args: string[];
   env: Record<string, string>;
@@ -56,10 +62,10 @@ export class MCPServerRegistry {
     try {
       // Validate template
       this.validateServerTemplate(template);
-      
+
       // Store template
       this.serverTemplates.set(template.id, template);
-      
+
       // Save to database if available
       try {
         await (this.databaseService.prisma as any).mcpServerTemplate?.create({
@@ -84,7 +90,10 @@ export class MCPServerRegistry {
 
       this.logger.log(`Registered MCP server template: ${template.name}`);
     } catch (error) {
-      this.logger.error(`Failed to register server template ${template.name}:`, error);
+      this.logger.error(
+        `Failed to register server template ${template.name}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -120,7 +129,9 @@ export class MCPServerRegistry {
 
       // Save to database if available
       try {
-        await (this.databaseService.prisma as any).mcpServerRegistration?.create({
+        await (
+          this.databaseService.prisma as any
+        ).mcpServerRegistration?.create({
           data: {
             id: registrationId,
             userId,
@@ -134,7 +145,9 @@ export class MCPServerRegistry {
         this.logger.debug('Database not available for registration storage');
       }
 
-      this.logger.log(`MCP server registration submitted: ${registrationId} by user ${userId}`);
+      this.logger.log(
+        `MCP server registration submitted: ${registrationId} by user ${userId}`,
+      );
       return registrationId;
     } catch (error) {
       this.logger.error(`Failed to submit server registration:`, error);
@@ -187,7 +200,9 @@ export class MCPServerRegistry {
 
       // Update in database if available
       try {
-        await (this.databaseService.prisma as any).mcpServerRegistration?.update({
+        await (
+          this.databaseService.prisma as any
+        ).mcpServerRegistration?.update({
           where: { id: registrationId },
           data: {
             status: 'approved',
@@ -202,7 +217,10 @@ export class MCPServerRegistry {
 
       this.logger.log(`Approved MCP server registration: ${registrationId}`);
     } catch (error) {
-      this.logger.error(`Failed to approve registration ${registrationId}:`, error);
+      this.logger.error(
+        `Failed to approve registration ${registrationId}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -231,7 +249,9 @@ export class MCPServerRegistry {
 
       // Update in database if available
       try {
-        await (this.databaseService.prisma as any).mcpServerRegistration?.update({
+        await (
+          this.databaseService.prisma as any
+        ).mcpServerRegistration?.update({
           where: { id: registrationId },
           data: {
             status: 'rejected',
@@ -244,9 +264,14 @@ export class MCPServerRegistry {
         this.logger.debug('Database not available for registration update');
       }
 
-      this.logger.log(`Rejected MCP server registration: ${registrationId} - ${reason}`);
+      this.logger.log(
+        `Rejected MCP server registration: ${registrationId} - ${reason}`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to reject registration ${registrationId}:`, error);
+      this.logger.error(
+        `Failed to reject registration ${registrationId}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -256,11 +281,11 @@ export class MCPServerRegistry {
    */
   getServerTemplates(category?: string): MCPServerTemplate[] {
     const templates = Array.from(this.serverTemplates.values());
-    
+
     if (category) {
-      return templates.filter(template => template.category === category);
+      return templates.filter((template) => template.category === category);
     }
-    
+
     return templates;
   }
 
@@ -271,11 +296,13 @@ export class MCPServerRegistry {
     try {
       // Try to get from database first
       try {
-        const dbRegistrations = await (this.databaseService.prisma as any).mcpServerRegistration?.findMany({
+        const dbRegistrations = await (
+          this.databaseService.prisma as any
+        ).mcpServerRegistration?.findMany({
           where: { userId },
           orderBy: { submittedAt: 'desc' },
         });
-        
+
         if (dbRegistrations) {
           return dbRegistrations;
         }
@@ -284,10 +311,14 @@ export class MCPServerRegistry {
       }
 
       // Fallback to memory
-      return Array.from(this.registrations.values())
-        .filter(reg => reg.userId === userId);
+      return Array.from(this.registrations.values()).filter(
+        (reg) => reg.userId === userId,
+      );
     } catch (error) {
-      this.logger.error(`Failed to get user registrations for ${userId}:`, error);
+      this.logger.error(
+        `Failed to get user registrations for ${userId}:`,
+        error,
+      );
       return [];
     }
   }
@@ -299,21 +330,26 @@ export class MCPServerRegistry {
     try {
       // Try to get from database first
       try {
-        const dbRegistrations = await (this.databaseService.prisma as any).mcpServerRegistration?.findMany({
+        const dbRegistrations = await (
+          this.databaseService.prisma as any
+        ).mcpServerRegistration?.findMany({
           where: { status: 'pending' },
           orderBy: { submittedAt: 'asc' },
         });
-        
+
         if (dbRegistrations) {
           return dbRegistrations;
         }
       } catch (dbError) {
-        this.logger.debug('Database not available for pending registrations lookup');
+        this.logger.debug(
+          'Database not available for pending registrations lookup',
+        );
       }
 
       // Fallback to memory
-      return Array.from(this.registrations.values())
-        .filter(reg => reg.status === 'pending');
+      return Array.from(this.registrations.values()).filter(
+        (reg) => reg.status === 'pending',
+      );
     } catch (error) {
       this.logger.error('Failed to get pending registrations:', error);
       return [];
@@ -325,17 +361,34 @@ export class MCPServerRegistry {
       throw new Error('Template must have id, name, and command');
     }
 
-    if (!['development', 'data', 'automation', 'integration', 'ai', 'blockchain'].includes(template.category)) {
+    if (
+      ![
+        'development',
+        'data',
+        'automation',
+        'integration',
+        'ai',
+        'blockchain',
+      ].includes(template.category)
+    ) {
       throw new Error('Invalid template category');
     }
 
     // Validate command is safe (basic checks)
-    if (template.command.includes('rm ') || template.command.includes('sudo ')) {
-      throw new Error('Template command contains potentially dangerous operations');
+    if (
+      template.command.includes('rm ') ||
+      template.command.includes('sudo ')
+    ) {
+      throw new Error(
+        'Template command contains potentially dangerous operations',
+      );
     }
   }
 
-  private validateCustomConfig(template: MCPServerTemplate, config: Record<string, any>): void {
+  private validateCustomConfig(
+    template: MCPServerTemplate,
+    config: Record<string, any>,
+  ): void {
     // Validate against config schema if provided
     if (template.configSchema) {
       // Basic validation - in production would use JSON Schema validator
@@ -348,8 +401,13 @@ export class MCPServerRegistry {
 
     // Security checks
     for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'string' && (value.includes('rm ') || value.includes('sudo '))) {
-        throw new Error(`Configuration ${key} contains potentially dangerous values`);
+      if (
+        typeof value === 'string' &&
+        (value.includes('rm ') || value.includes('sudo '))
+      ) {
+        throw new Error(
+          `Configuration ${key} contains potentially dangerous values`,
+        );
       }
     }
   }
@@ -366,8 +424,15 @@ export class MCPServerRegistry {
       env: {},
       requiredPermissions: ['FILE_SYSTEM_READ', 'FILE_SYSTEM_WRITE'],
       configSchema: {
-        basePath: { type: 'string', required: true, description: 'Base directory path' },
-        allowedExtensions: { type: 'array', description: 'Allowed file extensions' },
+        basePath: {
+          type: 'string',
+          required: true,
+          description: 'Base directory path',
+        },
+        allowedExtensions: {
+          type: 'array',
+          description: 'Allowed file extensions',
+        },
       },
       examples: [
         {
@@ -394,7 +459,11 @@ export class MCPServerRegistry {
       env: {},
       requiredPermissions: ['GIT_READ', 'GIT_WRITE'],
       configSchema: {
-        repository: { type: 'string', required: true, description: 'Git repository path' },
+        repository: {
+          type: 'string',
+          required: true,
+          description: 'Git repository path',
+        },
       },
       examples: [
         {
@@ -421,7 +490,11 @@ export class MCPServerRegistry {
       env: {},
       requiredPermissions: ['DATABASE_READ', 'DATABASE_WRITE'],
       configSchema: {
-        dbPath: { type: 'string', required: true, description: 'SQLite database file path' },
+        dbPath: {
+          type: 'string',
+          required: true,
+          description: 'SQLite database file path',
+        },
       },
       examples: [
         {
@@ -448,7 +521,11 @@ export class MCPServerRegistry {
       env: {},
       requiredPermissions: ['WEB_SEARCH'],
       configSchema: {
-        apiKey: { type: 'string', required: true, description: 'Brave Search API key' },
+        apiKey: {
+          type: 'string',
+          required: true,
+          description: 'Brave Search API key',
+        },
       },
       examples: [
         {
@@ -464,6 +541,8 @@ export class MCPServerRegistry {
       ],
     });
 
-    this.logger.log(`Initialized ${this.serverTemplates.size} builtin MCP server templates`);
+    this.logger.log(
+      `Initialized ${this.serverTemplates.size} builtin MCP server templates`,
+    );
   }
 }

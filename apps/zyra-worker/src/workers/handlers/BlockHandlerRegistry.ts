@@ -25,6 +25,8 @@ import { MCPServerManager } from './ai-agent/MCPServerManager';
 import { SecurityValidator } from './ai-agent/SecurityValidator';
 import { ReasoningEngine } from './ai-agent/ReasoningEngine';
 import { SubscriptionService } from './ai-agent/SubscriptionService';
+import { CacheService } from './ai-agent/CacheService';
+import { ToolAnalyticsService } from './ai-agent/ToolAnalyticsService';
 import { ConfigService } from '@nestjs/config';
 
 /**
@@ -407,11 +409,27 @@ export class BlockHandlerRegistry {
   private createAIAgentHandler(): AIAgentHandler {
     try {
       // Initialize AI Agent dependencies
-      const llmProviderManager = new LLMProviderManager(this.configService);
-      const mcpServerManager = new MCPServerManager(this.databaseService);
+      const cacheService = new CacheService(this.configService);
+      const llmProviderManager = new LLMProviderManager(
+        this.configService,
+        cacheService,
+      );
+      const toolAnalyticsService = new ToolAnalyticsService(
+        this.databaseService,
+        cacheService,
+      );
+      const mcpServerManager = new MCPServerManager(
+        this.databaseService,
+        cacheService,
+      );
       const securityValidator = new SecurityValidator(this.databaseService);
       const subscriptionService = new SubscriptionService();
-      const reasoningEngine = new ReasoningEngine(this.databaseService, subscriptionService);
+      const reasoningEngine = new ReasoningEngine(
+        this.databaseService,
+        subscriptionService,
+        toolAnalyticsService,
+        cacheService,
+      );
 
       // Create and return AI Agent handler
       return new AIAgentHandler(

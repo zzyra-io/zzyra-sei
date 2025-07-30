@@ -76,7 +76,9 @@ async function bootstrap() {
     await app.listen(port);
 
     logger.log('🔄 Worker is ready to process tasks');
-    logger.log(`🔌 WebSocket server running on ws://localhost:${port}/execution`);
+    logger.log(
+      `🔌 WebSocket server running on ws://localhost:${port}/execution`,
+    );
 
     // Health check endpoint info
     logger.log(`🏥 Health check available at: http://localhost:${port}/health`);

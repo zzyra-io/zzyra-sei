@@ -35,7 +35,11 @@ export class ExecutionEventsService {
     this.emitter.emit('workflow-failed', payload);
   }
 
-  static emitWorkflowStarted(payload: { executionId: string; userId?: string; timestamp: string }) {
+  static emitWorkflowStarted(payload: {
+    executionId: string;
+    userId?: string;
+    timestamp: string;
+  }) {
     this.emitter.emit('workflow-started', payload);
   }
 

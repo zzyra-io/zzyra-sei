@@ -20,7 +20,8 @@ export class MagicTradeService {
   };
 
   // Uniswap V2 Router address
-  private readonly UNISWAP_ROUTER = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
+  private readonly UNISWAP_ROUTER =
+    '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
 
   // Uniswap Router ABI (only the functions we need)
   private readonly UNISWAP_ABI = [
@@ -64,7 +65,7 @@ export class MagicTradeService {
     // Extract Magic issuer from wallet metadata
     const metadata = userWallet.metadata as Record<string, any>;
     const magicIssuer = metadata?.magicIssuer;
-    
+
     if (!magicIssuer) {
       throw new Error(`No Magic issuer found for user ${userId}`);
     }
@@ -87,7 +88,9 @@ export class MagicTradeService {
     // Check if user has enough ETH
     const amountWei = ethers.parseEther(amountEth);
     if (balance < amountWei) {
-      throw new Error(`Insufficient ETH balance. Required: ${amountEth}, Available: ${formattedBalance}`);
+      throw new Error(
+        `Insufficient ETH balance. Required: ${amountEth}, Available: ${formattedBalance}`,
+      );
     }
 
     // Get stablecoin address
@@ -110,16 +113,16 @@ export class MagicTradeService {
 
     // Calculate minimum output with slippage
     const slippageFactor = 1 - slippagePercent / 100;
-    const minOutput = (expectedOutput * BigInt(Math.floor(slippageFactor * 1000))) / BigInt(1000);
+    const minOutput =
+      (expectedOutput * BigInt(Math.floor(slippageFactor * 1000))) /
+      BigInt(1000);
 
     // Prepare transaction data for swapping ETH for stablecoin
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20; // 20 minutes from now
-    const data = uniswapRouter.interface.encodeFunctionData('swapExactETHForTokens', [
-      minOutput,
-      path,
-      walletInfo.publicAddress,
-      deadline,
-    ]);
+    const data = uniswapRouter.interface.encodeFunctionData(
+      'swapExactETHForTokens',
+      [minOutput, path, walletInfo.publicAddress, deadline],
+    );
 
     // Prepare transaction parameters
     const txParams = {
@@ -139,8 +142,14 @@ export class MagicTradeService {
     return {
       status: 'prepared',
       transaction: txParams,
-      expectedOutput: ethers.formatUnits(expectedOutput, stablecoin === 'USDC' || stablecoin === 'USDT' ? 6 : 18),
-      minOutput: ethers.formatUnits(minOutput, stablecoin === 'USDC' || stablecoin === 'USDT' ? 6 : 18),
+      expectedOutput: ethers.formatUnits(
+        expectedOutput,
+        stablecoin === 'USDC' || stablecoin === 'USDT' ? 6 : 18,
+      ),
+      minOutput: ethers.formatUnits(
+        minOutput,
+        stablecoin === 'USDC' || stablecoin === 'USDT' ? 6 : 18,
+      ),
       stablecoin,
       timestamp: new Date().toISOString(),
     };
@@ -154,19 +163,29 @@ export class MagicTradeService {
     let rpcUrl: string;
     switch (chainId) {
       case 1: // Ethereum Mainnet
-        rpcUrl = process.env.ETH_MAINNET_RPC_URL || 'https://eth-mainnet.g.alchemy.com/v2/demo';
+        rpcUrl =
+          process.env.ETH_MAINNET_RPC_URL ||
+          'https://eth-mainnet.g.alchemy.com/v2/demo';
         break;
       case 5: // Goerli Testnet
-        rpcUrl = process.env.ETH_GOERLI_RPC_URL || 'https://eth-goerli.g.alchemy.com/v2/demo';
+        rpcUrl =
+          process.env.ETH_GOERLI_RPC_URL ||
+          'https://eth-goerli.g.alchemy.com/v2/demo';
         break;
       case 137: // Polygon Mainnet
-        rpcUrl = process.env.POLYGON_MAINNET_RPC_URL || 'https://polygon-mainnet.g.alchemy.com/v2/demo';
+        rpcUrl =
+          process.env.POLYGON_MAINNET_RPC_URL ||
+          'https://polygon-mainnet.g.alchemy.com/v2/demo';
         break;
       case 80001: // Mumbai Testnet
-        rpcUrl = process.env.POLYGON_MUMBAI_RPC_URL || 'https://polygon-mumbai.g.alchemy.com/v2/demo';
+        rpcUrl =
+          process.env.POLYGON_MUMBAI_RPC_URL ||
+          'https://polygon-mumbai.g.alchemy.com/v2/demo';
         break;
       default:
-        rpcUrl = process.env.ETH_MAINNET_RPC_URL || 'https://eth-mainnet.g.alchemy.com/v2/demo';
+        rpcUrl =
+          process.env.ETH_MAINNET_RPC_URL ||
+          'https://eth-mainnet.g.alchemy.com/v2/demo';
     }
 
     return new ethers.JsonRpcProvider(rpcUrl);

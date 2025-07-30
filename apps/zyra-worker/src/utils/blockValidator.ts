@@ -1,6 +1,4 @@
-
 // Import removed as BlockType is not used in this file
-
 
 export interface ValidationError {
   nodeId: string;
@@ -13,7 +11,7 @@ export function validateWorkflowDefinition(
   userId: string,
 ): ValidationError[] {
   const errors: ValidationError[] = [];
-  
+
   if (!Array.isArray(nodes)) {
     errors.push({ nodeId: '', message: 'Invalid nodes array provided' });
     return errors;
@@ -38,18 +36,19 @@ export function validateWorkflowDefinition(
 
     // Consistent node type resolution with fallback hierarchy
     const typeKey = resolveNodeType(node);
-    
+
     if (!typeKey) {
-      errors.push({ 
-        nodeId: node.id, 
-        message: 'Node missing type. Expected type in node.type, node.data.type, or node.data.blockType' 
+      errors.push({
+        nodeId: node.id,
+        message:
+          'Node missing type. Expected type in node.type, node.data.type, or node.data.blockType',
       });
       continue;
     }
 
     // Find handler with case-insensitive matching to handle registry inconsistencies
     const handler = findHandlerByType(handlerRegistry, typeKey);
-    
+
     if (!handler) {
       const availableTypes = Object.keys(handlerRegistry).join(', ');
       errors.push({
@@ -64,7 +63,7 @@ export function validateWorkflowDefinition(
       if (typeof handler.validateConfig === 'function') {
         const config = node.data?.config || {};
         const configErrors = handler.validateConfig(config, userId);
-        
+
         if (Array.isArray(configErrors) && configErrors.length > 0) {
           configErrors.forEach((msg) => {
             if (typeof msg === 'string') {
@@ -109,7 +108,10 @@ function resolveNodeType(node: any): string | null {
   }
 
   // Priority 4: Check for known type patterns in data
-  if (node.data?.config?.blockType && typeof node.data.config.blockType === 'string') {
+  if (
+    node.data?.config?.blockType &&
+    typeof node.data.config.blockType === 'string'
+  ) {
     return node.data.config.blockType.trim();
   }
 
@@ -119,7 +121,10 @@ function resolveNodeType(node: any): string | null {
 /**
  * Find handler by type with case-insensitive matching
  */
-function findHandlerByType(handlerRegistry: Record<string, any>, typeKey: string): any {
+function findHandlerByType(
+  handlerRegistry: Record<string, any>,
+  typeKey: string,
+): any {
   // Direct match first
   if (handlerRegistry[typeKey]) {
     return handlerRegistry[typeKey];
@@ -135,10 +140,10 @@ function findHandlerByType(handlerRegistry: Record<string, any>, typeKey: string
 
   // Handle common type variations
   const typeVariations = [
-    typeKey.replace(/_/g, '-'),  // underscore to dash
-    typeKey.replace(/-/g, '_'),  // dash to underscore
-    typeKey.toLowerCase(),       // lowercase
-    typeKey.toUpperCase(),       // uppercase
+    typeKey.replace(/_/g, '-'), // underscore to dash
+    typeKey.replace(/-/g, '_'), // dash to underscore
+    typeKey.toLowerCase(), // lowercase
+    typeKey.toUpperCase(), // uppercase
   ];
 
   for (const variation of typeVariations) {
@@ -168,7 +173,7 @@ function validateNodeDataStructure(node: any, errors: ValidationError[]): void {
     });
   }
 
-  // Validate parameters structure if present  
+  // Validate parameters structure if present
   if (node.data.parameters && typeof node.data.parameters !== 'object') {
     errors.push({
       nodeId: node.id,

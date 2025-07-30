@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CacheService } from './CacheService';
 
 interface LLMProvider {
   name: string;
@@ -40,35 +41,112 @@ interface ProviderConfig {
 export class LLMProviderManager {
   private readonly logger = new Logger(LLMProviderManager.name);
   private providers = new Map<string, LLMProvider>();
+  private providerMetrics = new Map<
+    string,
+    {
+      requests: number;
+      failures: number;
+      avgResponseTime: number;
+      lastFailure?: Date;
+      consecutiveFailures: number;
+    }
+  >();
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly cacheService: CacheService,
+  ) {
     this.initializeProviders();
+    this.initializeMetrics();
   }
 
   async getProvider(
     type: string,
     config: ProviderConfig,
   ): Promise<LLMProvider> {
-    const provider = this.providers.get(type);
-    if (!provider) {
-      throw new Error(`LLM provider ${type} not found`);
+    // Input validation
+    if (!type || typeof type !== 'string') {
+      throw new Error('Provider type must be a non-empty string');
     }
 
-    // Health check
-    const isHealthy = await provider.isHealthy();
-    if (!isHealthy) {
-      // Try fallback provider
-      const fallbackProvider = await this.getFallbackProvider(type);
-      if (fallbackProvider) {
-        this.logger.warn(`Using fallback provider for ${type}`);
-        return fallbackProvider;
-      }
+    if (!config || typeof config !== 'object') {
+      throw new Error('Provider config must be a valid object');
+    }
+
+    const sanitizedType = type.toLowerCase().trim();
+    const provider = this.providers.get(sanitizedType);
+
+    if (!provider) {
+      // List available providers for better error messaging
+      const availableProviders = Array.from(this.providers.keys()).join(', ');
       throw new Error(
-        `LLM provider ${type} is not healthy and no fallback available`,
+        `LLM provider '${sanitizedType}' not found. Available providers: ${availableProviders}`,
       );
     }
 
-    return provider;
+    try {
+      // Health check with caching and timeout
+      const cachedHealth =
+        await this.cacheService.getCachedProviderHealth(sanitizedType);
+      let isHealthy = cachedHealth;
+
+      if (isHealthy === null) {
+        // Not cached, perform actual health check with timeout
+        try {
+          isHealthy = await Promise.race([
+            provider.isHealthy(),
+            new Promise<boolean>((_, reject) =>
+              setTimeout(
+                () => reject(new Error('Health check timeout')),
+                10000,
+              ),
+            ),
+          ]);
+
+          await this.cacheService.cacheProviderHealth(sanitizedType, isHealthy);
+        } catch (healthError) {
+          const errorMessage = healthError instanceof Error ? healthError.message : String(healthError);
+          this.logger.error(
+            `Health check failed for ${sanitizedType}: ${errorMessage}`,
+          );
+          isHealthy = false;
+          // Cache the failure to prevent repeated attempts
+          await this.cacheService.cacheProviderHealth(
+            sanitizedType,
+            false,
+            60000,
+          ); // Cache for 1 minute
+        }
+      }
+
+      if (!isHealthy || this.isCircuitBreakerOpen(sanitizedType)) {
+        // Try fallback provider
+        const fallbackProvider = await this.getFallbackProvider(sanitizedType);
+        if (fallbackProvider) {
+          this.logger.warn(
+            `Using fallback provider for ${sanitizedType} (health: ${isHealthy}, circuit: ${this.isCircuitBreakerOpen(sanitizedType)})`,
+          );
+          return fallbackProvider;
+        }
+
+        // If no fallback available, try to recover the primary provider
+        if (this.isCircuitBreakerOpen(sanitizedType)) {
+          this.logger.warn(
+            `Circuit breaker open for ${sanitizedType}, attempting recovery`,
+          );
+          this.resetCircuitBreaker(sanitizedType);
+        }
+
+        throw new Error(
+          `LLM provider ${sanitizedType} is not healthy and no fallback available`,
+        );
+      }
+
+      return provider;
+    } catch (error) {
+      this.recordFailure(sanitizedType);
+      throw error;
+    }
   }
 
   private initializeProviders(): void {
@@ -378,5 +456,90 @@ export class LLMProviderManager {
     }
 
     return toolCalls;
+  }
+
+  private initializeMetrics(): void {
+    const providerTypes = ['openrouter', 'openai', 'anthropic', 'ollama'];
+
+    for (const type of providerTypes) {
+      this.providerMetrics.set(type, {
+        requests: 0,
+        failures: 0,
+        avgResponseTime: 0,
+        consecutiveFailures: 0,
+      });
+    }
+  }
+
+  private isCircuitBreakerOpen(providerType: string): boolean {
+    const metrics = this.providerMetrics.get(providerType);
+    if (!metrics) return false;
+
+    // Open circuit if consecutive failures exceed threshold
+    const failureThreshold = 5;
+    const timeWindowMs = 5 * 60 * 1000; // 5 minutes
+
+    if (metrics.consecutiveFailures >= failureThreshold) {
+      const timeSinceLastFailure = metrics.lastFailure
+        ? Date.now() - metrics.lastFailure.getTime()
+        : Infinity;
+
+      // Keep circuit open for time window after last failure
+      return timeSinceLastFailure < timeWindowMs;
+    }
+
+    return false;
+  }
+
+  private recordSuccess(providerType: string, responseTime: number): void {
+    const metrics = this.providerMetrics.get(providerType);
+    if (!metrics) return;
+
+    metrics.requests++;
+    metrics.consecutiveFailures = 0; // Reset on success
+
+    // Update rolling average response time
+    const alpha = 0.1; // Smoothing factor
+    metrics.avgResponseTime =
+      metrics.avgResponseTime === 0
+        ? responseTime
+        : alpha * responseTime + (1 - alpha) * metrics.avgResponseTime;
+  }
+
+  private recordFailure(providerType: string): void {
+    const metrics = this.providerMetrics.get(providerType);
+    if (!metrics) return;
+
+    metrics.requests++;
+    metrics.failures++;
+    metrics.consecutiveFailures++;
+    metrics.lastFailure = new Date();
+  }
+
+  private resetCircuitBreaker(providerType: string): void {
+    const metrics = this.providerMetrics.get(providerType);
+    if (!metrics) return;
+
+    metrics.consecutiveFailures = 0;
+    metrics.lastFailure = undefined;
+  }
+
+  async getProviderMetrics(): Promise<Map<string, any>> {
+    const enhancedMetrics = new Map();
+
+    for (const [type, metrics] of this.providerMetrics) {
+      const failureRate =
+        metrics.requests > 0 ? metrics.failures / metrics.requests : 0;
+      const isCircuitOpen = this.isCircuitBreakerOpen(type);
+
+      enhancedMetrics.set(type, {
+        ...metrics,
+        failureRate,
+        isCircuitOpen,
+        isHealthy: await this.cacheService.getCachedProviderHealth(type),
+      });
+    }
+
+    return enhancedMetrics;
   }
 }

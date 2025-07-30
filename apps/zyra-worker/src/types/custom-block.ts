@@ -1,6 +1,6 @@
 // Import shared types from @zyra/types
-import { 
-  NodeCategory, 
+import {
+  NodeCategory,
   DataType,
   LogicType as SharedLogicType,
   BlockParameter as SharedBlockParameter,
@@ -8,22 +8,22 @@ import {
   CustomBlockData as SharedCustomBlockData,
   CustomBlockExecutionResult as SharedExecutionResult,
   createParameter as sharedCreateParameter,
-  createCustomBlockDefinition as sharedCreateCustomBlockDefinition
-} from "@zyra/types";
+  createCustomBlockDefinition as sharedCreateCustomBlockDefinition,
+} from '@zyra/types';
 
 // Re-export the shared types
 export { DataType };
 
 // Extend LogicType enum with additional types needed by the worker
 export enum LogicType {
-  JAVASCRIPT = "javascript",
-  TYPESCRIPT = "typescript",
-  PYTHON = "python",
-  REST_API = "rest-api",
+  JAVASCRIPT = 'javascript',
+  TYPESCRIPT = 'typescript',
+  PYTHON = 'python',
+  REST_API = 'rest-api',
   // Extended types for worker use
-  JSON_TRANSFORM = "json-transform",
-  TEMPLATE = "template",
-  CONDITION = "condition"
+  JSON_TRANSFORM = 'json-transform',
+  TEMPLATE = 'template',
+  CONDITION = 'condition',
 }
 
 // Re-export using aliases to avoid import/export conflicts
@@ -49,7 +49,7 @@ export function createCustomBlockDefinition(
   outputs: BlockParameter[] = [],
   configFields: any[] = [], // Add configFields parameter
   logicType: SharedLogicType = SharedLogicType.JAVASCRIPT,
-  code = ""
+  code = '',
 ): CustomBlockDefinition {
   // Create a base definition using the shared function
   const baseDefinition = sharedCreateCustomBlockDefinition({
@@ -61,20 +61,20 @@ export function createCustomBlockDefinition(
     outputs,
     code,
     logicType,
-    isPublic: false
+    isPublic: false,
   });
-  
+
   // Add worker-specific properties
   return {
     ...baseDefinition,
-    configFields
+    configFields,
   };
 }
 
 // Worker-specific implementation of custom block execution
 export async function executeCustomBlockLogic(
   blockDefinition: CustomBlockDefinition,
-  inputs: Record<string, any>
+  inputs: Record<string, any>,
 ): Promise<ExecutionResult> {
   try {
     let outputs: Record<string, any> = {};
@@ -83,20 +83,22 @@ export async function executeCustomBlockLogic(
     const log = (...args: any[]) => {
       logs.push(
         args
-          .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg)))
-          .join(" ")
+          .map((arg) =>
+            typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
+          )
+          .join(' '),
       );
     };
 
     // Convert logicType to string for switch case comparison
     const logicTypeStr = blockDefinition.logicType.toString();
-    
+
     switch (logicTypeStr) {
       case SharedLogicType.JAVASCRIPT: {
         const asyncFunction = new Function(
-          "inputs",
-          "log",
-          "outputs",
+          'inputs',
+          'log',
+          'outputs',
           `
           try {
             ${blockDefinition.code}
@@ -104,36 +106,36 @@ export async function executeCustomBlockLogic(
           } catch (error) {
             throw new Error("Execution error: " + error.message);
           }
-          `
+          `,
         );
         outputs = (await asyncFunction(inputs, log, {})) || {};
         break;
       }
-      case "json-transform": {
+      case 'json-transform': {
         try {
           const template = JSON.parse(blockDefinition.code);
           outputs = applyJsonTemplate(template, inputs);
         } catch (error: any) {
           throw new Error(
-            `JSON transform error: ${error instanceof Error ? error.message : String(error)}`
+            `JSON transform error: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
         break;
       }
-      case "template": {
+      case 'template': {
         outputs = { result: applyStringTemplate(blockDefinition.code, inputs) };
         break;
       }
-      case "condition": {
+      case 'condition': {
         const condition = new Function(
-          "inputs",
+          'inputs',
           `
           try {
             return Boolean(${blockDefinition.code});
           } catch (error) {
             throw new Error("Condition error: " + error.message);
           }
-          `
+          `,
         );
         outputs = { result: condition(inputs) };
         break;
@@ -166,12 +168,16 @@ export async function executeCustomBlockLogic(
 }
 
 function applyJsonTemplate(template: any, data: Record<string, any>): any {
-  if (typeof template === "string" && template.startsWith("{{") && template.endsWith("}}")) {
+  if (
+    typeof template === 'string' &&
+    template.startsWith('{{') &&
+    template.endsWith('}}')
+  ) {
     const path = template.slice(2, -2).trim();
     return getNestedValue(data, path);
   } else if (Array.isArray(template)) {
     return template.map((item) => applyJsonTemplate(item, data));
-  } else if (typeof template === "object" && template !== null) {
+  } else if (typeof template === 'object' && template !== null) {
     const result: Record<string, any> = {};
     for (const key in template) {
       result[key] = applyJsonTemplate(template[key], data);
@@ -181,15 +187,18 @@ function applyJsonTemplate(template: any, data: Record<string, any>): any {
   return template;
 }
 
-function applyStringTemplate(template: string, data: Record<string, any>): string {
+function applyStringTemplate(
+  template: string,
+  data: Record<string, any>,
+): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
     const value = getNestedValue(data, path.trim());
-    return value !== undefined ? String(value) : "";
+    return value !== undefined ? String(value) : '';
   });
 }
 
 function getNestedValue(obj: Record<string, any>, path: string): any {
-  const parts = path.split(".");
+  const parts = path.split('.');
   let current: any = obj;
   for (const part of parts) {
     if (current === undefined || current === null) {

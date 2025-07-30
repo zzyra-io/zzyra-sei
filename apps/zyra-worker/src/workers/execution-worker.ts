@@ -465,14 +465,14 @@ export class ExecutionWorker implements OnModuleInit {
       const resumeData = isResume ? payload?.resumeData || {} : {};
 
       // Get workflow using existing method
-      let workflow =
+      const workflow =
         this.workflowCache.get(workflowId) ||
         (await this.fetchWorkflow(workflowId));
       if (workflow.user_id !== userId)
         throw new Error('User does not have permission');
 
       // Get or create profile using DatabaseService
-      let profile =
+      const profile =
         this.profileCache.get(userId) ||
         (await this.databaseService.getOrCreateUserProfile(userId));
       if (profile.monthlyExecutionCount >= profile.monthlyExecutionQuota) {

@@ -34,7 +34,7 @@ export class CustomBlockHandler
 
       // Get custom block definition from database
       // Check multiple possible locations for the custom block ID
-      let customBlockId =
+      const customBlockId =
         node.data?.customBlockId ||
         node.data?.blockId ||
         node.data?.config?.customBlockId ||

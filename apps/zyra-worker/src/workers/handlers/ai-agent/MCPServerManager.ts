@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../services/database.service';
+import { CacheService } from './CacheService';
 
 interface MCPServer {
   id: string;
@@ -40,7 +41,10 @@ export class MCPServerManager {
   private readonly servers = new Map<string, MCPServer>();
   private readonly defaultTimeout = 300000; // 5 minutes to match AI Agent timeout
 
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async registerServer(
     config: MCPServerConfig,
@@ -92,9 +96,24 @@ export class MCPServerManager {
         );
       }
 
-      // Discover available tools and resources
-      const tools = await this.discoverTools(client);
-      const resources = await this.discoverResources(client);
+      // Discover available tools and resources with caching
+      const cachedTools = await this.cacheService.getCachedToolDiscovery(
+        serverRecord.id,
+      );
+      let tools, resources;
+
+      if (cachedTools) {
+        this.logger.log(`Using cached tools for server: ${config.name}`);
+        tools = cachedTools;
+        resources = []; // Resources not cached yet, but could be extended
+      } else {
+        this.logger.log(`Discovering tools for server: ${config.name}`);
+        tools = await this.discoverTools(client);
+        resources = await this.discoverResources(client);
+
+        // Cache the discovered tools
+        await this.cacheService.cacheToolDiscovery(serverRecord.id, tools);
+      }
 
       // Store in memory cache
       const server: MCPServer = {

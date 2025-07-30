@@ -158,8 +158,8 @@ export class MCPToolsManager {
       }
 
       // Create server configuration with user-provided values
-      let args = [...(serverDef.connection.args || [])];
-      let env = { ...userConfig };
+      const args = [...(serverDef.connection.args || [])];
+      const env = { ...userConfig };
 
       // Handle dynamic argument mapping from server definition
       if (serverDef.connection.argMapping) {

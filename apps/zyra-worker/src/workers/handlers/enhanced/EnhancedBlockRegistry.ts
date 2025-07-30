@@ -87,15 +87,19 @@ export class EnhancedBlockRegistry {
 
     // Normalize block type to prevent race conditions
     const normalizedType = blockType.trim();
-    
+
     this.logger.debug(`Looking for handler for block type: ${normalizedType}`);
 
     // Use a deterministic lookup strategy to prevent race conditions
     const handler = this.findHandlerDeterministically(normalizedType);
-    
+
     if (handler) {
-      const handlerType = this.isEnhancedBlock(normalizedType) ? 'enhanced' : 'legacy';
-      this.logger.debug(`Found ${handlerType} handler for block type: ${normalizedType}`);
+      const handlerType = this.isEnhancedBlock(normalizedType)
+        ? 'enhanced'
+        : 'legacy';
+      this.logger.debug(
+        `Found ${handlerType} handler for block type: ${normalizedType}`,
+      );
       return handler;
     }
 
@@ -121,7 +125,7 @@ export class EnhancedBlockRegistry {
       return this.enhancedBlocks.get(blockType)!;
     }
 
-    // Priority 2: Exact match in legacy blocks  
+    // Priority 2: Exact match in legacy blocks
     if (this.legacyBlocks.has(blockType)) {
       return this.legacyBlocks.get(blockType)!;
     }
@@ -129,7 +133,7 @@ export class EnhancedBlockRegistry {
     // Priority 3: Case-insensitive match in enhanced blocks (deterministic order)
     const upperBlockType = blockType.toUpperCase();
     const enhancedKeys = Array.from(this.enhancedBlocks.keys()).sort(); // Sorted for determinism
-    
+
     for (const key of enhancedKeys) {
       if (key.toUpperCase() === upperBlockType) {
         this.logger.debug(
@@ -141,7 +145,7 @@ export class EnhancedBlockRegistry {
 
     // Priority 4: Case-insensitive match in legacy blocks (deterministic order)
     const legacyKeys = Array.from(this.legacyBlocks.keys()).sort(); // Sorted for determinism
-    
+
     for (const key of legacyKeys) {
       if (key.toUpperCase() === upperBlockType) {
         this.logger.debug(
@@ -298,7 +302,7 @@ export class EnhancedBlockRegistry {
             json: output,
             pairedItem: { item: 0 },
             // Add metadata to track source block
-            metadata: { sourceBlockId: blockId }
+            metadata: { sourceBlockId: blockId },
           } as ZyraNodeData);
         }
       }
@@ -321,7 +325,7 @@ export class EnhancedBlockRegistry {
     let nodeLogger: any;
     const executionId = context.executionId || node.executionId;
     const nodeId = context.nodeId || node.id;
-    
+
     if (executionId && nodeId) {
       try {
         nodeLogger = this.executionLogger.createNodeLogger(executionId, nodeId);
@@ -340,7 +344,10 @@ export class EnhancedBlockRegistry {
         nodeExecutionId: node.executionId,
         nodeIdFromNode: node.id,
       });
-      nodeLogger = this.createFallbackLogger(executionId || 'unknown', nodeId || 'unknown');
+      nodeLogger = this.createFallbackLogger(
+        executionId || 'unknown',
+        nodeId || 'unknown',
+      );
     }
 
     // Enhanced context with all critical fields populated
@@ -388,7 +395,11 @@ export class EnhancedBlockRegistry {
 
         processTemplate: (template: string, data: any) => {
           // Enhance template processing with structured context for cross-block data access
-          return this.templateProcessor.process(template, data, templateContext);
+          return this.templateProcessor.process(
+            template,
+            data,
+            templateContext,
+          );
         },
 
         formatValue: (value: any, format?: string) => {

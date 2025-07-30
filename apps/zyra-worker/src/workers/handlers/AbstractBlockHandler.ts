@@ -25,42 +25,51 @@ export abstract class AbstractBlockHandler implements BlockHandler {
    * Wrapper method that enforces the abstract contract with proper error handling
    * This ensures all handlers follow the same execution pattern
    */
-  async executeWithContract(node: any, ctx: BlockExecutionContext): Promise<any> {
+  async executeWithContract(
+    node: any,
+    ctx: BlockExecutionContext,
+  ): Promise<any> {
     // Validate inputs before execution
     this.validateExecutionInputs(node, ctx);
 
     const blockExecutionId = await this.startExecution(
       ctx.nodeId || node.id,
       ctx.executionId,
-      node.type || node.data?.type || 'unknown'
+      node.type || node.data?.type || 'unknown',
     );
 
     try {
       // Execute the concrete implementation
       const result = await this.execute(node, ctx);
-      
+
       // Track successful completion
       await this.completeExecution(blockExecutionId, 'completed', result);
-      
+
       return result;
     } catch (error) {
       // Track failed execution
-      const executionError = error instanceof Error ? error : new Error(String(error));
-      await this.completeExecution(blockExecutionId, 'failed', undefined, executionError);
-      
+      const executionError =
+        error instanceof Error ? error : new Error(String(error));
+      await this.completeExecution(
+        blockExecutionId,
+        'failed',
+        undefined,
+        executionError,
+      );
+
       // Log the error
       await this.trackLog(
         ctx.executionId,
         ctx.nodeId || node.id,
         'error',
         `Block execution failed: ${executionError.message}`,
-        { 
+        {
           blockType: node.type || node.data?.type,
           errorStack: executionError.stack,
-          nodeData: node.data 
-        }
+          nodeData: node.data,
+        },
       );
-      
+
       throw executionError;
     }
   }
@@ -74,11 +83,15 @@ export abstract class AbstractBlockHandler implements BlockHandler {
     }
 
     if (!node.id && !ctx.nodeId) {
-      throw new Error('AbstractBlockHandler: node must have an id or ctx must have nodeId');
+      throw new Error(
+        'AbstractBlockHandler: node must have an id or ctx must have nodeId',
+      );
     }
 
     if (!node.type && !node.data?.type) {
-      throw new Error('AbstractBlockHandler: node must have a type in node.type or node.data.type');
+      throw new Error(
+        'AbstractBlockHandler: node must have a type in node.type or node.data.type',
+      );
     }
 
     if (!ctx) {
@@ -86,12 +99,16 @@ export abstract class AbstractBlockHandler implements BlockHandler {
     }
 
     if (!ctx.executionId) {
-      throw new Error('AbstractBlockHandler: execution context must have executionId');
+      throw new Error(
+        'AbstractBlockHandler: execution context must have executionId',
+      );
     }
 
     // Ensure nodeId is available from either context or node
     if (!ctx.nodeId && !node.id) {
-      throw new Error('AbstractBlockHandler: nodeId must be available in context or node');
+      throw new Error(
+        'AbstractBlockHandler: nodeId must be available in context or node',
+      );
     }
   }
 

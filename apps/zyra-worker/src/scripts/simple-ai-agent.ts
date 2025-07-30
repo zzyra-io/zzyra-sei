@@ -29,6 +29,8 @@ import { ReasoningEngine } from '../workers/handlers/ai-agent/ReasoningEngine';
 import { MCPToolsManager } from '../workers/handlers/ai-agent/MCPToolsManager';
 import { SubscriptionService } from '../workers/handlers/ai-agent/SubscriptionService';
 import { GOATManager } from '../workers/handlers/ai-agent/GOATManager';
+import { CacheService } from '../workers/handlers/ai-agent/CacheService';
+import { ToolAnalyticsService } from '../workers/handlers/ai-agent/ToolAnalyticsService';
 import { randomUUID } from 'crypto';
 import * as dotenv from 'dotenv';
 dotenv.config();
@@ -127,13 +129,23 @@ async function createAIAgentHandler() {
   const executionLogger = new SimpleExecutionLogger() as any;
 
   // Create AI Agent components
-  const llmProviderManager = new LLMProviderManager(configService);
-  const mcpServerManager = new MCPServerManager(databaseService);
+  const cacheService = new CacheService(configService);
+  const llmProviderManager = new LLMProviderManager(
+    configService,
+    cacheService,
+  );
+  const toolAnalyticsService = new ToolAnalyticsService(
+    databaseService,
+    cacheService,
+  );
+  const mcpServerManager = new MCPServerManager(databaseService, cacheService);
   const securityValidator = new SecurityValidator(databaseService);
   const subscriptionService = new SubscriptionService();
   const reasoningEngine = new ReasoningEngine(
     databaseService,
     subscriptionService,
+    toolAnalyticsService,
+    cacheService,
   );
   const mcpToolsManager = new MCPToolsManager(
     databaseService,
