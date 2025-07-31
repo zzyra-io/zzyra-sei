@@ -317,6 +317,7 @@ export class MCPServerManager {
           ...process.env,
           ...config.env,
         },
+        cwd: process.cwd(), // Set working directory explicitly
       });
 
       // Create and connect client

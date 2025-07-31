@@ -9,6 +9,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../../apps/zyra-worker/src/mcps"],
   "exclude": ["node_modules", "dist"]
 }

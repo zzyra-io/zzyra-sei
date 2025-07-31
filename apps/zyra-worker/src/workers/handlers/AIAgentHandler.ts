@@ -6,7 +6,7 @@ import { LLMProviderManager } from './ai-agent/LLMProviderManager';
 import { MCPServerManager } from './ai-agent/MCPServerManager';
 import { SecurityValidator } from './ai-agent/SecurityValidator';
 import { ReasoningEngine } from './ai-agent/ReasoningEngine';
-import { defaultMCPs } from '@zyra/ai';
+import { defaultMCPs } from '../../mcps/default_mcp_configs';
 
 interface AIAgentConfig {
   provider: {

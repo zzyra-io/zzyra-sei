@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../services/database.service';
 import { MCPServerManager } from './MCPServerManager';
-import { defaultMCPs } from '@zyra/ai';
+import { defaultMCPs } from '../../../mcps/default_mcp_configs';
 
 interface MCPServerConnection {
   id: string;

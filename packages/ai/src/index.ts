@@ -1,1 +1,1 @@
-export * as defaultMCPs from "./mcps/default_mcp_configs";
+export * as defaultMCPs from "../../../apps/zyra-worker/src/mcps/default_mcp_configs";
