@@ -253,6 +253,28 @@ export const postgres = {
   ],
 };
 
+const blockScout = {
+  id: 'blockScout',
+  name: 'blockScout',
+  displayName: 'BlockScout',
+  description: 'BlockScout database operations',
+  category: 'database',
+  icon: '🔗',
+  connection: {
+    type: 'stdio',
+    command: 'docker',
+    args: [
+      'run',
+      '--rm',
+      '-i',
+      'sparfenyuk/mcp-proxy:latest',
+      '--transport',
+      'streamablehttp',
+      'https://mcp.blockscout.com/mcp/',
+    ],
+  },
+};
+
 // Export all MCP configurations as a single object
 export const defaultMCPs = {
   fetch,
@@ -263,4 +285,5 @@ export const defaultMCPs = {
   time,
   weather,
   postgres,
+  blockScout,
 };

@@ -6,7 +6,7 @@ import { LLMProviderManager } from './ai-agent/LLMProviderManager';
 import { MCPServerManager } from './ai-agent/MCPServerManager';
 import { SecurityValidator } from './ai-agent/SecurityValidator';
 import { ReasoningEngine } from './ai-agent/ReasoningEngine';
-import { defaultMCPs } from '../../mcps/default_mcp_configs';
+import { defaultMCPs } from './ai-agent/mcps';
 
 interface AIAgentConfig {
   provider: {
