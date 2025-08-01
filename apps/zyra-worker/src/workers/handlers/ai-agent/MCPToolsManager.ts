@@ -192,24 +192,33 @@ export class MCPToolsManager {
               // Pass as environment variable
               env[configKey] = userConfig[configKey];
             }
-          } else if (serverId === 'sei') {
+          } else {
+            // DYNAMIC ENV VAR DISCOVERY - No hardcoded tool-specific logic
             this.logger.log(
-              `❌ Missing user config for ${configKey}, trying process.env`,
+              `🔍 Auto-discovering env var: ${configKey} for ${serverId}`,
             );
-            // Fallback to process.env if user config doesn't have it
+
+            // Try exact match first
             if (process.env[configKey]) {
               env[configKey] = process.env[configKey];
-              this.logger.log(
-                `✅ Found ${configKey} in process.env and added to env`,
-              );
-            } else if (
+              this.logger.log(`✅ Found ${configKey} in process.env`);
+            }
+            // Smart fallbacks for common patterns
+            else if (
               configKey === 'PRIVATE_KEY' &&
               process.env.EVM_WALLET_PRIVATE_KEY
             ) {
-              // Special case: use EVM_WALLET_PRIVATE_KEY as PRIVATE_KEY for SEI MCP server
               env[configKey] = process.env.EVM_WALLET_PRIVATE_KEY;
               this.logger.log(
-                `✅ Found EVM_WALLET_PRIVATE_KEY in process.env and mapped to ${configKey}`,
+                `✅ Mapped EVM_WALLET_PRIVATE_KEY → ${configKey}`,
+              );
+            } else if (
+              configKey === 'WALLET_PRIVATE_KEY' &&
+              process.env.EVM_WALLET_PRIVATE_KEY
+            ) {
+              env[configKey] = process.env.EVM_WALLET_PRIVATE_KEY;
+              this.logger.log(
+                `✅ Mapped EVM_WALLET_PRIVATE_KEY → ${configKey}`,
               );
             }
           }

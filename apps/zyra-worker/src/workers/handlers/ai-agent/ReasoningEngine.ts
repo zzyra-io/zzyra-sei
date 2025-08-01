@@ -512,15 +512,14 @@ export class ReasoningEngine {
       const startTime = Date.now();
 
       try {
-        // Enhance parameters with results from previous tools using semantic intelligence
-        const enhancedParameters =
-          await this.enhanceParametersWithPreviousResults(
-            toolEntry.parameters || {},
-            previousResults,
-            tool,
-            toolEntry.name,
-            params.prompt, // Pass conversation context
-          );
+        // Use AI's original parameters - trust the AI's intelligence
+        // Only add essential user context that the AI needs but doesn't have
+        const enhancedParameters = await this.addUserContextToParameters(
+          toolEntry.parameters || {},
+          tool,
+          params.userId,
+          params.prompt,
+        );
 
         this.logger.log(
           `Executing tool: ${toolEntry.name} with parameters:`,
@@ -616,12 +615,56 @@ export class ReasoningEngine {
   }
 
   /**
-   * Enhance parameters with results from previous tool executions
+   * Add essential user context to parameters without interfering with AI reasoning
+   * This only provides context the AI needs but doesn't have (like user's wallet address)
    */
+  private async addUserContextToParameters(
+    originalParameters: any,
+    tool: any,
+    userId?: string,
+    conversationContext: string = '',
+  ): Promise<any> {
+    const contextualParameters = { ...originalParameters };
+
+    // Only add user's wallet address if the AI is asking for balance/wallet operations
+    // and hasn't specified an address (meaning it wants the user's own address)
+    if (tool?.inputSchema?.properties) {
+      for (const [paramName, paramSchema] of Object.entries(
+        tool.inputSchema.properties,
+      )) {
+        const schema = paramSchema as any;
+        const paramNameLower = paramName.toLowerCase();
+
+        // If this is an address parameter and the AI didn't provide one,
+        // it likely wants the user's address for balance/wallet operations
+        if (
+          (paramNameLower.includes('address') ||
+            paramNameLower.includes('wallet')) &&
+          (!originalParameters[paramName] ||
+            originalParameters[paramName] === '') &&
+          (conversationContext.toLowerCase().includes('balance') ||
+            conversationContext.toLowerCase().includes('my ') ||
+            conversationContext.toLowerCase().includes('user'))
+        ) {
+          const userWalletAddress = this.deriveAddressFromPrivateKey();
+          if (userWalletAddress) {
+            contextualParameters[paramName] = userWalletAddress;
+            this.logger.log(
+              `Added user wallet context for ${paramName}: ${userWalletAddress}`,
+            );
+          }
+        }
+      }
+    }
+
+    return contextualParameters;
+  }
+
   /**
-   * Dynamically enhance parameters with semantic intelligence (with caching)
+   * DEPRECATED: This method interfered with AI reasoning and is no longer used
+   * Legacy method for enhancing parameters with semantic intelligence
    */
-  private async enhanceParametersWithPreviousResults(
+  private async enhanceParametersWithPreviousResults_DEPRECATED(
     originalParameters: any,
     previousResults: Map<string, any>,
     tool: any,
@@ -836,6 +879,24 @@ export class ReasoningEngine {
       paramNameLower.includes('address') ||
       paramNameLower.includes('wallet')
     ) {
+      // Prioritize user's wallet address for balance/wallet-related parameters
+      if (
+        paramNameLower.includes('wallet') ||
+        paramNameLower.includes('owner') ||
+        paramNameLower.includes('user') ||
+        (paramNameLower === 'address' &&
+          conversationContext.toLowerCase().includes('balance'))
+      ) {
+        const userWalletAddress = this.deriveAddressFromPrivateKey();
+        if (userWalletAddress) {
+          this.logger.log(
+            `Prioritizing user wallet address for ${paramNameLower}: ${userWalletAddress}`,
+          );
+          return userWalletAddress;
+        }
+      }
+
+      // For specific contract addresses, token addresses, etc., extract from results
       return this.extractAddressFromResult(resultText);
     }
 

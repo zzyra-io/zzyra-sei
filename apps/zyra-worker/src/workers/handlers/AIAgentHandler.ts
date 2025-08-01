@@ -464,7 +464,10 @@ export class AIAgentHandler implements BlockHandler {
         this.logger.log(
           `[AI_AGENT] Using fallback server configs for tool ${toolConfig.id}`,
         );
-        serverConfigs = this.getMCPServerConfigs(toolConfig.id);
+        serverConfigs = this.getMCPServerConfigs(
+          toolConfig.id,
+          toolConfig.config,
+        );
       }
 
       this.logger.log(
@@ -607,7 +610,7 @@ export class AIAgentHandler implements BlockHandler {
     return tools;
   }
 
-  private getMCPServerConfigs(toolId: string): any[] {
+  private getMCPServerConfigs(toolId: string, userConfig?: any): any[] {
     this.logger.log(
       `[AI_AGENT] Getting MCP server configs for tool ID: ${toolId}`,
     );
@@ -630,7 +633,7 @@ export class AIAgentHandler implements BlockHandler {
       name: `${toolId}-server`,
       command: config.connection.command,
       args: config.connection.args,
-      env: this.getEnvironmentForTool(toolId, config),
+      env: this.getEnvironmentForTool(toolId, config, userConfig),
       timeout: 300000, // 5 minutes
     };
 
@@ -640,25 +643,66 @@ export class AIAgentHandler implements BlockHandler {
   private getEnvironmentForTool(
     toolId: string,
     config: any,
+    userConfig?: any,
   ): Record<string, string> {
     const baseEnv: Record<string, string> = {};
 
-    // Add environment variables based on tool type
-    switch (toolId) {
-      case 'goat':
-        baseEnv.EVM_WALLET_PRIVATE_KEY = process.env.EVM_WALLET_PRIVATE_KEY;
-        baseEnv.RPC_PROVIDER_URL =
-          process.env.RPC_PROVIDER_URL || 'https://sepolia.base.org';
-        break;
-      case 'brave-search':
-        baseEnv.BRAVE_API_KEY = process.env.BRAVE_API_KEY || 'demo-key';
-        break;
-      case 'postgres':
-        baseEnv.DATABASE_URL =
-          process.env.DATABASE_URL || 'postgresql://localhost/zyra';
-        break;
+    this.logger.log(`[AI_AGENT] 🤖 Dynamic env setup for tool: ${toolId}`);
+
+    // 1. PASS ALL USER CONFIG DIRECTLY AS ENV VARS (highest priority)
+    if (userConfig) {
+      Object.entries(userConfig).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          baseEnv[key] = String(value);
+          this.logger.log(`[AI_AGENT] ✅ User config: ${key}=${String(value)}`);
+        }
+      });
     }
 
+    // 2. AUTO-DISCOVER ENV VARS FROM TOOL'S CONFIG SCHEMA
+    const schemaProperties = config?.configSchema?.properties || {};
+    Object.keys(schemaProperties).forEach((envVar) => {
+      // Only add if not already set by user config
+      if (!baseEnv[envVar] && process.env[envVar]) {
+        baseEnv[envVar] = process.env[envVar];
+        this.logger.log(`[AI_AGENT] 🔍 Auto-discovered: ${envVar}=SET`);
+      }
+    });
+
+    // 3. INTELLIGENT FALLBACKS FOR COMMON PATTERNS
+    const commonEnvVars = [
+      'EVM_WALLET_PRIVATE_KEY',
+      'WALLET_PRIVATE_KEY',
+      'PRIVATE_KEY',
+      'RPC_PROVIDER_URL',
+      'API_KEY',
+      'DATABASE_URL',
+      'BRAVE_API_KEY',
+      'BLOCKSCOUT_API_KEY',
+    ];
+
+    commonEnvVars.forEach((envVar) => {
+      if (!baseEnv[envVar] && process.env[envVar]) {
+        baseEnv[envVar] = process.env[envVar];
+        this.logger.log(`[AI_AGENT] 🔧 Common pattern: ${envVar}=SET`);
+      }
+    });
+
+    // 4. SMART DEFAULTS (only if nothing else set)
+    if (!baseEnv.RPC_PROVIDER_URL && !baseEnv.CUSTOM_RPC_URL) {
+      baseEnv.RPC_PROVIDER_URL = 'https://sepolia.base.org';
+    }
+    if (!baseEnv.BRAVE_API_KEY) {
+      baseEnv.BRAVE_API_KEY = 'demo-key';
+    }
+    if (!baseEnv.DATABASE_URL) {
+      baseEnv.DATABASE_URL = 'postgresql://localhost/zyra';
+    }
+
+    this.logger.log(
+      `[AI_AGENT] 🎯 Final env vars for ${toolId}:`,
+      Object.keys(baseEnv),
+    );
     return baseEnv;
   }
 
@@ -718,10 +762,13 @@ export class AIAgentHandler implements BlockHandler {
       `[AI_AGENT] Processing with direct reasoning (sequential thinking disabled)...`,
     );
 
+    // Generate secure system prompt with user context
+    const systemPrompt = await this.buildSystemPrompt(userId, tools);
+
     // Direct execution without sequential thinking dependency
     const executionPromise = this.reasoningEngine.execute({
       prompt: config.agent.userPrompt,
-      systemPrompt: config.agent.systemPrompt,
+      systemPrompt: systemPrompt,
       provider,
       tools,
       maxSteps: config.agent.maxSteps,
@@ -843,6 +890,93 @@ export class AIAgentHandler implements BlockHandler {
         `Failed to log execution: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  /**
+   * Build secure system prompt with user context
+   * System prompts are controlled by the system for security and consistency
+   */
+  private async buildSystemPrompt(
+    userId: string,
+    tools: any[],
+  ): Promise<string> {
+    // Derive user's wallet address for context
+    let userWalletAddress = 'Not available';
+    try {
+      if (process.env.EVM_WALLET_PRIVATE_KEY) {
+        const { privateKeyToAccount } = require('viem/accounts');
+        userWalletAddress = privateKeyToAccount(
+          process.env.EVM_WALLET_PRIVATE_KEY as `0x${string}`,
+        ).address;
+      }
+    } catch (error) {
+      this.logger.warn(
+        'Failed to derive wallet address for AI context:',
+        error,
+      );
+    }
+
+    // Build tool descriptions for AI context
+    const toolDescriptions = tools
+      .map(
+        (tool) =>
+          `- ${tool.name}: ${tool.description || 'No description available'}`,
+      )
+      .join('\n');
+
+    return `Analyze the user's request and execute appropriate tools to provide helpful, accurate responses using the Model Context Protocol (MCP).
+
+REASONING APPROACH:
+Before taking any action, follow this reasoning process:
+1. Understand what the user is asking for
+2. Identify which tools can help accomplish this goal
+3. Determine the correct parameters for each tool call
+4. Execute tools in logical sequence
+5. Synthesize results into a clear response
+
+USER CONTEXT:
+- User ID: ${userId}
+- User's Wallet Address: ${userWalletAddress}
+- When user references "my wallet", "my balance", "my transactions", use the wallet address above
+
+AVAILABLE TOOLS:
+${toolDescriptions}
+
+STEPS:
+1. **Analyze Request**: Break down what the user wants to accomplish
+2. **Reason About Tools**: Identify which tools are needed and why
+3. **Determine Parameters**: Use natural language understanding to extract or infer correct parameters
+4. **Execute Tools**: Call tools with appropriate parameters
+5. **Synthesize Response**: Combine tool results into a coherent, helpful answer
+
+OUTPUT FORMAT:
+Always explain your reasoning process, then provide the requested information. Structure responses as:
+- Brief explanation of what you're doing and why
+- Tool execution results
+- Clear summary or answer to the user's question
+
+EXAMPLES:
+User: "What's my SEI balance?"
+Reasoning: User wants their SEI token balance. I need to use a balance-checking tool with their wallet address.
+Tool: get_balance with address: ${userWalletAddress}
+Response: Based on the blockchain query, your current SEI balance is [amount] SEI.
+
+User: "Show me recent transactions"
+Reasoning: User wants transaction history. I need to query blockchain data for their wallet address.
+Tool: get_transactions with address: ${userWalletAddress}
+Response: Here are your recent transactions: [transaction details]
+
+SECURITY CONSTRAINTS:
+- Only use provided tools with valid parameters
+- Never expose private keys or sensitive data
+- Validate all inputs before processing
+- Use the user's wallet address from context for personal queries
+
+IMPORTANT NOTES:
+- Always reason first, then execute tools, then provide conclusions
+- Trust your natural language understanding for parameter extraction
+- If unsure about parameters, explain your reasoning process
+- Maintain user privacy and security at all times`;
   }
 
   private emitRealTimeUpdate(update: {

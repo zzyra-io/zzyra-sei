@@ -44,6 +44,11 @@ console.log('Environment variables loaded:', {
   RPC_PROVIDER_URL: process.env.RPC_PROVIDER_URL ? 'SET' : 'NOT SET',
   BRAVE_API_KEY: process.env.BRAVE_API_KEY ? 'SET' : 'NOT SET',
   DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'NOT SET',
+  SEI_TESTNET_RPC: process.env.SEI_TESTNET_RPC ? 'SET' : 'NOT SET',
+  SEI_TESTNET_NETWORK: process.env.SEI_TESTNET_NETWORK ? 'SET' : 'NOT SET',
+  SEI_TESTNET_EXPLORER_URL: process.env.SEI_TESTNET_EXPLORER_URL
+    ? 'SET'
+    : 'NOT SET',
 });
 
 // Simple mock implementations
@@ -400,7 +405,7 @@ const TEST_SCENARIOS = {
         config: {
           WALLET_MODE: 'private-key',
           PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
-          SEI_NETWORK: 'mainnet',
+          SEI_NETWORK: 'testnet',
         },
       },
     ],
@@ -675,6 +680,19 @@ async function runCompleteSystemTest() {
 
     logger.log(`💭 Test prompt: ${scenario.prompt}\n`);
 
+    // Derive wallet address for AI context
+    let userWalletAddress = 'Not provided';
+    if (process.env.EVM_WALLET_PRIVATE_KEY) {
+      try {
+        const { privateKeyToAccount } = require('viem/accounts');
+        userWalletAddress = privateKeyToAccount(
+          process.env.EVM_WALLET_PRIVATE_KEY as `0x${string}`,
+        ).address;
+      } catch (error) {
+        userWalletAddress = 'Unable to derive address';
+      }
+    }
+
     // Create comprehensive AI Agent node configuration
     const aiAgentNode = {
       id: 'system-test-agent',
@@ -692,10 +710,6 @@ async function runCompleteSystemTest() {
         },
         agent: {
           name: `${scenario.name} Agent`,
-          systemPrompt: `You are an advanced AI assistant with access to multiple tools. 
-                        You can access files, search the web, perform blockchain operations, and more.
-                        Always explain what tools you're using and why.
-                        Be thorough but concise in your responses.`,
           userPrompt: scenario.prompt,
           maxSteps: 10,
           thinkingMode: 'deliberate',
