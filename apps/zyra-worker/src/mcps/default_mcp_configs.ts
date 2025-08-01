@@ -296,48 +296,58 @@ export const sei = {
   name: 'sei',
   displayName: 'Sei Network',
   description:
-    'Native Sei Network operations (balances, transactions, network info)',
-  category: 'api',
+    'Official Sei Network MCP Server - blockchain operations, token management, NFT operations, and smart contracts',
+  category: 'blockchain',
   icon: '⚡',
   connection: {
     type: 'stdio',
-    command: 'ts-node',
-    args: ['./src/mcps/sei/sei-mcp-server.ts'],
+    command: 'npx',
+    args: ['-y', '@sei-js/mcp-server'],
+    argMapping: {
+      PRIVATE_KEY: 'env',
+      CUSTOM_RPC_URL: 'env',
+      CUSTOM_CHAIN_ID: 'env',
+    },
   },
   configSchema: {
     type: 'object',
     properties: {
-      WALLET_PRIVATE_KEY: {
+      PRIVATE_KEY: {
         type: 'string',
-        description: 'Private key for wallet operations',
+        description: 'Private key for wallet operations (use dedicated wallet)',
         required: true,
         sensitive: true,
       },
-      RPC_PROVIDER_URL: {
+      CUSTOM_RPC_URL: {
         type: 'string',
         description:
-          'RPC provider URL for Sei Network (optional, uses default testnet)',
+          'Custom RPC URL for Sei Network (optional, uses default endpoints)',
         required: false,
-        default: 'https://evm-rpc-testnet.sei-apis.com',
+      },
+      CUSTOM_CHAIN_ID: {
+        type: 'string',
+        description:
+          'Custom chain ID (optional, uses default: 1329 for mainnet)',
+        required: false,
       },
     },
-    required: ['WALLET_PRIVATE_KEY'],
+    required: ['PRIVATE_KEY'],
   },
   examples: [
     {
-      name: 'Sei Testnet Wallet',
-      description: 'Connect to Sei testnet for native operations',
+      name: 'Sei Testnet Operations',
+      description: 'Connect to Sei testnet with official MCP server',
       configuration: {
-        WALLET_PRIVATE_KEY: '0x...',
-        RPC_PROVIDER_URL: 'https://evm-rpc-testnet.sei-apis.com',
+        PRIVATE_KEY: '0x...',
       },
     },
     {
-      name: 'Sei Mainnet Wallet',
-      description: 'Connect to Sei mainnet (when available)',
+      name: 'Sei Mainnet Operations',
+      description: 'Connect to Sei mainnet with custom RPC',
       configuration: {
-        WALLET_PRIVATE_KEY: '0x...',
-        RPC_PROVIDER_URL: 'https://evm-rpc.sei-apis.com',
+        PRIVATE_KEY: '0x...',
+        CUSTOM_RPC_URL: 'https://evm-rpc.sei-apis.com',
+        CUSTOM_CHAIN_ID: '1329',
       },
     },
   ],

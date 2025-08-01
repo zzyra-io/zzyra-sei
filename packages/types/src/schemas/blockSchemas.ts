@@ -1,13 +1,7 @@
 import { z } from "zod";
 import { BlockType } from "../workflow/block-types";
 import { walletListenerSchema } from "./blockchains/wallet-listener/schema";
-import {
-  seiWalletListenerSchema,
-  seiSmartContractCallSchema,
-  seiOnchainDataFetchSchema,
-  seiPaymentSchema,
-  seiNftSchema,
-} from "./blockchains/sei";
+// Sei blockchain schemas removed - now using @sei-js/mcp-server
 
 /**
  * Enhanced block schema definition with input/output schemas
@@ -501,12 +495,22 @@ const enhancedAIAgentSchema: EnhancedBlockSchema = {
 // Calculator schema for mathematical operations
 const enhancedCalculatorSchema: EnhancedBlockSchema = {
   configSchema: z.object({
-    operation: z.enum([
-      'add', 'subtract', 'multiply', 'divide', 'power', 'modulo',
-      'absolute', 'round', 'floor', 'ceiling'
-    ]).default('add'),
-    leftOperand: z.string().default('0'),
-    rightOperand: z.string().default('0'),
+    operation: z
+      .enum([
+        "add",
+        "subtract",
+        "multiply",
+        "divide",
+        "power",
+        "modulo",
+        "absolute",
+        "round",
+        "floor",
+        "ceiling",
+      ])
+      .default("add"),
+    leftOperand: z.string().default("0"),
+    rightOperand: z.string().default("0"),
     precision: z.number().min(0).max(10).default(2),
   }),
   inputSchema: z.object({
@@ -525,13 +529,18 @@ const enhancedCalculatorSchema: EnhancedBlockSchema = {
   },
 };
 
-// Magic Wallet schema for blockchain operations  
+// Magic Wallet schema for blockchain operations
 const enhancedMagicWalletSchema: EnhancedBlockSchema = {
   configSchema: z.object({
-    operation: z.enum([
-      'get_balance', 'prepare_transaction', 'send_transaction', 'get_address'
-    ]).default('get_balance'),
-    network: z.string().default('ethereum'),
+    operation: z
+      .enum([
+        "get_balance",
+        "prepare_transaction",
+        "send_transaction",
+        "get_address",
+      ])
+      .default("get_balance"),
+    network: z.string().default("ethereum"),
     amount: z.string().optional(),
     recipient: z.string().optional(),
     tokenAddress: z.string().optional(),
@@ -575,11 +584,7 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
   [BlockType.CALCULATOR]: enhancedCalculatorSchema.configSchema,
   [BlockType.MAGIC_WALLET]: enhancedMagicWalletSchema.configSchema,
   [BlockType.WALLET_LISTEN]: walletListenerSchema.configSchema,
-  [BlockType.SEI_WALLET_LISTEN]: seiWalletListenerSchema.configSchema,
-  [BlockType.SEI_CONTRACT_CALL]: seiSmartContractCallSchema.configSchema,
-  [BlockType.SEI_DATA_FETCH]: seiOnchainDataFetchSchema.configSchema,
-  [BlockType.SEI_PAYMENT]: seiPaymentSchema.configSchema,
-  [BlockType.SEI_NFT]: seiNftSchema.configSchema,
+  // Sei blockchain operations now available through @sei-js/mcp-server via AI_AGENT blocks
   [BlockType.UNKNOWN]: z.any(),
 };
 
@@ -603,11 +608,7 @@ export const enhancedBlockSchemas: Partial<
   [BlockType.CALCULATOR]: enhancedCalculatorSchema,
   [BlockType.MAGIC_WALLET]: enhancedMagicWalletSchema,
   [BlockType.WALLET_LISTEN]: walletListenerSchema,
-  [BlockType.SEI_WALLET_LISTEN]: seiWalletListenerSchema,
-  [BlockType.SEI_CONTRACT_CALL]: seiSmartContractCallSchema,
-  [BlockType.SEI_DATA_FETCH]: seiOnchainDataFetchSchema,
-  [BlockType.SEI_PAYMENT]: seiPaymentSchema,
-  [BlockType.SEI_NFT]: seiNftSchema,
+  // Sei blockchain operations now available through @sei-js/mcp-server via AI_AGENT blocks
 };
 
 /**

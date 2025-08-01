@@ -19,12 +19,7 @@ export enum BlockType {
   CALCULATOR = "CALCULATOR",
   MAGIC_WALLET = "MAGIC_WALLET",
 
-  // Sei blockchain blocks
-  SEI_WALLET_LISTEN = "SEI_WALLET_LISTEN",
-  SEI_CONTRACT_CALL = "SEI_CONTRACT_CALL",
-  SEI_DATA_FETCH = "SEI_DATA_FETCH",
-  SEI_PAYMENT = "SEI_PAYMENT",
-  SEI_NFT = "SEI_NFT",
+  // Sei blockchain operations now available through @sei-js/mcp-server via AI_AGENT blocks
 
   // Default/unknown
   UNKNOWN = "UNKNOWN",
@@ -49,9 +44,5 @@ export const BLOCK_TYPES = [
   "AI_AGENT",
   "CALCULATOR",
   "MAGIC_WALLET",
-  "SEI_WALLET_LISTEN",
-  "SEI_CONTRACT_CALL",
-  "SEI_DATA_FETCH",
-  "SEI_PAYMENT",
-  "SEI_NFT",
+  // Sei blockchain operations now available through @sei-js/mcp-server
 ] as const;

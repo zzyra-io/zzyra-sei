@@ -717,26 +717,13 @@ export class AIAgentHandler implements BlockHandler {
     // Always use enhanced reasoning engine for better AI performance
     // Sequential thinking is now automatic for all AI agent executions
     this.logger.log(
-      `[AI_AGENT] Processing with automatic sequential thinking...`,
+      `[AI_AGENT] Processing with direct reasoning (sequential thinking disabled)...`,
     );
 
-    const sequentialResult =
-      await this.enhancedReasoningEngine.processWithSequentialThinking({
-        prompt: config.agent.userPrompt,
-        systemPrompt: config.agent.systemPrompt,
-        tools,
-        maxSteps: config.agent.maxSteps,
-        thinkingMode: config.agent.thinkingMode,
-        userId: userId,
-      });
-
-    // Execute the AI call with enhanced sequential thinking context
+    // Direct execution without sequential thinking dependency
     const executionPromise = this.reasoningEngine.execute({
       prompt: config.agent.userPrompt,
-      systemPrompt:
-        config.agent.systemPrompt +
-        '\n\nSequential Thinking Context:\n' +
-        sequentialResult.executionResult.reasoning,
+      systemPrompt: config.agent.systemPrompt,
       provider,
       tools,
       maxSteps: config.agent.maxSteps,
@@ -759,24 +746,16 @@ export class AIAgentHandler implements BlockHandler {
         resultKeys: Object.keys(result || {}),
       });
 
-      // Combine sequential thinking steps with execution thinking steps
-      const originalThinkingSteps = (result as any).thinkingSteps || [];
-      const sequentialThinkingSteps = sequentialResult.thinkingSteps || [];
-
-      // Merge all thinking steps for comprehensive UI display
-      const allThinkingSteps = [
-        ...sequentialThinkingSteps,
-        ...originalThinkingSteps,
-      ];
+      // Get thinking steps from execution
+      const thinkingSteps = (result as any).thinkingSteps || [];
 
       // Enhance the result with detailed execution information for UI
       const enhancedResult = {
         ...(result as any),
         success: true,
         toolCalls: this.enhanceToolCalls((result as any).toolCalls || []),
-        thinkingSteps: allThinkingSteps, // Now includes both sequential and execution thinking
-        sequentialAnalysis: sequentialResult.executionResult, // Include sequential analysis details
-        totalSteps: allThinkingSteps.length,
+        thinkingSteps: thinkingSteps,
+        totalSteps: thinkingSteps.length,
         totalToolCalls: (result as any).toolCalls?.length || 0,
         toolsUsed: tools.map((t) => ({ id: t.id, name: t.name })),
         executionTime: Date.now() - startTime,

@@ -388,6 +388,107 @@ const TEST_SCENARIOS = {
       },
     ],
   },
+  'sei-basic': {
+    name: 'SEI Basic Operations',
+    prompt:
+      'Check my SEI wallet address and balance. Also check the latest block information on SEI network.',
+    tools: [
+      {
+        id: 'sei',
+        name: 'SEI Network Operations',
+        type: 'mcp',
+        config: {
+          PRIVATE_KEY:
+            process.env.WALLET_PRIVATE_KEY ||
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+        },
+      },
+    ],
+  },
+  'sei-token-management': {
+    name: 'SEI Token Management',
+    prompt:
+      'Check my USDC token balance on SEI network, get token info for USDC contract 0x3894085ef7ff0f0aedf52e2a2704928d1ec074f1, and show me details about the latest block.',
+    tools: [
+      {
+        id: 'sei',
+        name: 'SEI Network Operations',
+        type: 'mcp',
+        config: {
+          PRIVATE_KEY:
+            process.env.WALLET_PRIVATE_KEY ||
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+        },
+      },
+    ],
+  },
+  'sei-multi-ops': {
+    name: 'SEI Multiple Operations',
+    prompt:
+      'Perform comprehensive SEI analysis: 1) Get my wallet address and native SEI balance, 2) Check if 0x3894085ef7ff0f0aedf52e2a2704928d1ec074f1 is a contract, 3) Get chain information for SEI network, 4) Get the latest block details. Provide a detailed summary.',
+    tools: [
+      {
+        id: 'sei',
+        name: 'SEI Network Operations',
+        type: 'mcp',
+        config: {
+          PRIVATE_KEY:
+            process.env.WALLET_PRIVATE_KEY ||
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+        },
+      },
+    ],
+  },
+  'sei-defi-analysis': {
+    name: 'SEI DeFi Analysis with Web Search',
+    prompt:
+      'Analyze SEI DeFi ecosystem: 1) Get my SEI balance and wallet address, 2) Check USDC token info on SEI, 3) Search online for current SEI token price and market cap, 4) Provide investment insights.',
+    tools: [
+      {
+        id: 'sei',
+        name: 'SEI Network Operations',
+        type: 'mcp',
+        config: {
+          PRIVATE_KEY:
+            process.env.WALLET_PRIVATE_KEY ||
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+        },
+      },
+      {
+        id: 'brave-search',
+        name: 'Web Search for SEI Price',
+        type: 'mcp',
+        config: {
+          apiKey: process.env.BRAVE_API_KEY || 'demo-key',
+        },
+      },
+    ],
+  },
+  'sei-comprehensive': {
+    name: 'SEI Comprehensive Test',
+    prompt:
+      'Execute comprehensive SEI blockchain operations: 1) Get wallet address from private key, 2) Check native SEI balance, 3) Get USDC token balance (0x3894085ef7ff0f0aedf52e2a2704928d1ec074f1), 4) Verify if the USDC contract address is valid, 5) Get current chain info and latest block, 6) Search for SEI network status online. Provide detailed analysis.',
+    tools: [
+      {
+        id: 'sei',
+        name: 'SEI Network Operations',
+        type: 'mcp',
+        config: {
+          PRIVATE_KEY:
+            process.env.WALLET_PRIVATE_KEY ||
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+        },
+      },
+      {
+        id: 'brave-search',
+        name: 'Web Search for SEI Status',
+        type: 'mcp',
+        config: {
+          apiKey: process.env.BRAVE_API_KEY || 'demo-key',
+        },
+      },
+    ],
+  },
 };
 
 async function runCompleteSystemTest() {
@@ -729,19 +830,26 @@ Usage:
   OPENROUTER_API_KEY=your_key ts-node src/scripts/simple-ai-agent.ts [test-type]
 
 Test Types:
-  basic        - Basic AI response (default)
-  mcp          - Test with MCP tools (filesystem)
-  mcp-real     - Test with real MCP servers (web search)
-  mcp-multi    - Test with multiple MCP servers (web search)
-  goat-test    - Test with GOAT blockchain operations
-  blockchain   - Test with GOAT SDK tools
-  multi-tool   - Test with multiple tool types
-  workflow     - Full workflow simulation
+  basic                - Basic AI response (default)
+  mcp                  - Test with MCP tools (filesystem)
+  mcp-real             - Test with real MCP servers (web search)
+  mcp-multi            - Test with multiple MCP servers (web search)
+  goat-test            - Test with GOAT blockchain operations
+  blockchain           - Test with GOAT SDK tools
+  multi-tool           - Test with multiple tool types
+  workflow             - Full workflow simulation
+  sei-basic            - SEI basic operations (address, balance, block info)
+  sei-token-management - SEI token operations (USDC balance, token info)
+  sei-multi-ops        - SEI multiple operations (comprehensive analysis)
+  sei-defi-analysis    - SEI DeFi analysis with web search
+  sei-comprehensive    - SEI comprehensive test (all operations)
 
 Examples:
   ts-node src/scripts/simple-ai-agent.ts
   ts-node src/scripts/simple-ai-agent.ts mcp-real
   ts-node src/scripts/simple-ai-agent.ts goat-test
+  ts-node src/scripts/simple-ai-agent.ts sei-basic
+  ts-node src/scripts/simple-ai-agent.ts sei-comprehensive
 
 Environment Variables:
   OPENROUTER_API_KEY - OpenRouter API key (recommended)

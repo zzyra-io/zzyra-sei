@@ -310,13 +310,38 @@ export class MCPServerManager {
       );
 
       // Create transport for subprocess
+      const envConfig = {
+        ...process.env,
+        ...config.env,
+      };
+
+      // Debug logging for SEI MCP server environment
+      if (
+        config.command.includes('sei') ||
+        JSON.stringify(config).includes('sei')
+      ) {
+        this.logger.log(`🔧 SEI MCP Server Environment Configuration:`);
+        this.logger.log(`Command: ${config.command}`);
+        this.logger.log(`Args: ${JSON.stringify(config.args)}`);
+        this.logger.log(`Config env keys: ${Object.keys(config.env || {})}`);
+        this.logger.log(
+          `PRIVATE_KEY present in config: ${!!config.env?.PRIVATE_KEY}`,
+        );
+        this.logger.log(
+          `PRIVATE_KEY length: ${config.env?.PRIVATE_KEY?.length || 0}`,
+        );
+        this.logger.log(
+          `PRIVATE_KEY starts with 0x: ${config.env?.PRIVATE_KEY?.startsWith('0x') || false}`,
+        );
+        this.logger.log(
+          `PRIVATE_KEY present in process.env: ${!!process.env.PRIVATE_KEY}`,
+        );
+      }
+
       const transport = new StdioClientTransport({
         command: config.command,
         args: config.args || [],
-        env: {
-          ...process.env,
-          ...config.env,
-        },
+        env: envConfig,
         cwd: process.cwd(), // Set working directory explicitly
       });
 

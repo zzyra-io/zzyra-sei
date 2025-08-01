@@ -13,12 +13,7 @@ import { HttpRequestHandler } from './HttpRequestHandler';
 import { ZyraTemplateProcessor } from '../../utils/template-processor';
 import * as vm from 'vm';
 
-// Import Sei blockchain handlers
-import { SeiWalletListenerHandler } from './blockchain/sei/SeiWalletListenerHandler';
-import { SeiSmartContractCallHandler } from './blockchain/sei/SeiSmartContractCallHandler';
-import { SeiOnchainDataFetchHandler } from './blockchain/sei/SeiOnchainDataFetchHandler';
-import { SeiPaymentHandler } from './blockchain/sei/SeiPaymentHandler';
-import { SeiNftHandler } from './blockchain/sei/SeiNftHandler';
+// Sei blockchain operations now handled by official @sei-js/mcp-server
 import { AIAgentHandler } from './AIAgentHandler';
 import { LLMProviderManager } from './ai-agent/LLMProviderManager';
 import { MCPServerManager } from './ai-agent/MCPServerManager';
@@ -98,31 +93,7 @@ export class BlockHandlerRegistry {
         new HttpRequestHandler(),
       ),
 
-      // Sei blockchain blocks
-      [BlockType.SEI_WALLET_LISTEN]: new MetricsBlockHandler(
-        BlockType.SEI_WALLET_LISTEN,
-        new SeiWalletListenerHandler(this.executionLogger),
-      ),
-
-      [BlockType.SEI_CONTRACT_CALL]: new MetricsBlockHandler(
-        BlockType.SEI_CONTRACT_CALL,
-        new SeiSmartContractCallHandler(),
-      ),
-
-      [BlockType.SEI_DATA_FETCH]: new MetricsBlockHandler(
-        BlockType.SEI_DATA_FETCH,
-        new SeiOnchainDataFetchHandler(),
-      ),
-
-      [BlockType.SEI_PAYMENT]: new MetricsBlockHandler(
-        BlockType.SEI_PAYMENT,
-        new SeiPaymentHandler(),
-      ),
-
-      [BlockType.SEI_NFT]: new MetricsBlockHandler(
-        BlockType.SEI_NFT,
-        new SeiNftHandler(),
-      ),
+      // Sei blockchain operations now available through @sei-js/mcp-server via AI_AGENT blocks
 
       // AI Agent handler with proper dependency injection
       ['AI_AGENT']: new MetricsBlockHandler(

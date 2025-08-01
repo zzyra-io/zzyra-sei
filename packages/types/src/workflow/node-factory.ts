@@ -31,7 +31,6 @@ export class WorkflowNodeFactory {
       case BlockType.SCHEDULE:
       case BlockType.PRICE_MONITOR:
       case BlockType.WALLET_LISTEN:
-      case BlockType.SEI_CONTRACT_CALL:
         return {
           nodeType: "TRIGGER" as const,
           iconName: "play",
@@ -41,9 +40,7 @@ export class WorkflowNodeFactory {
       case BlockType.HTTP_REQUEST:
       case BlockType.EMAIL:
       case BlockType.NOTIFICATION:
-      case BlockType.SEI_PAYMENT:
-      case BlockType.SEI_NFT:
-      case BlockType.SEI_CONTRACT_CALL:
+        // Sei blockchain operations now available through @sei-js/mcp-server via AI_AGENT blocks
         return {
           nodeType: "ACTION" as const,
           iconName: "zap",
