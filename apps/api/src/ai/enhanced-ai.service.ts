@@ -5,7 +5,7 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 
 // Import types from the types package
-import { BlockType, DataType, defaultMCPs } from "@zyra/types";
+import { BlockType, DataType } from "@zyra/types";
 
 // Import new services
 import { WorkflowValidatorService } from "./services/workflow-validator.service";
@@ -767,8 +767,12 @@ Edges: ${JSON.stringify(edges, null, 2)}
     const mcpServers = await this.getAvailableMCPServers();
     const categories = await this.getMCPServersByCategory();
 
+    // Include GOAT SDK tools for blockchain operations
+    const goatTools = this.getAvailableGoatTools();
+
     const toolsContext = {
       totalServers: mcpServers.length,
+      totalGoatTools: goatTools.length,
       availableMCPServers: mcpServers.map((server) => ({
         id: server.id,
         name: server.displayName,
@@ -788,16 +792,606 @@ Edges: ${JSON.stringify(edges, null, 2)}
           enabled: true,
         },
       })),
-      categories: Object.keys(categories).map((categoryName) => ({
-        name: categoryName,
-        description: `${categoryName} tools and integrations`,
-        servers: categories[categoryName].map((server) => server.id),
+      availableGoatTools: goatTools.map((tool) => ({
+        id: tool.id,
+        name: tool.name,
+        description: tool.description,
+        category: tool.category,
+        capabilities: tool.capabilities,
+        network: tool.network,
+        // Provide the exact structure needed for selectedTools
+        selectedToolFormat: {
+          id: tool.id,
+          name: tool.name,
+          type: "goat",
+          config: {},
+          description: tool.description,
+          category: tool.category,
+          enabled: true,
+        },
       })),
+      categories: [
+        ...Object.keys(categories).map((categoryName) => ({
+          name: categoryName,
+          description: `${categoryName} tools and integrations`,
+          servers: categories[categoryName].map((server) => server.id),
+          type: "mcp",
+        })),
+        {
+          name: "Blockchain & DeFi",
+          description: "GOAT SDK blockchain and DeFi tools",
+          tools: goatTools
+            .filter((t) => t.category === "blockchain" || t.category === "defi")
+            .map((t) => t.id),
+          type: "goat",
+        },
+        {
+          name: "Token Operations",
+          description: "GOAT SDK ERC-20 and token management tools",
+          tools: goatTools
+            .filter((t) => t.category === "erc20")
+            .map((t) => t.id),
+          type: "goat",
+        },
+        {
+          name: "Analytics & Monitoring",
+          description: "GOAT SDK analytics and monitoring tools",
+          tools: goatTools
+            .filter((t) => t.category === "analytics")
+            .map((t) => t.id),
+          type: "goat",
+        },
+      ],
       availableBlockTypes: Object.values(BlockType),
-      summary: this.generateToolsSummary(mcpServers),
+      summary:
+        this.generateToolsSummary(mcpServers) +
+        this.generateGoatToolsSummary(goatTools),
     };
 
     return JSON.stringify(toolsContext, null, 2);
+  }
+
+  /**
+   * Get available GOAT SDK tools with their configurations
+   */
+  private getAvailableGoatTools(): Array<{
+    id: string;
+    name: string;
+    description: string;
+    category: string;
+    capabilities: string[];
+    network: string;
+  }> {
+    return [
+      // Sei Network Tools
+      {
+        id: "enhanced-transaction-history-get_transaction_history_sei-testnet",
+        name: "get_transaction_history_sei_testnet",
+        description:
+          "Get transaction history for Sei testnet addresses with enhanced filtering",
+        category: "analytics",
+        capabilities: ["transaction-history", "filtering", "pagination"],
+        network: "sei-testnet",
+      },
+      {
+        id: "enhanced-transaction-history-get_wallet_balance_detailed_sei-testnet",
+        name: "get_wallet_balance_detailed_sei_testnet",
+        description:
+          "Get detailed wallet balance including native tokens and ERC-20 tokens on Sei",
+        category: "blockchain",
+        capabilities: ["balance-check", "token-info", "multi-token"],
+        network: "sei-testnet",
+      },
+      {
+        id: "enhanced-transaction-history-estimate_gas_price_sei-testnet",
+        name: "estimate_gas_price_sei_testnet",
+        description: "Estimate current gas prices for Sei network transactions",
+        category: "blockchain",
+        capabilities: ["gas-estimation", "network-fees"],
+        network: "sei-testnet",
+      },
+
+      // DeFi Analytics Tools
+      {
+        id: "defi-analytics-analyze_portfolio_sei-testnet",
+        name: "analyze_portfolio_sei_testnet",
+        description: "Analyze DeFi portfolio performance and positions",
+        category: "defi",
+        capabilities: ["portfolio-analysis", "yield-tracking", "performance"],
+        network: "sei-testnet",
+      },
+      {
+        id: "defi-analytics-find_arbitrage_opportunities_sei-testnet",
+        name: "find_arbitrage_opportunities_sei_testnet",
+        description: "Find arbitrage opportunities across different DEXs",
+        category: "defi",
+        capabilities: ["arbitrage", "dex-analysis", "profit-detection"],
+        network: "sei-testnet",
+      },
+
+      // Base Sepolia Tools
+      {
+        id: "enhanced-transaction-history-get_transaction_history_base-sepolia",
+        name: "get_transaction_history_base_sepolia",
+        description: "Get transaction history for Base Sepolia addresses",
+        category: "analytics",
+        capabilities: ["transaction-history", "filtering", "pagination"],
+        network: "base-sepolia",
+      },
+      {
+        id: "enhanced-transaction-history-get_wallet_balance_detailed_base-sepolia",
+        name: "get_wallet_balance_detailed_base_sepolia",
+        description: "Get detailed wallet balance on Base Sepolia network",
+        category: "blockchain",
+        capabilities: ["balance-check", "token-info", "multi-token"],
+        network: "base-sepolia",
+      },
+
+      // ERC-20 Tools (Base Sepolia)
+      {
+        id: "erc20-get_balance_base-sepolia",
+        name: "get_balance_base_sepolia",
+        description: "Get ERC-20 token balance on Base Sepolia",
+        category: "erc20",
+        capabilities: ["token-balance", "erc20"],
+        network: "base-sepolia",
+      },
+      {
+        id: "erc20-transfer_base-sepolia",
+        name: "transfer_base_sepolia",
+        description: "Transfer ERC-20 tokens on Base Sepolia",
+        category: "erc20",
+        capabilities: ["token-transfer", "erc20", "transaction"],
+        network: "base-sepolia",
+      },
+
+      // Uniswap Tools (Base Sepolia)
+      {
+        id: "uniswap-swap_base-sepolia",
+        name: "swap_base_sepolia",
+        description: "Swap tokens using Uniswap on Base Sepolia",
+        category: "defi",
+        capabilities: ["token-swap", "uniswap", "defi"],
+        network: "base-sepolia",
+      },
+      {
+        id: "uniswap-get_quote_base-sepolia",
+        name: "get_quote_base_sepolia",
+        description: "Get swap quote from Uniswap on Base Sepolia",
+        category: "defi",
+        capabilities: ["price-quote", "uniswap", "defi"],
+        network: "base-sepolia",
+      },
+
+      // Ethereum Mainnet Tools
+      {
+        id: "erc20-get_balance_ethereum",
+        name: "get_balance_ethereum",
+        description: "Get ERC-20 token balance on Ethereum mainnet",
+        category: "erc20",
+        capabilities: ["token-balance", "erc20"],
+        network: "ethereum",
+      },
+      {
+        id: "uniswap-swap_ethereum",
+        name: "swap_ethereum",
+        description: "Swap tokens using Uniswap on Ethereum mainnet",
+        category: "defi",
+        capabilities: ["token-swap", "uniswap", "defi"],
+        network: "ethereum",
+      },
+    ];
+  }
+
+  /**
+   * Generate summary of available GOAT tools
+   */
+  private generateGoatToolsSummary(tools: any[]): string {
+    const networkCounts = tools.reduce(
+      (acc, tool) => {
+        acc[tool.network] = (acc[tool.network] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    const categoryCounts = tools.reduce(
+      (acc, tool) => {
+        acc[tool.category] = (acc[tool.category] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    return `
+
+🔗 **GOAT SDK BLOCKCHAIN TOOLS** (${tools.length} total):
+- **Networks**: ${Object.entries(networkCounts)
+      .map(([network, count]) => `${network} (${count} tools)`)
+      .join(", ")}
+- **Categories**: ${Object.entries(categoryCounts)
+      .map(([cat, count]) => `${cat} (${count} tools)`)
+      .join(", ")}
+
+💡 **Key GOAT Capabilities**:
+- ✅ Multi-network support (Sei, Base, Ethereum)
+- ✅ Real-time blockchain data access
+- ✅ DeFi operations (swaps, liquidity, analytics)
+- ✅ ERC-20 token management
+- ✅ Transaction history and monitoring
+- ✅ Gas price estimation and optimization
+- ✅ Portfolio analysis and yield tracking
+
+⚠️ **GOAT Tools Usage**:
+- All GOAT tools require wallet configuration (WALLET_PRIVATE_KEY)
+- Network-specific tools work on their respective chains
+- DeFi tools require sufficient token balances for transactions
+- Use appropriate network tools for the user's intended blockchain`;
+  }
+
+  /**
+   * Get intelligent tool recommendations based on user prompt
+   */
+  async getIntelligentToolRecommendations(prompt: string): Promise<{
+    recommendedTools: Array<{
+      id: string;
+      name: string;
+      type: "mcp" | "goat";
+      confidence: number;
+      reason: string;
+      category: string;
+      suggestedConfig: any;
+      description: string;
+    }>;
+    analysis: {
+      detectedIntent: string;
+      keywords: string[];
+      categories: string[];
+      complexity: "simple" | "moderate" | "complex";
+    };
+  }> {
+    try {
+      this.logger.log(
+        `Getting intelligent tool recommendations for prompt: "${prompt.substring(0, 100)}..."`
+      );
+
+      // Get all available tools
+      const mcpServers = await this.getAvailableMCPServers();
+      const goatTools = this.getAvailableGoatTools();
+
+      // Convert to unified format for analysis
+      const allTools = [
+        ...mcpServers.map((server: any) => ({
+          id: server.id,
+          name: server.displayName,
+          description: server.description,
+          type: "mcp" as const,
+          category: server.category || "utilities",
+          capabilities: this.extractCapabilitiesFromMCP(server),
+        })),
+        ...goatTools.map((tool: any) => ({
+          id: tool.id,
+          name: tool.name,
+          description: tool.description,
+          type: "goat" as const,
+          category: tool.category,
+          capabilities: tool.capabilities,
+        })),
+      ];
+
+      // Analyze prompt and get recommendations
+      const analysis = this.analyzePromptIntent(prompt);
+      const recommendations = this.scoreAndRankTools(
+        prompt,
+        allTools,
+        analysis
+      );
+
+      return {
+        recommendedTools: recommendations.slice(0, 8), // Top 8 recommendations
+        analysis,
+      };
+    } catch (error) {
+      this.logger.error(
+        "Failed to get intelligent tool recommendations:",
+        error
+      );
+
+      // Fallback recommendations
+      return {
+        recommendedTools: [],
+        analysis: {
+          detectedIntent: "Unable to analyze",
+          keywords: [],
+          categories: [],
+          complexity: "simple",
+        },
+      };
+    }
+  }
+
+  private analyzePromptIntent(prompt: string): {
+    detectedIntent: string;
+    keywords: string[];
+    categories: string[];
+    complexity: "simple" | "moderate" | "complex";
+  } {
+    const promptLower = prompt.toLowerCase();
+    const keywords: string[] = [];
+    const categories: string[] = [];
+    const intents: string[] = [];
+
+    // Keyword extraction with categories
+    const keywordMap = {
+      blockchain: [
+        "wallet",
+        "balance",
+        "transaction",
+        "crypto",
+        "blockchain",
+        "ethereum",
+        "sei",
+        "gas",
+        "address",
+      ],
+      defi: [
+        "swap",
+        "trade",
+        "defi",
+        "liquidity",
+        "pool",
+        "yield",
+        "farm",
+        "lending",
+        "arbitrage",
+        "uniswap",
+      ],
+      search: [
+        "search",
+        "find",
+        "lookup",
+        "query",
+        "information",
+        "browse",
+        "web",
+      ],
+      data: ["fetch", "get", "retrieve", "api", "data", "database", "sql"],
+      analytics: [
+        "analyze",
+        "monitor",
+        "track",
+        "stats",
+        "metrics",
+        "performance",
+      ],
+      communication: ["send", "notify", "email", "message", "alert"],
+      utilities: ["calculate", "convert", "format", "validate", "check"],
+    };
+
+    // Extract keywords and determine categories
+    for (const [category, categoryKeywords] of Object.entries(keywordMap)) {
+      for (const keyword of categoryKeywords) {
+        if (promptLower.includes(keyword)) {
+          keywords.push(keyword);
+          if (!categories.includes(category)) {
+            categories.push(category);
+          }
+        }
+      }
+    }
+
+    // Determine intents based on categories
+    if (categories.includes("blockchain"))
+      intents.push("Blockchain Operations");
+    if (categories.includes("defi")) intents.push("DeFi Operations");
+    if (categories.includes("search")) intents.push("Information Retrieval");
+    if (categories.includes("data")) intents.push("Data Access");
+    if (categories.includes("analytics"))
+      intents.push("Analytics & Monitoring");
+    if (categories.includes("communication")) intents.push("Communication");
+    if (categories.includes("utilities")) intents.push("Utility Operations");
+
+    // Determine complexity
+    let complexity: "simple" | "moderate" | "complex" = "simple";
+    if (categories.length > 2 || promptLower.split(" ").length > 15) {
+      complexity = "moderate";
+    }
+    if (
+      categories.length > 3 ||
+      promptLower.includes("workflow") ||
+      promptLower.includes("automate")
+    ) {
+      complexity = "complex";
+    }
+
+    return {
+      detectedIntent: intents.join(", ") || "General Task",
+      keywords: [...new Set(keywords)], // Remove duplicates
+      categories,
+      complexity,
+    };
+  }
+
+  private scoreAndRankTools(
+    prompt: string,
+    tools: any[],
+    analysis: any
+  ): Array<{
+    id: string;
+    name: string;
+    type: "mcp" | "goat";
+    confidence: number;
+    reason: string;
+    category: string;
+    suggestedConfig: any;
+    description: string;
+  }> {
+    const scoredTools = [];
+
+    for (const tool of tools) {
+      const score = this.calculateIntelligentToolScore(prompt, tool, analysis);
+      if (score.confidence >= 40) {
+        // Lower threshold for more suggestions
+        scoredTools.push({
+          id: tool.id,
+          name: tool.name,
+          type: tool.type,
+          confidence: score.confidence,
+          reason: score.reason,
+          category: tool.category,
+          suggestedConfig: this.generateSmartConfig(prompt, tool),
+          description: tool.description,
+        });
+      }
+    }
+
+    // Sort by confidence descending
+    return scoredTools.sort((a, b) => b.confidence - a.confidence);
+  }
+
+  private calculateIntelligentToolScore(
+    prompt: string,
+    tool: any,
+    analysis: any
+  ): { confidence: number; reason: string } {
+    let score = 0;
+    const reasons = [];
+
+    const toolName = tool.name.toLowerCase();
+    const toolDesc = (tool.description || "").toLowerCase();
+    const promptLower = prompt.toLowerCase();
+
+    // Category matching (high weight for direct category match)
+    if (analysis.categories.includes(tool.category)) {
+      score += 35;
+      reasons.push(`matches ${tool.category} category`);
+    }
+
+    // Keyword matching in tool name (highest weight)
+    for (const keyword of analysis.keywords) {
+      if (toolName.includes(keyword)) {
+        score += 30;
+        reasons.push(`tool name contains "${keyword}"`);
+      }
+      if (toolDesc.includes(keyword)) {
+        score += 20;
+        reasons.push(`description contains "${keyword}"`);
+      }
+    }
+
+    // Intent-based scoring
+    if (
+      analysis.detectedIntent.includes("Blockchain") &&
+      tool.category === "blockchain"
+    ) {
+      score += 25;
+      reasons.push("blockchain intent detected");
+    }
+    if (analysis.detectedIntent.includes("DeFi") && tool.category === "defi") {
+      score += 25;
+      reasons.push("DeFi intent detected");
+    }
+    if (
+      analysis.detectedIntent.includes("Search") &&
+      toolName.includes("search")
+    ) {
+      score += 30;
+      reasons.push("search intent detected");
+    }
+
+    // Specific pattern matching
+    if (
+      promptLower.includes("balance") &&
+      (toolName.includes("balance") || toolName.includes("wallet"))
+    ) {
+      score += 35;
+      reasons.push("balance query pattern");
+    }
+    if (
+      promptLower.includes("swap") &&
+      (toolName.includes("swap") || toolName.includes("uniswap"))
+    ) {
+      score += 35;
+      reasons.push("swap operation pattern");
+    }
+    if (promptLower.includes("price") && toolName.includes("price")) {
+      score += 30;
+      reasons.push("price query pattern");
+    }
+
+    // GOAT tools get slight preference for blockchain/DeFi operations
+    if (
+      tool.type === "goat" &&
+      (analysis.categories.includes("blockchain") ||
+        analysis.categories.includes("defi"))
+    ) {
+      score += 10;
+      reasons.push("native blockchain integration");
+    }
+
+    // Cap at 100%
+    score = Math.min(score, 100);
+
+    return {
+      confidence: score,
+      reason:
+        reasons.length > 0
+          ? reasons.slice(0, 3).join(", ")
+          : "general relevance",
+    };
+  }
+
+  private generateSmartConfig(prompt: string, tool: any): any {
+    const config: any = {};
+
+    // Extract potential addresses
+    const addressMatch = prompt.match(/0x[a-fA-F0-9]{40}/);
+    if (
+      addressMatch &&
+      (tool.name.toLowerCase().includes("balance") ||
+        tool.name.toLowerCase().includes("transaction"))
+    ) {
+      config.address = addressMatch[0];
+    }
+
+    // Extract numbers for limits/amounts
+    const numberMatch = prompt.match(/\b(\d+(?:\.\d+)?)\b/);
+    if (numberMatch) {
+      const number = parseFloat(numberMatch[1]);
+      if (
+        tool.name.toLowerCase().includes("transaction") ||
+        tool.name.toLowerCase().includes("history")
+      ) {
+        config.limit = Math.min(Math.max(number, 1), 100);
+      }
+      if (
+        tool.name.toLowerCase().includes("swap") ||
+        tool.name.toLowerCase().includes("amount")
+      ) {
+        config.amount = numberMatch[1];
+      }
+    }
+
+    // Extract token symbols
+    const tokenMatch = prompt.match(/\b(ETH|USDC|SEI|BTC|USDT|WETH|DAI)\b/i);
+    if (
+      tokenMatch &&
+      (tool.name.toLowerCase().includes("token") ||
+        tool.name.toLowerCase().includes("swap"))
+    ) {
+      config.token = tokenMatch[1].toUpperCase();
+    }
+
+    // Network detection
+    if (prompt.toLowerCase().includes("sei")) {
+      config.network = "sei-testnet";
+    } else if (prompt.toLowerCase().includes("base")) {
+      config.network = "base-sepolia";
+    } else if (prompt.toLowerCase().includes("ethereum")) {
+      config.network = "ethereum";
+    }
+
+    return config;
   }
 
   /**

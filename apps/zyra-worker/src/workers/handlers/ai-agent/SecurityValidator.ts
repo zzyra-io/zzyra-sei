@@ -365,13 +365,20 @@ export class SecurityValidator {
     try {
       // Check user permissions from database
       // This is a placeholder - implement based on your permission system
-      const user = await this.databaseService.prisma.user.findUnique({
+      const user = (await this.databaseService.prisma.user.findUnique({
         where: { id: userId },
         select: { id: true, email: true },
-      });
+      })) as any; // Cast to any to handle mock permissions
 
-      // Basic permission checks - for now, allow all authenticated users
-      if (user && permission === 'AI_AGENT') return true;
+      // Check if user exists and has the required permission
+      if (user) {
+        // For demo purposes, check the permissions array if it exists (mock implementation)
+        if (user.permissions && Array.isArray(user.permissions)) {
+          return user.permissions.includes(permission);
+        }
+        // Basic permission checks - for now, allow all authenticated users for AI_AGENT
+        if (permission === 'AI_AGENT') return true;
+      }
 
       return false;
     } catch (error) {

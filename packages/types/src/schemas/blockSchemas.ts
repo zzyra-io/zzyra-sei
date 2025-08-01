@@ -498,6 +498,64 @@ const enhancedAIAgentSchema: EnhancedBlockSchema = {
   },
 };
 
+// Calculator schema for mathematical operations
+const enhancedCalculatorSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
+    operation: z.enum([
+      'add', 'subtract', 'multiply', 'divide', 'power', 'modulo',
+      'absolute', 'round', 'floor', 'ceiling'
+    ]).default('add'),
+    leftOperand: z.string().default('0'),
+    rightOperand: z.string().default('0'),
+    precision: z.number().min(0).max(10).default(2),
+  }),
+  inputSchema: z.object({
+    leftValue: z.union([z.number(), z.string()]).optional(),
+    rightValue: z.union([z.number(), z.string()]).optional(),
+  }),
+  outputSchema: z.object({
+    result: z.number(),
+    success: z.boolean(),
+    error: z.string().optional(),
+  }),
+  metadata: {
+    category: "utility",
+    icon: "calculate",
+    description: "Perform mathematical operations on numeric values",
+  },
+};
+
+// Magic Wallet schema for blockchain operations  
+const enhancedMagicWalletSchema: EnhancedBlockSchema = {
+  configSchema: z.object({
+    operation: z.enum([
+      'get_balance', 'prepare_transaction', 'send_transaction', 'get_address'
+    ]).default('get_balance'),
+    network: z.string().default('ethereum'),
+    amount: z.string().optional(),
+    recipient: z.string().optional(),
+    tokenAddress: z.string().optional(),
+  }),
+  inputSchema: z.object({
+    amount: z.union([z.number(), z.string()]).optional(),
+    recipient: z.string().optional(),
+    data: z.any().optional(),
+  }),
+  outputSchema: z.object({
+    result: z.any(),
+    success: z.boolean(),
+    error: z.string().optional(),
+    transactionHash: z.string().optional(),
+    balance: z.string().optional(),
+    address: z.string().optional(),
+  }),
+  metadata: {
+    category: "blockchain",
+    icon: "wallet",
+    description: "Interact with Magic wallet for blockchain operations",
+  },
+};
+
 /**
  * Zod schemas for block configurations
  * Shared between UI and worker for consistent validation
@@ -514,6 +572,8 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
   [BlockType.CUSTOM]: enhancedCustomSchema.configSchema,
   [BlockType.DATA_TRANSFORM]: enhancedDataTransformSchema.configSchema,
   [BlockType.AI_AGENT]: enhancedAIAgentSchema.configSchema,
+  [BlockType.CALCULATOR]: enhancedCalculatorSchema.configSchema,
+  [BlockType.MAGIC_WALLET]: enhancedMagicWalletSchema.configSchema,
   [BlockType.WALLET_LISTEN]: walletListenerSchema.configSchema,
   [BlockType.SEI_WALLET_LISTEN]: seiWalletListenerSchema.configSchema,
   [BlockType.SEI_CONTRACT_CALL]: seiSmartContractCallSchema.configSchema,
@@ -540,6 +600,8 @@ export const enhancedBlockSchemas: Partial<
   [BlockType.CUSTOM]: enhancedCustomSchema,
   [BlockType.DATA_TRANSFORM]: enhancedDataTransformSchema,
   [BlockType.AI_AGENT]: enhancedAIAgentSchema,
+  [BlockType.CALCULATOR]: enhancedCalculatorSchema,
+  [BlockType.MAGIC_WALLET]: enhancedMagicWalletSchema,
   [BlockType.WALLET_LISTEN]: walletListenerSchema,
   [BlockType.SEI_WALLET_LISTEN]: seiWalletListenerSchema,
   [BlockType.SEI_CONTRACT_CALL]: seiSmartContractCallSchema,

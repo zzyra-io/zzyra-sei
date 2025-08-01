@@ -328,50 +328,354 @@ export class ToolAnalyticsService {
     userId?: string,
   ): Promise<ToolMetrics | null> {
     try {
-      // This would query the database for real metrics
-      // For now, return mock data based on tool name
-      const mockMetrics: ToolMetrics = {
+      // **REAL IMPLEMENTATION**: Query actual database for tool metrics
+      let metricsResult: any[];
+
+      if (userId) {
+        metricsResult = await this.databaseService.prisma.$queryRaw`
+          SELECT 
+            COUNT(*) as total_usage,
+            AVG(CASE WHEN success = true THEN 1 ELSE 0 END) as success_rate,
+            AVG(execution_time_ms) as avg_response_time,
+            AVG(CASE WHEN success = false THEN 1 ELSE 0 END) as error_rate,
+            MAX(created_at) as last_used,
+            COUNT(DISTINCT user_id) as user_count
+          FROM tool_executions 
+          WHERE tool_name = ${toolName}
+          AND user_id = ${userId}
+          AND created_at >= NOW() - INTERVAL '30 days'
+        `;
+      } else {
+        metricsResult = await this.databaseService.prisma.$queryRaw`
+          SELECT 
+            COUNT(*) as total_usage,
+            AVG(CASE WHEN success = true THEN 1 ELSE 0 END) as success_rate,
+            AVG(execution_time_ms) as avg_response_time,
+            AVG(CASE WHEN success = false THEN 1 ELSE 0 END) as error_rate,
+            MAX(created_at) as last_used,
+            COUNT(DISTINCT user_id) as user_count
+          FROM tool_executions 
+          WHERE tool_name = ${toolName}
+          AND created_at >= NOW() - INTERVAL '30 days'
+        `;
+      }
+
+      const metrics = metricsResult[0];
+
+      if (!metrics || metrics.total_usage === 0) {
+        // Return minimal metrics for new/unused tools
+        return {
+          toolName,
+          totalUsage: 0,
+          successRate: 0,
+          avgResponseTime: 0,
+          errorRate: 0,
+          lastUsed: null,
+          popularParameters: {},
+          userCount: 0,
+          effectiveness: 0,
+          trends: {
+            hourly: Array(24).fill(0),
+            daily: Array(7).fill(0),
+            weekly: Array(4).fill(0),
+          },
+        };
+      }
+
+      // Get popular parameters from actual usage
+      const popularParameters = await this.getRealPopularParameters(
         toolName,
-        totalUsage: Math.floor(Math.random() * 100) + 10,
-        successRate: 0.75 + Math.random() * 0.2, // 75-95%
-        avgResponseTime: 500 + Math.random() * 2000, // 500-2500ms
-        errorRate: Math.random() * 0.15, // 0-15%
-        lastUsed: new Date(),
-        popularParameters: this.getMockPopularParameters(toolName),
-        userCount: Math.floor(Math.random() * 20) + 5,
-        effectiveness: 0,
-        trends: {
-          hourly: Array.from({ length: 24 }, () =>
-            Math.floor(Math.random() * 10),
-          ),
-          daily: Array.from({ length: 7 }, () =>
-            Math.floor(Math.random() * 50),
-          ),
-          weekly: Array.from({ length: 4 }, () =>
-            Math.floor(Math.random() * 200),
-          ),
-        },
+        userId,
+      );
+
+      // Get usage trends
+      const trends = await this.getRealUsageTrends(toolName, userId);
+
+      const realMetrics: ToolMetrics = {
+        toolName,
+        totalUsage: parseInt(metrics.total_usage) || 0,
+        successRate: parseFloat(metrics.success_rate) || 0,
+        avgResponseTime: parseFloat(metrics.avg_response_time) || 0,
+        errorRate: parseFloat(metrics.error_rate) || 0,
+        lastUsed: metrics.last_used ? new Date(metrics.last_used) : null,
+        popularParameters,
+        userCount: parseInt(metrics.user_count) || 0,
+        effectiveness: 0, // Will be calculated below
+        trends,
       };
 
-      mockMetrics.effectiveness = this.calculateToolEffectiveness(mockMetrics);
-      return mockMetrics;
+      realMetrics.effectiveness = this.calculateToolEffectiveness(realMetrics);
+      return realMetrics;
     } catch (error) {
       this.logger.error(`Failed to calculate metrics for ${toolName}:`, error);
-      return null;
+      // Fallback to basic metrics
+      return {
+        toolName,
+        totalUsage: 0,
+        successRate: 0,
+        avgResponseTime: 0,
+        errorRate: 0,
+        lastUsed: null,
+        popularParameters: {},
+        userCount: 0,
+        effectiveness: 0,
+        trends: {
+          hourly: Array(24).fill(0),
+          daily: Array(7).fill(0),
+          weekly: Array(4).fill(0),
+        },
+      };
     }
   }
 
-  private getMockPopularParameters(toolName: string): Record<string, number> {
-    const parameterPatterns: Record<string, Record<string, number>> = {
-      'brave-search': { query: 45, count: 25, freshness: 15 },
-      filesystem: { path: 60, recursive: 20, pattern: 15 },
-      postgres: { sql: 80, timeout: 10, format: 10 },
-      git: { command: 50, repository: 30, branch: 20 },
-      weather: { location: 70, units: 20, forecast: 10 },
-      fetch: { url: 85, method: 10, headers: 5 },
-    };
+  /**
+   * **REAL IMPLEMENTATION**: Get actual popular parameters from database
+   */
+  private async getRealPopularParameters(
+    toolName: string,
+    userId?: string,
+  ): Promise<Record<string, number>> {
+    try {
+      const parametersQuery = `
+        SELECT 
+          parameter_name,
+          COUNT(*) as usage_count,
+          (COUNT(*) * 100.0 / SUM(COUNT(*)) OVER()) as usage_percentage
+        FROM (
+          SELECT 
+            jsonb_object_keys(parameters) as parameter_name
+          FROM tool_executions 
+          WHERE tool_name = $1
+          ${userId ? 'AND user_id = $2' : ''}
+          AND created_at >= NOW() - INTERVAL '30 days'
+          AND parameters IS NOT NULL
+        ) param_keys
+        GROUP BY parameter_name
+        ORDER BY usage_count DESC
+        LIMIT 10
+      `;
 
-    return parameterPatterns[toolName] || {};
+      const queryParams = userId ? [toolName, userId] : [toolName];
+      let parametersResult: any[];
+
+      if (userId) {
+        parametersResult = await this.databaseService.prisma.$queryRaw`
+          SELECT 
+            parameter_name,
+            COUNT(*) as usage_count,
+            (COUNT(*) * 100.0 / SUM(COUNT(*)) OVER()) as usage_percentage
+          FROM (
+            SELECT 
+              jsonb_object_keys(parameters) as parameter_name
+            FROM tool_executions 
+            WHERE tool_name = ${toolName}
+            AND user_id = ${userId}
+            AND created_at >= NOW() - INTERVAL '30 days'
+            AND parameters IS NOT NULL
+          ) param_keys
+          GROUP BY parameter_name
+          ORDER BY usage_count DESC
+          LIMIT 10
+        `;
+      } else {
+        parametersResult = await this.databaseService.prisma.$queryRaw`
+          SELECT 
+            parameter_name,
+            COUNT(*) as usage_count,
+            (COUNT(*) * 100.0 / SUM(COUNT(*)) OVER()) as usage_percentage
+          FROM (
+            SELECT 
+              jsonb_object_keys(parameters) as parameter_name
+            FROM tool_executions 
+            WHERE tool_name = ${toolName}
+            AND created_at >= NOW() - INTERVAL '30 days'
+            AND parameters IS NOT NULL
+          ) param_keys
+          GROUP BY parameter_name
+          ORDER BY usage_count DESC
+          LIMIT 10
+        `;
+      }
+
+      const popularParameters: Record<string, number> = {};
+      parametersResult.forEach((row: any) => {
+        popularParameters[row.parameter_name] = Math.round(
+          parseFloat(row.usage_percentage),
+        );
+      });
+
+      return popularParameters;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get popular parameters for ${toolName}:`,
+        error,
+      );
+      return {};
+    }
+  }
+
+  /**
+   * **REAL IMPLEMENTATION**: Get actual usage trends from database
+   */
+  private async getRealUsageTrends(
+    toolName: string,
+    userId?: string,
+  ): Promise<{
+    hourly: number[];
+    daily: number[];
+    weekly: number[];
+  }> {
+    try {
+      // Get hourly trends for the last 24 hours
+      const hourlyQuery = `
+        SELECT 
+          EXTRACT(HOUR FROM created_at) as hour,
+          COUNT(*) as usage_count
+        FROM tool_executions 
+        WHERE tool_name = $1
+        ${userId ? 'AND user_id = $2' : ''}
+        AND created_at >= NOW() - INTERVAL '24 hours'
+        GROUP BY EXTRACT(HOUR FROM created_at)
+        ORDER BY hour
+      `;
+
+      // Get daily trends for the last 7 days
+      const dailyQuery = `
+        SELECT 
+          DATE(created_at) as day,
+          COUNT(*) as usage_count
+        FROM tool_executions 
+        WHERE tool_name = $1
+        ${userId ? 'AND user_id = $2' : ''}
+        AND created_at >= NOW() - INTERVAL '7 days'
+        GROUP BY DATE(created_at)
+        ORDER BY day
+      `;
+
+      // Get weekly trends for the last 4 weeks
+      const weeklyQuery = `
+        SELECT 
+          DATE_TRUNC('week', created_at) as week,
+          COUNT(*) as usage_count
+        FROM tool_executions 
+        WHERE tool_name = $1
+        ${userId ? 'AND user_id = $2' : ''}
+        AND created_at >= NOW() - INTERVAL '4 weeks'
+        GROUP BY DATE_TRUNC('week', created_at)
+        ORDER BY week
+      `;
+
+      const queryParams = userId ? [toolName, userId] : [toolName];
+
+      // Execute all trend queries in parallel
+      const [hourlyResult, dailyResult, weeklyResult] = await Promise.all([
+        // Hourly trends
+        userId
+          ? this.databaseService.prisma.$queryRaw`
+              SELECT 
+                EXTRACT(HOUR FROM created_at) as hour,
+                COUNT(*) as usage_count
+              FROM tool_executions 
+              WHERE tool_name = ${toolName}
+              AND user_id = ${userId}
+              AND created_at >= NOW() - INTERVAL '24 hours'
+              GROUP BY EXTRACT(HOUR FROM created_at)
+              ORDER BY hour
+            `
+          : this.databaseService.prisma.$queryRaw`
+              SELECT 
+                EXTRACT(HOUR FROM created_at) as hour,
+                COUNT(*) as usage_count
+              FROM tool_executions 
+              WHERE tool_name = ${toolName}
+              AND created_at >= NOW() - INTERVAL '24 hours'
+              GROUP BY EXTRACT(HOUR FROM created_at)
+              ORDER BY hour
+            `,
+        // Daily trends
+        userId
+          ? this.databaseService.prisma.$queryRaw`
+              SELECT 
+                DATE(created_at) as day,
+                COUNT(*) as usage_count
+              FROM tool_executions 
+              WHERE tool_name = ${toolName}
+              AND user_id = ${userId}
+              AND created_at >= NOW() - INTERVAL '7 days'
+              GROUP BY DATE(created_at)
+              ORDER BY day
+            `
+          : this.databaseService.prisma.$queryRaw`
+              SELECT 
+                DATE(created_at) as day,
+                COUNT(*) as usage_count
+              FROM tool_executions 
+              WHERE tool_name = ${toolName}
+              AND created_at >= NOW() - INTERVAL '7 days'
+              GROUP BY DATE(created_at)
+              ORDER BY day
+            `,
+        // Weekly trends
+        userId
+          ? this.databaseService.prisma.$queryRaw`
+              SELECT 
+                DATE_TRUNC('week', created_at) as week,
+                COUNT(*) as usage_count
+              FROM tool_executions 
+              WHERE tool_name = ${toolName}
+              AND user_id = ${userId}
+              AND created_at >= NOW() - INTERVAL '4 weeks'
+              GROUP BY DATE_TRUNC('week', created_at)
+              ORDER BY week
+            `
+          : this.databaseService.prisma.$queryRaw`
+              SELECT 
+                DATE_TRUNC('week', created_at) as week,
+                COUNT(*) as usage_count
+              FROM tool_executions 
+              WHERE tool_name = ${toolName}
+              AND created_at >= NOW() - INTERVAL '4 weeks'
+              GROUP BY DATE_TRUNC('week', created_at)
+              ORDER BY week
+            `,
+      ]);
+
+      // Initialize arrays with zeros
+      const hourly = Array(24).fill(0);
+      const daily = Array(7).fill(0);
+      const weekly = Array(4).fill(0);
+
+      // Fill hourly data
+      (hourlyResult as any[]).forEach((row: any) => {
+        const hour = parseInt(row.hour);
+        if (hour >= 0 && hour < 24) {
+          hourly[hour] = parseInt(row.usage_count);
+        }
+      });
+
+      // Fill daily data (last 7 days)
+      (dailyResult as any[]).forEach((row: any, index: number) => {
+        if (index < 7) {
+          daily[index] = parseInt(row.usage_count);
+        }
+      });
+
+      // Fill weekly data (last 4 weeks)
+      (weeklyResult as any[]).forEach((row: any, index: number) => {
+        if (index < 4) {
+          weekly[index] = parseInt(row.usage_count);
+        }
+      });
+
+      return { hourly, daily, weekly };
+    } catch (error) {
+      this.logger.warn(`Failed to get usage trends for ${toolName}:`, error);
+      return {
+        hourly: Array(24).fill(0),
+        daily: Array(7).fill(0),
+        weekly: Array(4).fill(0),
+      };
+    }
   }
 
   private async getAllToolMetrics(userId: string): Promise<ToolMetrics[]> {

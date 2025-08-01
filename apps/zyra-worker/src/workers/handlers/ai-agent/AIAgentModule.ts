@@ -49,6 +49,7 @@ import { AIAgentEnhancementsAPI } from './AIAgentEnhancementsAPI';
           databaseService,
           cacheService,
           toolAnalyticsService,
+          new (require('../goat/GoatPluginManager').GoatPluginManager)(),
         ),
       inject: [DatabaseService, CacheService, ToolAnalyticsService],
     },
@@ -160,6 +161,8 @@ import { AIAgentEnhancementsAPI } from './AIAgentEnhancementsAPI';
           mcpServerManager,
           securityValidator,
           reasoningEngine,
+          new (require('./EnhancedReasoningEngine').EnhancedReasoningEngine)(),
+          new (require('../goat/GoatPluginManager').GoatPluginManager)(),
         ),
       inject: [
         DatabaseService,

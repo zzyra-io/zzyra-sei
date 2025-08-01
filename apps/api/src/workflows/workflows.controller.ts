@@ -31,12 +31,16 @@ import {
 } from "./dto/execute-workflow.dto";
 import { WorkflowsService } from "./workflows.service";
 import { Public } from "../auth/decorators/public.decorator";
+import { EnhancedAiService } from "../ai/enhanced-ai.service";
 
 @ApiTags("workflows")
 @Controller("workflows")
 // @ApiBearerAuth()
 export class WorkflowsController {
-  constructor(private readonly workflowsService: WorkflowsService) {}
+  constructor(
+    private readonly workflowsService: WorkflowsService,
+    private readonly enhancedAiService: EnhancedAiService
+  ) {}
 
   @Get()
   @ApiOperation({ summary: "Get all workflows" })
@@ -170,5 +174,74 @@ export class WorkflowsController {
     @Body() toggleFavoriteDto: ToggleFavoriteDto
   ): Promise<{ isFavorite: boolean }> {
     return this.workflowsService.toggleFavorite(toggleFavoriteDto, req.user.id);
+  }
+
+  @Post("tools/recommendations")
+  @Public()
+  @ApiOperation({
+    summary: "Get intelligent tool recommendations based on user prompt",
+    description:
+      "Analyzes user prompt and returns recommended tools with confidence scores and suggested configurations",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Returns intelligent tool recommendations",
+    schema: {
+      type: "object",
+      properties: {
+        recommendedTools: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              type: { type: "string", enum: ["mcp", "goat"] },
+              confidence: { type: "number" },
+              reason: { type: "string" },
+              category: { type: "string" },
+              suggestedConfig: { type: "object" },
+              description: { type: "string" },
+            },
+          },
+        },
+        analysis: {
+          type: "object",
+          properties: {
+            detectedIntent: { type: "string" },
+            keywords: { type: "array", items: { type: "string" } },
+            categories: { type: "array", items: { type: "string" } },
+            complexity: {
+              type: "string",
+              enum: ["simple", "moderate", "complex"],
+            },
+          },
+        },
+      },
+    },
+  })
+  async getIntelligentToolRecommendations(
+    @Body() body: { prompt: string }
+  ): Promise<{
+    recommendedTools: Array<{
+      id: string;
+      name: string;
+      type: "mcp" | "goat";
+      confidence: number;
+      reason: string;
+      category: string;
+      suggestedConfig: any;
+      description: string;
+    }>;
+    analysis: {
+      detectedIntent: string;
+      keywords: string[];
+      categories: string[];
+      complexity: "simple" | "moderate" | "complex";
+    };
+  }> {
+    return this.enhancedAiService.getIntelligentToolRecommendations(
+      body.prompt
+    );
   }
 }

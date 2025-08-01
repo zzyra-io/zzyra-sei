@@ -750,19 +750,23 @@ export function AgentNodeComponent({
       {/* Custom CSS animations */}
       <style jsx global>{`
         .thinking-glow {
-          box-shadow: 0 0 20px rgba(59, 130, 246, 0.4),
-            0 0 40px rgba(147, 51, 234, 0.3), 0 0 60px rgba(59, 130, 246, 0.2) !important;
+          box-shadow:
+            0 0 20px rgba(59, 130, 246, 0.4),
+            0 0 40px rgba(147, 51, 234, 0.3),
+            0 0 60px rgba(59, 130, 246, 0.2) !important;
           animation: thinking-glow 4s ease-in-out infinite !important;
         }
 
         .success-glow {
-          box-shadow: 0 0 20px rgba(34, 197, 94, 0.5),
+          box-shadow:
+            0 0 20px rgba(34, 197, 94, 0.5),
             0 0 40px rgba(34, 197, 94, 0.3) !important;
           animation: success-glow 3s ease-in-out !important;
         }
 
         .error-glow {
-          box-shadow: 0 0 20px rgba(239, 68, 68, 0.5),
+          box-shadow:
+            0 0 20px rgba(239, 68, 68, 0.5),
             0 0 40px rgba(239, 68, 68, 0.3) !important;
           animation: error-glow 2s ease-in-out infinite !important;
         }
@@ -775,11 +779,14 @@ export function AgentNodeComponent({
         @keyframes thinking-glow {
           0%,
           100% {
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4),
-              0 0 40px rgba(147, 51, 234, 0.3), 0 0 60px rgba(59, 130, 246, 0.2);
+            box-shadow:
+              0 0 20px rgba(59, 130, 246, 0.4),
+              0 0 40px rgba(147, 51, 234, 0.3),
+              0 0 60px rgba(59, 130, 246, 0.2);
           }
           50% {
-            box-shadow: 0 0 35px rgba(59, 130, 246, 0.6),
+            box-shadow:
+              0 0 35px rgba(59, 130, 246, 0.6),
               0 0 70px rgba(147, 51, 234, 0.4),
               0 0 100px rgba(59, 130, 246, 0.3);
           }
@@ -787,15 +794,18 @@ export function AgentNodeComponent({
 
         @keyframes success-glow {
           0% {
-            box-shadow: 0 0 15px rgba(34, 197, 94, 0.3),
+            box-shadow:
+              0 0 15px rgba(34, 197, 94, 0.3),
               0 0 30px rgba(34, 197, 94, 0.2);
           }
           50% {
-            box-shadow: 0 0 25px rgba(34, 197, 94, 0.6),
+            box-shadow:
+              0 0 25px rgba(34, 197, 94, 0.6),
               0 0 50px rgba(34, 197, 94, 0.4);
           }
           100% {
-            box-shadow: 0 0 20px rgba(34, 197, 94, 0.4),
+            box-shadow:
+              0 0 20px rgba(34, 197, 94, 0.4),
               0 0 40px rgba(34, 197, 94, 0.3);
           }
         }
@@ -803,11 +813,13 @@ export function AgentNodeComponent({
         @keyframes error-glow {
           0%,
           100% {
-            box-shadow: 0 0 20px rgba(239, 68, 68, 0.5),
+            box-shadow:
+              0 0 20px rgba(239, 68, 68, 0.5),
               0 0 40px rgba(239, 68, 68, 0.3);
           }
           50% {
-            box-shadow: 0 0 30px rgba(239, 68, 68, 0.7),
+            box-shadow:
+              0 0 30px rgba(239, 68, 68, 0.7),
               0 0 60px rgba(239, 68, 68, 0.4);
           }
         }
@@ -1111,6 +1123,10 @@ export function AgentNodeComponent({
                 <CollapsibleContent>
                   <div className='space-y-4'>
                     {/* Thinking Process */}
+                    {console.log(
+                      "AI Agent thinking steps:",
+                      data.thinkingSteps
+                    )}
                     {data.thinkingSteps && data.thinkingSteps.length > 0 && (
                       <div>
                         <h4 className='text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2'>
@@ -1143,6 +1159,22 @@ export function AgentNodeComponent({
                               </div>
                             );
                           })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show message when no thinking steps */}
+                    {(!data.thinkingSteps ||
+                      data.thinkingSteps.length === 0) && (
+                      <div className='text-center py-4'>
+                        <div className='text-gray-400 mb-2'>
+                          <Brain className='w-8 h-8 mx-auto' />
+                        </div>
+                        <div className='text-sm text-gray-500 font-medium'>
+                          No thinking steps captured
+                        </div>
+                        <div className='text-xs text-gray-400 mt-1'>
+                          Enable "Save Thinking Process" to see AI reasoning
                         </div>
                       </div>
                     )}
@@ -1180,8 +1212,8 @@ export function AgentNodeComponent({
                                           callData.status === "success"
                                             ? "bg-green-100 text-green-700"
                                             : callData.status === "error"
-                                            ? "bg-red-100 text-red-700"
-                                            : "bg-yellow-100 text-yellow-700"
+                                              ? "bg-red-100 text-red-700"
+                                              : "bg-yellow-100 text-yellow-700"
                                         }`}>
                                         {callData.status as string}
                                       </span>
@@ -1279,8 +1311,8 @@ export function AgentNodeComponent({
                                 log.level === "error"
                                   ? "bg-red-50 border-red-200 text-red-700"
                                   : log.level === "warn"
-                                  ? "bg-yellow-50 border-yellow-200 text-yellow-700"
-                                  : "bg-white border-gray-200 text-gray-700"
+                                    ? "bg-yellow-50 border-yellow-200 text-yellow-700"
+                                    : "bg-white border-gray-200 text-gray-700"
                               }`}>
                               <div className='flex items-center gap-2 mb-1'>
                                 <span className='font-medium'>
@@ -1293,8 +1325,8 @@ export function AgentNodeComponent({
                                     log.level === "error"
                                       ? "bg-red-100 text-red-700"
                                       : log.level === "warn"
-                                      ? "bg-yellow-100 text-yellow-700"
-                                      : "bg-blue-100 text-blue-700"
+                                        ? "bg-yellow-100 text-yellow-700"
+                                        : "bg-blue-100 text-blue-700"
                                   }`}>
                                   {log.level.toUpperCase()}
                                 </span>
@@ -1536,7 +1568,7 @@ export function AgentNodeComponent({
                   <div className='flex items-center justify-between'>
                     <Label className='text-xs'>Save Thinking Process</Label>
                     <Switch
-                      checked={data.config?.execution?.saveThinking || false}
+                      checked={data.config?.execution?.saveThinking !== false} // Default to true
                       onCheckedChange={(checked) =>
                         handleConfigUpdate({
                           execution: {
@@ -2161,7 +2193,7 @@ export function AIAgentConfig({
                 id='save-thinking'
                 checked={
                   ((config.execution as Record<string, unknown>)
-                    ?.saveThinking as boolean) || false
+                    ?.saveThinking as boolean) !== false // Default to true
                 }
                 onCheckedChange={(checked) =>
                   handleConfigUpdate({

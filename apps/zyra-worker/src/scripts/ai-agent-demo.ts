@@ -127,6 +127,13 @@ class AIAgentDemo {
     );
 
     // Create AI Agent handler
+    const {
+      EnhancedReasoningEngine,
+    } = require('../workers/handlers/ai-agent/EnhancedReasoningEngine');
+    const {
+      GoatPluginManager,
+    } = require('../workers/handlers/goat/GoatPluginManager');
+
     this.aiAgentHandler = new AIAgentHandler(
       this.databaseService,
       this.executionLogger,
@@ -134,6 +141,8 @@ class AIAgentDemo {
       mcpServerManager,
       securityValidator,
       reasoningEngine,
+      new EnhancedReasoningEngine(),
+      new GoatPluginManager(),
     );
 
     this.logger.log('✅ AI Agent Demo initialized');

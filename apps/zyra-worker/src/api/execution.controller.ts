@@ -77,6 +77,13 @@ export class ExecutionController {
       cacheService,
     );
 
+    const {
+      EnhancedReasoningEngine,
+    } = require('../workers/handlers/ai-agent/EnhancedReasoningEngine');
+    const {
+      GoatPluginManager,
+    } = require('../workers/handlers/goat/GoatPluginManager');
+
     this.aiAgentHandler = new AIAgentHandler(
       databaseService,
       executionLogger,
@@ -84,6 +91,8 @@ export class ExecutionController {
       mcpServerManager,
       securityValidator,
       reasoningEngine,
+      new EnhancedReasoningEngine(),
+      new GoatPluginManager(),
     );
   }
 

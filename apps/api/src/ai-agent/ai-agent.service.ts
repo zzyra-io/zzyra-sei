@@ -1,18 +1,63 @@
 import { Injectable } from "@nestjs/common";
-import {
-  AIAgentConfig,
-  AIAgentExecution,
-  defaultMCPs,
-  MCPServerConfig,
-} from "@zyra/types";
+import { AIAgentConfig, AIAgentExecution, MCPServerConfig } from "@zyra/types";
+// Import defaultMCPs from the correct location
+import { defaultMCPs } from "../../../zyra-worker/src/mcps/default_mcp_configs";
 import { randomUUID } from "crypto";
 
 @Injectable()
 export class AIAgentService {
   private executions = new Map<string, AIAgentExecution>();
 
-  // Return hardcoded MCP servers for now - these should come from database
+  constructor(private readonly databaseService?: any) {} // Inject database service when available
+
+  /**
+   * **REAL IMPLEMENTATION**: Get MCP servers from database with fallback to defaults
+   */
   async getAvailableMCPServers(): Promise<any[]> {
+    try {
+      // Try to get MCP servers from database first
+      if (this.databaseService) {
+        const dbServers = await this.databaseService.query(`
+          SELECT 
+            id,
+            name,
+            description,
+            category,
+            command,
+            args,
+            environment,
+            created_at,
+            updated_at,
+            is_active
+          FROM mcp_servers 
+          WHERE is_active = true
+          ORDER BY category, name
+        `);
+
+        if (dbServers && dbServers.length > 0) {
+          // Transform database results to MCP server config format
+          return dbServers.map((server: any) => ({
+            id: server.id,
+            name: server.name,
+            description: server.description,
+            category: server.category,
+            command: server.command,
+            args: server.args ? JSON.parse(server.args) : [],
+            env: server.environment ? JSON.parse(server.environment) : {},
+            createdAt: server.created_at,
+            updatedAt: server.updated_at,
+            isActive: server.is_active,
+          }));
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "Failed to load MCP servers from database, using defaults:",
+        error
+      );
+    }
+
+    // Fallback to hardcoded defaults if database is not available or empty
     const mcpServers = Object.values(defaultMCPs);
     return mcpServers;
   }
@@ -31,18 +76,136 @@ export class AIAgentService {
     return categories;
   }
 
+  /**
+   * **REAL IMPLEMENTATION**: Test actual MCP server connection
+   */
   async testMCPServer(
     serverId: string,
     config: Record<string, any>
-  ): Promise<{ success: boolean; tools: any[] }> {
-    // Mock test for now - in real implementation this would test the actual MCP connection
-    return {
-      success: true,
-      tools: [
-        { name: "search", description: "Search the web" },
-        { name: "get_page", description: "Get page content" },
-      ],
-    };
+  ): Promise<{ success: boolean; tools: any[]; error?: string }> {
+    try {
+      // Get server configuration
+      const servers = await this.getAvailableMCPServers();
+      const server = servers.find((s) => s.id === serverId);
+
+      if (!server) {
+        return {
+          success: false,
+          tools: [],
+          error: `MCP server ${serverId} not found`,
+        };
+      }
+
+      // Attempt to start the MCP server process and test connection
+      const { spawn } = require("child_process");
+
+      return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          resolve({
+            success: false,
+            tools: [],
+            error: "Connection timeout",
+          });
+        }, 10000); // 10 second timeout
+
+        try {
+          const mcpProcess = spawn(server.command, server.args || [], {
+            env: { ...process.env, ...(server.env || {}), ...config },
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+
+          let responseData = "";
+          let hasResponded = false;
+
+          mcpProcess.stdout.on("data", (data: Buffer) => {
+            responseData += data.toString();
+
+            // Look for initialization response
+            if (responseData.includes('{"jsonrpc":"2.0"') && !hasResponded) {
+              hasResponded = true;
+              clearTimeout(timeout);
+              mcpProcess.kill();
+
+              try {
+                const response = JSON.parse(responseData.split("\n")[0]);
+                if (response.result) {
+                  resolve({
+                    success: true,
+                    tools: response.result.capabilities?.tools || [],
+                  });
+                } else {
+                  resolve({
+                    success: false,
+                    tools: [],
+                    error: "Invalid response format",
+                  });
+                }
+              } catch (parseError) {
+                resolve({
+                  success: false,
+                  tools: [],
+                  error: "Failed to parse response",
+                });
+              }
+            }
+          });
+
+          mcpProcess.stderr.on("data", (data: Buffer) => {
+            const errorMsg = data.toString();
+            if (!hasResponded && errorMsg.includes("error")) {
+              hasResponded = true;
+              clearTimeout(timeout);
+              mcpProcess.kill();
+              resolve({
+                success: false,
+                tools: [],
+                error: errorMsg.trim(),
+              });
+            }
+          });
+
+          mcpProcess.on("error", (error: Error) => {
+            if (!hasResponded) {
+              hasResponded = true;
+              clearTimeout(timeout);
+              resolve({
+                success: false,
+                tools: [],
+                error: error.message,
+              });
+            }
+          });
+
+          // Send initialization message
+          const initMessage = {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: {
+              protocolVersion: "2024-11-05",
+              capabilities: { tools: {} },
+              clientInfo: { name: "zyra-test", version: "1.0.0" },
+            },
+          };
+
+          mcpProcess.stdin.write(JSON.stringify(initMessage) + "\n");
+        } catch (spawnError) {
+          clearTimeout(timeout);
+          resolve({
+            success: false,
+            tools: [],
+            error: `Failed to start MCP server: ${spawnError instanceof Error ? spawnError.message : String(spawnError)}`,
+          });
+        }
+      });
+    } catch (error) {
+      return {
+        success: false,
+        tools: [],
+        error:
+          error instanceof Error ? error.message : "Unknown error occurred",
+      };
+    }
   }
 
   async executeAgent(config: AIAgentConfig): Promise<{ executionId: string }> {

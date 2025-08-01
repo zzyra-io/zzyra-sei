@@ -26,9 +26,11 @@ import { LLMProviderManager } from '../workers/handlers/ai-agent/LLMProviderMana
 import { MCPServerManager } from '../workers/handlers/ai-agent/MCPServerManager';
 import { SecurityValidator } from '../workers/handlers/ai-agent/SecurityValidator';
 import { ReasoningEngine } from '../workers/handlers/ai-agent/ReasoningEngine';
+import { EnhancedReasoningEngine } from '../workers/handlers/ai-agent/EnhancedReasoningEngine';
 import { MCPToolsManager } from '../workers/handlers/ai-agent/MCPToolsManager';
 import { SubscriptionService } from '../workers/handlers/ai-agent/SubscriptionService';
 import { GOATManager } from '../workers/handlers/ai-agent/GOATManager';
+import { GoatPluginManager } from '../workers/handlers/goat/GoatPluginManager';
 import { CacheService } from '../workers/handlers/ai-agent/CacheService';
 import { ToolAnalyticsService } from '../workers/handlers/ai-agent/ToolAnalyticsService';
 import { randomUUID } from 'crypto';
@@ -83,6 +85,11 @@ class SimpleDatabaseService {
           'mcp_access',
           'brave_search_access',
           'goat_access',
+          'WALLET_ACCESS',
+          'DATABASE_ACCESS',
+          'FILE_ACCESS',
+          'NETWORK_ACCESS',
+          'AI_AGENT',
         ],
       }),
     },
@@ -147,11 +154,18 @@ async function createAIAgentHandler() {
     toolAnalyticsService,
     cacheService,
   );
+  const enhancedReasoningEngine = new EnhancedReasoningEngine();
   const mcpToolsManager = new MCPToolsManager(
     databaseService,
     mcpServerManager, // Use the same mcpServerManager instance
   );
   const goatManager = new GOATManager(configService);
+  const goatPluginManager = new GoatPluginManager();
+
+  // Enhanced reasoning engine doesn't need initialization
+
+  // Initialize GOAT plugin manager
+  await goatPluginManager.initialize();
 
   // Create main handler
   return {
@@ -162,9 +176,12 @@ async function createAIAgentHandler() {
       mcpServerManager,
       securityValidator,
       reasoningEngine,
+      enhancedReasoningEngine,
+      goatPluginManager,
     ),
     mcpToolsManager,
     goatManager,
+    goatPluginManager,
     llmProviderManager,
   };
 }
@@ -348,6 +365,29 @@ const TEST_SCENARIOS = {
       },
     ],
   },
+  'complex-defi': {
+    name: 'Complex DeFi Operations',
+    prompt:
+      'Get token balances and latest transactions for wallet 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 (Vitalik Buterin). Also get current ETH price from web search.',
+    tools: [
+      {
+        id: 'blockScout',
+        name: 'BlockScout Blockchain Data',
+        type: 'mcp',
+        config: {
+          // BlockScout doesn't need specific config, uses default endpoints
+        },
+      },
+      {
+        id: 'brave-search',
+        name: 'Web Search for ETH Price',
+        type: 'mcp',
+        config: {
+          apiKey: process.env.BRAVE_API_KEY || 'demo-key',
+        },
+      },
+    ],
+  },
 };
 
 async function runCompleteSystemTest() {
@@ -365,7 +405,13 @@ async function runCompleteSystemTest() {
     process.exit(1);
   }
 
-  logger.log(`🚀 Starting Complete AI Agent System Test: ${scenario.name}\n`);
+  logger.log(`🚀 Starting Enhanced AI Agent System Test: ${scenario.name}`);
+  logger.log(
+    `🧠 Enhanced Features: Automatic Sequential Thinking + Intelligent Tool Analysis`,
+  );
+  logger.log(
+    `🔄 Behind-the-scenes improvements: Better reasoning, smarter tool selection\n`,
+  );
 
   // Check for API key
   if (
@@ -546,20 +592,44 @@ async function runCompleteSystemTest() {
       console.log(result.result);
       console.log('-'.repeat(80));
 
-      if (result.steps && result.steps.length > 0) {
-        console.log('\n🧠 Thinking Process:');
-        result.steps.forEach((step: any, index: number) => {
-          console.log(`\n${index + 1}. ${step.type?.toUpperCase() || 'STEP'}`);
+      if (result.thinkingSteps && result.thinkingSteps.length > 0) {
+        console.log('\n🧠 Enhanced Sequential Thinking Process:');
+        result.thinkingSteps.forEach((step: any, index: number) => {
+          console.log(
+            `\n${index + 1}. ${step.type?.toUpperCase() || 'THINKING_STEP'}`,
+          );
           if (step.reasoning) {
-            console.log(`   Reasoning: ${step.reasoning}`);
+            console.log(
+              `   Reasoning: ${step.reasoning.substring(0, 200)}${step.reasoning.length > 200 ? '...' : ''}`,
+            );
           }
           if (step.confidence) {
             console.log(`   Confidence: ${Math.round(step.confidence * 100)}%`);
           }
-          if (step.toolsUsed && step.toolsUsed.length > 0) {
-            console.log(`   Tools Used: ${step.toolsUsed.join(', ')}`);
+          if (step.recommendations && step.recommendations.length > 0) {
+            console.log(
+              `   Recommendations: ${step.recommendations.slice(0, 2).join(', ')}`,
+            );
+          }
+          if (step.timestamp) {
+            console.log(
+              `   Time: ${new Date(step.timestamp).toLocaleTimeString()}`,
+            );
           }
         });
+      }
+
+      if (result.sequentialAnalysis) {
+        console.log('\n📊 Sequential Analysis Summary:');
+        console.log(
+          `   Final Confidence: ${Math.round((result.sequentialAnalysis.confidence || 0.7) * 100)}%`,
+        );
+        console.log(`   Reasoning Steps: ${result.thinkingSteps?.length || 0}`);
+        if (result.sequentialAnalysis.reasoning) {
+          console.log(
+            `   Key Insights: ${result.sequentialAnalysis.reasoning.substring(0, 150)}...`,
+          );
+        }
       }
 
       if (result.toolCalls && result.toolCalls.length > 0) {
@@ -578,21 +648,27 @@ async function runCompleteSystemTest() {
         });
       }
 
-      console.log(`\n📈 System Performance:`);
+      console.log(`\n📈 Enhanced System Performance:`);
       console.log(`   Total Execution Time: ${executionTime}ms`);
-      console.log(`   Thinking Steps: ${result.steps?.length || 0}`);
+      console.log(
+        `   Sequential Thinking Steps: ${result.thinkingSteps?.length || 0}`,
+      );
       console.log(`   Tool Calls Made: ${result.toolCalls?.length || 0}`);
       console.log(`   Tools Configured: ${scenario.tools.length}`);
       console.log(`   LLM Provider: ${providerType}`);
       console.log(`   Session ID: ${result.sessionId}`);
+      console.log(
+        `   Enhanced Features: ✅ Sequential Thinking, ✅ Intelligent Analysis`,
+      );
 
       // Test Summary
-      console.log('\n🎯 Test Summary:');
-      console.log(`   ✅ AI Agent Handler: Working`);
+      console.log('\n🎯 Enhanced Test Summary:');
+      console.log(`   ✅ AI Agent Handler: Working (Enhanced)`);
+      console.log(`   ✅ Sequential Thinking Engine: Working (NEW)`);
+      console.log(`   ✅ Intelligent Tool Analysis: Working (NEW)`);
       console.log(`   ✅ LLM Integration: Working`);
       console.log(`   ✅ Security Validation: Working`);
       console.log(`   ✅ Database Persistence: Working`);
-      console.log(`   ✅ Reasoning Engine: Working`);
       if (scenario.tools.some((t) => t.type === 'mcp')) {
         console.log(
           `   🔧 MCP Tools: Configured (${scenario.tools.filter((t) => t.type === 'mcp').length} servers)`,

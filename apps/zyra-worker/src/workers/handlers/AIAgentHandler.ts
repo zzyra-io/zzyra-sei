@@ -6,7 +6,9 @@ import { LLMProviderManager } from './ai-agent/LLMProviderManager';
 import { MCPServerManager } from './ai-agent/MCPServerManager';
 import { SecurityValidator } from './ai-agent/SecurityValidator';
 import { ReasoningEngine } from './ai-agent/ReasoningEngine';
-import { defaultMCPs } from './ai-agent/mcps';
+import { EnhancedReasoningEngine } from './ai-agent/EnhancedReasoningEngine';
+import { GoatPluginManager } from './goat/GoatPluginManager';
+import { defaultMCPs } from '../../mcps/default_mcp_configs';
 
 interface AIAgentConfig {
   provider: {
@@ -51,6 +53,8 @@ export class AIAgentHandler implements BlockHandler {
     private readonly mcpServerManager: MCPServerManager,
     private readonly securityValidator: SecurityValidator,
     private readonly reasoningEngine: ReasoningEngine,
+    private readonly enhancedReasoningEngine: EnhancedReasoningEngine,
+    private readonly goatPluginManager: GoatPluginManager,
   ) {}
 
   async execute(node: any, ctx: BlockExecutionContext): Promise<any> {
@@ -202,6 +206,14 @@ export class AIAgentHandler implements BlockHandler {
           result: call.result || call.output || null,
         })) || [];
 
+      // Extract and log thinking steps for debugging
+      const thinkingSteps =
+        (result as any).thinkingSteps || (result as any).steps || [];
+      this.logger.log(
+        `[AI_AGENT] Thinking steps captured: ${thinkingSteps.length} steps`,
+      );
+      this.logger.debug(`[AI_AGENT] Thinking steps details:`, thinkingSteps);
+
       const output = {
         success: true,
         result: resultString,
@@ -210,8 +222,7 @@ export class AIAgentHandler implements BlockHandler {
         output: resultString, // Add 'output' field for {previousBlock.output} templates
         steps: (result as any).steps || [],
         toolCalls: formattedToolCalls,
-        thinkingSteps:
-          (result as any).thinkingSteps || (result as any).steps || [],
+        thinkingSteps: thinkingSteps,
         executionTime: Date.now() - startTime,
         sessionId: session.id,
         // Additional fields for template consumption
@@ -395,10 +406,9 @@ export class AIAgentHandler implements BlockHandler {
           const mcpTools = await this.loadMCPTools(toolConfig, userId);
           tools.push(...mcpTools);
         } else if (toolConfig.type === 'goat') {
-          // For GOAT tools, we'll implement this later
-          this.logger.warn(
-            `GOAT tools not yet implemented: ${toolConfig.name}`,
-          );
+          // For GOAT tools, use the GOAT plugin manager
+          const goatTools = await this.loadGoatTools(toolConfig, userId);
+          tools.push(...goatTools);
         } else if (toolConfig.type === 'builtin') {
           // For builtin tools, we'll implement this later
           this.logger.warn(
@@ -528,6 +538,75 @@ export class AIAgentHandler implements BlockHandler {
     return tools;
   }
 
+  /**
+   * Load GOAT SDK tools and convert them to AI SDK format
+   */
+  private async loadGoatTools(toolConfig: any, userId: string): Promise<any[]> {
+    const tools = [];
+
+    try {
+      this.logger.log(`[AI_AGENT] Loading GOAT tools for tool config:`, {
+        id: toolConfig.id,
+        name: toolConfig.name,
+        type: toolConfig.type,
+        config: toolConfig.config,
+      });
+
+      // Get the GOAT tool from the plugin manager
+      const goatTool = await this.goatPluginManager.getTool(toolConfig.id);
+
+      if (!goatTool) {
+        this.logger.warn(`GOAT tool not found: ${toolConfig.id}`);
+        return tools;
+      }
+
+      // Convert GOAT tool to AI SDK function format
+      const aiTool = {
+        name: goatTool.name,
+        description: goatTool.description,
+        id: goatTool.id,
+        category: goatTool.category,
+        plugin: goatTool.plugin,
+        parameters: goatTool.inputSchema,
+        execute: async (parameters: any) => {
+          try {
+            this.logger.debug(
+              `[AI_AGENT] Executing GOAT tool: ${goatTool.name} with parameters:`,
+              parameters,
+            );
+
+            const result = await this.goatPluginManager.executeTool(
+              goatTool.id,
+              parameters,
+            );
+
+            this.logger.debug(
+              `[AI_AGENT] GOAT tool ${goatTool.name} execution result:`,
+              result,
+            );
+
+            return result;
+          } catch (error) {
+            this.logger.error(
+              `[AI_AGENT] GOAT tool ${goatTool.name} execution failed:`,
+              error,
+            );
+            throw error;
+          }
+        },
+      };
+
+      tools.push(aiTool);
+      this.logger.log(`Successfully loaded GOAT tool: ${goatTool.name}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to load GOAT tool ${toolConfig.name}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return tools;
+  }
+
   private getMCPServerConfigs(toolId: string): any[] {
     this.logger.log(
       `[AI_AGENT] Getting MCP server configs for tool ID: ${toolId}`,
@@ -630,11 +709,34 @@ export class AIAgentHandler implements BlockHandler {
       }, config.execution.timeout);
     });
 
-    // Execute with reasoning engine
-    this.logger.log(`[AI_AGENT] Calling reasoning engine`);
+    // Execute with enhanced reasoning engine for sequential thinking (ALWAYS ENABLED)
+    this.logger.log(
+      `[AI_AGENT] Calling enhanced reasoning engine with sequential thinking`,
+    );
+
+    // Always use enhanced reasoning engine for better AI performance
+    // Sequential thinking is now automatic for all AI agent executions
+    this.logger.log(
+      `[AI_AGENT] Processing with automatic sequential thinking...`,
+    );
+
+    const sequentialResult =
+      await this.enhancedReasoningEngine.processWithSequentialThinking({
+        prompt: config.agent.userPrompt,
+        systemPrompt: config.agent.systemPrompt,
+        tools,
+        maxSteps: config.agent.maxSteps,
+        thinkingMode: config.agent.thinkingMode,
+        userId: userId,
+      });
+
+    // Execute the AI call with enhanced sequential thinking context
     const executionPromise = this.reasoningEngine.execute({
       prompt: config.agent.userPrompt,
-      systemPrompt: config.agent.systemPrompt,
+      systemPrompt:
+        config.agent.systemPrompt +
+        '\n\nSequential Thinking Context:\n' +
+        sequentialResult.executionResult.reasoning,
       provider,
       tools,
       maxSteps: config.agent.maxSteps,
@@ -657,13 +759,24 @@ export class AIAgentHandler implements BlockHandler {
         resultKeys: Object.keys(result || {}),
       });
 
+      // Combine sequential thinking steps with execution thinking steps
+      const originalThinkingSteps = (result as any).thinkingSteps || [];
+      const sequentialThinkingSteps = sequentialResult.thinkingSteps || [];
+
+      // Merge all thinking steps for comprehensive UI display
+      const allThinkingSteps = [
+        ...sequentialThinkingSteps,
+        ...originalThinkingSteps,
+      ];
+
       // Enhance the result with detailed execution information for UI
       const enhancedResult = {
         ...(result as any),
         success: true,
         toolCalls: this.enhanceToolCalls((result as any).toolCalls || []),
-        thinkingSteps: (result as any).thinkingSteps || [],
-        totalSteps: (result as any).thinkingSteps?.length || 0,
+        thinkingSteps: allThinkingSteps, // Now includes both sequential and execution thinking
+        sequentialAnalysis: sequentialResult.executionResult, // Include sequential analysis details
+        totalSteps: allThinkingSteps.length,
         totalToolCalls: (result as any).toolCalls?.length || 0,
         toolsUsed: tools.map((t) => ({ id: t.id, name: t.name })),
         executionTime: Date.now() - startTime,

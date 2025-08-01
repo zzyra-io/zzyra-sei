@@ -80,12 +80,18 @@ export interface ThinkingStep {
     | "reasoning"
     | "tool_selection"
     | "execution"
-    | "reflection";
+    | "reflection"
+    | "conclusion"
+    | "error_recovery"
+    | "fallback_planning"
+    | "fallback_analysis"
+    | "fallback_execution";
   reasoning: string;
-  confidence: number;
+  confidence?: number;
   toolsConsidered?: string[];
   decision?: string;
-  timestamp: string;
+  timestamp?: string;
+  recommendations?: string[];
 }
 
 export interface ToolCall {
@@ -94,4 +100,21 @@ export interface ToolCall {
   result?: any;
   error?: string;
   duration?: number;
+}
+
+export interface ReasoningParams {
+  prompt: string;
+  systemPrompt?: string;
+  tools: any[];
+  maxSteps?: number;
+  thinkingMode?: "fast" | "deliberate" | "collaborative";
+  userId?: string;
+  sessionId?: string;
+}
+
+export interface ReasoningResult {
+  thinkingSteps: ThinkingStep[];
+  executionResult: any;
+  confidence?: number;
+  reasoning?: string;
 }

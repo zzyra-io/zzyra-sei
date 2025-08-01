@@ -17,6 +17,8 @@ import { HttpBlockHandler } from '../HttpBlockHandler';
 import { EnhancedComparatorBlock } from './EnhancedComparatorBlock';
 import { NotificationBlockHandler } from '../NotificationBlockHandler';
 import { PriceMonitorBlockHandler } from '../PriceMonitorBlockHandler';
+import { CalculatorBlockHandler } from './CalculatorBlockHandler';
+import { MagicWalletBlockHandler } from './MagicWalletBlockHandler';
 
 // Import legacy blocks
 import { EmailBlockHandler } from '../EmailBlockHandler';
@@ -47,6 +49,8 @@ export class EnhancedBlockRegistry {
     this.registerEnhancedBlock(
       new PriceMonitorBlockHandler(this.databaseService),
     );
+    this.registerEnhancedBlock(new CalculatorBlockHandler());
+    this.registerEnhancedBlock(new MagicWalletBlockHandler());
 
     // Register legacy blocks for backward compatibility
     this.registerLegacyBlock(

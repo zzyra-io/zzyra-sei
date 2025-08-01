@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../services/database.service';
 import { CacheService } from './CacheService';
 import { ToolAnalyticsService } from './ToolAnalyticsService';
+import { GoatPluginManager } from '../goat/GoatPluginManager';
 
 interface ToolDefinition {
   id: string;
@@ -62,6 +63,8 @@ enum ToolCategory {
   DEVELOPMENT = 'development',
   ANALYTICS = 'analytics',
   AUTOMATION = 'automation',
+  DEFI = 'defi',
+  ERC20 = 'erc20',
 }
 
 interface ToolDiscoveryQuery {
@@ -95,6 +98,7 @@ export class ToolDiscoveryService {
     private readonly databaseService: DatabaseService,
     private readonly cacheService: CacheService,
     private readonly toolAnalyticsService: ToolAnalyticsService,
+    private readonly goatPluginManager: GoatPluginManager,
   ) {
     this.initializeToolRegistry();
   }
@@ -689,12 +693,135 @@ export class ToolDiscoveryService {
         await this.registerTool(tool);
       }
 
+      // Load and register GOAT tools
+      await this.loadGoatTools();
+
       this.logger.log(
-        `Initialized ${toolDefinitions.length} tools in registry`,
+        `Initialized ${toolDefinitions.length} MCP tools + GOAT tools in registry`,
       );
     } catch (error) {
       this.logger.error('Failed to initialize tool registry:', error);
     }
+  }
+
+  /**
+   * Load GOAT SDK tools and register them in the discovery system
+   */
+  private async loadGoatTools(): Promise<void> {
+    try {
+      this.logger.log('Loading GOAT SDK tools...');
+
+      const goatTools = await this.goatPluginManager.getToolsForDiscovery();
+      let goatToolCount = 0;
+
+      for (const goatTool of goatTools) {
+        const toolDefinition: ToolDefinition = {
+          id: goatTool.id,
+          name: goatTool.name,
+          description: goatTool.description,
+          category: this.mapGoatCategoryToToolCategory(goatTool.category),
+          subcategory: goatTool.category,
+          type: 'goat',
+          inputSchema: goatTool.inputSchema || {
+            type: 'object',
+            properties: {},
+            description: 'No parameters required',
+          },
+          metadata: {
+            version: '1.0.0',
+            author: 'GOAT SDK',
+            documentation: 'https://docs.goat.xyz',
+            examples: goatTool.examples.map((example) => ({
+              title: `${goatTool.name} Example`,
+              description: `Example usage of ${goatTool.name}`,
+              input: example.input || {},
+              expectedOutput: example.output || 'Operation result',
+              useCase: goatTool.description,
+            })),
+            tags: goatTool.capabilities || [goatTool.category],
+            difficulty: this.determineToolDifficulty(goatTool),
+            reliability: 0.85, // Default reliability for GOAT tools
+            performance: {
+              avgResponseTime: 2000, // Default average response time
+              successRate: 0.9, // Default success rate
+            },
+            dependencies: ['WALLET_PRIVATE_KEY'],
+            limitations: ['Requires wallet configuration', 'Network-dependent'],
+          },
+          connection: {
+            // GOAT tools are executed directly, no external command needed
+            timeout: 30000,
+            healthCheck: 'ping',
+          },
+          availability: {
+            platforms: ['any'],
+            requirements: ['Wallet private key', 'Network access'],
+            supportedModels: ['gpt-4', 'claude-3', 'gpt-3.5-turbo'],
+          },
+        };
+
+        await this.registerTool(toolDefinition);
+        goatToolCount++;
+      }
+
+      this.logger.log(`Loaded ${goatToolCount} GOAT SDK tools`);
+    } catch (error) {
+      this.logger.error('Failed to load GOAT tools:', error);
+    }
+  }
+
+  /**
+   * Map GOAT tool categories to ToolDiscovery categories
+   */
+  private mapGoatCategoryToToolCategory(goatCategory: string): ToolCategory {
+    const categoryMap: { [key: string]: ToolCategory } = {
+      analytics: ToolCategory.ANALYTICS,
+      defi: ToolCategory.DEFI,
+      erc20: ToolCategory.ERC20,
+      blockchain: ToolCategory.BLOCKCHAIN,
+      wallet: ToolCategory.BLOCKCHAIN,
+      transaction: ToolCategory.BLOCKCHAIN,
+      token: ToolCategory.ERC20,
+      swap: ToolCategory.DEFI,
+      liquidity: ToolCategory.DEFI,
+      lending: ToolCategory.DEFI,
+      utility: ToolCategory.UTILITIES,
+    };
+
+    return categoryMap[goatCategory.toLowerCase()] || ToolCategory.BLOCKCHAIN;
+  }
+
+  /**
+   * Determine tool difficulty based on GOAT tool characteristics
+   */
+  private determineToolDifficulty(
+    goatTool: any,
+  ): 'beginner' | 'intermediate' | 'advanced' {
+    const name = goatTool.name.toLowerCase();
+    const capabilities = goatTool.capabilities || [];
+
+    // Simple operations are beginner-friendly
+    if (
+      name.includes('balance') ||
+      name.includes('address') ||
+      name.includes('get_')
+    ) {
+      return 'beginner';
+    }
+
+    // DeFi and complex operations are advanced
+    if (
+      capabilities.some((cap: string) =>
+        ['defi', 'swap', 'liquidity', 'arbitrage', 'lending'].includes(
+          cap.toLowerCase(),
+        ),
+      )
+    ) {
+      return 'advanced';
+    }
+
+    // Everything else is intermediate
+    return 'intermediate';
   }
 
   /**

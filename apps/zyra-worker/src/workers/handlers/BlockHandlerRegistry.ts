@@ -432,6 +432,11 @@ export class BlockHandlerRegistry {
       );
 
       // Create and return AI Agent handler
+      const {
+        EnhancedReasoningEngine,
+      } = require('./ai-agent/EnhancedReasoningEngine');
+      const { GoatPluginManager } = require('./goat/GoatPluginManager');
+
       return new AIAgentHandler(
         this.databaseService,
         this.executionLogger,
@@ -439,6 +444,8 @@ export class BlockHandlerRegistry {
         mcpServerManager,
         securityValidator,
         reasoningEngine,
+        new EnhancedReasoningEngine(),
+        new GoatPluginManager(),
       );
     } catch (error) {
       this.logger.error('Failed to create AI Agent handler:', error);

@@ -68,6 +68,16 @@ export class ReasoningEngine {
       throw new Error('LLM provider is required');
     }
 
+    // **CACHE OPTIMIZATION**: Warm up cache for this user
+    if (params.userId) {
+      try {
+        await this.cacheService.warmupCache(params.userId);
+        this.logger.debug(`Cache warmed up for user: ${params.userId}`);
+      } catch (warmupError) {
+        this.logger.warn('Cache warmup failed:', warmupError);
+      }
+    }
+
     // Sanitize user prompt to prevent injection
     params.prompt = this.sanitizePrompt(params.prompt);
 
@@ -104,17 +114,27 @@ export class ReasoningEngine {
         }
       }
 
-      // Step 1: Planning
+      // Step 1: Planning (always generate for debugging)
       const planningStep = await this.planExecution(params, currentStep++);
       steps.push(planningStep);
 
-      // Step 2: Tool Selection
+      // Step 2: Initial reasoning step
+      const reasoningStep: ThinkingStep = {
+        step: currentStep++,
+        type: 'reasoning',
+        reasoning: `Analyzing user request: "${params.prompt.substring(0, 100)}..." with ${params.tools.length} available tools.`,
+        confidence: 0.8,
+        timestamp: new Date().toISOString(),
+      };
+      steps.push(reasoningStep);
+
+      // Step 3: Tool Selection
       if (params.tools.length > 0) {
         const toolSelectionStep = await this.selectTools(params, currentStep++);
         steps.push(toolSelectionStep);
       }
 
-      // Step 3: Execute with provider
+      // Step 4: Execute with provider
       const executionResult = await this.executeWithProvider(params, steps);
 
       // Extract tool calls from execution
@@ -122,27 +142,60 @@ export class ReasoningEngine {
         toolCalls.push(...executionResult.toolCalls);
       }
 
-      // Step 4: Reflection (if deliberate mode and user has access)
+      // Step 5: Post-execution analysis (always add for debugging)
+      const postExecutionStep: ThinkingStep = {
+        step: currentStep++,
+        type: 'execution',
+        reasoning: `Execution completed. Generated response with ${toolCalls.length} tool calls. Result confidence: ${this.calculateOverallConfidence([...steps])}`,
+        confidence: 0.9,
+        timestamp: new Date().toISOString(),
+      };
+      steps.push(postExecutionStep);
+
+      // Step 6: Reflection (if deliberate mode and user has access)
       if (params.thinkingMode === 'deliberate' && params.userId) {
-        const canUseDeliberate =
-          await this.subscriptionService.canUseDeliberateThinking(
-            params.userId,
-          );
-        if (canUseDeliberate) {
-          const reflectionStep = await this.reflect(
-            executionResult,
-            currentStep++,
-          );
-          steps.push(reflectionStep);
-        } else {
+        try {
+          const canUseDeliberate =
+            await this.subscriptionService.canUseDeliberateThinking(
+              params.userId,
+            );
+          if (canUseDeliberate) {
+            const reflectionStep = await this.reflect(
+              executionResult,
+              currentStep++,
+            );
+            steps.push(reflectionStep);
+          } else {
+            this.logger.warn(
+              `User ${params.userId} attempted deliberate thinking without subscription`,
+            );
+          }
+        } catch (error) {
           this.logger.warn(
-            `User ${params.userId} attempted deliberate thinking without subscription`,
+            'Failed to check deliberate thinking subscription, skipping reflection',
           );
         }
       }
 
       // Save thinking process
       await this.saveThinkingProcess(params.sessionId, steps);
+
+      // **CACHE OPTIMIZATION**: Cache the complete reasoning session
+      if (steps.length > 0) {
+        try {
+          const completeCacheKey = {
+            prompt: params.prompt,
+            systemPrompt: params.systemPrompt,
+            provider: params.provider.constructor.name || 'unknown',
+            model: params.provider.modelName || 'unknown',
+            thinkingMode: params.thinkingMode,
+          };
+          await this.cacheService.cacheReasoningSteps(completeCacheKey, steps);
+          this.logger.debug('Cached complete reasoning session');
+        } catch (cacheError) {
+          this.logger.warn('Failed to cache reasoning session:', cacheError);
+        }
+      }
 
       return {
         text:
@@ -197,6 +250,32 @@ export class ReasoningEngine {
     params: ReasoningParams,
     stepNumber: number,
   ): Promise<ThinkingStep> {
+    // **CACHE OPTIMIZATION**: Check for cached planning results
+    const planningCacheKey = {
+      prompt: params.prompt,
+      systemPrompt: params.systemPrompt,
+      provider: params.provider.constructor.name || 'unknown',
+      model: params.provider.modelName || 'unknown',
+      thinkingMode: params.thinkingMode,
+    };
+
+    // Try to get cached planning result
+    const cachedPlanning =
+      await this.cacheService.getCachedReasoningSteps(planningCacheKey);
+    if (cachedPlanning && cachedPlanning.length > 0) {
+      const cachedStep = cachedPlanning.find(
+        (step) => step.type === 'planning',
+      );
+      if (cachedStep) {
+        this.logger.debug('Using cached planning result');
+        return {
+          ...cachedStep,
+          step: stepNumber,
+          timestamp: new Date().toISOString(),
+        };
+      }
+    }
+
     const planningPrompt = this.buildPlanningPrompt(params);
 
     try {
@@ -211,13 +290,25 @@ export class ReasoningEngine {
       const plan = planningResult.text || planningResult.content;
       const confidence = this.assessPlanConfidence(plan);
 
-      return {
+      const planningStep = {
         step: stepNumber,
-        type: 'planning',
+        type: 'planning' as const,
         reasoning: plan,
         confidence,
         timestamp: new Date().toISOString(),
       };
+
+      // **CACHE OPTIMIZATION**: Cache the planning result
+      try {
+        await this.cacheService.cacheReasoningSteps(planningCacheKey, [
+          planningStep,
+        ]);
+        this.logger.debug('Cached planning result for future use');
+      } catch (cacheError) {
+        this.logger.warn('Failed to cache planning result:', cacheError);
+      }
+
+      return planningStep;
     } catch (error) {
       this.logger.warn('Planning step failed, using fallback:', error);
 
@@ -241,6 +332,39 @@ export class ReasoningEngine {
     this.logger.log(
       `Available tools: ${params.tools.map((t) => t.name).join(', ')}`,
     );
+
+    // **CACHE OPTIMIZATION**: Create cache key for tool selection
+    const toolSelectionCacheKey = {
+      prompt: params.prompt,
+      systemPrompt: params.systemPrompt,
+      provider: params.provider.constructor.name || 'unknown',
+      model: params.provider.modelName || 'unknown',
+      thinkingMode:
+        params.thinkingMode +
+        '_tools_' +
+        params.tools
+          .map((t) => t.id)
+          .sort()
+          .join(','),
+    };
+
+    // Try to get cached tool selection result
+    const cachedToolSelection = await this.cacheService.getCachedReasoningSteps(
+      toolSelectionCacheKey,
+    );
+    if (cachedToolSelection && cachedToolSelection.length > 0) {
+      const cachedStep = cachedToolSelection.find(
+        (step) => step.type === 'tool_selection',
+      );
+      if (cachedStep) {
+        this.logger.debug('Using cached tool selection result');
+        return {
+          ...cachedStep,
+          step: stepNumber,
+          timestamp: new Date().toISOString(),
+        };
+      }
+    }
 
     const availableTools = params.tools.map((tool) => ({
       id: tool.id,
@@ -268,15 +392,27 @@ export class ReasoningEngine {
         availableTools,
       );
 
-      return {
+      const toolSelectionStep = {
         step: stepNumber,
-        type: 'tool_selection',
+        type: 'tool_selection' as const,
         reasoning,
         confidence: selectedTools.length > 0 ? 0.8 : 0.3,
         toolsConsidered: availableTools.map((t) => t.name),
         decision: `Selected tools: ${selectedTools.join(', ')}`,
         timestamp: new Date().toISOString(),
       };
+
+      // **CACHE OPTIMIZATION**: Cache the tool selection result
+      try {
+        await this.cacheService.cacheReasoningSteps(toolSelectionCacheKey, [
+          toolSelectionStep,
+        ]);
+        this.logger.debug('Cached tool selection result for future use');
+      } catch (cacheError) {
+        this.logger.warn('Failed to cache tool selection result:', cacheError);
+      }
+
+      return toolSelectionStep;
     } catch (error) {
       this.logger.warn('Tool selection failed:', error);
 
@@ -374,13 +510,15 @@ export class ReasoningEngine {
       const startTime = Date.now();
 
       try {
-        // Enhance parameters with results from previous tools
-        const enhancedParameters = this.enhanceParametersWithPreviousResults(
-          toolEntry.parameters || {},
-          previousResults,
-          tool,
-          toolEntry.name,
-        );
+        // Enhance parameters with results from previous tools using semantic intelligence
+        const enhancedParameters =
+          await this.enhanceParametersWithPreviousResults(
+            toolEntry.parameters || {},
+            previousResults,
+            tool,
+            toolEntry.name,
+            params.prompt, // Pass conversation context
+          );
 
         this.logger.log(
           `Executing tool: ${toolEntry.name} with parameters:`,
@@ -478,12 +616,31 @@ export class ReasoningEngine {
   /**
    * Enhance parameters with results from previous tool executions
    */
-  private enhanceParametersWithPreviousResults(
+  /**
+   * Dynamically enhance parameters with semantic intelligence (with caching)
+   */
+  private async enhanceParametersWithPreviousResults(
     originalParameters: any,
     previousResults: Map<string, any>,
     tool: any,
     toolName: string,
-  ): any {
+    conversationContext: string = '',
+  ): Promise<any> {
+    // **CACHE OPTIMIZATION**: Create cache key for parameter enhancement
+    const enhancementCacheKey = {
+      toolName,
+      parameters: originalParameters,
+      userId: 'system', // Could be passed as parameter
+    };
+
+    // Try to get cached enhancement result
+    const cachedEnhancement =
+      await this.cacheService.getCachedToolResult(enhancementCacheKey);
+    if (cachedEnhancement) {
+      this.logger.debug(`Using cached parameter enhancement for ${toolName}`);
+      return cachedEnhancement;
+    }
+
     const enhancedParameters = { ...originalParameters };
 
     // If this tool needs parameters that might come from previous tools
@@ -492,254 +649,518 @@ export class ReasoningEngine {
         tool.inputSchema.properties,
       )) {
         const schema = paramSchema as any;
+        const currentValue = originalParameters[paramName];
 
-        // Check if the parameter is missing or is an invalid placeholder
-        let needsOverride = false;
-        const currentValue = enhancedParameters[paramName];
+        // Use semantic analysis to determine if parameter needs enhancement
+        const needsEnhancement = this.shouldEnhanceParameter(
+          paramName,
+          currentValue,
+          schema,
+          conversationContext,
+        );
 
-        if (!currentValue) {
-          needsOverride = true;
-        } else if (typeof currentValue === 'string') {
-          // Check for invalid placeholders or poor values
-          const invalidPatterns = [
-            /^balance$/i,
-            /^placeholder$/i,
-            /^default$/i,
-            /^\[.*\]$/, // [wallet_address] style placeholders
-            /^\{.*\}$/, // {placeholder} style placeholders
-            /^`.*`$/, // `placeholder` style placeholders
-            /^".*"$/, // "placeholder" style placeholders
-            /^'.*'$/, // 'placeholder' style placeholders
-            /^retrieved_.*$/i, // retrieved_address, retrieved_value, etc.
-            /^\[.*\]`$/, // [retrieved_address]` style
-            /^\{.*\}`$/, // {retrieved_address}` style
-            /^".*"`$/, // "retrieved_address"` style
-            /^'.*'`$/, // 'retrieved_address'` style
-            /^`.*"$/, // `retrieved_address" style
-            /^`.*'$/, // `retrieved_address' style
-            /^".*`$/, // "retrieved_address` style
-            /^'.*`$/, // 'retrieved_address` style
-          ];
+        if (needsEnhancement) {
+          let enhancedValue = null;
 
-          if (invalidPatterns.some((pattern) => pattern.test(currentValue))) {
-            this.logger.log(
-              `Detected invalid parameter value: ${currentValue}, will override`,
-            );
-            needsOverride = true;
-          }
-
-          // Special validation for addresses - be more lenient with user-provided addresses
-          if (paramName.toLowerCase().includes('address')) {
-            // If it's a valid Ethereum address (0x + 40 hex chars), don't override
-            if (currentValue.startsWith('0x') && currentValue.length === 42) {
-              // Additional check: ensure it's actually hex
-              const hexPart = currentValue.slice(2);
-              if (/^[a-fA-F0-9]{40}$/.test(hexPart)) {
-                this.logger.log(
-                  `Respecting user-provided Ethereum address: ${currentValue}`,
-                );
-                needsOverride = false;
-              } else {
-                this.logger.log(
-                  `Invalid Ethereum address hex format: ${currentValue}, will override`,
-                );
-                needsOverride = true;
-              }
-            } else if (
-              currentValue.startsWith('sei1') && 
-              currentValue.length >= 39 && 
-              currentValue.length <= 59
-            ) {
-              // Support Sei bech32 addresses (sei1...)
-              this.logger.log(
-                `Respecting user-provided Sei address: ${currentValue}`,
-              );
-              needsOverride = false;
-            } else {
-              // Only override if it's clearly not a valid address format
-              this.logger.log(
-                `Invalid address format: ${currentValue}, will override`,
-              );
-              needsOverride = true;
-            }
-          }
-
-          // Special validation for URLs
-          if (
-            paramName.toLowerCase().includes('url') ||
-            paramName.toLowerCase().includes('link')
-          ) {
-            if (!currentValue.startsWith('http')) {
-              needsOverride = true;
-            }
-          }
-
-          // Special validation for emails
-          if (
-            paramName.toLowerCase().includes('email') ||
-            paramName.toLowerCase().includes('mail')
-          ) {
-            if (!currentValue.includes('@')) {
-              needsOverride = true;
-            }
-          }
-        }
-
-        if (needsOverride && previousResults.size > 0) {
-          const extractedValue = this.extractValueFromPreviousResults(
-            paramName,
-            schema,
-            previousResults,
-            toolName,
-          );
-
-          if (extractedValue !== null) {
-            enhancedParameters[paramName] = extractedValue;
-            this.logger.log(
-              `Enhanced parameter ${paramName} with value from previous results: ${extractedValue}`,
-            );
-          } else {
-            // Generate intelligent default if no previous result available
-            const defaultValue = this.generateIntelligentDefault(
+          // First try to extract from previous results
+          if (previousResults.size > 0) {
+            enhancedValue = this.extractValueFromPreviousResults(
               paramName,
               schema,
-              '',
+              previousResults,
+              toolName,
+              conversationContext,
             );
-            if (defaultValue !== null) {
-              enhancedParameters[paramName] = defaultValue;
-              this.logger.log(
-                `Generated intelligent default for ${paramName}: ${defaultValue}`,
-              );
-            }
           }
-        } else if (needsOverride) {
-          // No previous results available, generate intelligent default
-          const defaultValue = this.generateIntelligentDefault(
-            paramName,
-            schema,
-            '',
-          );
-          if (defaultValue !== null) {
-            enhancedParameters[paramName] = defaultValue;
+
+          // If no value found in previous results, generate intelligently
+          if (enhancedValue === null) {
+            enhancedValue = this.generateIntelligentDefault(
+              paramName,
+              schema,
+              conversationContext,
+            );
+          }
+
+          // Apply the enhancement if we got a valid value
+          if (enhancedValue !== null) {
+            enhancedParameters[paramName] = enhancedValue;
             this.logger.log(
-              `Generated intelligent default for ${paramName}: ${defaultValue}`,
+              `Semantically enhanced parameter ${paramName}: ${enhancedValue}`,
             );
           }
         }
       }
+    }
+
+    // **CACHE OPTIMIZATION**: Cache the enhanced parameters result
+    try {
+      const finalCacheKey = {
+        toolName,
+        parameters: enhancedParameters,
+        userId: 'system',
+      };
+      await this.cacheService.cacheToolResult(
+        finalCacheKey,
+        enhancedParameters,
+      );
+      this.logger.debug(`Cached parameter enhancement for ${toolName}`);
+    } catch (cacheError) {
+      this.logger.warn('Failed to cache parameter enhancement:', cacheError);
     }
 
     return enhancedParameters;
   }
 
   /**
-   * Extract value from previous tool results based on parameter name and schema
+   * Semantic decision on whether a parameter needs enhancement
+   */
+  private shouldEnhanceParameter(
+    paramName: string,
+    currentValue: any,
+    paramSchema: any,
+    conversationContext: string,
+  ): boolean {
+    // Quick checks for obvious cases
+    if (
+      currentValue === undefined ||
+      currentValue === null ||
+      currentValue === '' ||
+      currentValue === 'placeholder' ||
+      currentValue === 'default_value'
+    ) {
+      return true;
+    }
+
+    // Use semantic validation for nuanced decisions
+    if (typeof currentValue === 'string') {
+      return !this.isValidParameterValue(
+        currentValue,
+        paramName,
+        paramSchema,
+        conversationContext,
+      );
+    }
+
+    return false;
+  }
+
+  /**
+   * Dynamically extract value from previous tool results using semantic intelligence
    */
   private extractValueFromPreviousResults(
     paramName: string,
     paramSchema: any,
     previousResults: Map<string, any>,
     currentToolName: string,
+    conversationContext: string = '',
   ): any {
-    // Enhanced extraction patterns for all common parameter types
-    const extractionPatterns = [
-      // For wallet addresses - look for get_address results
-      {
-        paramName: 'address',
-        sourceTools: ['get_address'],
-        extractionMethod: (result: any) => {
-          if (result?.result?.[0]?.text) {
-            const addressText = result.result[0].text;
-            return addressText.replace(/^"|"$/g, '');
-          }
-          return null;
-        },
-      },
-      // For chain information - look for get_chain results
-      {
-        paramName: 'chain',
-        sourceTools: ['get_chain'],
-        extractionMethod: (result: any) => {
-          if (result?.result?.[0]?.text) {
-            return result.result[0].text.replace(/^"|"$/g, '');
-          }
-          return null;
-        },
-      },
-      // For balance information - look for get_balance results
-      {
-        paramName: 'balance',
-        sourceTools: ['get_balance'],
-        extractionMethod: (result: any) => {
-          if (result?.result?.[0]?.text) {
-            return result.result[0].text.replace(/^"|"$/g, '');
-          }
-          return null;
-        },
-      },
-      // For message parameters - generate intelligent defaults
-      {
-        paramName: 'message',
-        sourceTools: ['*'],
-        extractionMethod: (result: any) => {
-          // Generate a meaningful message based on context
-          return 'Hello, this is a test message for signing.';
-        },
-      },
-      // For text parameters - extract from any tool result
-      {
-        paramName: 'text',
-        sourceTools: ['*'],
-        extractionMethod: (result: any) => {
-          if (result?.result?.[0]?.text) {
-            return result.result[0].text.replace(/^"|"$/g, '');
-          }
-          return null;
-        },
-      },
-      // For any string parameter - try to extract from previous results
-      {
-        paramName: 'string',
-        sourceTools: ['*'],
-        extractionMethod: (result: any) => {
-          if (result?.result?.[0]?.text) {
-            return result.result[0].text.replace(/^"|"$/g, '');
-          }
-          return null;
-        },
-      },
-    ];
+    if (previousResults.size === 0) {
+      return null;
+    }
 
-    // Find matching extraction pattern
-    for (const pattern of extractionPatterns) {
+    return this.extractParameterSemantically(
+      paramName,
+      paramSchema,
+      previousResults,
+      currentToolName,
+      conversationContext,
+    );
+  }
+
+  /**
+   * Semantic parameter extraction from previous results
+   */
+  private extractParameterSemantically(
+    paramName: string,
+    paramSchema: any,
+    previousResults: Map<string, any>,
+    currentToolName: string,
+    conversationContext: string,
+  ): any {
+    const paramNameLower = paramName.toLowerCase();
+    const paramType = paramSchema?.type || 'string';
+
+    // Try semantic extraction patterns
+    for (const [toolName, result] of previousResults.entries()) {
+      const extractedValue = this.extractBySemanticPattern(
+        paramNameLower,
+        paramType,
+        result,
+        toolName,
+        conversationContext,
+      );
+
       if (
-        pattern.paramName === paramName ||
-        paramName.toLowerCase().includes(pattern.paramName.toLowerCase()) ||
-        (paramSchema?.type === 'string' && pattern.paramName === 'string')
+        extractedValue !== null &&
+        this.isValidParameterValue(
+          extractedValue,
+          paramName,
+          paramSchema,
+          conversationContext,
+        )
       ) {
-        // Try to extract from any of the source tools
-        for (const sourceTool of pattern.sourceTools) {
-          for (const [toolName, result] of previousResults.entries()) {
-            if (sourceTool === '*' || toolName === sourceTool) {
-              const extractedValue = pattern.extractionMethod(result);
-              if (extractedValue !== null) {
-                return this.convertValueToType(extractedValue, paramSchema);
-              }
-            }
-          }
-        }
+        this.logger.log(
+          `Extracted ${paramName} from ${toolName}: ${extractedValue}`,
+        );
+        return extractedValue;
       }
     }
 
-    // Fallback: try to extract any meaningful text from previous results
+    return null;
+  }
+
+  /**
+   * Extract parameter using semantic pattern matching
+   */
+  private extractBySemanticPattern(
+    paramNameLower: string,
+    paramType: string,
+    result: any,
+    toolName: string,
+    conversationContext: string,
+  ): any {
+    if (!result?.result) return null;
+
+    // Get result text
+    const resultText = this.getResultText(result);
+    if (!resultText) return null;
+
+    // Skip error results
+    if (this.isErrorMessage(resultText)) return null;
+
+    // Address extraction patterns
+    if (
+      paramNameLower.includes('address') ||
+      paramNameLower.includes('wallet')
+    ) {
+      return this.extractAddressFromResult(resultText);
+    }
+
+    // Chain ID extraction patterns
+    if (
+      paramNameLower.includes('chain') ||
+      paramNameLower.includes('network')
+    ) {
+      return this.extractChainFromResult(resultText);
+    }
+
+    // Block extraction patterns
+    if (
+      paramNameLower.includes('block') &&
+      (paramNameLower.includes('number') || paramNameLower.includes('hash'))
+    ) {
+      return this.extractBlockFromResult(resultText);
+    }
+
+    // Token/balance extraction patterns
+    if (
+      paramNameLower.includes('token') ||
+      paramNameLower.includes('balance') ||
+      paramNameLower.includes('amount')
+    ) {
+      return this.extractTokenInfoFromResult(resultText, paramNameLower);
+    }
+
+    // Transaction hash extraction
+    if (
+      paramNameLower.includes('transaction') ||
+      paramNameLower.includes('tx')
+    ) {
+      return this.extractTransactionFromResult(resultText);
+    }
+
+    // Boolean extraction from result context
+    if (paramType === 'boolean') {
+      return this.extractBooleanFromResult(resultText, paramNameLower);
+    }
+
+    // Generic text extraction for string parameters
+    if (paramType === 'string') {
+      return this.extractStringFromResult(resultText, paramNameLower);
+    }
+
+    return null;
+  }
+
+  /**
+   * Get text content from result object
+   */
+  private getResultText(result: any): string | null {
+    if (!result?.result) return null;
+
+    if (Array.isArray(result.result)) {
+      const textResults = result.result
+        .map((r) => r.text || JSON.stringify(r))
+        .filter((text) => text && !this.isErrorMessage(text))
+        .join(' ');
+      return textResults || null;
+    }
+
+    if (typeof result.result === 'string') {
+      return result.result;
+    }
+
+    if (typeof result.result === 'object') {
+      return JSON.stringify(result.result);
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract blockchain addresses from result text
+   */
+  private extractAddressFromResult(text: string): string | null {
+    // Ethereum addresses
+    const ethMatch = text.match(/0x[a-fA-F0-9]{40}/);
+    if (ethMatch) return ethMatch[0];
+
+    // Sei addresses
+    const seiMatch = text.match(/sei1[a-z0-9]{38,58}/);
+    if (seiMatch) return seiMatch[0];
+
+    return null;
+  }
+
+  /**
+   * Extract chain information from result text
+   */
+  private extractChainFromResult(text: string): string | null {
+    const textLower = text.toLowerCase();
+
+    // Look for chain mentions
+    if (textLower.includes('ethereum') || textLower.includes('mainnet'))
+      return '1';
+    if (textLower.includes('polygon')) return '137';
+    if (textLower.includes('bsc') || textLower.includes('binance')) return '56';
+
+    // Look for numeric chain IDs
+    const chainMatch = text.match(/"chain_id":\s*"?(\d+)"?/);
+    if (chainMatch) return chainMatch[1];
+
+    return null;
+  }
+
+  /**
+   * Extract block information from result text
+   */
+  private extractBlockFromResult(text: string): string | null {
+    // Block hash
+    const hashMatch = text.match(/0x[a-fA-F0-9]{64}/);
+    if (hashMatch) return hashMatch[0];
+
+    // Block number
+    const numberMatch = text.match(/"block_number":\s*"?(\d+)"?/);
+    if (numberMatch) return numberMatch[1];
+
+    return null;
+  }
+
+  /**
+   * Extract token information from result text
+   */
+  private extractTokenInfoFromResult(
+    text: string,
+    paramName: string,
+  ): string | null {
+    // Token symbols
+    if (paramName.includes('symbol') || paramName.includes('token')) {
+      const symbolMatch = text.match(
+        /\b(ETH|BTC|USDC|USDT|DAI|WETH|MATIC|BNB|ARB|SEI)\b/i,
+      );
+      if (symbolMatch) return symbolMatch[0].toUpperCase();
+    }
+
+    // Balance amounts
+    if (paramName.includes('balance') || paramName.includes('amount')) {
+      const balanceMatch = text.match(/"balance":\s*"?(\d+(?:\.\d+)?)"?/);
+      if (balanceMatch) return balanceMatch[1];
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract transaction information from result text
+   */
+  private extractTransactionFromResult(text: string): string | null {
+    // Transaction hash
+    const txMatch = text.match(/0x[a-fA-F0-9]{64}/);
+    if (txMatch) return txMatch[0];
+
+    return null;
+  }
+
+  /**
+   * Extract boolean values from result context
+   */
+  private extractBooleanFromResult(
+    text: string,
+    paramName: string,
+  ): boolean | null {
+    const textLower = text.toLowerCase();
+
+    if (paramName.includes('include') || paramName.includes('show')) {
+      return (
+        textLower.includes('true') ||
+        textLower.includes('yes') ||
+        textLower.includes('enabled')
+      );
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract string values from result
+   */
+  private extractStringFromResult(
+    text: string,
+    paramName: string,
+  ): string | null {
+    // Don't return the entire result text - be selective
+    if (text.length > 100) return null;
+
+    // Clean up the text
+    const cleanText = text.replace(/["{}\[\]]/g, '').trim();
+
+    if (cleanText.length > 0 && cleanText.length < 100) {
+      return cleanText;
+    }
+
+    return null;
+  }
+
+  /**
+   * AI-driven parameter extraction from previous results
+   */
+  private async extractParameterWithAI(
+    paramName: string,
+    paramSchema: any,
+    previousResults: Map<string, any>,
+    currentToolName: string,
+    conversationContext: string,
+    provider: any,
+  ): Promise<any> {
+    const extractionPrompt = this.buildParameterExtractionPrompt(
+      paramName,
+      paramSchema,
+      previousResults,
+      currentToolName,
+      conversationContext,
+    );
+
+    const response = await provider.generateText({
+      prompt: extractionPrompt,
+      maxTokens: 250,
+      temperature: 0.1, // Very low temperature for precise extraction
+    });
+
+    return this.parseAIExtractedParameter(response, paramSchema);
+  }
+
+  /**
+   * Build dynamic parameter extraction prompt
+   */
+  private buildParameterExtractionPrompt(
+    paramName: string,
+    paramSchema: any,
+    previousResults: Map<string, any>,
+    currentToolName: string,
+    conversationContext: string,
+  ): string {
+    let resultsContext = '';
+    let resultIndex = 1;
+
+    for (const [toolName, result] of previousResults.entries()) {
+      if (result?.result) {
+        const resultText = Array.isArray(result.result)
+          ? result.result.map((r) => r.text || JSON.stringify(r)).join(' ')
+          : JSON.stringify(result.result);
+        resultsContext += `\n${resultIndex}. ${toolName}: ${resultText.slice(0, 200)}...`;
+        resultIndex++;
+      }
+    }
+
+    return `As an AI parameter extractor, find the most appropriate value for this parameter from previous tool results.
+
+PARAMETER TO EXTRACT:
+- Name: ${paramName}
+- Type: ${paramSchema?.type || 'unknown'}
+- Description: ${paramSchema?.description || 'No description'}
+- For tool: ${currentToolName}
+
+PREVIOUS TOOL RESULTS:${resultsContext}
+
+CONVERSATION CONTEXT: ${conversationContext.slice(-300)}
+
+EXTRACTION RULES:
+1. Look for exact matches to the parameter name first
+2. Look for semantically related values (e.g., wallet addresses for "address" parameter)
+3. Ignore error messages, validation errors, and placeholder values
+4. Return the most relevant, actual data value
+5. Consider the tool context - what would this parameter logically need?
+
+RESPONSE FORMAT:
+If you found a value: "EXTRACTED: [the actual value]"
+If no relevant value found: "NOT_FOUND: [brief reason]"
+If multiple candidates: "BEST_MATCH: [the best value] - [reason]"
+
+Extract the parameter:`;
+  }
+
+  /**
+   * Parse AI-extracted parameter response
+   */
+  private parseAIExtractedParameter(response: string, paramSchema: any): any {
+    const trimmedResponse = response.trim();
+
+    if (trimmedResponse.startsWith('EXTRACTED:')) {
+      const value = trimmedResponse.replace('EXTRACTED:', '').trim();
+      return this.convertValueToParameterType(value, paramSchema);
+    }
+
+    if (trimmedResponse.startsWith('BEST_MATCH:')) {
+      const value = trimmedResponse
+        .replace('BEST_MATCH:', '')
+        .split(' - ')[0]
+        .trim();
+      return this.convertValueToParameterType(value, paramSchema);
+    }
+
+    if (trimmedResponse.startsWith('NOT_FOUND:')) {
+      return null;
+    }
+
+    // Fallback: try to extract value from the entire response
+    return this.convertValueToParameterType(trimmedResponse, paramSchema);
+  }
+
+  /**
+   * Fallback parameter extraction when AI fails
+   */
+  private fallbackParameterExtraction(
+    paramName: string,
+    paramSchema: any,
+    previousResults: Map<string, any>,
+  ): any {
+    // Simple fallback: look for obvious matches
     for (const [toolName, result] of previousResults.entries()) {
       if (result?.result?.[0]?.text) {
-        const text = result.result[0].text.replace(/^"|"$/g, '');
-        if (text && text.length > 0) {
-          // Check if this text is appropriate for the parameter type
-          if (this.isValidParameterValue(text, paramName, paramSchema)) {
-            return this.convertValueToType(text, paramSchema);
-          }
+        const text = result.result[0].text;
+
+        // Skip obvious error messages
+        if (
+          text.includes('Error executing') ||
+          text.includes('validation error')
+        ) {
+          continue;
+        }
+
+        // Return first non-error text if it seems reasonable
+        if (text.length > 0 && text.length < 500) {
+          return this.convertValueToParameterType(text, paramSchema);
         }
       }
     }
@@ -1562,57 +1983,346 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
   }
 
   /**
-   * Generate intelligent default based on parameter type and context
+   * Dynamically generate intelligent parameter values using semantic analysis
    */
   private generateIntelligentDefault(
     paramName: string,
     paramSchema: any,
-    fullReasoning: string,
+    conversationContext: string = '',
+  ): any {
+    return this.generateParameterSemantics(
+      paramName,
+      paramSchema,
+      conversationContext,
+    );
+  }
+
+  /**
+   * Semantic parameter generation - dynamic and context-aware
+   */
+  private generateParameterSemantics(
+    paramName: string,
+    paramSchema: any,
+    conversationContext: string,
   ): any {
     const paramNameLower = paramName.toLowerCase();
     const paramType = paramSchema?.type || 'string';
 
-    // Message parameters - generate meaningful defaults
-    if (paramNameLower.includes('message') || paramNameLower.includes('text')) {
-      if (paramNameLower.includes('sign')) {
-        return 'Hello, this is a test message for signing.';
-      }
-      return 'Test message';
+    // Extract context-aware values first
+    const contextValue = this.extractFromContext(
+      paramName,
+      paramType,
+      conversationContext,
+    );
+    if (contextValue !== null) {
+      this.logger.log(
+        `Generated from context for ${paramName}: ${contextValue}`,
+      );
+      return contextValue;
     }
 
-    // Address parameters - look for context clues
-    if (paramNameLower.includes('address')) {
-      // Check if there's any mention of wallet or address in the reasoning
-      if (
-        fullReasoning.includes('wallet') ||
-        fullReasoning.includes('address')
-      ) {
-        // Return a placeholder that will be filled by tool chaining
-        return '[wallet_address]';
-      }
+    // Generate semantic defaults based on parameter meaning
+    return this.generateSemanticDefault(paramNameLower, paramType, paramSchema);
+  }
+
+  /**
+   * Extract parameter values from conversation context using semantic analysis
+   */
+  private extractFromContext(
+    paramName: string,
+    paramType: string,
+    context: string,
+  ): any {
+    if (!context) return null;
+
+    const paramNameLower = paramName.toLowerCase();
+    const contextLower = context.toLowerCase();
+
+    // Address extraction - look for blockchain addresses in context
+    if (
+      paramNameLower.includes('address') ||
+      paramNameLower.includes('wallet')
+    ) {
+      // Ethereum addresses
+      const ethMatch = context.match(/0x[a-fA-F0-9]{40}/);
+      if (ethMatch) return ethMatch[0];
+
+      // Sei addresses
+      const seiMatch = context.match(/sei1[a-z0-9]{38,58}/);
+      if (seiMatch) return seiMatch[0];
+
+      // ENS names
+      const ensMatch = context.match(/\b\w+\.eth\b/);
+      if (ensMatch) return ensMatch[0];
     }
 
-    // URL parameters
-    if (paramNameLower.includes('url') || paramNameLower.includes('link')) {
-      return 'https://example.com';
+    // Chain ID extraction
+    if (
+      paramNameLower.includes('chain') ||
+      paramNameLower.includes('network')
+    ) {
+      // Look for chain mentions
+      if (contextLower.includes('ethereum') || contextLower.includes('eth'))
+        return '1';
+      if (contextLower.includes('polygon')) return '137';
+      if (contextLower.includes('bsc')) return '56';
+      if (contextLower.includes('arbitrum')) return '42161';
+      if (contextLower.includes('sei')) return 'pacific-1';
     }
 
-    // Number parameters
-    if (paramType === 'number' || paramType === 'integer') {
-      return 0;
-    }
-
-    // Boolean parameters
+    // Boolean extraction from context intent
     if (paramType === 'boolean') {
-      return false;
+      if (paramNameLower.includes('include')) {
+        return (
+          contextLower.includes('with') ||
+          contextLower.includes('include') ||
+          contextLower.includes('show')
+        );
+      }
+      if (
+        paramNameLower.includes('enable') ||
+        paramNameLower.includes('active')
+      ) {
+        return (
+          contextLower.includes('enable') ||
+          contextLower.includes('activate') ||
+          contextLower.includes('on')
+        );
+      }
     }
 
-    // String parameters
-    if (paramType === 'string') {
-      return 'default_value';
+    // Token/symbol extraction
+    if (paramNameLower.includes('token') || paramNameLower.includes('symbol')) {
+      const tokenMatch = context.match(
+        /\b(ETH|BTC|USDC|USDT|DAI|WETH|MATIC|BNB|ARB|SEI)\b/i,
+      );
+      if (tokenMatch) return tokenMatch[0].toUpperCase();
+    }
+
+    // Amount/value extraction
+    if (paramNameLower.includes('amount') || paramNameLower.includes('value')) {
+      const amountMatch = context.match(/(\d+(?:\.\d+)?)\s*(?:ETH|BTC|USD|%)/i);
+      if (amountMatch) return amountMatch[1];
     }
 
     return null;
+  }
+
+  /**
+   * Generate semantic defaults based on parameter name and type
+   */
+  private generateSemanticDefault(
+    paramNameLower: string,
+    paramType: string,
+    paramSchema: any,
+  ): any {
+    // Boolean parameters - intelligent defaults
+    if (paramType === 'boolean') {
+      if (
+        paramNameLower.includes('include_transactions') ||
+        paramNameLower.includes('include_tx')
+      )
+        return true;
+      if (
+        paramNameLower.includes('include_') ||
+        paramNameLower.includes('show_')
+      )
+        return true;
+      if (
+        paramNameLower.includes('enable_') ||
+        paramNameLower.includes('active_')
+      )
+        return false;
+      return false;
+    }
+
+    // Number parameters - context-aware defaults
+    if (paramType === 'number' || paramType === 'integer') {
+      if (paramNameLower.includes('limit') || paramNameLower.includes('count'))
+        return 10;
+      if (paramNameLower.includes('page') || paramNameLower.includes('offset'))
+        return 0;
+      if (
+        paramNameLower.includes('chain') ||
+        paramNameLower.includes('network')
+      )
+        return 1; // Ethereum
+      return 0;
+    }
+
+    // String parameters - semantic defaults
+    if (paramType === 'string') {
+      if (
+        paramNameLower.includes('block') &&
+        (paramNameLower.includes('number') || paramNameLower.includes('hash'))
+      ) {
+        return 'latest';
+      }
+      if (
+        paramNameLower.includes('chain_id') ||
+        paramNameLower.includes('chainid')
+      )
+        return '1';
+      if (
+        paramNameLower.includes('cursor') ||
+        paramNameLower.includes('next_page')
+      )
+        return null; // Skip pagination
+      if (
+        paramNameLower.includes('transaction_hash') ||
+        paramNameLower.includes('tx_hash')
+      )
+        return null; // Don't fake hashes
+    }
+
+    // Array parameters
+    if (paramType === 'array') {
+      return [];
+    }
+
+    // Object parameters
+    if (paramType === 'object') {
+      return {};
+    }
+
+    return null;
+  }
+
+  /**
+   * AI-driven parameter generation - completely dynamic and context-aware
+   */
+  private async generateParameterWithAI(
+    paramName: string,
+    paramSchema: any,
+    fullReasoning: string,
+    conversationContext: string,
+    provider: any,
+  ): Promise<any> {
+    const generationPrompt = this.buildParameterGenerationPrompt(
+      paramName,
+      paramSchema,
+      fullReasoning,
+      conversationContext,
+    );
+
+    const response = await provider.generateText({
+      prompt: generationPrompt,
+      maxTokens: 200,
+      temperature: 0.2, // Low temperature for consistent generation
+    });
+
+    return this.parseAIGeneratedParameter(response, paramSchema);
+  }
+
+  /**
+   * Build dynamic parameter generation prompt
+   */
+  private buildParameterGenerationPrompt(
+    paramName: string,
+    paramSchema: any,
+    fullReasoning: string,
+    conversationContext: string,
+  ): string {
+    return `As an AI parameter generator, create an appropriate value for this parameter based on context.
+
+PARAMETER DETAILS:
+- Name: ${paramName}
+- Type: ${paramSchema?.type || 'unknown'}
+- Description: ${paramSchema?.description || 'No description'}
+- Required: ${paramSchema?.required || false}
+
+CONTEXT FROM REASONING: ${fullReasoning.slice(-800)} // Last 800 chars
+
+CONVERSATION CONTEXT: ${conversationContext.slice(-400)} // Last 400 chars
+
+GENERATION RULES:
+1. Extract real values from the context when possible
+2. For addresses: Look for wallet addresses, ENS names, or blockchain addresses in context
+3. For chain_id: Use appropriate chain based on context (1=Ethereum, 137=Polygon, etc.)
+4. For booleans: Use true/false based on parameter meaning and context
+5. For optional parameters: Return null if no clear value can be determined
+6. Never return placeholder values, error messages, or fake data
+
+RESPONSE FORMAT:
+If you can determine a value: "VALUE: [the actual value]"
+If parameter should be skipped: "SKIP: [reason]"
+If you need more context: "CONTEXT_NEEDED: [what's missing]"
+
+Generate the most appropriate value:`;
+  }
+
+  /**
+   * Parse AI-generated parameter response
+   */
+  private parseAIGeneratedParameter(response: string, paramSchema: any): any {
+    const trimmedResponse = response.trim();
+
+    if (trimmedResponse.startsWith('VALUE:')) {
+      const value = trimmedResponse.replace('VALUE:', '').trim();
+      return this.convertValueToParameterType(value, paramSchema);
+    }
+
+    if (
+      trimmedResponse.startsWith('SKIP:') ||
+      trimmedResponse.startsWith('CONTEXT_NEEDED:')
+    ) {
+      return null;
+    }
+
+    // Fallback: try to extract value from response
+    return this.convertValueToParameterType(trimmedResponse, paramSchema);
+  }
+
+  /**
+   * Convert string value to appropriate parameter type
+   */
+  private convertValueToParameterType(value: string, paramSchema: any): any {
+    const paramType = paramSchema?.type || 'string';
+
+    switch (paramType) {
+      case 'boolean':
+        return /^(true|yes|1|on)$/i.test(value);
+      case 'number':
+      case 'integer':
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
+      case 'array':
+        try {
+          return JSON.parse(value);
+        } catch {
+          return null;
+        }
+      case 'object':
+        try {
+          return JSON.parse(value);
+        } catch {
+          return null;
+        }
+      default:
+        return value === 'null' ? null : value;
+    }
+  }
+
+  /**
+   * Fallback parameter generation when AI fails
+   */
+  private generateFallbackParameter(paramName: string, paramSchema: any): any {
+    const paramType = paramSchema?.type || 'string';
+
+    // Return appropriate defaults based on type only
+    switch (paramType) {
+      case 'boolean':
+        return false;
+      case 'number':
+      case 'integer':
+        return 0;
+      case 'array':
+        return [];
+      case 'object':
+        return {};
+      default:
+        return null; // Skip unknown parameters
+    }
   }
 
   /**
@@ -1641,94 +2351,338 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
   }
 
   /**
-   * Validate if a parameter value is appropriate for the parameter
+   * Dynamically validate parameter value using semantic intelligence
    */
   private isValidParameterValue(
     value: string,
     paramName: string,
     paramSchema: any,
+    conversationContext: string = '',
   ): boolean {
     if (!value || value.trim() === '') {
       return false;
     }
 
+    return this.validateParameterSemantics(
+      value,
+      paramName,
+      paramSchema,
+      conversationContext,
+    );
+  }
+
+  /**
+   * Semantic parameter validation - dynamic without heavy AI usage
+   */
+  private validateParameterSemantics(
+    value: string,
+    paramName: string,
+    paramSchema: any,
+    conversationContext: string,
+  ): boolean {
+    const valueStr = String(value).trim();
     const paramNameLower = paramName.toLowerCase();
     const paramType = paramSchema?.type || 'string';
 
-    // Check for invalid patterns that indicate poor extraction - but be more lenient
-    const invalidPatterns = [
-      /^placeholder$/i,
-      /^default_?value$/i,
-      /^test_?value$/i,
-      /^example$/i,
-      /^sample$/i,
-      /^dummy$/i,
-      /^null$/i,
-      /^undefined$/i,
-      /^retrieved_.*$/i, // retrieved_address, retrieved_value, etc.
-      /^\[placeholder\]$/i,
-      /^\{placeholder\}$/i,
-      /^"placeholder"$/i,
-      /^'placeholder'$/i,
-    ];
-
-    for (const pattern of invalidPatterns) {
-      if (pattern.test(value)) {
-        this.logger.log(
-          `Rejected invalid parameter value: ${value} (matches pattern: ${pattern})`,
-        );
-        return false;
-      }
-    }
-
-    // Validate addresses (Ethereum and Sei)
-    if (paramNameLower.includes('address')) {
-      // Ethereum addresses (0x + 40 hex chars)
-      if (/^0x[a-fA-F0-9]{40}$/.test(value)) {
-        return true;
-      }
-      // Sei bech32 addresses (sei1... with length 39-59)
-      if (value.startsWith('sei1') && value.length >= 39 && value.length <= 59) {
-        return true;
-      }
-      // Other valid blockchain address formats can be added here
+    // Dynamic error detection using semantic patterns
+    if (this.isErrorMessage(valueStr)) {
+      this.logger.log(
+        `Rejected error message as parameter: ${paramName}="${valueStr}"`,
+      );
       return false;
     }
 
-    // Validate URLs
-    if (paramNameLower.includes('url') || paramNameLower.includes('link')) {
-      return /^https?:\/\/.+/.test(value);
-    }
-
-    // Validate emails
-    if (paramNameLower.includes('email') || paramNameLower.includes('mail')) {
-      return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$/.test(value);
-    }
-
-    // Validate numbers
-    if (paramType === 'number' || paramType === 'integer') {
-      return !isNaN(parseFloat(value));
-    }
-
-    // Validate booleans
-    if (paramType === 'boolean') {
-      return /^(true|false|yes|no|on|off)$/i.test(value);
-    }
-
-    // For strings, be more lenient - just check basic validity
-    if (paramType === 'string') {
-      return (
-        value.length > 0 &&
-        value.length <= 1000 && // Reasonable length limit
-        !value.includes('undefined') &&
-        !value.includes('null') &&
-        value !== 'placeholder' &&
-        value !== 'default_value' &&
-        value !== 'test_value'
+    // Dynamic placeholder detection
+    if (this.isPlaceholderValue(valueStr)) {
+      this.logger.log(
+        `Rejected placeholder as parameter: ${paramName}="${valueStr}"`,
       );
+      return false;
     }
+
+    // Context-aware semantic validation
+    return this.validateBySemanticType(
+      valueStr,
+      paramNameLower,
+      paramType,
+      conversationContext,
+    );
+  }
+
+  /**
+   * Dynamic error message detection using semantic analysis
+   */
+  private isErrorMessage(value: string): boolean {
+    const errorIndicators = [
+      'error',
+      'failed',
+      'exception',
+      'validation',
+      'pydantic',
+      'http/1.1',
+      'status code',
+      'bad request',
+      'not found',
+      'expired',
+      'invalid',
+      'cannot',
+      'unable',
+      'denied',
+    ];
+
+    const valueLower = value.toLowerCase();
+    return errorIndicators.some(
+      (indicator) =>
+        valueLower.includes(indicator) &&
+        valueLower.length > indicator.length * 3,
+    );
+  }
+
+  /**
+   * Dynamic placeholder detection using semantic analysis
+   */
+  private isPlaceholderValue(value: string): boolean {
+    const placeholderIndicators = [
+      'placeholder',
+      'default_value',
+      'example',
+      'sample',
+      'test_value',
+      'dummy',
+      'mock',
+      'fake',
+      'retrieved_',
+      'generated_',
+    ];
+
+    const valueLower = value.toLowerCase();
+    return placeholderIndicators.some((indicator) =>
+      valueLower.includes(indicator),
+    );
+  }
+
+  /**
+   * Semantic type validation based on parameter context
+   */
+  private validateBySemanticType(
+    value: string,
+    paramNameLower: string,
+    paramType: string,
+    conversationContext: string,
+  ): boolean {
+    // Address validation - dynamic pattern recognition
+    if (
+      paramNameLower.includes('address') ||
+      paramNameLower.includes('wallet')
+    ) {
+      return this.validateAddressSemantics(value, conversationContext);
+    }
+
+    // Chain/Network validation
+    if (
+      paramNameLower.includes('chain') ||
+      paramNameLower.includes('network')
+    ) {
+      return this.validateChainSemantics(value);
+    }
+
+    // Boolean validation
+    if (paramType === 'boolean') {
+      return this.validateBooleanSemantics(value);
+    }
+
+    // Number validation
+    if (paramType === 'number' || paramType === 'integer') {
+      return this.validateNumberSemantics(value);
+    }
+
+    // URL validation
+    if (paramNameLower.includes('url') || paramNameLower.includes('link')) {
+      return this.validateUrlSemantics(value);
+    }
+
+    // Default string validation - be permissive but intelligent
+    return this.validateStringSemantics(
+      value,
+      paramNameLower,
+      conversationContext,
+    );
+  }
+
+  /**
+   * Dynamic address validation using multiple blockchain patterns
+   */
+  private validateAddressSemantics(value: string, context: string): boolean {
+    // Ethereum addresses
+    if (/^0x[a-fA-F0-9]{40}$/.test(value)) return true;
+
+    // Sei addresses
+    if (/^sei1[a-z0-9]{38,58}$/.test(value)) return true;
+
+    // Bitcoin addresses (basic patterns)
+    if (/^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(value)) return true;
+    if (/^bc1[a-z0-9]{39,59}$/.test(value)) return true;
+
+    // Other blockchain patterns can be dynamically added
+    return false;
+  }
+
+  /**
+   * Dynamic chain validation
+   */
+  private validateChainSemantics(value: string): boolean {
+    // Numeric chain IDs
+    if (/^\d+$/.test(value)) return true;
+
+    // Named chains
+    const validChainNames = [
+      'mainnet',
+      'testnet',
+      'sepolia',
+      'goerli',
+      'polygon',
+      'bsc',
+      'arbitrum',
+    ];
+    return validChainNames.includes(value.toLowerCase());
+  }
+
+  /**
+   * Dynamic boolean validation
+   */
+  private validateBooleanSemantics(value: string): boolean {
+    const booleanValues = ['true', 'false', 'yes', 'no', 'on', 'off', '1', '0'];
+    return booleanValues.includes(value.toLowerCase());
+  }
+
+  /**
+   * Dynamic number validation
+   */
+  private validateNumberSemantics(value: string): boolean {
+    return !isNaN(parseFloat(value)) && isFinite(parseFloat(value));
+  }
+
+  /**
+   * Dynamic URL validation
+   */
+  private validateUrlSemantics(value: string): boolean {
+    return /^https?:\/\/.+\..+/.test(value);
+  }
+
+  /**
+   * Dynamic string validation with context awareness
+   */
+  private validateStringSemantics(
+    value: string,
+    paramName: string,
+    context: string,
+  ): boolean {
+    // Length checks
+    if (value.length === 0 || value.length > 5000) return false;
+
+    // Content quality checks
+    if (value === paramName) return false; // Parameter name as value
+    if (/^[^a-zA-Z0-9]*$/.test(value)) return false; // Only special chars
 
     return true;
+  }
+
+  /**
+   * AI-driven parameter validation - completely dynamic
+   */
+  private async validateParameterWithAI(
+    value: string,
+    paramName: string,
+    paramSchema: any,
+    conversationContext: string,
+    provider: any,
+  ): Promise<boolean> {
+    try {
+      const validationPrompt = this.buildParameterValidationPrompt(
+        value,
+        paramName,
+        paramSchema,
+        conversationContext,
+      );
+
+      const response = await provider.generateText({
+        prompt: validationPrompt,
+        maxTokens: 150,
+        temperature: 0.1, // Low temperature for consistent validation
+      });
+
+      // Parse AI response - expect "VALID" or "INVALID" with reasoning
+      const isValid =
+        response.toLowerCase().includes('valid') &&
+        !response.toLowerCase().includes('invalid');
+
+      if (!isValid) {
+        this.logger.log(
+          `AI rejected parameter ${paramName}="${value}": ${response}`,
+        );
+      }
+
+      return isValid;
+    } catch (error) {
+      this.logger.warn(
+        `AI validation failed for ${paramName}, using fallback:`,
+        error,
+      );
+      return this.fallbackParameterValidation(value, paramName, paramSchema);
+    }
+  }
+
+  /**
+   * Build dynamic validation prompt for AI
+   */
+  private buildParameterValidationPrompt(
+    value: string,
+    paramName: string,
+    paramSchema: any,
+    conversationContext: string,
+  ): string {
+    return `As an AI parameter validator, determine if this parameter value is appropriate and valid.
+
+PARAMETER DETAILS:
+- Name: ${paramName}
+- Type: ${paramSchema?.type || 'unknown'}
+- Description: ${paramSchema?.description || 'No description'}
+- Value: "${value}"
+
+CONVERSATION CONTEXT: ${conversationContext.slice(-500)} // Last 500 chars
+
+VALIDATION CRITERIA:
+1. Is this value semantically appropriate for the parameter name?
+2. Does it match the expected data type?
+3. Is it a real, usable value (not an error message, placeholder, or invalid data)?
+4. Does it make sense in the conversation context?
+
+ERROR INDICATORS TO REJECT:
+- Error messages (contains "error", "failed", "exception")
+- Validation errors (contains "validation error", "pydantic")
+- HTTP responses (contains "HTTP/1.1", status codes)
+- Placeholder values ("default_value", "placeholder", "example")
+- Invalid formats for the parameter type
+
+Respond with: "VALID - [brief reason]" or "INVALID - [brief reason]"`;
+  }
+
+  /**
+   * Fallback validation when AI fails
+   */
+  private fallbackParameterValidation(
+    value: string,
+    paramName: string,
+    paramSchema: any,
+  ): boolean {
+    // Basic fallback checks
+    const hasError =
+      /error|failed|exception|validation|pydantic|http\/1\.1/i.test(value);
+    const isPlaceholder =
+      /placeholder|default_value|example|sample|test_value/i.test(value);
+    const isTooLong = value.length > 2000;
+
+    return !hasError && !isPlaceholder && !isTooLong;
   }
 
   /**

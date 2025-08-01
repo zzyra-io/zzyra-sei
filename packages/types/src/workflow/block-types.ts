@@ -16,14 +16,16 @@ export enum BlockType {
   DATA_TRANSFORM = "DATA_TRANSFORM", // Enhanced transformation block
   WALLET_LISTEN = "WALLET_LISTEN",
   AI_AGENT = "AI_AGENT",
-  
+  CALCULATOR = "CALCULATOR",
+  MAGIC_WALLET = "MAGIC_WALLET",
+
   // Sei blockchain blocks
   SEI_WALLET_LISTEN = "SEI_WALLET_LISTEN",
   SEI_CONTRACT_CALL = "SEI_CONTRACT_CALL",
   SEI_DATA_FETCH = "SEI_DATA_FETCH",
   SEI_PAYMENT = "SEI_PAYMENT",
   SEI_NFT = "SEI_NFT",
-  
+
   // Default/unknown
   UNKNOWN = "UNKNOWN",
 }
@@ -45,6 +47,8 @@ export const BLOCK_TYPES = [
   "DATA_TRANSFORM", // Enhanced transformation block
   "WALLET_LISTEN",
   "AI_AGENT",
+  "CALCULATOR",
+  "MAGIC_WALLET",
   "SEI_WALLET_LISTEN",
   "SEI_CONTRACT_CALL",
   "SEI_DATA_FETCH",
