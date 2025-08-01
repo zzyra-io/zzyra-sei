@@ -21,20 +21,19 @@
  */
 
 import { Logger } from '@nestjs/common';
-import { AIAgentHandler } from '../workers/handlers/AIAgentHandler';
-import { LLMProviderManager } from '../workers/handlers/ai-agent/LLMProviderManager';
-import { MCPServerManager } from '../workers/handlers/ai-agent/MCPServerManager';
-import { SecurityValidator } from '../workers/handlers/ai-agent/SecurityValidator';
-import { ReasoningEngine } from '../workers/handlers/ai-agent/ReasoningEngine';
-import { EnhancedReasoningEngine } from '../workers/handlers/ai-agent/EnhancedReasoningEngine';
-import { MCPToolsManager } from '../workers/handlers/ai-agent/MCPToolsManager';
-import { SubscriptionService } from '../workers/handlers/ai-agent/SubscriptionService';
-import { GOATManager } from '../workers/handlers/ai-agent/GOATManager';
-import { GoatPluginManager } from '../workers/handlers/goat/GoatPluginManager';
-import { CacheService } from '../workers/handlers/ai-agent/CacheService';
-import { ToolAnalyticsService } from '../workers/handlers/ai-agent/ToolAnalyticsService';
 import { randomUUID } from 'crypto';
 import * as dotenv from 'dotenv';
+import { AIAgentHandler } from '../workers/handlers/AIAgentHandler';
+import { CacheService } from '../workers/handlers/ai-agent/CacheService';
+
+import { GOATManager } from '../workers/handlers/ai-agent/GOATManager';
+import { LLMProviderManager } from '../workers/handlers/ai-agent/LLMProviderManager';
+import { MCPServerManager } from '../workers/handlers/ai-agent/MCPServerManager';
+import { MCPToolsManager } from '../workers/handlers/ai-agent/MCPToolsManager';
+import { ReasoningEngine } from '../workers/handlers/ai-agent/ReasoningEngine';
+import { SecurityValidator } from '../workers/handlers/ai-agent/SecurityValidator';
+import { ToolAnalyticsService } from '../workers/handlers/ai-agent/ToolAnalyticsService';
+import { GoatPluginManager } from '../workers/handlers/goat/GoatPluginManager';
 dotenv.config();
 console.log('Environment variables loaded:', {
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ? 'SET' : 'NOT SET',
@@ -154,14 +153,12 @@ async function createAIAgentHandler() {
   );
   const mcpServerManager = new MCPServerManager(databaseService, cacheService);
   const securityValidator = new SecurityValidator(databaseService);
-  const subscriptionService = new SubscriptionService();
   const reasoningEngine = new ReasoningEngine(
     databaseService,
-    subscriptionService,
     toolAnalyticsService,
     cacheService,
   );
-  const enhancedReasoningEngine = new EnhancedReasoningEngine();
+
   const mcpToolsManager = new MCPToolsManager(
     databaseService,
     mcpServerManager, // Use the same mcpServerManager instance
@@ -183,7 +180,6 @@ async function createAIAgentHandler() {
       mcpServerManager,
       securityValidator,
       reasoningEngine,
-      enhancedReasoningEngine,
       goatPluginManager,
     ),
     mcpToolsManager,
@@ -396,7 +392,7 @@ const TEST_SCENARIOS = {
   'sei-basic': {
     name: 'SEI Basic Operations',
     prompt:
-      'Check the Sei network information, get my wallet address and SEI balance, and show me the latest block information.',
+      'Check the Sei network information, get my wallet address and SEI balance, and show me the latest block information and give me the output in html format.',
     tools: [
       {
         id: 'sei',
@@ -439,7 +435,7 @@ const TEST_SCENARIOS = {
         config: {
           WALLET_MODE: 'private-key',
           PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
-          SEI_NETWORK: 'mainnet',
+          SEI_NETWORK: 'testnet',
         },
       },
     ],
@@ -538,6 +534,90 @@ const TEST_SCENARIOS = {
       },
     ],
   },
+  'sei-real-world': {
+    name: 'SEI Real-World DeFi Scenario',
+    prompt: `You are a DeFi analyst helping a user with their SEI portfolio. Perform a comprehensive analysis:
+
+1. **Wallet Analysis**: Get my wallet address and check my native SEI balance
+2. **Token Portfolio**: Check my USDC balance (contract: 0x3894085ef7ff0f0aedf52e2a2704928d1ec074f1) and any other ERC20 tokens
+3. **Network Health**: Get current chain information, latest block details, and network statistics
+4. **Market Research**: Search for current SEI token price, market cap, and recent news
+5. **DeFi Opportunities**: Search for active DeFi protocols on SEI network and yield farming opportunities
+6. **Transaction History**: Get my recent transactions and analyze spending patterns
+7. **Risk Assessment**: Based on current market conditions and my portfolio, provide investment recommendations
+
+Format the response as a professional DeFi portfolio report with:
+- Executive Summary
+- Portfolio Overview
+- Market Analysis
+- Risk Assessment
+- Recommendations
+
+Include specific data points, current prices, and actionable insights.`,
+    tools: [
+      {
+        id: 'sei',
+        name: 'SEI Network Operations',
+        type: 'mcp',
+        config: {
+          WALLET_MODE: 'private-key',
+          PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
+          SEI_NETWORK: 'testnet',
+          SEI_TESTNET_RPC:
+            'https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32',
+          SEI_TESTNET_NETWORK: 'atlantic-2',
+          SEI_TESTNET_EXPLORER_URL: 'https://testnet.seistream.app',
+          SEI_TESTNET_NAME: 'Sei Atlantic-2 Testnet',
+        },
+      },
+      {
+        id: 'brave-search',
+        name: 'Market Research & News',
+        type: 'mcp',
+        config: {
+          apiKey: process.env.BRAVE_API_KEY || 'demo-key',
+        },
+      },
+    ],
+  },
+  'sei-all-tools': {
+    name: 'SEI All Tools Demonstration',
+    prompt: `Demonstrate all available SEI blockchain tools and capabilities. Perform the following operations:
+
+1. **Network Information**: Get chain information and supported networks
+2. **Wallet Operations**: Get my wallet address and native SEI balance
+3. **Token Analysis**: Check my USDC token balance and verify the contract address
+4. **Blockchain Data**: Get the latest block details and a specific block by number
+5. **Transaction Analysis**: Get recent transaction information and receipts
+6. **Gas Estimation**: Estimate gas costs for a simple SEI transfer
+7. **Contract Interaction**: Read contract data and verify contract addresses
+8. **Portfolio Summary**: Provide a comprehensive overview of my SEI holdings
+
+For each operation, explain what tool was used and what the results mean. Format the response as a technical demonstration report with:
+- Tool Usage Summary
+- Data Analysis
+- Technical Insights
+- Recommendations for Further Analysis
+
+Include specific blockchain data, transaction hashes, and technical details.`,
+    tools: [
+      {
+        id: 'sei',
+        name: 'SEI Network Operations',
+        type: 'mcp',
+        config: {
+          WALLET_MODE: 'private-key',
+          PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
+          SEI_NETWORK: 'testnet',
+          SEI_TESTNET_RPC:
+            'https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32',
+          SEI_TESTNET_NETWORK: 'atlantic-2',
+          SEI_TESTNET_EXPLORER_URL: 'https://testnet.seistream.app',
+          SEI_TESTNET_NAME: 'Sei Atlantic-2 Testnet',
+        },
+      },
+    ],
+  },
 };
 
 async function runCompleteSystemTest() {
@@ -554,14 +634,6 @@ async function runCompleteSystemTest() {
     );
     process.exit(1);
   }
-
-  logger.log(`🚀 Starting Enhanced AI Agent System Test: ${scenario.name}`);
-  logger.log(
-    `🧠 Enhanced Features: Automatic Sequential Thinking + Intelligent Tool Analysis`,
-  );
-  logger.log(
-    `🔄 Behind-the-scenes improvements: Better reasoning, smarter tool selection\n`,
-  );
 
   // Check for API key
   if (
@@ -582,31 +654,17 @@ async function runCompleteSystemTest() {
       '❌ SEI blockchain tests require EVM_WALLET_PRIVATE_KEY environment variable',
     );
     logger.error('   Please set EVM_WALLET_PRIVATE_KEY=your_private_key');
-    logger.error(
-      '   Example: EVM_WALLET_PRIVATE_KEY=0x... ts-node src/scripts/simple-ai-agent.ts sei-basic',
-    );
     process.exit(1);
   }
 
   try {
     // Create AI Agent system components
-    logger.log('📦 Creating AI Agent system...');
     const aiSystem = await createAIAgentHandler();
 
     // Test MCP Tools Manager if MCP tools are requested
     if (scenario.tools.some((t) => t.type === 'mcp')) {
-      logger.log('🔧 Testing MCP Tools Manager...');
-      const availableServers = aiSystem.mcpToolsManager.getServersByCategory();
-      logger.log(
-        `   Found ${Object.keys(availableServers).length} MCP server categories`,
-      );
-
-      // Test real MCP server connections
       for (const tool of scenario.tools.filter((t) => t.type === 'mcp')) {
-        logger.log(`   Testing MCP server: ${tool.name} (${tool.id})`);
-
         try {
-          // Fix filesystem server configuration
           let config = tool.config;
           if (tool.id === 'filesystem') {
             config = {
@@ -616,88 +674,36 @@ async function runCompleteSystemTest() {
             };
           }
 
-          const tools = await aiSystem.mcpToolsManager.connectAndDiscoverTools(
+          await aiSystem.mcpToolsManager.connectAndDiscoverTools(
             tool.id,
             config,
-            'demo-user', // Pass the correct user ID
+            'demo-user',
           );
-          logger.log(
-            `   ✅ Successfully discovered ${tools.length} tools from ${tool.name}`,
-          );
-
-          // Log discovered tools
-          tools.forEach((tool) => {
-            logger.log(`     - ${tool.name}: ${tool.description}`);
-          });
         } catch (error) {
-          logger.warn(
-            `   ⚠️  MCP server ${tool.name} connection failed: ${error}`,
-          );
-          logger.log(`   💡 To test with real MCP servers:`);
-          if (tool.id === 'filesystem') {
-            logger.log(
-              `      npm install -g @modelcontextprotocol/server-filesystem`,
-            );
-            logger.log(
-              `      npx @modelcontextprotocol/server-filesystem ${process.cwd()}`,
-            );
-          } else if (tool.id === 'brave-search') {
-            logger.log(
-              `      npm install -g @modelcontextprotocol/server-brave-search`,
-            );
-            logger.log(
-              `      BRAVE_API_KEY=your_key npx @modelcontextprotocol/server-brave-search`,
-            );
-          } else {
-            logger.log(
-              `      npm install -g @modelcontextprotocol/server-${tool.id}`,
-            );
-            logger.log(`      npx @modelcontextprotocol/server-${tool.id}`);
-          }
+          // Silently continue if MCP server not available
         }
       }
     }
 
     // Test GOAT Manager if blockchain tools are requested
     if (scenario.tools.some((t) => t.type === 'goat')) {
-      logger.log('⛓️  Testing GOAT SDK Manager...');
-      const availableTools = await aiSystem.goatManager.getAvailableTools();
-      logger.log(`   Found ${availableTools.length} GOAT SDK tools`);
+      await aiSystem.goatManager.getAvailableTools();
     }
 
     // Test LLM Provider
-    logger.log('🧠 Testing LLM Provider...');
     const providerType = process.env.OPENROUTER_API_KEY
       ? 'openrouter'
       : process.env.OPENAI_API_KEY
         ? 'openai'
         : 'anthropic';
+
     try {
-      const provider = await aiSystem.llmProviderManager.getProvider(
-        providerType,
-        {
-          type: providerType,
-          model: 'test-model',
-        },
-      );
-      logger.log(`   LLM Provider (${providerType}) initialized successfully`);
+      await aiSystem.llmProviderManager.getProvider(providerType, {
+        type: providerType,
+        model: 'test-model',
+      });
     } catch (error) {
-      logger.warn(`   LLM Provider test skipped: ${error}`);
-    }
-
-    logger.log(`💭 Test prompt: ${scenario.prompt}\n`);
-
-    // Derive wallet address for AI context
-    let userWalletAddress = 'Not provided';
-    if (process.env.EVM_WALLET_PRIVATE_KEY) {
-      try {
-        const { privateKeyToAccount } = require('viem/accounts');
-        userWalletAddress = privateKeyToAccount(
-          process.env.EVM_WALLET_PRIVATE_KEY as `0x${string}`,
-        ).address;
-      } catch (error) {
-        userWalletAddress = 'Unable to derive address';
-      }
+      // Continue if LLM provider test fails
     }
 
     // Create comprehensive AI Agent node configuration
@@ -724,7 +730,7 @@ async function runCompleteSystemTest() {
         selectedTools: scenario.tools,
         execution: {
           mode: 'autonomous',
-          timeout: 120000, // 2 minutes for complex operations
+          timeout: 120000,
           requireApproval: false,
           saveThinking: true,
         },
@@ -739,155 +745,31 @@ async function runCompleteSystemTest() {
     );
 
     // Execute AI Agent
-    logger.log('🤖 Executing AI Agent with full system integration...\n');
-    const startTime = Date.now();
-
     const result = await aiSystem.handler.execute(
       aiAgentNode,
       executionContext,
     );
 
-    const executionTime = Date.now() - startTime;
-    logger.log(`\n✅ Execution completed in ${executionTime}ms\n`);
-
-    // Display comprehensive results
-    console.log('='.repeat(100));
-    console.log(
-      `📊 COMPLETE SYSTEM TEST RESULTS - ${scenario.name.toUpperCase()}`,
-    );
-    console.log('='.repeat(100));
-
+    // Display only the AI response
     if (result.success) {
-      console.log('\n📝 AI Response:');
-      console.log('-'.repeat(80));
+      console.log('\n🤖 AI AGENT RESPONSE:');
+      console.log('='.repeat(80));
       console.log(result.result);
-      console.log('-'.repeat(80));
-
-      if (result.thinkingSteps && result.thinkingSteps.length > 0) {
-        console.log('\n🧠 Enhanced Sequential Thinking Process:');
-        result.thinkingSteps.forEach((step: any, index: number) => {
-          console.log(
-            `\n${index + 1}. ${step.type?.toUpperCase() || 'THINKING_STEP'}`,
-          );
-          if (step.reasoning) {
-            console.log(
-              `   Reasoning: ${step.reasoning.substring(0, 200)}${step.reasoning.length > 200 ? '...' : ''}`,
-            );
-          }
-          if (step.confidence) {
-            console.log(`   Confidence: ${Math.round(step.confidence * 100)}%`);
-          }
-          if (step.recommendations && step.recommendations.length > 0) {
-            console.log(
-              `   Recommendations: ${step.recommendations.slice(0, 2).join(', ')}`,
-            );
-          }
-          if (step.timestamp) {
-            console.log(
-              `   Time: ${new Date(step.timestamp).toLocaleTimeString()}`,
-            );
-          }
-        });
-      }
-
-      if (result.sequentialAnalysis) {
-        console.log('\n📊 Sequential Analysis Summary:');
-        console.log(
-          `   Final Confidence: ${Math.round((result.sequentialAnalysis.confidence || 0.7) * 100)}%`,
-        );
-        console.log(`   Reasoning Steps: ${result.thinkingSteps?.length || 0}`);
-        if (result.sequentialAnalysis.reasoning) {
-          console.log(
-            `   Key Insights: ${result.sequentialAnalysis.reasoning.substring(0, 150)}...`,
-          );
-        }
-      }
+      console.log('='.repeat(80));
 
       if (result.toolCalls && result.toolCalls.length > 0) {
-        console.log('\n🔧 Tool Executions:');
+        console.log('\n🔧 TOOLS USED:');
         result.toolCalls.forEach((call: any, index: number) => {
-          console.log(`\n${index + 1}. ${call.name || 'Unknown Tool'}`);
-          console.log(
-            `   Parameters: ${JSON.stringify(call.parameters || {}, null, 2)}`,
-          );
-          if (call.result) {
-            console.log(`   Result: ${JSON.stringify(call.result, null, 2)}`);
-          }
-          if (call.error) {
-            console.log(`   Error: ${call.error}`);
-          }
+          console.log(`${index + 1}. ${call.name || 'Unknown Tool'}`);
         });
       }
-
-      console.log(`\n📈 Enhanced System Performance:`);
-      console.log(`   Total Execution Time: ${executionTime}ms`);
-      console.log(
-        `   Sequential Thinking Steps: ${result.thinkingSteps?.length || 0}`,
-      );
-      console.log(`   Tool Calls Made: ${result.toolCalls?.length || 0}`);
-      console.log(`   Tools Configured: ${scenario.tools.length}`);
-      console.log(`   LLM Provider: ${providerType}`);
-      console.log(`   Session ID: ${result.sessionId}`);
-      console.log(
-        `   Enhanced Features: ✅ Sequential Thinking, ✅ Intelligent Analysis`,
-      );
-
-      // Test Summary
-      console.log('\n🎯 Enhanced Test Summary:');
-      console.log(`   ✅ AI Agent Handler: Working (Enhanced)`);
-      console.log(`   ✅ Sequential Thinking Engine: Working (NEW)`);
-      console.log(`   ✅ Intelligent Tool Analysis: Working (NEW)`);
-      console.log(`   ✅ LLM Integration: Working`);
-      console.log(`   ✅ Security Validation: Working`);
-      console.log(`   ✅ Database Persistence: Working`);
-      if (scenario.tools.some((t) => t.type === 'mcp')) {
-        console.log(
-          `   🔧 MCP Tools: Configured (${scenario.tools.filter((t) => t.type === 'mcp').length} servers)`,
-        );
-      }
-      if (scenario.tools.some((t) => t.type === 'goat')) {
-        console.log(
-          `   ⛓️  GOAT SDK: Configured (${scenario.tools.filter((t) => t.type === 'goat').length} tools)`,
-        );
-      }
     } else {
-      console.log('\n❌ Execution Failed:');
-      console.log(`   Error: ${result.error}`);
-      console.log(`   Node ID: ${result.nodeId}`);
-      console.log(`   Execution Time: ${executionTime}ms`);
-
-      if (result.error?.includes('Security violations')) {
-        console.log('\n🔒 Security Event Detected:');
-        console.log(
-          '   The AI Agent security system correctly blocked potentially harmful content.',
-        );
-        console.log(
-          '   This demonstrates the security validation is working properly.',
-        );
-      }
-
-      // Failure analysis
-      console.log('\n🔍 Failure Analysis:');
-      console.log(`   ✅ AI Agent Handler: Loaded`);
-      console.log(`   ✅ System Components: Initialized`);
-      console.log(`   ❌ Execution: Failed at runtime`);
+      console.log('\n❌ EXECUTION FAILED:');
+      console.log(result.error);
     }
-
-    console.log('\n' + '='.repeat(100));
   } catch (error) {
-    logger.error('\n💥 System Test Failed:');
-    logger.error(error instanceof Error ? error.message : String(error));
-
-    if (error instanceof Error && error.stack) {
-      logger.error('\nDetailed Stack Trace:');
-      logger.error(error.stack);
-    }
-
-    // Component status check
-    console.log('\n🔍 Component Status Check:');
-    console.log('   ❌ System failed during initialization or execution');
-    console.log('   📝 Check the error details above for specific issues');
-
+    console.log('\n💥 SYSTEM ERROR:');
+    console.log(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
@@ -915,6 +797,8 @@ Test Types:
   sei-read-only        - SEI read-only mode (no wallet required)
   sei-atlantic-testnet - SEI Atlantic-2 testnet with custom QuickNode RPC
   sei-comprehensive    - SEI comprehensive test (all operations)
+  sei-real-world       - SEI real-world DeFi portfolio analysis
+  sei-all-tools        - SEI all tools demonstration (technical showcase)
 
 Examples:
   ts-node src/scripts/simple-ai-agent.ts
@@ -922,6 +806,8 @@ Examples:
   ts-node src/scripts/simple-ai-agent.ts goat-test
   ts-node src/scripts/simple-ai-agent.ts sei-basic
   ts-node src/scripts/simple-ai-agent.ts sei-comprehensive
+  ts-node src/scripts/simple-ai-agent.ts sei-real-world
+  ts-node src/scripts/simple-ai-agent.ts sei-all-tools
 
 Environment Variables:
   OPENROUTER_API_KEY - OpenRouter API key (recommended)
@@ -960,4 +846,4 @@ if (require.main === module) {
     });
 }
 
-export { runCompleteSystemTest, createAIAgentHandler };
+export { createAIAgentHandler, runCompleteSystemTest };

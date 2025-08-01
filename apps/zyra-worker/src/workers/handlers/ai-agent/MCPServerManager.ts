@@ -241,6 +241,7 @@ export class MCPServerManager {
       const connectedServers = Array.from(this.servers.values()).filter(
         (server) => server.userId === userId && server.status === 'connected',
       );
+
       this.logger.log(
         `Found ${connectedServers.length} connected servers in memory for user ${userId}`,
       );
@@ -257,6 +258,14 @@ export class MCPServerManager {
       this.logger.error(`Failed to get user servers for ${userId}:`, error);
       return [];
     }
+  }
+
+  /**
+   * Clear the MCP server cache to force restart
+   */
+  clearCache(): void {
+    this.logger.log('Clearing MCP server cache...');
+    this.servers.clear();
   }
 
   async healthCheck(serverId: string): Promise<boolean> {
@@ -324,6 +333,15 @@ export class MCPServerManager {
         this.logger.log(`Command: ${config.command}`);
         this.logger.log(`Args: ${JSON.stringify(config.args)}`);
         this.logger.log(`Config env keys: ${Object.keys(config.env || {})}`);
+        this.logger.log(
+          `SEI_TESTNET_RPC in config.env: ${config.env?.SEI_TESTNET_RPC || 'NOT SET'}`,
+        );
+        this.logger.log(
+          `SEI_TESTNET_RPC in process.env: ${process.env.SEI_TESTNET_RPC || 'NOT SET'}`,
+        );
+        this.logger.log(
+          `SEI_TESTNET_RPC in envConfig: ${envConfig.SEI_TESTNET_RPC || 'NOT SET'}`,
+        );
         this.logger.log(
           `PRIVATE_KEY present in config: ${!!config.env?.PRIVATE_KEY}`,
         );

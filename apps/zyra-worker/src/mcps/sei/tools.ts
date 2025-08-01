@@ -122,17 +122,28 @@ function registerReadOnlyTools(server: McpServer) {
   // Get block by number
   server.tool(
     'get_block_by_number',
-    'Get a block by its block number',
+    'Get a block by its block number (if no blockNumber provided, gets the latest block)',
     {
-      blockNumber: z.number().describe('The block number to fetch'),
+      blockNumber: z
+        .number()
+        .optional()
+        .describe(
+          'The block number to fetch. If not provided, gets the latest block.',
+        ),
       network: z
         .string()
         .optional()
-        .describe('Network name or chain ID. Defaults to Sei mainnet.'),
+        .describe('Network name or chain ID. Defaults to Sei testnet.'),
     },
     async ({ blockNumber, network = DEFAULT_NETWORK }) => {
       try {
-        const block = await services.getBlockByNumber(blockNumber, network);
+        let block;
+        if (blockNumber !== undefined) {
+          block = await services.getBlockByNumber(blockNumber, network);
+        } else {
+          // If no block number provided, get the latest block
+          block = await services.getLatestBlock(network);
+        }
 
         return {
           content: [
@@ -147,7 +158,7 @@ function registerReadOnlyTools(server: McpServer) {
           content: [
             {
               type: 'text',
-              text: `Error fetching block ${blockNumber}: ${error instanceof Error ? error.message : String(error)}`,
+              text: `Error fetching block: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,
@@ -164,7 +175,7 @@ function registerReadOnlyTools(server: McpServer) {
       network: z
         .string()
         .optional()
-        .describe('Network name or chain ID. Defaults to Sei mainnet.'),
+        .describe('Network name or chain ID. Defaults to Sei testnet.'),
     },
     async ({ network = DEFAULT_NETWORK }) => {
       try {
@@ -208,7 +219,7 @@ function registerReadOnlyTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei testnet.",
         ),
     },
     async ({ address, network = DEFAULT_NETWORK }) => {
@@ -256,7 +267,7 @@ function registerReadOnlyTools(server: McpServer) {
       network: z
         .string()
         .optional()
-        .describe('Network name or chain ID. Defaults to Sei mainnet.'),
+        .describe('Network name or chain ID. Defaults to Sei testnet.'),
     },
     async ({ address, tokenAddress, network = DEFAULT_NETWORK }) => {
       try {

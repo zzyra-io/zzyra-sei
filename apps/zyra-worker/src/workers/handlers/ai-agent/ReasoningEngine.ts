@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../../services/database.service';
-import { SubscriptionService } from './SubscriptionService';
 import { ToolAnalyticsService } from './ToolAnalyticsService';
 import { CacheService } from './CacheService';
 import { createWalletClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 interface ThinkingStep {
   step: number;
@@ -19,9 +20,39 @@ interface ThinkingStep {
   toolsConsidered?: string[];
   decision?: string;
   timestamp: string;
+  recommendations?: string[];
 }
 
-interface ReasoningParams {
+interface SequentialThinkingRequest {
+  thought: string;
+  nextThoughtNeeded: boolean;
+  thoughtNumber: number;
+  totalThoughts: number;
+  isRevision?: boolean;
+  revisesThought?: number;
+  branchFromThought?: number;
+  branchId?: string;
+  needsMoreThoughts?: boolean;
+}
+
+interface SequentialThinkingResponse {
+  content: Array<{
+    type: 'text';
+    text: string;
+  }>;
+}
+
+interface SequentialThinkingResult {
+  thought: string;
+  thoughtNumber: number;
+  totalThoughts: number;
+  nextThoughtNeeded: boolean;
+  reasoning: string;
+  confidence?: number;
+  recommendations?: string[];
+}
+
+export interface ReasoningParams {
   prompt: string;
   systemPrompt: string;
   provider: any;
@@ -44,10 +75,14 @@ interface ReasoningResult {
 @Injectable()
 export class ReasoningEngine {
   private readonly logger = new Logger(ReasoningEngine.name);
+  private sequentialThinkingClient: Client | null = null;
+  private isSequentialThinkingReady = false;
+  private maxThoughts = 10;
+  private thinkingHistory: SequentialThinkingResult[] = [];
+  private provider: any = null; // AI provider for semantic understanding
 
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly subscriptionService: SubscriptionService,
     private readonly toolAnalyticsService: ToolAnalyticsService,
     private readonly cacheService: CacheService,
   ) {}
@@ -83,132 +118,22 @@ export class ReasoningEngine {
     // Sanitize user prompt to prevent injection
     params.prompt = this.sanitizePrompt(params.prompt);
 
-    // Set safe defaults
-    params.thinkingMode = params.thinkingMode || 'fast';
+    // Set safe defaults - always use thinking mode
+    params.thinkingMode = params.thinkingMode || 'deliberate';
     params.maxSteps = Math.min(params.maxSteps || 10, 50); // Cap at 50 steps
     params.tools = Array.isArray(params.tools) ? params.tools.slice(0, 20) : []; // Limit tools
 
     try {
-      // Check subscription for advanced thinking modes with timeout
-      if (params.userId && params.thinkingMode !== 'fast') {
-        try {
-          const canUseAdvanced = await Promise.race([
-            this.subscriptionService.canUseAdvancedThinking(params.userId),
-            new Promise<boolean>((_, reject) =>
-              setTimeout(
-                () => reject(new Error('Subscription check timeout')),
-                5000,
-              ),
-            ),
-          ]);
-
-          if (!canUseAdvanced) {
-            this.logger.warn(
-              `User ${params.userId} attempted to use ${params.thinkingMode} thinking without subscription`,
-            );
-            params.thinkingMode = 'fast'; // Fallback to fast thinking
-          }
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          this.logger.error(`Subscription check failed: ${errorMessage}`);
-          params.thinkingMode = 'fast'; // Safe fallback
-        }
+      // Initialize Sequential Thinking MCP if not ready
+      if (!this.isSequentialThinkingReady) {
+        await this.initializeSequentialThinkingMCP();
       }
 
-      // Step 1: Planning (always generate for debugging)
-      const planningStep = await this.planExecution(params, currentStep++);
-      steps.push(planningStep);
-
-      // Step 2: Initial reasoning step
-      const reasoningStep: ThinkingStep = {
-        step: currentStep++,
-        type: 'reasoning',
-        reasoning: `Analyzing user request: "${params.prompt.substring(0, 100)}..." with ${params.tools.length} available tools.`,
-        confidence: 0.8,
-        timestamp: new Date().toISOString(),
-      };
-      steps.push(reasoningStep);
-
-      // Step 3: Tool Selection
-      if (params.tools.length > 0) {
-        const toolSelectionStep = await this.selectTools(params, currentStep++);
-        steps.push(toolSelectionStep);
-      }
-
-      // Step 4: Execute with provider
-      const executionResult = await this.executeWithProvider(params, steps);
-
-      // Extract tool calls from execution
-      if (executionResult.toolCalls) {
-        toolCalls.push(...executionResult.toolCalls);
-      }
-
-      // Step 5: Post-execution analysis (always add for debugging)
-      const postExecutionStep: ThinkingStep = {
-        step: currentStep++,
-        type: 'execution',
-        reasoning: `Execution completed. Generated response with ${toolCalls.length} tool calls. Result confidence: ${this.calculateOverallConfidence([...steps])}`,
-        confidence: 0.9,
-        timestamp: new Date().toISOString(),
-      };
-      steps.push(postExecutionStep);
-
-      // Step 6: Reflection (if deliberate mode and user has access)
-      if (params.thinkingMode === 'deliberate' && params.userId) {
-        try {
-          const canUseDeliberate =
-            await this.subscriptionService.canUseDeliberateThinking(
-              params.userId,
-            );
-          if (canUseDeliberate) {
-            const reflectionStep = await this.reflect(
-              executionResult,
-              currentStep++,
-            );
-            steps.push(reflectionStep);
-          } else {
-            this.logger.warn(
-              `User ${params.userId} attempted deliberate thinking without subscription`,
-            );
-          }
-        } catch (error) {
-          this.logger.warn(
-            'Failed to check deliberate thinking subscription, skipping reflection',
-          );
-        }
-      }
-
-      // Save thinking process
-      await this.saveThinkingProcess(params.sessionId, steps);
-
-      // **CACHE OPTIMIZATION**: Cache the complete reasoning session
-      if (steps.length > 0) {
-        try {
-          const completeCacheKey = {
-            prompt: params.prompt,
-            systemPrompt: params.systemPrompt,
-            provider: params.provider.constructor.name || 'unknown',
-            model: params.provider.modelName || 'unknown',
-            thinkingMode: params.thinkingMode,
-          };
-          await this.cacheService.cacheReasoningSteps(completeCacheKey, steps);
-          this.logger.debug('Cached complete reasoning session');
-        } catch (cacheError) {
-          this.logger.warn('Failed to cache reasoning session:', cacheError);
-        }
-      }
-
-      return {
-        text:
-          executionResult.text ||
-          executionResult.content ||
-          'No response generated',
-        steps,
-        toolCalls,
-        confidence: this.calculateOverallConfidence(steps),
-        executionPath: steps.map((s) => s.type),
-      };
+      // Use Sequential Thinking MCP for enhanced reasoning
+      this.logger.log(
+        '[ReasoningEngine] Using Sequential Thinking MCP for enhanced reasoning',
+      );
+      return await this.executeWithSequentialThinkingMCP(params);
     } catch (error) {
       this.logger.error('Reasoning engine execution failed:', error);
 
@@ -248,188 +173,6 @@ export class ReasoningEngine {
     }
   }
 
-  private async planExecution(
-    params: ReasoningParams,
-    stepNumber: number,
-  ): Promise<ThinkingStep> {
-    // **CACHE OPTIMIZATION**: Check for cached planning results
-    const planningCacheKey = {
-      prompt: params.prompt,
-      systemPrompt: params.systemPrompt,
-      provider: params.provider.constructor.name || 'unknown',
-      model: params.provider.modelName || 'unknown',
-      thinkingMode: params.thinkingMode,
-    };
-
-    // Try to get cached planning result
-    const cachedPlanning =
-      await this.cacheService.getCachedReasoningSteps(planningCacheKey);
-    if (cachedPlanning && cachedPlanning.length > 0) {
-      const cachedStep = cachedPlanning.find(
-        (step) => step.type === 'planning',
-      );
-      if (cachedStep) {
-        this.logger.debug('Using cached planning result');
-        return {
-          ...cachedStep,
-          step: stepNumber,
-          timestamp: new Date().toISOString(),
-        };
-      }
-    }
-
-    const planningPrompt = this.buildPlanningPrompt(params);
-
-    try {
-      const planningResult = await params.provider.generateText({
-        prompt: planningPrompt,
-        systemPrompt:
-          'You are a planning assistant. Create a step-by-step plan.',
-        temperature: 0.3,
-        maxTokens: 500,
-      });
-
-      const plan = planningResult.text || planningResult.content;
-      const confidence = this.assessPlanConfidence(plan);
-
-      const planningStep = {
-        step: stepNumber,
-        type: 'planning' as const,
-        reasoning: plan,
-        confidence,
-        timestamp: new Date().toISOString(),
-      };
-
-      // **CACHE OPTIMIZATION**: Cache the planning result
-      try {
-        await this.cacheService.cacheReasoningSteps(planningCacheKey, [
-          planningStep,
-        ]);
-        this.logger.debug('Cached planning result for future use');
-      } catch (cacheError) {
-        this.logger.warn('Failed to cache planning result:', cacheError);
-      }
-
-      return planningStep;
-    } catch (error) {
-      this.logger.warn('Planning step failed, using fallback:', error);
-
-      return {
-        step: stepNumber,
-        type: 'planning',
-        reasoning: 'Using direct execution approach due to planning failure.',
-        confidence: 0.5,
-        timestamp: new Date().toISOString(),
-      };
-    }
-  }
-
-  private async selectTools(
-    params: ReasoningParams,
-    stepNumber: number,
-  ): Promise<ThinkingStep> {
-    this.logger.log(
-      `Selecting tools from ${params.tools.length} available tools`,
-    );
-    this.logger.log(
-      `Available tools: ${params.tools.map((t) => t.name).join(', ')}`,
-    );
-
-    // **CACHE OPTIMIZATION**: Create cache key for tool selection
-    const toolSelectionCacheKey = {
-      prompt: params.prompt,
-      systemPrompt: params.systemPrompt,
-      provider: params.provider.constructor.name || 'unknown',
-      model: params.provider.modelName || 'unknown',
-      thinkingMode:
-        params.thinkingMode +
-        '_tools_' +
-        params.tools
-          .map((t) => t.id)
-          .sort()
-          .join(','),
-    };
-
-    // Try to get cached tool selection result
-    const cachedToolSelection = await this.cacheService.getCachedReasoningSteps(
-      toolSelectionCacheKey,
-    );
-    if (cachedToolSelection && cachedToolSelection.length > 0) {
-      const cachedStep = cachedToolSelection.find(
-        (step) => step.type === 'tool_selection',
-      );
-      if (cachedStep) {
-        this.logger.debug('Using cached tool selection result');
-        return {
-          ...cachedStep,
-          step: stepNumber,
-          timestamp: new Date().toISOString(),
-        };
-      }
-    }
-
-    const availableTools = params.tools.map((tool) => ({
-      id: tool.id,
-      name: tool.id, // Use id as name since we're using simple names
-      description: tool.description,
-    }));
-
-    const toolSelectionPrompt = this.buildToolSelectionPrompt(
-      params.prompt,
-      availableTools,
-    );
-
-    try {
-      const selectionResult = await params.provider.generateText({
-        prompt: toolSelectionPrompt,
-        systemPrompt:
-          'You are a tool selection assistant. Choose the most appropriate tools.',
-        temperature: 0.2,
-        maxTokens: 300,
-      });
-
-      const reasoning = selectionResult.text || selectionResult.content;
-      const selectedTools = this.extractSelectedTools(
-        reasoning,
-        availableTools,
-      );
-
-      const toolSelectionStep = {
-        step: stepNumber,
-        type: 'tool_selection' as const,
-        reasoning,
-        confidence: selectedTools.length > 0 ? 0.8 : 0.3,
-        toolsConsidered: availableTools.map((t) => t.name),
-        decision: `Selected tools: ${selectedTools.join(', ')}`,
-        timestamp: new Date().toISOString(),
-      };
-
-      // **CACHE OPTIMIZATION**: Cache the tool selection result
-      try {
-        await this.cacheService.cacheReasoningSteps(toolSelectionCacheKey, [
-          toolSelectionStep,
-        ]);
-        this.logger.debug('Cached tool selection result for future use');
-      } catch (cacheError) {
-        this.logger.warn('Failed to cache tool selection result:', cacheError);
-      }
-
-      return toolSelectionStep;
-    } catch (error) {
-      this.logger.warn('Tool selection failed:', error);
-
-      return {
-        step: stepNumber,
-        type: 'tool_selection',
-        reasoning:
-          'Tool selection failed, proceeding with all available tools.',
-        confidence: 0.4,
-        toolsConsidered: availableTools.map((t) => t.name),
-        timestamp: new Date().toISOString(),
-      };
-    }
-  }
-
   private async executeWithProvider(
     params: ReasoningParams,
     previousSteps: ThinkingStep[],
@@ -450,7 +193,7 @@ export class ReasoningEngine {
       (step) => step.type === 'tool_selection',
     );
     if (toolSelectionStep && toolSelectionStep.decision) {
-      const selectedTools = this.extractSelectedTools(
+      const selectedTools = await this.extractSelectedTools(
         toolSelectionStep.reasoning,
         params.tools,
       );
@@ -1371,111 +1114,6 @@ Tool Execution Results:`;
     }
   }
 
-  private buildPlanningPrompt(params: ReasoningParams): string {
-    const availableTools = params.tools.map((t) => t.name).join(', ');
-
-    return `
-      Create a step-by-step plan to address this request: "${params.prompt}"
-      
-      Available tools: ${availableTools}
-      Thinking mode: ${params.thinkingMode}
-      
-      Provide a clear, numbered plan with 3-5 steps.
-    `;
-  }
-
-  private buildToolSelectionPrompt(prompt: string, tools: any[]): string {
-    const toolsList = tools
-      .map((t) => `- ${t.name}: ${t.description}`)
-      .join('\n');
-
-    return `
-     ## Role
-You are an expert tool selector and parameter specialist with deep knowledge across multiple domains including blockchain operations, data analysis, content creation, web development, file management, API integrations, database operations, machine learning, automation, and various other technical and non-technical fields. You possess exceptional analytical skills for matching user requests to appropriate tools, with expertise in interpreting requirements and translating them into precise tool selections with accurate parameters.
-
-## Task
-Analyze incoming user requests and select the most appropriate tools from the available toolkit to fulfill each request. You must identify the exact tools needed and specify any required parameters based on the user's specific requirements across any domain or field of operation. For this request: "${prompt}"
-
-## Context
-This tool selection process is critical for enabling users to interact with various systems effectively across all domains, not limited to blockchain operations. Your selections directly impact the user's ability to perform operations in any field including but not limited to finance, content creation, data processing, web services, file operations, and countless other applications. Accurate tool selection with proper parameters ensures seamless interactions and prevents failed operations that could result in lost time, missed opportunities, or user frustration.
-
-## Instructions
-
-### Primary Analysis Process
-1. **Request Parsing**: Read the user request word by word to identify the specific operation they want to perform in any domain
-2. **Tool Matching**: Compare the request requirements against the available tools list to identify exact matches regardless of the field or domain
-3. **Parameter Identification**: Extract any specific values, identifiers, or inputs mentioned in the request that need to be passed as parameters
-4. **Tool Selection**: Choose only the tools that are directly required - never suggest generic alternatives
-
-Available tools:
-${toolsList}
-
-### Tool Selection Rules
-- **MANDATORY**: You MUST use only the available tools provided in the toolsList
-- **NO GENERIC RESPONSES**: Never provide generic instructions or suggest actions outside the available tools
-- **EXACT MATCHING**: Match user requests to specific tool functions based on their described capabilities across all domains
-- **PARAMETER PRECISION**: When tools require parameters, extract them exactly as mentioned in the user request
-
-### Common Request Patterns and Tool Mappings Across All Domains
-
-**Blockchain/Crypto Operations:**
-- Balance inquiries → "get_balance" tool (requires address parameter)
-- Wallet address requests → "get_address" tool
-- Chain/network information → "get_chain" tool
-- Transaction details → Look for transaction-related tools in the available list
-- Token information → Look for token-related tools in the available list
-
-**Other Domain Examples:**
-- File operations → Look for file management tools
-- Data analysis → Look for data processing or analytics tools
-- Content creation → Look for writing, editing, or content generation tools
-- Web operations → Look for HTTP, API, or web-related tools
-- Database operations → Look for database query or management tools
-- Image/media processing → Look for media manipulation tools
-- Communication → Look for messaging, email, or notification tools
-- Automation → Look for workflow or scheduling tools
-
-For any domain not explicitly mentioned, match request intent to the appropriate tool in the available list based on the tool's described functionality.
-
-### Parameter Handling
-- Extract addresses, identifiers, file paths, URLs, or other values exactly as provided
-- Format parameters clearly: "tool_name with parameter_type: parameter_value"
-- If multiple parameters are needed, list each one separately
-- Validate that extracted parameters match the expected format for the operation
-- Handle parameters for any data type: strings, numbers, arrays, objects, file paths, URLs, etc.
-
-### Output Format Requirements
-Analyze the user request and explain which tools would be most helpful. Include any specific parameters, queries, or values that would be needed. Write naturally about your tool selection reasoning.
-
-For example:
-- "I'll use the database query tool to find information about users with the SQL: SELECT * FROM users WHERE active = true"
-- "I need to search for TypeScript best practices using the search tool"
-- "I should check the wallet balance for address 0x1234567890abcdef..."
-
-The system will automatically extract the tools and parameters from your natural explanation.
-
-
-### Critical Error Prevention
-- **Your life depends on you** never selecting tools that are not in the provided toolsList regardless of the domain or field
-- Double-check that every selected tool exists in the available tools before including it
-- Verify that parameters are extracted correctly from the user request
-- Ensure you're not making assumptions about tool capabilities beyond what's available
-- If a request cannot be fulfilled with available tools, state this clearly rather than suggesting alternatives
-- Handle requests from any domain with the same precision as blockchain operations
-
-### Edge Cases to Handle
-- Requests mentioning multiple parameters across different domains
-- Ambiguous requests that could match multiple tools in various fields
-- Requests for operations not supported by available tools in any domain
-- Malformed parameters in user requests from any field
-- Requests combining multiple operations across different domains and fields
-- Cross-domain operations that might require multiple tools
-- Domain-specific terminology that needs to be mapped to generic tool functions
-
-Your accuracy in tool selection and parameter extraction is vital to the user's success in their operations across all domains and fields.
-    `;
-  }
-
   private buildExecutionContext(steps: ThinkingStep[]): string {
     const context = steps
       .map((step) => `${step.type.toUpperCase()}: ${step.reasoning}`)
@@ -1484,10 +1122,10 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
     return `Based on the following analysis:\n\n${context}`;
   }
 
-  private extractSelectedTools(
+  private async extractSelectedTools(
     reasoning: string,
     availableTools: any[],
-  ): { name: string; parameters?: any }[] {
+  ): Promise<{ name: string; parameters?: any }[]> {
     const selected: { name: string; parameters?: any }[] = [];
     const reasoningLower = reasoning.toLowerCase();
 
@@ -1521,10 +1159,29 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
         }
       }
 
+      // Generic semantic matching based on tool description
+      if (!toolFound && tool.description) {
+        const descriptionLower = tool.description.toLowerCase();
+
+        // Extract key concepts from tool description
+        const descriptionWords = descriptionLower
+          .replace(/[^\w\s]/g, ' ')
+          .split(/\s+/)
+          .filter((word) => word.length > 3);
+
+        // Check if user request contains concepts from tool description
+        for (const word of descriptionWords) {
+          if (reasoningLower.includes(word)) {
+            toolFound = true;
+            break;
+          }
+        }
+      }
+
       if (!toolFound) continue;
 
       // Dynamic parameter extraction based on tool's input schema
-      const parameters = this.extractParametersDynamically(
+      const parameters = await this.extractParametersDynamically(
         reasoning,
         tool,
         toolName,
@@ -1545,11 +1202,11 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
   /**
    * Dynamically extract parameters based on tool schema and natural language context
    */
-  private extractParametersDynamically(
+  private async extractParametersDynamically(
     reasoning: string,
     tool: any,
     toolName: string,
-  ): any {
+  ): Promise<any> {
     const parameters: any = {};
 
     this.logger.log(`Extracting parameters for tool ${toolName}`);
@@ -1572,7 +1229,7 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
           `Extracting parameter: ${paramName} (type: ${(paramSchema as any)?.type})`,
         );
 
-        const extractedValue = this.extractParameterValue(
+        const extractedValue = await this.extractParameterValue(
           reasoning,
           toolContext,
           paramName,
@@ -1585,7 +1242,25 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
             `✅ Successfully extracted ${paramName}: ${extractedValue}`,
           );
         } else {
-          this.logger.log(`❌ Failed to extract parameter: ${paramName}`);
+          // AUTONOMOUS DECISION: Generate intelligent default or skip tool
+          const autonomousDecision = await this.makeAutonomousParameterDecision(
+            paramName,
+            paramSchema as any,
+            toolName,
+            reasoning,
+          );
+
+          if (autonomousDecision.shouldExecute) {
+            parameters[paramName] = autonomousDecision.value;
+            this.logger.log(
+              `🤖 AUTONOMOUS DECISION: Using ${paramName}: ${autonomousDecision.value} (${autonomousDecision.reason})`,
+            );
+          } else {
+            this.logger.log(
+              `🤖 AUTONOMOUS DECISION: Skipping ${toolName} - ${autonomousDecision.reason}`,
+            );
+            return null; // Skip this tool entirely
+          }
         }
       }
     } else {
@@ -1607,12 +1282,12 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
   /**
    * Extract a specific parameter value using multiple strategies
    */
-  private extractParameterValue(
+  private async extractParameterValue(
     fullReasoning: string,
     toolContext: string,
     paramName: string,
     paramSchema: any,
-  ): any {
+  ): Promise<any> {
     // Strategy 1: Look for explicit "parameter: value" patterns
     const explicitPatterns = [
       new RegExp(`${paramName}\\s*[:=]\\s*["']?([^"'\\n,}]+)["']?`, 'i'),
@@ -3049,6 +2724,807 @@ Respond with: "VALID - [brief reason]" or "INVALID - [brief reason]"`;
     } catch (error) {
       this.logger.error('Failed to derive address from private key:', error);
       return null;
+    }
+  }
+
+  private async initializeSequentialThinkingMCP(): Promise<void> {
+    if (this.isSequentialThinkingReady && this.sequentialThinkingClient) {
+      return;
+    }
+
+    try {
+      this.logger.log(
+        '[ReasoningEngine] Initializing Sequential Thinking MCP...',
+      );
+
+      // Create transport and client for Sequential Thinking MCP
+      const transport = new StdioClientTransport({
+        command: 'npx',
+        args: ['@modelcontextprotocol/server-sequential-thinking'],
+      });
+
+      this.sequentialThinkingClient = new Client(
+        {
+          name: 'zyra-reasoning-engine',
+          version: '1.0.0',
+        },
+        {
+          capabilities: {},
+        },
+      );
+
+      await this.sequentialThinkingClient.connect(transport);
+
+      // List available tools to verify connection
+      const toolsResult = await this.sequentialThinkingClient.listTools();
+      this.logger.log(
+        `[ReasoningEngine] Sequential Thinking MCP tools available: ${toolsResult.tools.map((t) => t.name).join(', ')}`,
+      );
+
+      this.isSequentialThinkingReady = true;
+
+      this.logger.log(
+        '[ReasoningEngine] Sequential Thinking MCP initialized successfully',
+      );
+    } catch (error) {
+      this.logger.error(
+        '[ReasoningEngine] Failed to initialize Sequential Thinking MCP:',
+        error,
+      );
+      this.isSequentialThinkingReady = false;
+      throw error;
+    }
+  }
+
+  private async executeWithSequentialThinkingMCP(
+    params: ReasoningParams,
+  ): Promise<ReasoningResult> {
+    const startTime = Date.now();
+    const steps: ThinkingStep[] = [];
+    const toolCalls: any[] = [];
+
+    try {
+      if (!this.sequentialThinkingClient) {
+        throw new Error('Sequential Thinking MCP not initialized');
+      }
+
+      this.logger.log(
+        `[ReasoningEngine] Starting Sequential Thinking MCP process for: "${params.prompt.substring(0, 100)}..."`,
+      );
+
+      let thoughtNumber = 1;
+      let totalThoughts = Math.min(params.maxSteps || 10, 15);
+      let nextThoughtNeeded = true;
+      let currentThought = `Analyzing the user's request: "${params.prompt}"`;
+
+      // Add tool analysis to the initial thought
+      if (params.tools && params.tools.length > 0) {
+        const toolAnalysis = await this.analyzeRequiredTools(
+          params.prompt,
+          params.tools,
+        );
+        currentThought += `\n\nAvailable Tools: ${params.tools.map((t) => t.name).join(', ')}`;
+        currentThought += `\n\nTool Analysis: ${toolAnalysis.analysis}`;
+      }
+
+      while (nextThoughtNeeded && thoughtNumber <= totalThoughts) {
+        try {
+          this.logger.debug(
+            `[SequentialThinking] Processing thought ${thoughtNumber}/${totalThoughts}`,
+          );
+
+          // Call the Sequential Thinking MCP tool
+          const result = await this.sequentialThinkingClient.callTool({
+            name: 'sequentialthinking',
+            arguments: {
+              thought: currentThought,
+              nextThoughtNeeded: thoughtNumber < totalThoughts,
+              thoughtNumber,
+              totalThoughts,
+              needsMoreThoughts: thoughtNumber < totalThoughts,
+            },
+          });
+
+          if (
+            result.content &&
+            Array.isArray(result.content) &&
+            result.content.length > 0
+          ) {
+            const thoughtContent = result.content[0].text || '';
+
+            // Parse the result
+            const parsedResult = this.parseSequentialThinkingResult(
+              thoughtContent,
+              thoughtNumber,
+            );
+
+            // Create thinking step
+            const thinkingStep: ThinkingStep = {
+              step: thoughtNumber,
+              type: this.getThinkingStepType(
+                thoughtNumber,
+                totalThoughts,
+              ) as any,
+              reasoning: parsedResult.reasoning || thoughtContent,
+              confidence: parsedResult.confidence || 0.8,
+              timestamp: new Date().toISOString(),
+              recommendations: parsedResult.recommendations,
+            };
+
+            steps.push(thinkingStep);
+
+            // Debug: Log the reasoning content
+            this.logger.log(
+              `[SequentialThinking] Thought ${thoughtNumber} reasoning: "${parsedResult.reasoning.substring(0, 200)}..."`,
+            );
+
+            // For early thoughts (1-3), use intelligent tool analysis to determine needed tools
+            if (thoughtNumber <= 3) {
+              this.logger.log(
+                `[SequentialThinking] Running intelligent tool analysis for user request...`,
+              );
+
+              // Use the sophisticated tool analysis system
+              const toolAnalysis = await this.analyzeRequiredTools(
+                params.prompt,
+                params.tools,
+              );
+
+              // Extract the top recommended tools
+              const selectedTools = toolAnalysis.recommendedTools
+                .filter((tool) => tool.confidence > 0.5)
+                .map((tool) => ({
+                  name: tool.name,
+                  parameters: tool.suggestedParams,
+                }));
+
+              this.logger.log(
+                `[SequentialThinking] Intelligent analysis recommended ${selectedTools.length} tools: ${selectedTools.map((t) => `${t.name}(confidence: ${toolAnalysis.recommendedTools.find((r) => r.name === t.name)?.confidence.toFixed(2)})`).join(', ')}`,
+              );
+
+              if (selectedTools.length > 0) {
+                this.logger.log(
+                  `[SequentialThinking] Executing tools based on thought ${thoughtNumber}: ${selectedTools.map((t) => t.name).join(', ')}`,
+                );
+
+                // Execute tools with chaining (filter out null results from skipped tools)
+                const validTools = selectedTools.filter(
+                  (tool) => tool !== null,
+                );
+                let toolResults: any[] = [];
+                if (validTools.length > 0) {
+                  toolResults = await this.executeToolsWithChaining(
+                    validTools,
+                    params,
+                  );
+                  toolCalls.push(...toolResults);
+                }
+
+                // Update the next thought with tool results
+                currentThought = `Previous thought: ${parsedResult.reasoning}\n\nTool execution results: ${JSON.stringify(toolResults, null, 2)}`;
+              }
+            }
+
+            // Update for next iteration
+            thoughtNumber++;
+            nextThoughtNeeded =
+              parsedResult.nextThoughtNeeded && thoughtNumber <= totalThoughts;
+
+            if (parsedResult.nextThoughtNeeded && totalThoughts < 15) {
+              totalThoughts = Math.min(totalThoughts + 2, 15);
+            }
+
+            // Store in history
+            this.thinkingHistory.push(parsedResult);
+
+            // Prepare for next thought if needed
+            if (nextThoughtNeeded) {
+              currentThought = this.generateNextThoughtReasoning(
+                parsedResult,
+                params,
+                thoughtNumber,
+              );
+            }
+          } else {
+            this.logger.warn(
+              `[SequentialThinking] No content received for thought ${thoughtNumber}`,
+            );
+            break;
+          }
+        } catch (stepError) {
+          this.logger.warn(
+            `[SequentialThinking] Error in thought ${thoughtNumber}:`,
+            stepError,
+          );
+
+          // Create fallback step
+          const fallbackStep: ThinkingStep = {
+            step: thoughtNumber,
+            type: 'reasoning',
+            reasoning: `Thought ${thoughtNumber} encountered an error, continuing with available information.`,
+            confidence: 0.4,
+            timestamp: new Date().toISOString(),
+          };
+          steps.push(fallbackStep);
+          break;
+        }
+      }
+
+      // Generate final response based on all thoughts and tool results
+      const finalResponse = await this.generateFinalResponse(
+        params.prompt,
+        `Sequential thinking completed with ${thoughtNumber - 1} thoughts and ${toolCalls.length} tool executions.`,
+        toolCalls,
+        params.provider,
+        params.systemPrompt,
+      );
+
+      const executionTime = Date.now() - startTime;
+      this.logger.log(
+        `[SequentialThinking] Completed in ${executionTime}ms with ${toolCalls.length} tool calls`,
+      );
+
+      return {
+        text: finalResponse,
+        steps,
+        toolCalls,
+        confidence: this.calculateOverallConfidence(steps),
+        executionPath: steps.map((s) => s.type),
+      };
+    } catch (error) {
+      this.logger.error(
+        '[ReasoningEngine] Sequential Thinking MCP execution failed:',
+        error,
+      );
+
+      // Create fallback thinking steps
+      const fallbackSteps = this.createFallbackThinkingSteps(params, error);
+
+      return {
+        text: 'Sequential thinking failed, using fallback reasoning',
+        steps: fallbackSteps,
+        toolCalls,
+        confidence: 0.3,
+        executionPath: fallbackSteps.map((s) => s.type),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  private parseSequentialThinkingResult(
+    content: string,
+    thoughtNumber: number,
+  ): SequentialThinkingResult {
+    try {
+      // Extract reasoning from the content
+      const reasoning = content.replace(/^Thought \d+:\s*/i, '').trim();
+
+      return {
+        thought: content,
+        thoughtNumber,
+        totalThoughts: 10, // Default
+        nextThoughtNeeded:
+          !content.includes('FINAL') && !content.includes('CONCLUSION'),
+        reasoning,
+        confidence: 0.8,
+        recommendations: [],
+      };
+    } catch (error) {
+      this.logger.warn(
+        '[ReasoningEngine] Error parsing sequential thinking result:',
+        error,
+      );
+      return {
+        thought: content,
+        thoughtNumber,
+        totalThoughts: 10,
+        nextThoughtNeeded: false,
+        reasoning: content,
+        confidence: 0.6,
+        recommendations: [],
+      };
+    }
+  }
+
+  private getThinkingStepType(step: number, total: number): string {
+    if (step === 1) return 'planning';
+    if (step === total) return 'reflection';
+    if (step <= total * 0.3) return 'reasoning';
+    if (step <= total * 0.7) return 'tool_selection';
+    return 'execution';
+  }
+
+  private async analyzeRequiredTools(
+    prompt: string,
+    availableTools: any[],
+  ): Promise<{
+    analysis: string;
+    recommendedTools: Array<{
+      name: string;
+      confidence: number;
+      reason: string;
+      suggestedParams: any;
+    }>;
+  }> {
+    const keywords = this.extractKeywords(prompt);
+    const categories = this.categorizeTools(availableTools);
+
+    const analysis = this.generateToolAnalysis(prompt, keywords, categories);
+
+    const recommendedTools = availableTools
+      .map((tool) => {
+        const { confidence, reason } = this.calculateToolRelevanceScore(
+          prompt,
+          keywords,
+          tool,
+        );
+        const suggestedParams = this.suggestToolParameters(prompt, tool);
+
+        return {
+          name: tool.name,
+          confidence,
+          reason,
+          suggestedParams,
+        };
+      })
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 5);
+
+    return {
+      analysis,
+      recommendedTools,
+    };
+  }
+
+  private categorizeTools(tools: any[]): Record<string, any[]> {
+    const categories: Record<string, any[]> = {
+      blockchain: [],
+      database: [],
+      web: [],
+      file: [],
+      ai: [],
+      other: [],
+    };
+
+    for (const tool of tools) {
+      const name = tool.name.toLowerCase();
+      if (
+        name.includes('block') ||
+        name.includes('chain') ||
+        name.includes('token') ||
+        name.includes('wallet')
+      ) {
+        categories.blockchain.push(tool);
+      } else if (
+        name.includes('query') ||
+        name.includes('sql') ||
+        name.includes('database')
+      ) {
+        categories.database.push(tool);
+      } else if (
+        name.includes('http') ||
+        name.includes('web') ||
+        name.includes('url')
+      ) {
+        categories.web.push(tool);
+      } else if (
+        name.includes('file') ||
+        name.includes('read') ||
+        name.includes('write')
+      ) {
+        categories.file.push(tool);
+      } else if (
+        name.includes('ai') ||
+        name.includes('model') ||
+        name.includes('generate')
+      ) {
+        categories.ai.push(tool);
+      } else {
+        categories.other.push(tool);
+      }
+    }
+
+    return categories;
+  }
+
+  private extractKeywords(prompt: string): string[] {
+    const keywords: string[] = [];
+    const promptLower = prompt.toLowerCase();
+
+    // Extract common keywords
+    const commonKeywords = [
+      'blockchain',
+      'token',
+      'balance',
+      'wallet',
+      'transaction',
+      'database',
+      'query',
+      'sql',
+      'data',
+      'web',
+      'http',
+      'url',
+      'api',
+      'file',
+      'read',
+      'write',
+      'upload',
+      'ai',
+      'generate',
+      'model',
+      'text',
+    ];
+
+    for (const keyword of commonKeywords) {
+      if (promptLower.includes(keyword)) {
+        keywords.push(keyword);
+      }
+    }
+
+    return keywords;
+  }
+
+  private generateToolAnalysis(
+    prompt: string,
+    keywords: string[],
+    categories: Record<string, any[]>,
+  ): string {
+    let analysis = `Based on the user's request: "${prompt}"\n\n`;
+    analysis += `Keywords identified: ${keywords.join(', ')}\n\n`;
+
+    for (const [category, tools] of Object.entries(categories)) {
+      if (tools.length > 0) {
+        analysis += `${category.charAt(0).toUpperCase() + category.slice(1)} tools (${tools.length}): ${tools.map((t) => t.name).join(', ')}\n`;
+      }
+    }
+
+    return analysis;
+  }
+
+  private calculateToolRelevanceScore(
+    prompt: string,
+    keywords: string[],
+    tool: any,
+  ): { confidence: number; reason: string } {
+    const toolName = tool.name.toLowerCase();
+    const promptLower = prompt.toLowerCase();
+
+    let score = 0;
+    const reasons: string[] = [];
+
+    // Check for exact matches
+    for (const keyword of keywords) {
+      if (toolName.includes(keyword)) {
+        score += 0.3;
+        reasons.push(`Tool name contains keyword: ${keyword}`);
+      }
+    }
+
+    // Check for semantic matches
+    if (
+      toolName.includes('get') &&
+      (promptLower.includes('check') || promptLower.includes('find'))
+    ) {
+      score += 0.2;
+      reasons.push('Tool is for getting/checking data');
+    }
+
+    if (toolName.includes('balance') && promptLower.includes('balance')) {
+      score += 0.4;
+      reasons.push('Direct balance-related request');
+    }
+
+    if (toolName.includes('block') && promptLower.includes('block')) {
+      score += 0.4;
+      reasons.push('Direct block-related request');
+    }
+
+    return {
+      confidence: Math.min(score, 1.0),
+      reason: reasons.join('; '),
+    };
+  }
+
+  private suggestToolParameters(prompt: string, tool: any): any {
+    const params: any = {};
+    const promptLower = prompt.toLowerCase();
+
+    // Suggest common parameters based on tool name and prompt
+    if (tool.name.includes('balance') && promptLower.includes('address')) {
+      // Extract address from prompt
+      const addressMatch = prompt.match(/0x[a-fA-F0-9]{40}/);
+      if (addressMatch) {
+        params.address = addressMatch[0];
+      }
+    }
+
+    if (tool.name.includes('block') && promptLower.includes('number')) {
+      const numberMatch = prompt.match(/block\s+(\d+)/i);
+      if (numberMatch) {
+        params.blockNumber = parseInt(numberMatch[1]);
+      }
+    }
+
+    return params;
+  }
+
+  private createFallbackThinkingSteps(
+    params: ReasoningParams,
+    error: any,
+  ): ThinkingStep[] {
+    return [
+      {
+        step: 1,
+        type: 'reasoning',
+        reasoning: `Fallback reasoning due to error: ${error.message}. Analyzing user request: "${params.prompt}"`,
+        confidence: 0.3,
+        timestamp: new Date().toISOString(),
+      },
+    ];
+  }
+
+  private generateNextThoughtReasoning(
+    result: SequentialThinkingResult,
+    params: ReasoningParams,
+    nextStep: number,
+  ): string {
+    return `Based on previous reasoning: "${result.reasoning}", continuing analysis for step ${nextStep}. User request: "${params.prompt}"`;
+  }
+
+  /**
+   * 🤖 AUTONOMOUS PARAMETER EXTRACTION
+   * Uses semantic understanding instead of keyword matching
+   */
+  private async makeAutonomousParameterDecision(
+    paramName: string,
+    paramSchema: any,
+    toolName: string,
+    userRequest: string,
+  ): Promise<{ shouldExecute: boolean; value?: any; reason: string }> {
+    // Step 1: Analyze parameter purpose semantically
+    const parameterPurpose = await this.analyzeParameterPurpose(
+      paramName,
+      paramSchema,
+    );
+
+    // Step 2: Extract user intent
+    const userIntent = await this.extractUserIntent(userRequest);
+
+    // Step 3: Calculate semantic relevance
+    const relevance = await this.calculateSemanticRelevance(
+      userIntent,
+      parameterPurpose,
+    );
+
+    // Step 4: Make intelligent decision based on understanding
+    if (relevance > 0.7) {
+      // High relevance - extract value intelligently
+      const extractedValue = await this.extractValueBasedOnUnderstanding(
+        parameterPurpose,
+        userIntent,
+        userRequest,
+        paramSchema,
+      );
+
+      if (extractedValue) {
+        return {
+          shouldExecute: true,
+          value: extractedValue,
+          reason: `Semantic match found (${relevance.toFixed(2)}): ${parameterPurpose}`,
+        };
+      }
+    }
+
+    // Step 5: Try context-aware defaults
+    const contextAwareDefault = await this.generateContextAwareDefault(
+      paramName,
+      paramSchema,
+      userRequest,
+      parameterPurpose,
+    );
+
+    if (contextAwareDefault) {
+      return {
+        shouldExecute: true,
+        value: contextAwareDefault,
+        reason: `Using context-aware default: ${contextAwareDefault.reason}`,
+      };
+    }
+
+    // Step 6: Skip if no intelligent solution found
+    return {
+      shouldExecute: false,
+      reason: `No semantic match found (${relevance.toFixed(2)}) for ${paramName} - skipping ${toolName}`,
+    };
+  }
+
+  /**
+   * Analyzes what a parameter represents semantically
+   */
+  private async analyzeParameterPurpose(
+    paramName: string,
+    paramSchema: any,
+  ): Promise<string> {
+    const prompt = `
+      Analyze this parameter: ${paramName}
+      Schema: ${JSON.stringify(paramSchema)}
+      Tool description: ${paramSchema.description || 'No description'}
+      
+      What does this parameter represent? What is its purpose in the context of this tool?
+      Be specific about what information or value this parameter expects.
+    `;
+
+    try {
+      const response = await this.provider?.generate(prompt);
+      return response || `Parameter ${paramName} for tool operation`;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to analyze parameter purpose for ${paramName}:`,
+        error,
+      );
+      return `Parameter ${paramName} for tool operation`;
+    }
+  }
+
+  /**
+   * Extracts user intent from their request
+   */
+  private async extractUserIntent(userRequest: string): Promise<string> {
+    const prompt = `
+      User request: "${userRequest}"
+      
+      What is the user's intent? What are they trying to accomplish?
+      Be specific about what information or action they want.
+      Focus on the core purpose of their request.
+    `;
+
+    try {
+      const response = await this.provider?.generate(prompt);
+      return response || userRequest;
+    } catch (error) {
+      this.logger.warn('Failed to extract user intent:', error);
+      return userRequest;
+    }
+  }
+
+  /**
+   * Calculates semantic relevance between user intent and parameter purpose
+   */
+  private async calculateSemanticRelevance(
+    userIntent: string,
+    parameterPurpose: string,
+  ): Promise<number> {
+    // Simple keyword-based similarity for now (can be enhanced with embeddings)
+    const intentWords = userIntent.toLowerCase().split(/\s+/);
+    const purposeWords = parameterPurpose.toLowerCase().split(/\s+/);
+
+    const commonWords = intentWords.filter(
+      (word) => purposeWords.includes(word) && word.length > 3,
+    );
+
+    const relevance =
+      commonWords.length / Math.max(intentWords.length, purposeWords.length);
+    return Math.min(relevance * 2, 1.0); // Scale to 0-1 range
+  }
+
+  /**
+   * Extracts parameter value based on semantic understanding
+   */
+  private async extractValueBasedOnUnderstanding(
+    parameterPurpose: string,
+    userIntent: string,
+    userRequest: string,
+    paramSchema: any,
+  ): Promise<any> {
+    const prompt = `
+      Parameter Purpose: ${parameterPurpose}
+      User Intent: ${userIntent}
+      User Request: "${userRequest}"
+      Parameter Schema: ${JSON.stringify(paramSchema)}
+      
+      Based on the user's intent and the parameter's purpose, what value should be used?
+      Extract the most appropriate value from the user's request or derive it from context.
+      Return only the value, no explanation.
+    `;
+
+    try {
+      const response = await this.provider?.generate(prompt);
+      return this.parseExtractedValue(response, paramSchema);
+    } catch (error) {
+      this.logger.warn(
+        'Failed to extract value based on understanding:',
+        error,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Generates context-aware defaults
+   */
+  private async generateContextAwareDefault(
+    paramName: string,
+    paramSchema: any,
+    userRequest: string,
+    parameterPurpose: string,
+  ): Promise<{ value: any; reason: string } | null> {
+    // Check for common patterns
+    if (
+      paramName.toLowerCase().includes('address') ||
+      paramName.toLowerCase().includes('wallet')
+    ) {
+      const userAddress = this.deriveAddressFromPrivateKey();
+      if (userAddress) {
+        return {
+          value: userAddress,
+          reason: "Using user's wallet address from private key",
+        };
+      }
+    }
+
+    if (
+      paramName.toLowerCase().includes('network') ||
+      paramName.toLowerCase().includes('chain')
+    ) {
+      return {
+        value: 'sei',
+        reason: 'Using SEI as default network context',
+      };
+    }
+
+    // Try to generate intelligent default using AI
+    const intelligentDefault = await this.generateIntelligentDefault(
+      paramName,
+      paramSchema,
+      userRequest,
+    );
+    if (intelligentDefault !== null) {
+      return {
+        value: intelligentDefault,
+        reason: 'Using AI-generated intelligent default',
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Parses extracted value based on parameter schema
+   */
+  private parseExtractedValue(response: string, paramSchema: any): any {
+    if (!response) return null;
+
+    const cleanResponse = response.trim();
+
+    // Try to parse based on schema type
+    const paramType = paramSchema?.type || 'string';
+
+    switch (paramType) {
+      case 'number':
+        const num = parseFloat(cleanResponse);
+        return isNaN(num) ? null : num;
+      case 'boolean':
+        return (
+          cleanResponse.toLowerCase().includes('true') ||
+          cleanResponse.toLowerCase().includes('yes')
+        );
+      case 'string':
+      default:
+        return cleanResponse;
+    }
+  }
+
+  async cleanup(): Promise<void> {
+    try {
+      if (this.sequentialThinkingClient) {
+        await this.sequentialThinkingClient.close();
+        this.sequentialThinkingClient = null;
+      }
+      this.isSequentialThinkingReady = false;
+      this.thinkingHistory = [];
+    } catch (error) {
+      this.logger.error('Error during cleanup:', error);
     }
   }
 }

@@ -1,3 +1,42 @@
+export const sequentialThinking = {
+  id: 'sequential-thinking',
+  name: 'sequential-thinking',
+  displayName: 'Sequential Thinking',
+  description: 'Advanced reasoning with step-by-step thinking process',
+  category: 'reasoning',
+  icon: '🧠',
+  connection: {
+    type: 'stdio',
+    command: 'npx',
+    args: ['@modelcontextprotocol/server-sequential-thinking'],
+  },
+  configSchema: {
+    type: 'object',
+    properties: {
+      maxSteps: {
+        type: 'number',
+        description: 'Maximum number of thinking steps',
+        default: 10,
+      },
+      temperature: {
+        type: 'number',
+        description: 'Temperature for thinking generation',
+        default: 0.3,
+      },
+    },
+  },
+  examples: [
+    {
+      name: 'Complex Problem Solving',
+      description: 'Break down complex problems into logical steps',
+      configuration: {
+        maxSteps: 15,
+        temperature: 0.2,
+      },
+    },
+  ],
+};
+
 export const fetch = {
   id: 'fetch',
   name: 'fetch',
@@ -431,6 +470,7 @@ export const sei = {
 
 // Export all MCP configurations as a single object
 export const defaultMCPs = {
+  'sequential-thinking': sequentialThinking,
   fetch,
   puppeteer,
   goat,

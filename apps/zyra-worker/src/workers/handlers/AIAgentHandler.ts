@@ -6,7 +6,6 @@ import { LLMProviderManager } from './ai-agent/LLMProviderManager';
 import { MCPServerManager } from './ai-agent/MCPServerManager';
 import { SecurityValidator } from './ai-agent/SecurityValidator';
 import { ReasoningEngine } from './ai-agent/ReasoningEngine';
-import { EnhancedReasoningEngine } from './ai-agent/EnhancedReasoningEngine';
 import { GoatPluginManager } from './goat/GoatPluginManager';
 import { defaultMCPs } from '../../mcps/default_mcp_configs';
 
@@ -53,7 +52,6 @@ export class AIAgentHandler implements BlockHandler {
     private readonly mcpServerManager: MCPServerManager,
     private readonly securityValidator: SecurityValidator,
     private readonly reasoningEngine: ReasoningEngine,
-    private readonly enhancedReasoningEngine: EnhancedReasoningEngine,
     private readonly goatPluginManager: GoatPluginManager,
   ) {}
 
@@ -756,16 +754,10 @@ export class AIAgentHandler implements BlockHandler {
       `[AI_AGENT] Calling enhanced reasoning engine with sequential thinking`,
     );
 
-    // Always use enhanced reasoning engine for better AI performance
-    // Sequential thinking is now automatic for all AI agent executions
-    this.logger.log(
-      `[AI_AGENT] Processing with direct reasoning (sequential thinking disabled)...`,
-    );
-
     // Generate secure system prompt with user context
     const systemPrompt = await this.buildSystemPrompt(userId, tools);
 
-    // Direct execution without sequential thinking dependency
+    // Use enhanced reasoning engine with sequential thinking MCP server
     const executionPromise = this.reasoningEngine.execute({
       prompt: config.agent.userPrompt,
       systemPrompt: systemPrompt,
