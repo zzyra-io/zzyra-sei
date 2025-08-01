@@ -1,5 +1,7 @@
 # Zzyra - AI-Driven Blockchain Workflow Automation Platform
 
+https://docs.zzyra.io/
+
 [![Netlify Status](https://api.netlify.com/api/v1/badges/17fcd5ea-3c64-4008-89f8-ea0d64e9ff4f/deploy-status)](https://app.netlify.com/projects/zzyra/deploys)
 
 Zzyra is a revolutionary no-code workflow automation platform that combines AI and blockchain capabilities. Build, execute, and monitor complex workflows across DeFi, Enterprise AI, Gaming, IoT, and 20+ other industries without writing code.
