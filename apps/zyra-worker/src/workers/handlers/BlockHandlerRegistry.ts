@@ -394,18 +394,13 @@ export class BlockHandlerRegistry {
         cacheService,
       );
       const securityValidator = new SecurityValidator(this.databaseService);
-      const subscriptionService = new SubscriptionService();
       const reasoningEngine = new ReasoningEngine(
         this.databaseService,
-        subscriptionService,
         toolAnalyticsService,
         cacheService,
       );
 
       // Create and return AI Agent handler
-      const {
-        EnhancedReasoningEngine,
-      } = require('./ai-agent/EnhancedReasoningEngine');
       const { GoatPluginManager } = require('./goat/GoatPluginManager');
 
       return new AIAgentHandler(
@@ -415,7 +410,6 @@ export class BlockHandlerRegistry {
         mcpServerManager,
         securityValidator,
         reasoningEngine,
-        new EnhancedReasoningEngine(),
         new GoatPluginManager(),
       );
     } catch (error) {

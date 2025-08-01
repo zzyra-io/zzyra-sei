@@ -44,14 +44,18 @@ export const useMagicAuth = () => {
         // Step 2: Generate a DID token for backend auth
         const didToken = await magicInstance.user.generateIdToken();
 
-        // Step 3: Authenticate with backend using axios
+        // Step 3: Get user metadata
+        const userMetadata = await magicInstance.user.getInfo();
+
+        // Step 4: Authenticate with backend using axios
+        const walletAddress =
+          (userMetadata as any)?.wallets?.[0]?.public_address ||
+          userMetadata.publicAddress;
         const response = await api.post("/auth/login", {
           email,
           didToken,
+          publicAddress: walletAddress,
         });
-
-        // Step 4: Get user metadata
-        const userMetadata = await magicInstance.user.getInfo();
 
         console.log("userMetadata", userMetadata, "response", response);
 
@@ -119,10 +123,14 @@ export const useMagicAuth = () => {
         const userMetadata = await magicInstance.user.getInfo();
 
         // Step 3: Authenticate with backend using axios
+        const walletAddress =
+          (userMetadata as any)?.wallets?.[0]?.public_address ||
+          userMetadata?.publicAddress;
         const response = await api.post("/auth/login", {
           phoneNumber,
           email: userMetadata?.email,
           didToken,
+          publicAddress: walletAddress,
         });
 
         return { success: true, user: userMetadata };
@@ -205,6 +213,7 @@ export const useMagicAuth = () => {
         const response = await api.post("/auth/login", {
           email: userMetadata.email,
           didToken,
+          publicAddress: userMetadata.publicAddress,
           isOAuth: true,
           oauthProvider: provider,
           oauthUserInfo: userInfo,

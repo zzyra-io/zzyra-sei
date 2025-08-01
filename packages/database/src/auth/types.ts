@@ -46,6 +46,7 @@ export interface MagicAuthPayload {
   didToken: string;
   provider?: string;
   email?: string;
+  publicAddress?: string;
   isOAuth?: boolean;
   oauthProvider?: string;
   oauthUserInfo?: Record<string, any>;

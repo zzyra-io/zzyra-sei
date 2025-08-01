@@ -63,20 +63,24 @@ export const useAuth = (): AuthHook => {
         // Step 2: Generate DID token for backend authentication
         const didToken = await magic.user.generateIdToken();
 
-        // Step 3: Authenticate with backend
+        // Step 3: Get user metadata for public address
+        const userMetadata = await magic.user.getInfo();
+
+        // Step 4: Authenticate with backend
         const response = await api.post<LoginResponse>("/auth/login", {
           email,
           didToken,
+          publicAddress: userMetadata?.publicAddress,
         });
 
         if (!response.data.success) {
           throw new Error("Authentication failed");
         }
 
-        // Step 4: Update auth store
+        // Step 5: Update auth store
         storeLogin(response.data.user, response.data.token);
 
-        // Step 5: Redirect if callback URL provided
+        // Step 6: Redirect if callback URL provided
         if (response.data.callbackUrl) {
           router.push(response.data.callbackUrl);
         } else {

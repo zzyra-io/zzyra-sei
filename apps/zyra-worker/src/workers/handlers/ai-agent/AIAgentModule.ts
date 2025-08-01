@@ -120,19 +120,16 @@ import { AIAgentEnhancementsAPI } from './AIAgentEnhancementsAPI';
       provide: ReasoningEngine,
       useFactory: (
         databaseService,
-        subscriptionService,
         toolAnalyticsService,
         cacheService,
       ) =>
         new ReasoningEngine(
           databaseService,
-          subscriptionService,
           toolAnalyticsService,
           cacheService,
         ),
       inject: [
         DatabaseService,
-        SubscriptionService,
         ToolAnalyticsService,
         CacheService,
       ],
@@ -161,7 +158,6 @@ import { AIAgentEnhancementsAPI } from './AIAgentEnhancementsAPI';
           mcpServerManager,
           securityValidator,
           reasoningEngine,
-          new (require('./EnhancedReasoningEngine').EnhancedReasoningEngine)(),
           new (require('../goat/GoatPluginManager').GoatPluginManager)(),
         ),
       inject: [

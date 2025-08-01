@@ -314,6 +314,17 @@ export class AuthService {
         );
       }
 
+      // Auto-save Magic wallet if publicAddress is provided
+      if (payload.publicAddress) {
+        try {
+          await this.ensureMagicWalletSaved(user.id, payload.publicAddress);
+          console.log("Magic wallet auto-saved for user:", user.id);
+        } catch (walletError) {
+          console.error("Error auto-saving Magic wallet:", walletError);
+          // Don't fail authentication if wallet save fails
+        }
+      }
+
       // Create session
       try {
         const result = await this.createSession(user);
@@ -394,6 +405,42 @@ export class AuthService {
         "Failed to authenticate with wallet",
         "auth/wallet-auth-failed"
       );
+    }
+  }
+
+  /**
+   * Ensure Magic wallet is saved for user
+   * @param userId The user ID
+   * @param publicAddress The Magic wallet public address
+   */
+  private async ensureMagicWalletSaved(
+    userId: string,
+    publicAddress: string
+  ): Promise<void> {
+    try {
+      // Check if wallet already exists
+      const existingWallet =
+        await this.userRepository.findByWalletAddress(publicAddress);
+
+      if (!existingWallet) {
+        // Add new Magic wallet
+        await this.userRepository.addWallet(userId, {
+          walletAddress: publicAddress,
+          chainId: "1", // Default to Ethereum mainnet
+          chainType: "evm",
+          walletType: "magic",
+        });
+        console.log("Magic wallet saved:", publicAddress);
+      } else if (existingWallet.id === userId) {
+        // Wallet already exists for this user, update metadata if needed
+        console.log("Magic wallet already exists for user:", userId);
+      } else {
+        // Wallet exists for different user - this shouldn't happen with Magic
+        console.warn("Magic wallet exists for different user:", publicAddress);
+      }
+    } catch (error) {
+      console.error("Error ensuring Magic wallet saved:", error);
+      throw error;
     }
   }
 

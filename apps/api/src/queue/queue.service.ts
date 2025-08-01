@@ -46,7 +46,10 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private connection: any;
 
   async onModuleInit() {
-    await this.initQueue();
+    console.log(
+      "⏭️ Skipping RabbitMQ queue initialization to avoid startup hang"
+    );
+    // await this.initQueue();
   }
 
   async onModuleDestroy() {

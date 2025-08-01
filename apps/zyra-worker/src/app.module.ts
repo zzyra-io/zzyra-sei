@@ -4,18 +4,15 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { WorkflowModule } from './lib/services/workflow.module';
 import { HealthModule } from './health/health.module';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { NotificationModule } from './services/notification.module';
-import { TestNotificationController } from './controllers/test-notification.controller';
-import { ExecutionController } from './api/execution.controller';
 import { ExecutionWorker } from './workers/execution-worker';
-import { AIModule } from './modules/ai.module';
-import { BlockchainModule } from './lib/blockchain/BlockchainModule';
 import { DatabaseModule } from './services/database.module';
 import { RabbitMQService } from './services/rabbitmq.service';
 import { MagicModule } from './services/magic.module';
 import { ExecutionGateway } from './gateways/execution.gateway';
 import { ExecutionMonitorService } from './services/execution-monitor.service';
+import { BlockchainModule } from './lib/blockchain/BlockchainModule';
 
 // Exception Filters
 import { DatabaseExceptionFilter } from './filters/database-exception.filter';
@@ -67,20 +64,9 @@ const configValidationSchema = {
     HealthModule,
     NotificationModule,
     MagicModule,
-
-    // Conditional module imports for better startup performance
-    ...(process.env.ENABLE_AI_MODULE !== 'false' ? [AIModule] : []),
-    ...(process.env.ENABLE_BLOCKCHAIN_MODULE !== 'false'
-      ? [BlockchainModule]
-      : []),
+    BlockchainModule,
   ],
-  controllers: [
-    AppController,
-    ExecutionController,
-    ...(process.env.NODE_ENV !== 'production'
-      ? [TestNotificationController]
-      : []),
-  ],
+  controllers: [AppController],
   providers: [
     AppService,
     ExecutionWorker,

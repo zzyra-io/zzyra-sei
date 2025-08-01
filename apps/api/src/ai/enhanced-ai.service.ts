@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 import { BlockType, DataType } from "@zyra/types";
 
 // Import MCP configurations
-import { defaultMCPs } from "../../../zyra-worker/src/mcps/default_mcp_configs";
+import { defaultMCPs } from "@zyra/types";
 
 // Import new services
 import { WorkflowValidatorService } from "./services/workflow-validator.service";

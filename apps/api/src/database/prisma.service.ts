@@ -29,36 +29,9 @@ export class PrismaService implements OnModuleInit {
   public client: typeof defaultPrisma;
 
   constructor() {
-    // Use the enhanced Prisma client from @zyra/database
-    let extendedClient = defaultPrisma;
-    try {
-      const isProd = process.env.NODE_ENV === "production";
-      const extensionManager = isProd
-        ? createProductionExtensionManager({
-            userId: undefined, // Optionally set userId if available
-            cacheProvider: new DatabaseCacheProvider(defaultPrisma),
-            rateLimitStore: new DatabaseRateLimitStore(defaultPrisma),
-          })
-        : createDevelopmentExtensionManager();
-      extendedClient = createExtendedPrismaClient(
-        defaultPrisma,
-        extensionManager
-      );
-      this.logger.log(
-        "✅ PrismaService using extended Prisma client with extensions"
-      );
-    } catch (err) {
-      this.logger.warn(
-        "⚠️ Failed to initialize Prisma extensions, using default client",
-        err
-      );
-    }
-    this.client = extendedClient;
-
-    // Add query logging middleware for monitoring
-    this.setupQueryMonitoring();
-
-    this.logger.log("✅ PrismaService initialized with enhanced monitoring");
+    // Use the basic Prisma client for now to avoid initialization issues
+    this.client = defaultPrisma;
+    this.logger.log("✅ PrismaService initialized with basic client");
   }
 
   async onModuleInit() {
@@ -66,9 +39,6 @@ export class PrismaService implements OnModuleInit {
       // Connect to the database when the module initializes
       await this.client.$connect();
       this.logger.log("🔌 Database connection established");
-
-      // Test database functionality
-      await this.testDatabaseConnection();
     } catch (error) {
       this.logger.error("❌ Failed to initialize database connection", error);
       throw error;

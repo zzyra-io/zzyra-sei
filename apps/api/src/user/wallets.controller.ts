@@ -38,8 +38,10 @@ export class WalletsController {
   async getUserWallets(
     @Request() req: { user?: { id: string } }
   ): Promise<WalletResponseDto[]> {
-    const userId = req.user?.id || "user1";
-    return this.walletsService.getUserWallets(userId);
+    if (!req.user?.id) {
+      throw new Error("User not authenticated");
+    }
+    return this.walletsService.getUserWallets(req.user.id);
   }
 
   @Post()
@@ -53,8 +55,10 @@ export class WalletsController {
     @Request() req: { user?: { id: string } },
     @Body() createData: CreateWalletDto
   ): Promise<WalletResponseDto> {
-    const userId = req.user?.id || "user1";
-    return this.walletsService.createWallet(userId, createData);
+    if (!req.user?.id) {
+      throw new Error("User not authenticated");
+    }
+    return this.walletsService.createWallet(req.user.id, createData);
   }
 
   @Delete(":walletId")
@@ -67,8 +71,10 @@ export class WalletsController {
     @Request() req: { user?: { id: string } },
     @Param("walletId") walletId: string
   ): Promise<{ success: boolean; walletId: string }> {
-    const userId = req.user?.id || "user1";
-    return this.walletsService.deleteWallet(userId, walletId);
+    if (!req.user?.id) {
+      throw new Error("User not authenticated");
+    }
+    return this.walletsService.deleteWallet(req.user.id, walletId);
   }
 
   @Get("transactions")
@@ -83,10 +89,12 @@ export class WalletsController {
     @Query("walletAddress") walletAddress?: string,
     @Query("limit") limit?: string
   ): Promise<WalletTransactionResponseDto[]> {
-    const userId = req.user?.id || "user1";
+    if (!req.user?.id) {
+      throw new Error("User not authenticated");
+    }
     const parsedLimit = limit ? parseInt(limit, 10) : 10;
     return this.walletsService.getWalletTransactions(
-      userId,
+      req.user.id,
       walletAddress,
       parsedLimit
     );

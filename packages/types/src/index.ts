@@ -83,3 +83,6 @@ export { BlockGroup, ConnectionType, PropertyType } from "./workflow/execution";
 
 // Re-export metadata helper functions
 export { getBlockMetadata, getBlockType } from "./workflow/metadata";
+
+// Export MCP configurations
+export { defaultMCPs, sequentialThinking, fetch, puppeteer } from "./mcp-configs";

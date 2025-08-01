@@ -1,63 +1,22 @@
 import { Injectable } from "@nestjs/common";
 import { AIAgentConfig, AIAgentExecution, MCPServerConfig } from "@zyra/types";
-// Import defaultMCPs from the correct location
-import { defaultMCPs } from "../../../zyra-worker/src/mcps/default_mcp_configs";
+// Import defaultMCPs from the types package
+import { defaultMCPs } from "@zyra/types";
 import { randomUUID } from "crypto";
 
 @Injectable()
 export class AIAgentService {
   private executions = new Map<string, AIAgentExecution>();
 
-  constructor(private readonly databaseService?: any) {} // Inject database service when available
+  constructor() {
+    // No dependencies for now
+  }
 
   /**
    * **REAL IMPLEMENTATION**: Get MCP servers from database with fallback to defaults
    */
   async getAvailableMCPServers(): Promise<any[]> {
-    try {
-      // Try to get MCP servers from database first
-      if (this.databaseService) {
-        const dbServers = await this.databaseService.query(`
-          SELECT 
-            id,
-            name,
-            description,
-            category,
-            command,
-            args,
-            environment,
-            created_at,
-            updated_at,
-            is_active
-          FROM mcp_servers 
-          WHERE is_active = true
-          ORDER BY category, name
-        `);
-
-        if (dbServers && dbServers.length > 0) {
-          // Transform database results to MCP server config format
-          return dbServers.map((server: any) => ({
-            id: server.id,
-            name: server.name,
-            description: server.description,
-            category: server.category,
-            command: server.command,
-            args: server.args ? JSON.parse(server.args) : [],
-            env: server.environment ? JSON.parse(server.environment) : {},
-            createdAt: server.created_at,
-            updatedAt: server.updated_at,
-            isActive: server.is_active,
-          }));
-        }
-      }
-    } catch (error) {
-      console.warn(
-        "Failed to load MCP servers from database, using defaults:",
-        error
-      );
-    }
-
-    // Fallback to hardcoded defaults if database is not available or empty
+    // For now, use hardcoded defaults since database is temporarily disabled
     const mcpServers = Object.values(defaultMCPs);
     return mcpServers;
   }

@@ -1,7 +1,11 @@
+"use client";
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
+import { useMagic } from "@/lib/magic-provider";
 import { toast as showToast } from "@/components/ui/use-toast";
-import { useWalletClient } from "wagmi";
+import api from "@/lib/services/api";
+import { useState, useEffect } from "react";
 
 export interface UserWallet {
   id: string;
@@ -29,6 +33,45 @@ export interface CreateWalletInput {
  */
 export const useUserWallets = () => {
   const { user, isAuthenticated } = useMagicAuth();
+  const { magic: magicInstance } = useMagic();
+  const queryClient = useQueryClient();
+
+  // Use wallet connection state as fallback for authentication
+  const sessionAuthState =
+    typeof window !== "undefined"
+      ? sessionStorage.getItem("MAGIC_AUTH_STATE")
+      : null;
+
+  // Check Magic SDK directly for authentication state
+  const [magicAuthState, setMagicAuthState] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkMagicAuth = async () => {
+      if (magicInstance) {
+        try {
+          const isLoggedIn = await magicInstance.user.isLoggedIn();
+          setMagicAuthState(isLoggedIn);
+          console.log("UserWallets - Direct Magic SDK check:", isLoggedIn);
+        } catch (error) {
+          console.error("UserWallets - Error checking Magic auth:", error);
+          setMagicAuthState(false);
+        }
+      }
+    };
+
+    checkMagicAuth();
+  }, [magicInstance]);
+
+  const isUserConnected =
+    isAuthenticated || sessionAuthState === "true" || magicAuthState === true;
+
+  console.log("UserWallets - Auth state debug:", {
+    isAuthenticated,
+    sessionAuthState,
+    magicAuthState,
+    isUserConnected,
+    hasWindow: typeof window !== "undefined",
+  });
 
   const {
     data: wallets,
@@ -45,8 +88,8 @@ export const useUserWallets = () => {
         timestamp: new Date().toISOString(),
       });
 
-      if (!isAuthenticated) {
-        console.log("User not authenticated, returning empty wallet list");
+      if (!isUserConnected) {
+        console.log("User not connected, returning empty wallet list");
         return [];
       }
 
@@ -60,7 +103,7 @@ export const useUserWallets = () => {
           console.log(
             `Fetching wallets attempt ${attempts + 1}/${maxAttempts}`
           );
-          const response = await fetch("/api/user/wallets", {
+          const response = await api.get("/user/wallets", {
             // Add cache-busting to prevent stale data
             headers: {
               "Cache-Control": "no-cache",
@@ -68,8 +111,8 @@ export const useUserWallets = () => {
             },
           });
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
+          if (response.status !== 200) {
+            const errorData = response.data || {};
             console.error("Error fetching wallets:", {
               status: response.status,
               statusText: response.statusText,
@@ -84,7 +127,7 @@ export const useUserWallets = () => {
             throw new Error(`Failed to fetch wallets: ${response.statusText}`);
           }
 
-          const data = await response.json();
+          const data = response.data;
           console.log("Wallets fetched successfully:", {
             count: data.length,
             wallets: data.map((w: UserWallet) => ({
@@ -126,7 +169,7 @@ export const useUserWallets = () => {
 
       throw lastError;
     },
-    enabled: !!isAuthenticated,
+    enabled: !!isUserConnected,
     // Refresh wallets periodically to ensure up-to-date data
     refetchInterval: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: true,
@@ -142,14 +185,14 @@ export const useUserWallets = () => {
         walletType: data.walletType,
       });
 
-      if (!isAuthenticated) {
-        console.error("Cannot save wallet: User not authenticated");
+      if (!isUserConnected) {
+        console.error("Cannot save wallet: User not connected");
         showToast({
           title: "Authentication required",
           description: "Please log in to save your wallet.",
           variant: "destructive",
         });
-        throw new Error("User not authenticated");
+        throw new Error("User not connected");
       }
 
       // Add retry logic for saving wallet
@@ -161,16 +204,10 @@ export const useUserWallets = () => {
         try {
           console.log(`Saving wallet attempt ${attempts + 1}/${maxAttempts}`);
 
-          const response = await fetch("/api/user/wallets", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(data),
-          });
+          const response = await api.post("/user/wallets", data);
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
+          if (response.status !== 200 && response.status !== 201) {
+            const errorData = response.data || {};
             console.error("Error saving wallet:", {
               status: response.status,
               statusText: response.statusText,
@@ -192,7 +229,7 @@ export const useUserWallets = () => {
             );
           }
 
-          const savedWallet = await response.json();
+          const savedWallet = response.data;
           console.log("Wallet saved successfully:", savedWallet);
           return savedWallet;
         } catch (error) {
@@ -245,23 +282,21 @@ export const useUserWallets = () => {
   // Mutation to delete a wallet
   const deleteWallet = useMutation({
     mutationFn: async (walletId: string): Promise<{ success: boolean }> => {
-      if (!isAuthenticated || !user?.issuer) {
-        console.error("Cannot delete wallet: User not authenticated");
-        throw new Error("User not authenticated");
+      if (!isUserConnected || !user?.issuer) {
+        console.error("Cannot delete wallet: User not connected");
+        throw new Error("User not connected");
       }
 
       console.log("Deleting wallet with ID:", walletId);
-      const response = await fetch(`/api/user/wallets?id=${walletId}`, {
-        method: "DELETE",
-      });
+      const response = await api.delete(`/user/wallets/${walletId}`);
 
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (response.status !== 200 && response.status !== 204) {
+        const errorData = response.data || {};
         console.error("Error deleting wallet:", errorData);
         throw new Error(errorData.message || "Failed to delete wallet");
       }
 
-      const result = await response.json();
+      const result = response.data;
       console.log("Wallet deleted successfully:", result);
       return result;
     },
@@ -290,7 +325,7 @@ export const useUserWallets = () => {
 
   return {
     wallets,
-    isLoading, 
+    isLoading,
     isLoadingWallets: isLoading, // Include both names for compatibility
     error,
     refetch,

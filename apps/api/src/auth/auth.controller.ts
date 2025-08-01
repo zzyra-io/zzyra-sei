@@ -15,6 +15,7 @@ import { Public } from "./decorators/public.decorator";
 interface MagicAuthPayload {
   email: string;
   didToken: string;
+  publicAddress?: string;
   isOAuth?: boolean;
   oauthProvider?: string;
   oauthUserInfo?: any;
@@ -36,6 +37,7 @@ export class AuthController {
     body: {
       email: string;
       didToken: string;
+      publicAddress?: string;
       isOAuth?: boolean;
       oauthProvider?: string;
       oauthUserInfo?: any;
@@ -48,6 +50,7 @@ export class AuthController {
       const {
         email,
         didToken,
+        publicAddress,
         isOAuth,
         oauthProvider,
         oauthUserInfo,
@@ -74,6 +77,7 @@ export class AuthController {
       const magicPayload: MagicAuthPayload = {
         email,
         didToken,
+        publicAddress,
         isOAuth,
         oauthProvider,
         oauthUserInfo,
