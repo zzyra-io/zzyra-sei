@@ -163,9 +163,13 @@ export class MCPToolsManager {
       if (serverId === 'sei') {
         this.logger.log(`🔧 SEI MCP Server Configuration Debug:`);
         this.logger.log(`User config keys: ${Object.keys(userConfig)}`);
-        this.logger.log(`Server def argMapping: ${JSON.stringify(serverDef.connection.argMapping)}`);
-        this.logger.log(`User config PRIVATE_KEY: ${!!(userConfig.PRIVATE_KEY)}`);
-        this.logger.log(`Process env PRIVATE_KEY: ${!!(process.env.PRIVATE_KEY)}`);
+        this.logger.log(
+          `Server def argMapping: ${JSON.stringify(serverDef.connection.argMapping)}`,
+        );
+        this.logger.log(`User config PRIVATE_KEY: ${!!userConfig.PRIVATE_KEY}`);
+        this.logger.log(
+          `Process env PRIVATE_KEY: ${!!process.env.PRIVATE_KEY}`,
+        );
       }
 
       // Create server configuration with user-provided values
@@ -189,15 +193,24 @@ export class MCPToolsManager {
               env[configKey] = userConfig[configKey];
             }
           } else if (serverId === 'sei') {
-            this.logger.log(`❌ Missing user config for ${configKey}, trying process.env`);
+            this.logger.log(
+              `❌ Missing user config for ${configKey}, trying process.env`,
+            );
             // Fallback to process.env if user config doesn't have it
             if (process.env[configKey]) {
               env[configKey] = process.env[configKey];
-              this.logger.log(`✅ Found ${configKey} in process.env and added to env`);
-            } else if (configKey === 'PRIVATE_KEY' && process.env.WALLET_PRIVATE_KEY) {
-              // Special case: use WALLET_PRIVATE_KEY as PRIVATE_KEY for SEI MCP server
-              env[configKey] = process.env.WALLET_PRIVATE_KEY;
-              this.logger.log(`✅ Found WALLET_PRIVATE_KEY in process.env and mapped to ${configKey}`);
+              this.logger.log(
+                `✅ Found ${configKey} in process.env and added to env`,
+              );
+            } else if (
+              configKey === 'PRIVATE_KEY' &&
+              process.env.EVM_WALLET_PRIVATE_KEY
+            ) {
+              // Special case: use EVM_WALLET_PRIVATE_KEY as PRIVATE_KEY for SEI MCP server
+              env[configKey] = process.env.EVM_WALLET_PRIVATE_KEY;
+              this.logger.log(
+                `✅ Found EVM_WALLET_PRIVATE_KEY in process.env and mapped to ${configKey}`,
+              );
             }
           }
         }

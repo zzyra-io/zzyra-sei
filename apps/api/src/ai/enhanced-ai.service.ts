@@ -1026,7 +1026,7 @@ Edges: ${JSON.stringify(edges, null, 2)}
 - ✅ Portfolio analysis and yield tracking
 
 ⚠️ **GOAT Tools Usage**:
-- All GOAT tools require wallet configuration (WALLET_PRIVATE_KEY)
+        - All GOAT tools require wallet configuration (EVM_WALLET_PRIVATE_KEY)
 - Network-specific tools work on their respective chains
 - DeFi tools require sufficient token balances for transactions
 - Use appropriate network tools for the user's intended blockchain`;
@@ -1812,7 +1812,7 @@ EVERY AI_AGENT block MUST include selectedTools from availableMCPServers above. 
     "id": "goat", 
     "name": "GOAT Blockchain",
     "type": "mcp",
-    "config": { "WALLET_PRIVATE_KEY": "0x...", "RPC_PROVIDER_URL": "https://sepolia.base.org" },
+                "config": { "EVM_WALLET_PRIVATE_KEY": "0x...", "RPC_PROVIDER_URL": "https://sepolia.base.org" },
     "description": "Blockchain operations using GOAT SDK",
     "category": "api",
     "enabled": true

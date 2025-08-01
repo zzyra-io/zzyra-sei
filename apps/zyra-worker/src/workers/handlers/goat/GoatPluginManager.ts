@@ -589,7 +589,7 @@ export class GoatPluginManager {
 
     for (const network of networks) {
       try {
-        const privateKey = process.env.WALLET_PRIVATE_KEY;
+        const privateKey = process.env.EVM_WALLET_PRIVATE_KEY;
         if (!privateKey) {
           this.logger.warn(
             'No wallet private key provided, some tools may not work',

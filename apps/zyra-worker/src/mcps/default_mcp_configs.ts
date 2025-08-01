@@ -91,7 +91,7 @@ export const goat = {
   configSchema: {
     type: 'object',
     properties: {
-      WALLET_PRIVATE_KEY: {
+      EVM_WALLET_PRIVATE_KEY: {
         type: 'string',
         description: 'Private key for wallet operations',
         required: true,
@@ -110,14 +110,14 @@ export const goat = {
         default: 'false',
       },
     },
-    required: ['WALLET_PRIVATE_KEY'],
+    required: ['EVM_WALLET_PRIVATE_KEY'],
   },
   examples: [
     {
       name: 'Sei Testnet Wallet',
       description: 'Connect to Sei testnet (default)',
       configuration: {
-        WALLET_PRIVATE_KEY: '0x...',
+        EVM_WALLET_PRIVATE_KEY: '0x...',
         RPC_PROVIDER_URL: 'https://evm-rpc-testnet.sei-apis.com',
       },
     },
@@ -125,7 +125,7 @@ export const goat = {
       name: 'Base Sepolia Wallet',
       description: 'Connect to Base Sepolia testnet',
       configuration: {
-        WALLET_PRIVATE_KEY: '0x...',
+        EVM_WALLET_PRIVATE_KEY: '0x...',
         RPC_PROVIDER_URL: 'https://sepolia.base.org',
         USE_BASE_SEPOLIA: 'true',
       },
@@ -296,22 +296,39 @@ export const sei = {
   name: 'sei',
   displayName: 'Sei Network',
   description:
-    'Official Sei Network MCP Server - blockchain operations, token management, NFT operations, and smart contracts',
+    'Local Sei Network MCP Server - blockchain operations, token management, NFT operations, and smart contracts with wallet functionality',
   category: 'blockchain',
   icon: '⚡',
   connection: {
     type: 'stdio',
-    command: 'npx',
-    args: ['-y', '@sei-js/mcp-server'],
+    command: 'ts-node',
+    args: ['./src/mcps/sei/sei-mcp-server.ts'],
     argMapping: {
+      WALLET_MODE: 'env',
       PRIVATE_KEY: 'env',
       CUSTOM_RPC_URL: 'env',
       CUSTOM_CHAIN_ID: 'env',
+      SEI_NETWORK: 'env',
+      SEI_TESTNET_RPC: 'env',
+      SEI_TESTNET_CHAIN_ID: 'env',
+      SEI_TESTNET_NAME: 'env',
+      SEI_TESTNET_NETWORK: 'env',
+      SEI_TESTNET_EXPLORER_NAME: 'env',
+      SEI_TESTNET_EXPLORER_URL: 'env',
+      SEI_MAINNET_RPC: 'env',
     },
   },
   configSchema: {
     type: 'object',
     properties: {
+      WALLET_MODE: {
+        type: 'string',
+        description:
+          'Wallet mode: private-key (enables wallet) or disabled (read-only)',
+        enum: ['private-key', 'disabled'],
+        default: 'private-key',
+        required: true,
+      },
       PRIVATE_KEY: {
         type: 'string',
         description: 'Private key for wallet operations (use dedicated wallet)',
@@ -330,24 +347,83 @@ export const sei = {
           'Custom chain ID (optional, uses default: 1329 for mainnet)',
         required: false,
       },
+      SEI_NETWORK: {
+        type: 'string',
+        description: 'Sei network to use: mainnet or testnet',
+        enum: ['mainnet', 'testnet'],
+        default: 'mainnet',
+        required: false,
+      },
+      SEI_TESTNET_RPC: {
+        type: 'string',
+        description:
+          'Custom RPC URL for Sei testnet (e.g., QuickNode endpoint)',
+        required: false,
+      },
+      SEI_TESTNET_CHAIN_ID: {
+        type: 'string',
+        description: 'Chain ID for Sei testnet (default: 1328)',
+        required: false,
+      },
+      SEI_TESTNET_NAME: {
+        type: 'string',
+        description: 'Display name for Sei testnet',
+        required: false,
+      },
+      SEI_TESTNET_NETWORK: {
+        type: 'string',
+        description: 'Network identifier for Sei testnet (e.g., atlantic-2)',
+        required: false,
+      },
+      SEI_TESTNET_EXPLORER_NAME: {
+        type: 'string',
+        description: 'Name of the Sei testnet block explorer',
+        required: false,
+      },
+      SEI_TESTNET_EXPLORER_URL: {
+        type: 'string',
+        description: 'URL of the Sei testnet block explorer',
+        required: false,
+      },
+      SEI_MAINNET_RPC: {
+        type: 'string',
+        description: 'Custom RPC URL for Sei mainnet',
+        required: false,
+      },
     },
-    required: ['PRIVATE_KEY'],
+    required: ['WALLET_MODE', 'PRIVATE_KEY'],
   },
   examples: [
     {
-      name: 'Sei Testnet Operations',
-      description: 'Connect to Sei testnet with official MCP server',
+      name: 'Sei Mainnet with Wallet',
+      description: 'Full wallet functionality on Sei mainnet',
       configuration: {
+        WALLET_MODE: 'private-key',
         PRIVATE_KEY: '0x...',
+        SEI_NETWORK: 'mainnet',
       },
     },
     {
-      name: 'Sei Mainnet Operations',
-      description: 'Connect to Sei mainnet with custom RPC',
+      name: 'Sei Atlantic-2 Testnet with Wallet',
+      description:
+        'Full wallet functionality on Sei atlantic-2 testnet with custom configuration',
       configuration: {
+        WALLET_MODE: 'private-key',
         PRIVATE_KEY: '0x...',
-        CUSTOM_RPC_URL: 'https://evm-rpc.sei-apis.com',
-        CUSTOM_CHAIN_ID: '1329',
+        SEI_NETWORK: 'testnet',
+        SEI_TESTNET_RPC:
+          'https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32',
+        SEI_TESTNET_NETWORK: 'atlantic-2',
+        SEI_TESTNET_EXPLORER_URL: 'https://testnet.seistream.app',
+      },
+    },
+    {
+      name: 'Sei Read-Only Mode',
+      description: 'Read-only blockchain data access',
+      configuration: {
+        WALLET_MODE: 'disabled',
+        PRIVATE_KEY: '0x...',
+        SEI_NETWORK: 'mainnet',
       },
     },
   ],

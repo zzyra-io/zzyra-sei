@@ -187,14 +187,16 @@ class TransactionHistoryPlugin extends PluginBase<any> {
 
 // 1. Create the wallet client
 const account = privateKeyToAccount(
-  process.env.WALLET_PRIVATE_KEY as `0x${string}`,
+  process.env.EVM_WALLET_PRIVATE_KEY as `0x${string}`,
 );
 
 // Determine which chain to use based on environment variable or default to Sei testnet
-const chain = process.env.USE_BASE_SEPOLIA === 'true' ? baseSepolia : seiTestnet;
-const defaultRpcUrl = chain === seiTestnet ? 
-  'https://evm-rpc-testnet.sei-apis.com' : 
-  'https://sepolia.base.org';
+const chain =
+  process.env.USE_BASE_SEPOLIA === 'true' ? baseSepolia : seiTestnet;
+const defaultRpcUrl =
+  chain === seiTestnet
+    ? 'https://evm-rpc-testnet.sei-apis.com'
+    : 'https://sepolia.base.org';
 
 const walletClient = createWalletClient({
   account: account,

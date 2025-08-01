@@ -2049,7 +2049,9 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
       // First, try to derive the user's wallet address from their private key
       const userWalletAddress = this.deriveAddressFromPrivateKey();
       if (userWalletAddress) {
-        this.logger.log(`🔑 Using user's wallet address from private key: ${userWalletAddress}`);
+        this.logger.log(
+          `🔑 Using user's wallet address from private key: ${userWalletAddress}`,
+        );
         return userWalletAddress;
       }
 
@@ -2057,21 +2059,27 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
       // Ethereum addresses
       const ethMatch = context.match(/0x[a-fA-F0-9]{40}/);
       if (ethMatch) {
-        this.logger.log(`📦 Using address extracted from context: ${ethMatch[0]}`);
+        this.logger.log(
+          `📦 Using address extracted from context: ${ethMatch[0]}`,
+        );
         return ethMatch[0];
       }
 
       // Sei addresses
       const seiMatch = context.match(/sei1[a-z0-9]{38,58}/);
       if (seiMatch) {
-        this.logger.log(`📦 Using SEI address extracted from context: ${seiMatch[0]}`);
+        this.logger.log(
+          `📦 Using SEI address extracted from context: ${seiMatch[0]}`,
+        );
         return seiMatch[0];
       }
 
       // ENS names
       const ensMatch = context.match(/\b\w+\.eth\b/);
       if (ensMatch) {
-        this.logger.log(`📦 Using ENS name extracted from context: ${ensMatch[0]}`);
+        this.logger.log(
+          `📦 Using ENS name extracted from context: ${ensMatch[0]}`,
+        );
         return ensMatch[0];
       }
     }
@@ -2199,7 +2207,9 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
       ) {
         // Try to derive address from private key
         const derivedAddress = this.deriveAddressFromPrivateKey();
-        this.logger.log(`🔑 Derived address from private key: ${derivedAddress}`);
+        this.logger.log(
+          `🔑 Derived address from private key: ${derivedAddress}`,
+        );
         return derivedAddress;
       }
     }
@@ -2958,7 +2968,7 @@ Respond with: "VALID - [brief reason]" or "INVALID - [brief reason]"`;
     try {
       // Try to get private key from environment variables
       const privateKey =
-        process.env.WALLET_PRIVATE_KEY || process.env.PRIVATE_KEY;
+        process.env.EVM_WALLET_PRIVATE_KEY || process.env.PRIVATE_KEY;
 
       if (!privateKey) {
         this.logger.warn('No private key found in environment variables');

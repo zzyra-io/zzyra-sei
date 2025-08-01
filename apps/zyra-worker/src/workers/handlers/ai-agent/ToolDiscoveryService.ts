@@ -745,7 +745,7 @@ export class ToolDiscoveryService {
               avgResponseTime: 2000, // Default average response time
               successRate: 0.9, // Default success rate
             },
-            dependencies: ['WALLET_PRIVATE_KEY'],
+            dependencies: ['EVM_WALLET_PRIVATE_KEY'],
             limitations: ['Requires wallet configuration', 'Network-dependent'],
           },
           connection: {

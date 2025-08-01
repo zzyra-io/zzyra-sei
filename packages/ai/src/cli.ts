@@ -27,9 +27,7 @@ if (command === "mcp:goat") {
     stdio: "inherit",
     env: {
       ...process.env,
-      WALLET_PRIVATE_KEY:
-        process.env.WALLET_PRIVATE_KEY ||
-        "0x0000000000000000000000000000000000000000000000000000000000000001",
+      EVM_WALLET_PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
       RPC_PROVIDER_URL:
         process.env.RPC_PROVIDER_URL || "https://sepolia.base.org",
     },

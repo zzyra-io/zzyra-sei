@@ -38,7 +38,9 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 console.log('Environment variables loaded:', {
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ? 'SET' : 'NOT SET',
-  WALLET_PRIVATE_KEY: process.env.WALLET_PRIVATE_KEY ? 'SET' : 'NOT SET',
+  EVM_WALLET_PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY
+    ? 'SET'
+    : 'NOT SET',
   RPC_PROVIDER_URL: process.env.RPC_PROVIDER_URL ? 'SET' : 'NOT SET',
   BRAVE_API_KEY: process.env.BRAVE_API_KEY ? 'SET' : 'NOT SET',
   DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'NOT SET',
@@ -276,9 +278,7 @@ const TEST_SCENARIOS = {
         name: 'GOAT Blockchain',
         type: 'mcp',
         config: {
-          WALLET_PRIVATE_KEY:
-            process.env.WALLET_PRIVATE_KEY ||
-            '0x0000000000000000000000000000000000000000000000000000000000000001',
+          EVM_WALLET_PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
           RPC_PROVIDER_URL:
             process.env.RPC_PROVIDER_URL || 'https://sepolia.base.org',
         },
@@ -391,16 +391,16 @@ const TEST_SCENARIOS = {
   'sei-basic': {
     name: 'SEI Basic Operations',
     prompt:
-      'Check my SEI wallet address and balance. Also check the latest block information on SEI network.',
+      'Check the Sei network information, get my wallet address and SEI balance, and show me the latest block information.',
     tools: [
       {
         id: 'sei',
         name: 'SEI Network Operations',
         type: 'mcp',
         config: {
-          PRIVATE_KEY:
-            process.env.WALLET_PRIVATE_KEY ||
-            '0x0000000000000000000000000000000000000000000000000000000000000001',
+          WALLET_MODE: 'private-key',
+          PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
+          SEI_NETWORK: 'mainnet',
         },
       },
     ],
@@ -408,16 +408,16 @@ const TEST_SCENARIOS = {
   'sei-token-management': {
     name: 'SEI Token Management',
     prompt:
-      'Check my USDC token balance on SEI network, get token info for USDC contract 0x3894085ef7ff0f0aedf52e2a2704928d1ec074f1, and show me details about the latest block.',
+      'Check my USDC token balance on SEI network using contract address 0x3894085ef7ff0f0aedf52e2a2704928d1ec074f1, get the latest block, and show network information.',
     tools: [
       {
         id: 'sei',
         name: 'SEI Network Operations',
         type: 'mcp',
         config: {
-          PRIVATE_KEY:
-            process.env.WALLET_PRIVATE_KEY ||
-            '0x0000000000000000000000000000000000000000000000000000000000000001',
+          WALLET_MODE: 'private-key',
+          PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
+          SEI_NETWORK: 'mainnet',
         },
       },
     ],
@@ -425,16 +425,16 @@ const TEST_SCENARIOS = {
   'sei-multi-ops': {
     name: 'SEI Multiple Operations',
     prompt:
-      'Perform comprehensive SEI analysis: 1) Get my wallet address and native SEI balance, 2) Check if 0x3894085ef7ff0f0aedf52e2a2704928d1ec074f1 is a contract, 3) Get chain information for SEI network, 4) Get the latest block details. Provide a detailed summary.',
+      'Perform comprehensive SEI analysis: 1) Get my wallet address and native SEI balance, 2) Get chain information for SEI network, 3) Get the latest block details, 4) Check supported networks. Provide a detailed summary.',
     tools: [
       {
         id: 'sei',
         name: 'SEI Network Operations',
         type: 'mcp',
         config: {
-          PRIVATE_KEY:
-            process.env.WALLET_PRIVATE_KEY ||
-            '0x0000000000000000000000000000000000000000000000000000000000000001',
+          WALLET_MODE: 'private-key',
+          PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
+          SEI_NETWORK: 'mainnet',
         },
       },
     ],
@@ -442,16 +442,16 @@ const TEST_SCENARIOS = {
   'sei-defi-analysis': {
     name: 'SEI DeFi Analysis with Web Search',
     prompt:
-      'Analyze SEI DeFi ecosystem: 1) Get my SEI balance and wallet address, 2) Check USDC token info on SEI, 3) Search online for current SEI token price and market cap, 4) Provide investment insights.',
+      'Analyze SEI DeFi ecosystem: 1) Get my SEI balance and wallet address, 2) Get chain information, 3) Search online for current SEI token price and market cap, 4) Provide investment insights.',
     tools: [
       {
         id: 'sei',
         name: 'SEI Network Operations',
         type: 'mcp',
         config: {
-          PRIVATE_KEY:
-            process.env.WALLET_PRIVATE_KEY ||
-            '0x0000000000000000000000000000000000000000000000000000000000000001',
+          WALLET_MODE: 'private-key',
+          PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
+          SEI_NETWORK: 'mainnet',
         },
       },
       {
@@ -460,6 +460,45 @@ const TEST_SCENARIOS = {
         type: 'mcp',
         config: {
           apiKey: process.env.BRAVE_API_KEY || 'demo-key',
+        },
+      },
+    ],
+  },
+  'sei-read-only': {
+    name: 'SEI Read-Only Mode',
+    prompt:
+      'Get Sei network information, check the latest block, show supported networks, and provide network statistics. This should work in read-only mode without wallet functionality.',
+    tools: [
+      {
+        id: 'sei',
+        name: 'SEI Network Operations',
+        type: 'mcp',
+        config: {
+          WALLET_MODE: 'disabled',
+          PRIVATE_KEY: 'not_required_for_read_only',
+          SEI_NETWORK: 'testnet',
+        },
+      },
+    ],
+  },
+  'sei-atlantic-testnet': {
+    name: 'SEI Atlantic-2 Testnet Operations',
+    prompt:
+      'Test Sei Atlantic-2 testnet functionality: get network info, wallet address, SEI balance, latest block, and verify we are connected to the correct testnet with custom QuickNode RPC.',
+    tools: [
+      {
+        id: 'sei',
+        name: 'SEI Atlantic-2 Testnet',
+        type: 'mcp',
+        config: {
+          WALLET_MODE: 'private-key',
+          PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
+          SEI_NETWORK: 'testnet',
+          SEI_TESTNET_RPC:
+            'https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32',
+          SEI_TESTNET_NETWORK: 'atlantic-2',
+          SEI_TESTNET_EXPLORER_URL: 'https://testnet.seistream.app',
+          SEI_TESTNET_NAME: 'Sei Atlantic-2 Testnet',
         },
       },
     ],
@@ -474,9 +513,7 @@ const TEST_SCENARIOS = {
         name: 'SEI Network Operations',
         type: 'mcp',
         config: {
-          PRIVATE_KEY:
-            process.env.WALLET_PRIVATE_KEY ||
-            '0x0000000000000000000000000000000000000000000000000000000000000001',
+          PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
         },
       },
       {
@@ -524,6 +561,18 @@ async function runCompleteSystemTest() {
     logger.error('   OPENROUTER_API_KEY');
     logger.error('   OPENAI_API_KEY');
     logger.error('   ANTHROPIC_API_KEY');
+    process.exit(1);
+  }
+
+  // Check for required environment variables for specific test types
+  if (testType.startsWith('sei-') && !process.env.EVM_WALLET_PRIVATE_KEY) {
+    logger.error(
+      '❌ SEI blockchain tests require EVM_WALLET_PRIVATE_KEY environment variable',
+    );
+    logger.error('   Please set EVM_WALLET_PRIVATE_KEY=your_private_key');
+    logger.error(
+      '   Example: EVM_WALLET_PRIVATE_KEY=0x... ts-node src/scripts/simple-ai-agent.ts sei-basic',
+    );
     process.exit(1);
   }
 
@@ -842,6 +891,8 @@ Test Types:
   sei-token-management - SEI token operations (USDC balance, token info)
   sei-multi-ops        - SEI multiple operations (comprehensive analysis)
   sei-defi-analysis    - SEI DeFi analysis with web search
+  sei-read-only        - SEI read-only mode (no wallet required)
+  sei-atlantic-testnet - SEI Atlantic-2 testnet with custom QuickNode RPC
   sei-comprehensive    - SEI comprehensive test (all operations)
 
 Examples:
@@ -856,7 +907,7 @@ Environment Variables:
   OPENAI_API_KEY     - OpenAI API key
   ANTHROPIC_API_KEY  - Anthropic API key
   BRAVE_API_KEY      - Brave Search API key (for web search tests)
-  WALLET_PRIVATE_KEY - For GOAT blockchain operations
+  EVM_WALLET_PRIVATE_KEY - For GOAT blockchain operations
   RPC_PROVIDER_URL   - For blockchain RPC connection
 
 For Real MCP Server Testing:

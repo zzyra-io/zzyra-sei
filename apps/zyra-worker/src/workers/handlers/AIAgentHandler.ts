@@ -646,9 +646,7 @@ export class AIAgentHandler implements BlockHandler {
     // Add environment variables based on tool type
     switch (toolId) {
       case 'goat':
-        baseEnv.WALLET_PRIVATE_KEY =
-          process.env.WALLET_PRIVATE_KEY ||
-          '0x0000000000000000000000000000000000000000000000000000000000000001';
+        baseEnv.EVM_WALLET_PRIVATE_KEY = process.env.EVM_WALLET_PRIVATE_KEY;
         baseEnv.RPC_PROVIDER_URL =
           process.env.RPC_PROVIDER_URL || 'https://sepolia.base.org';
         break;
