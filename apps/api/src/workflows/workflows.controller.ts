@@ -34,7 +34,7 @@ import { Public } from "../auth/decorators/public.decorator";
 
 @ApiTags("workflows")
 @Controller("workflows")
-@ApiBearerAuth()
+// @ApiBearerAuth()
 export class WorkflowsController {
   constructor(private readonly workflowsService: WorkflowsService) {}
 
@@ -74,6 +74,7 @@ export class WorkflowsController {
   }
 
   @Post()
+  @Public()
   @ApiOperation({ summary: "Create a new workflow" })
   @ApiResponse({
     status: HttpStatus.CREATED,
@@ -124,6 +125,7 @@ export class WorkflowsController {
   }
 
   @Post(":id/execute")
+  @Public()
   @ApiOperation({ summary: "Execute a workflow" })
   @ApiResponse({
     status: HttpStatus.OK,

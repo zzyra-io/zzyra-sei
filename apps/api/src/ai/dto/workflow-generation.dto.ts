@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   ValidateNested,
+  IsIn,
 } from "class-validator";
 import { Type } from "class-transformer";
 
@@ -25,10 +26,14 @@ export class GenerationOptionsDto {
   @IsString()
   domainHint?: string;
 
-  @ApiProperty({ description: "User level", required: false })
+  @ApiProperty({
+    description: "User level",
+    required: false,
+    enum: ["beginner", "intermediate", "advanced"],
+  })
   @IsOptional()
-  @IsString()
-  userLevel?: string;
+  @IsIn(["beginner", "intermediate", "advanced"])
+  userLevel?: "beginner" | "intermediate" | "advanced";
 
   @ApiProperty({ description: "Enable security", required: false })
   @IsOptional()

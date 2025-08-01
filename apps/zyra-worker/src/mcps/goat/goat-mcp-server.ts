@@ -9,6 +9,33 @@ import { http, createWalletClient } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { baseSepolia } from 'viem/chains';
 
+// Sei Network configuration
+const seiTestnet = {
+  id: 1328,
+  name: 'Sei Testnet',
+  network: 'sei-testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'SEI',
+    symbol: 'SEI',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://evm-rpc-testnet.sei-apis.com'],
+    },
+    public: {
+      http: ['https://evm-rpc-testnet.sei-apis.com'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Seitrace',
+      url: 'https://seitrace.com',
+    },
+  },
+  testnet: true,
+} as const;
+
 import { getOnChainTools } from '@goat-sdk/adapter-model-context-protocol';
 import { viem } from '@goat-sdk/wallet-viem';
 import { PluginBase, createTool } from '@goat-sdk/core';
@@ -163,10 +190,16 @@ const account = privateKeyToAccount(
   process.env.WALLET_PRIVATE_KEY as `0x${string}`,
 );
 
+// Determine which chain to use based on environment variable or default to Sei testnet
+const chain = process.env.USE_BASE_SEPOLIA === 'true' ? baseSepolia : seiTestnet;
+const defaultRpcUrl = chain === seiTestnet ? 
+  'https://evm-rpc-testnet.sei-apis.com' : 
+  'https://sepolia.base.org';
+
 const walletClient = createWalletClient({
   account: account,
-  transport: http(process.env.RPC_PROVIDER_URL),
-  chain: baseSepolia,
+  transport: http(process.env.RPC_PROVIDER_URL || defaultRpcUrl),
+  chain,
 });
 
 // 2. Get the onchain tools for the wallet with our custom plugin

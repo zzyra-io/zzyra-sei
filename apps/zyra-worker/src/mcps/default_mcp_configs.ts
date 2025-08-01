@@ -80,7 +80,7 @@ export const goat = {
   name: 'goat',
   displayName: 'GOAT Blockchain',
   description:
-    'Blockchain operations using GOAT SDK (wallet management, DeFi, NFTs, etc.)',
+    'Blockchain operations using GOAT SDK (wallet management, DeFi, NFTs, etc.) - Now supports Sei Network',
   category: 'api',
   icon: '🔗',
   connection: {
@@ -99,19 +99,35 @@ export const goat = {
       },
       RPC_PROVIDER_URL: {
         type: 'string',
-        description: 'RPC provider URL for blockchain operations',
-        required: true,
+        description:
+          'RPC provider URL for blockchain operations (optional, defaults to Sei testnet)',
+        required: false,
+      },
+      USE_BASE_SEPOLIA: {
+        type: 'string',
+        description: 'Set to "true" to use Base Sepolia instead of Sei testnet',
+        required: false,
+        default: 'false',
       },
     },
-    required: ['WALLET_PRIVATE_KEY', 'RPC_PROVIDER_URL'],
+    required: ['WALLET_PRIVATE_KEY'],
   },
   examples: [
+    {
+      name: 'Sei Testnet Wallet',
+      description: 'Connect to Sei testnet (default)',
+      configuration: {
+        WALLET_PRIVATE_KEY: '0x...',
+        RPC_PROVIDER_URL: 'https://evm-rpc-testnet.sei-apis.com',
+      },
+    },
     {
       name: 'Base Sepolia Wallet',
       description: 'Connect to Base Sepolia testnet',
       configuration: {
         WALLET_PRIVATE_KEY: '0x...',
         RPC_PROVIDER_URL: 'https://sepolia.base.org',
+        USE_BASE_SEPOLIA: 'true',
       },
     },
   ],
@@ -275,11 +291,64 @@ const blockScout = {
   },
 };
 
+export const sei = {
+  id: 'sei',
+  name: 'sei',
+  displayName: 'Sei Network',
+  description:
+    'Native Sei Network operations (balances, transactions, network info)',
+  category: 'api',
+  icon: '⚡',
+  connection: {
+    type: 'stdio',
+    command: 'ts-node',
+    args: ['./src/mcps/sei/sei-mcp-server.ts'],
+  },
+  configSchema: {
+    type: 'object',
+    properties: {
+      WALLET_PRIVATE_KEY: {
+        type: 'string',
+        description: 'Private key for wallet operations',
+        required: true,
+        sensitive: true,
+      },
+      RPC_PROVIDER_URL: {
+        type: 'string',
+        description:
+          'RPC provider URL for Sei Network (optional, uses default testnet)',
+        required: false,
+        default: 'https://evm-rpc-testnet.sei-apis.com',
+      },
+    },
+    required: ['WALLET_PRIVATE_KEY'],
+  },
+  examples: [
+    {
+      name: 'Sei Testnet Wallet',
+      description: 'Connect to Sei testnet for native operations',
+      configuration: {
+        WALLET_PRIVATE_KEY: '0x...',
+        RPC_PROVIDER_URL: 'https://evm-rpc-testnet.sei-apis.com',
+      },
+    },
+    {
+      name: 'Sei Mainnet Wallet',
+      description: 'Connect to Sei mainnet (when available)',
+      configuration: {
+        WALLET_PRIVATE_KEY: '0x...',
+        RPC_PROVIDER_URL: 'https://evm-rpc.sei-apis.com',
+      },
+    },
+  ],
+};
+
 // Export all MCP configurations as a single object
 export const defaultMCPs = {
   fetch,
   puppeteer,
   goat,
+  sei,
   git,
   'brave-search': braveSearch,
   time,

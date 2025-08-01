@@ -82,67 +82,68 @@ interface EnhancedNlWorkflowGeneratorProps {
   className?: string;
 }
 
-// Enhanced example suggestions with domain-specific categories
+// MCP-powered example suggestions showcasing web2 + web3 integration
+// Categories align with available MCP servers: goat (web3), fetch/puppeteer/brave-search/postgres/git/weather/time (web2)
 const SUGGESTION_CATEGORIES = {
-  defi: [
-    "Create a DeFi yield farming workflow with automatic compound rewards",
-    "Monitor liquidity pool ratios and rebalance when they deviate by 5%",
-    "Set up arbitrage detection between Uniswap and Sushiswap with profit alerts",
-    "Track my DeFi portfolio daily and send performance reports via email",
+  web3: [
+    "Check my SEI wallet balance and send email alerts when it changes by 10%",
+    "Monitor my DeFi positions across chains and rebalance when needed using GOAT SDK",
+    "Track gas prices on multiple networks and execute transactions when optimal",
+    "Set up automated yield farming with cross-chain bridge operations and notifications",
   ],
-  ecommerce: [
-    "Build an order processing workflow with inventory checks and shipping notifications",
-    "Create automated customer support tickets when order issues are detected",
-    "Set up abandoned cart recovery emails with personalized product recommendations",
-    "Monitor competitor prices and adjust our pricing automatically",
+  web2: [
+    "Scrape competitor product prices using Puppeteer and update our database",
+    "Search trending topics with Brave Search and post summaries to our API",
+    "Monitor our GitHub repository for new issues and create tickets in PostgreSQL",
+    "Get weather data and send daily forecasts to our team via email notifications",
   ],
-  social: [
-    "Automate social media posting across Twitter, LinkedIn, and Instagram",
-    "Monitor brand mentions and respond to customer feedback automatically",
-    "Create viral content analysis and trending topic notifications",
-    "Set up influencer outreach workflows based on engagement metrics",
+  hybrid: [
+    "Search crypto news, analyze sentiment, and execute trades based on market signals",
+    "Monitor web3 protocol updates via GitHub and rebalance portfolio accordingly",
+    "Scrape DeFi TVL data from websites and compare with on-chain wallet balances",
+    "Track weather patterns and execute climate-based prediction market trades",
+  ],
+  business: [
+    "Automate invoice processing: scrape data, validate in database, send confirmations",
+    "Monitor competitor websites and update our pricing in PostgreSQL automatically",
+    "Create daily reports by fetching API data and storing insights in database",
+    "Set up customer onboarding: web forms, database updates, and email sequences",
+  ],
+  development: [
+    "Auto-deploy when GitHub main branch updates and notify team via webhooks",
+    "Monitor API performance, log to database, and alert when thresholds exceeded",
+    "Scrape documentation sites for changes and update our knowledge base",
+    "Schedule automated database backups and verify integrity via API calls",
   ],
   analytics: [
-    "Build a real-time dashboard for website traffic and user behavior analysis",
-    "Create automated reports on sales performance and KPI tracking",
-    "Set up A/B testing workflows with statistical significance alerts",
-    "Monitor API performance and send alerts when response times exceed thresholds",
-  ],
-  healthcare: [
-    "Create patient appointment reminders with SMS and email notifications",
-    "Set up medication adherence tracking with automated refill reminders",
-    "Build a symptom monitoring workflow with escalation to healthcare providers",
-    "Create automated health screening questionnaires with risk assessments",
-  ],
-  enterprise: [
-    "Automate employee onboarding with document collection and system access",
-    "Create expense report approval workflows with multi-level authorization",
-    "Set up IT ticket escalation based on priority and response time SLAs",
-    "Build automated backup verification and disaster recovery testing",
+    "Combine blockchain transaction data with web analytics for user insights",
+    "Fetch social media metrics, store in PostgreSQL, and generate trend reports",
+    "Monitor DEX prices across chains and create arbitrage opportunity alerts",
+    "Track wallet activities and correlate with weather/time patterns for predictions",
   ],
 };
 
-// Domain detection with enhanced patterns
+// Domain detection with MCP-focused patterns
 const detectDomain = (prompt: string): string | undefined => {
   const lowerPrompt = prompt.toLowerCase();
   
-  if (/\b(defi|crypto|bitcoin|eth|btc|blockchain|token|uniswap|swap|yield|farming|liquidity)\b/.test(lowerPrompt)) {
-    return "defi";
+  if (/\b(wallet|defi|crypto|bitcoin|eth|btc|blockchain|token|sei|goat|yield|farming|liquidity|swap|bridge|cross.chain)\b/.test(lowerPrompt)) {
+    return "web3";
   }
-  if (/\b(order|product|inventory|customer|cart|payment|shipping|ecommerce)\b/.test(lowerPrompt)) {
-    return "ecommerce";
+  if (/\b(scrape|puppeteer|api|http|fetch|search|brave|database|postgres|sql|github|git|weather|time)\b/.test(lowerPrompt)) {
+    return "web2";
   }
-  if (/\b(social|twitter|facebook|instagram|linkedin|post|content|viral)\b/.test(lowerPrompt)) {
-    return "social";
+  if (/\b(crypto.news|sentiment|protocol.update|tvl|prediction.market|arbitrage|dex|on.chain)\b/.test(lowerPrompt)) {
+    return "hybrid";
   }
-  if (/\b(analytics|dashboard|report|metric|kpi|data|analysis|tracking)\b/.test(lowerPrompt)) {
+  if (/\b(invoice|competitor|pricing|customer|onboard|report|business|automation)\b/.test(lowerPrompt)) {
+    return "business";
+  }
+  if (/\b(deploy|github|api.performance|documentation|backup|monitoring|alert|webhook)\b/.test(lowerPrompt)) {
+    return "development";
+  }
+  if (/\b(analytics|dashboard|report|metric|kpi|data|analysis|tracking|insights|trend)\b/.test(lowerPrompt)) {
     return "analytics";
-  }
-  if (/\b(patient|health|medical|medication|appointment|doctor|clinic)\b/.test(lowerPrompt)) {
-    return "healthcare";
-  }
-  if (/\b(employee|hr|onboard|expense|ticket|enterprise|workflow|approval)\b/.test(lowerPrompt)) {
-    return "enterprise";
   }
   
   return undefined;
@@ -185,7 +186,7 @@ export const EnhancedNlWorkflowGenerator: React.FC<EnhancedNlWorkflowGeneratorPr
 }) => {
   // State
   const [prompt, setPrompt] = useState<string>("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("defi");
+  const [selectedCategory, setSelectedCategory] = useState<string>("web3");
   const [promptSuggestions, setPromptSuggestions] = useState<string[]>([]);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [showExamplesPanel, setShowExamplesPanel] = useState<boolean>(false);
@@ -566,9 +567,14 @@ export const EnhancedNlWorkflowGenerator: React.FC<EnhancedNlWorkflowGeneratorPr
                 className="w-full"
               >
                 <TabsList className="grid grid-cols-3 h-8 mb-3">
-                  <TabsTrigger value="defi" className="text-xs">DeFi</TabsTrigger>
-                  <TabsTrigger value="ecommerce" className="text-xs">Commerce</TabsTrigger>
-                  <TabsTrigger value="social" className="text-xs">Social</TabsTrigger>
+                  <TabsTrigger value="web3" className="text-xs">Web3</TabsTrigger>
+                  <TabsTrigger value="web2" className="text-xs">Web2</TabsTrigger>
+                  <TabsTrigger value="hybrid" className="text-xs">Hybrid</TabsTrigger>
+                </TabsList>
+                <TabsList className="grid grid-cols-3 h-8 mb-3 mt-2">
+                  <TabsTrigger value="business" className="text-xs">Business</TabsTrigger>
+                  <TabsTrigger value="development" className="text-xs">DevOps</TabsTrigger>
+                  <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
                 </TabsList>
                 <TabsContent value={selectedCategory} className="mt-0">
                   <div className="space-y-2">
@@ -766,7 +772,7 @@ export const EnhancedNlWorkflowGenerator: React.FC<EnhancedNlWorkflowGeneratorPr
               <div className="space-y-3">
                 <Textarea
                   ref={textareaRef}
-                  placeholder="Describe your workflow (e.g., 'Create a DeFi yield farming workflow with automatic compound rewards')"
+                  placeholder="Describe your workflow (e.g., 'Check my SEI wallet balance and send email alerts when it changes by 10%')"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}

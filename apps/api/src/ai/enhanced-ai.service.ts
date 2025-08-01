@@ -5,7 +5,7 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 
 // Import types from the types package
-import { BlockType, DataType } from "@zyra/types";
+import { BlockType, DataType, defaultMCPs } from "@zyra/types";
 
 // Import new services
 import { WorkflowValidatorService } from "./services/workflow-validator.service";
@@ -41,6 +41,10 @@ interface GenerationOptions {
   detailedMode: boolean;
   prefillConfig: boolean;
   domainHint?: string;
+  userLevel?: "beginner" | "intermediate" | "advanced";
+  enableSecurity?: boolean;
+  enableValidation?: boolean;
+  autoHeal?: boolean;
 }
 
 interface GenerationMetadata {
@@ -360,8 +364,8 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
         `Generating workflow for user ${userId}: ${description.substring(0, 100)}...`
       );
 
-      // Step 2: Generate workflow with LLM
-      const systemPrompt = this.generateSystemPrompt();
+      // Step 2: Generate workflow with LLM (using generation options)
+      const systemPrompt = await this.generateSystemPrompt(options);
       const userContext =
         existingNodes.length > 0
           ? this.generateExistingContext(
@@ -382,7 +386,7 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
       });
 
       const parsedResponse = await this.parseAndValidateResponse(text);
-      const enhancedNodes = this.enhanceNodes(parsedResponse.nodes);
+      const enhancedNodes = this.enhanceNodes(parsedResponse.nodes, options);
       const enhancedEdges = this.enhanceEdges(parsedResponse.edges);
 
       const preliminaryWorkflow = this.mergeWorkflows(
@@ -547,7 +551,18 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
         prompt = securityValidation.sanitizedInput || prompt;
       }
 
-      const systemPrompt = this.generateRefinementSystemPrompt();
+      // Convert refinement options to generation options for system prompt
+      const generationOptions: GenerationOptions = {
+        detailedMode: true,
+        prefillConfig: true,
+        userLevel: "intermediate", // Default for refinement
+        enableSecurity: true,
+        enableValidation: true,
+        autoHeal: true,
+      };
+
+      const systemPrompt =
+        await this.generateRefinementSystemPrompt(generationOptions);
 
       const userContext = `
 WORKFLOW REFINEMENT REQUEST:
@@ -573,7 +588,10 @@ Edges: ${JSON.stringify(edges, null, 2)}
       });
 
       const parsedResponse = await this.parseAndValidateResponse(text);
-      const enhancedNodes = this.enhanceNodes(parsedResponse.nodes);
+      const enhancedNodes = this.enhanceNodes(
+        parsedResponse.nodes,
+        generationOptions
+      );
       const enhancedEdges = this.enhanceEdges(parsedResponse.edges);
 
       // Validate refined workflow
@@ -717,17 +735,391 @@ Edges: ${JSON.stringify(edges, null, 2)}
     });
   }
 
-  // Private methods (keeping existing implementations)
-  private generateSystemPrompt(): string {
+  // MCP Integration Methods
+  /**
+   * Get available MCP servers (following ai-agent pattern)
+   */
+  private async getAvailableMCPServers(): Promise<any[]> {
+    return Object.values(defaultMCPs);
+  }
+
+  /**
+   * Get MCP servers organized by category (following ai-agent pattern)
+   */
+  private async getMCPServersByCategory(): Promise<Record<string, any[]>> {
+    const servers = await this.getAvailableMCPServers();
+    const categories: Record<string, any[]> = {};
+
+    servers.forEach((server) => {
+      if (!categories[server.category]) {
+        categories[server.category] = [];
+      }
+      categories[server.category].push(server);
+    });
+
+    return categories;
+  }
+
+  /**
+   * Generate complete tools context with actual MCP server configurations
+   */
+  private async generateAvailableToolsContext(): Promise<string> {
+    const mcpServers = await this.getAvailableMCPServers();
+    const categories = await this.getMCPServersByCategory();
+
+    const toolsContext = {
+      totalServers: mcpServers.length,
+      availableMCPServers: mcpServers.map((server) => ({
+        id: server.id,
+        name: server.displayName,
+        description: server.description,
+        category: server.category,
+        capabilities: this.extractCapabilitiesFromMCP(server),
+        configSchema: server.configSchema,
+        examples: server.examples || [],
+        // Provide the exact structure needed for selectedTools
+        selectedToolFormat: {
+          id: server.id,
+          name: server.displayName,
+          type: "mcp",
+          config: this.generateDefaultConfigForServer(server),
+          description: server.description,
+          category: server.category,
+          enabled: true,
+        },
+      })),
+      categories: Object.keys(categories).map((categoryName) => ({
+        name: categoryName,
+        description: `${categoryName} tools and integrations`,
+        servers: categories[categoryName].map((server) => server.id),
+      })),
+      availableBlockTypes: Object.values(BlockType),
+      summary: this.generateToolsSummary(mcpServers),
+    };
+
+    return JSON.stringify(toolsContext, null, 2);
+  }
+
+  /**
+   * Generate default configuration for MCP server based on its schema
+   */
+  private generateDefaultConfigForServer(server: any): Record<string, any> {
+    const config: Record<string, any> = {};
+
+    if (server.configSchema?.properties) {
+      Object.keys(server.configSchema.properties).forEach((key) => {
+        const property = server.configSchema.properties[key];
+        if (property.default !== undefined) {
+          config[key] = property.default;
+        } else if (property.required) {
+          // Provide placeholder values for required fields
+          switch (property.type) {
+            case "string":
+              config[key] = property.sensitive
+                ? `your-${key}`
+                : `default-${key}`;
+              break;
+            case "number":
+              config[key] = 30000;
+              break;
+            case "boolean":
+              config[key] = true;
+              break;
+            default:
+              config[key] = property.default || null;
+          }
+        }
+      });
+    }
+
+    return config;
+  }
+
+  /**
+   * Extract capabilities from MCP server configuration
+   */
+  private extractCapabilitiesFromMCP(server: any): string[] {
+    const capabilities: string[] = [];
+
+    // Add category-based capabilities
+    capabilities.push(server.category);
+
+    // Add specific capabilities based on server type
+    switch (server.id) {
+      case "fetch":
+        capabilities.push("http_requests", "api_calls", "web_integration");
+        break;
+      case "goat":
+        capabilities.push(
+          "blockchain",
+          "wallet_operations",
+          "defi",
+          "cross_chain"
+        );
+        break;
+      case "puppeteer":
+        capabilities.push("web_automation", "browser_control", "scraping");
+        break;
+      case "brave-search":
+        capabilities.push("web_search", "information_retrieval");
+        break;
+      case "postgres":
+        capabilities.push("database_operations", "sql_queries");
+        break;
+      case "git":
+        capabilities.push("version_control", "repository_management");
+        break;
+      case "time":
+        capabilities.push("time_operations", "scheduling");
+        break;
+      case "weather":
+        capabilities.push("weather_data", "environmental_info");
+        break;
+      default:
+        capabilities.push("general_integration");
+    }
+
+    return capabilities;
+  }
+
+  /**
+   * Generate summary of available tools
+   */
+  private generateToolsSummary(servers: any[]): string {
+    return servers
+      .map((server) => `${server.displayName}: ${server.description}`)
+      .join(" | ");
+  }
+
+  /**
+   * Generate user-level specific instructions
+   */
+  private getUserLevelInstructions(userLevel: string): string {
+    switch (userLevel) {
+      case "beginner":
+        return `
+🟢 **BEGINNER MODE**:
+- Create simple, single-purpose workflows (2-4 blocks maximum)
+- Use well-known, reliable tools with minimal configuration
+- Provide clear, step-by-step descriptions
+- Avoid complex tool chaining or advanced features
+- Focus on HTTP_REQUEST, NOTIFICATION, and basic AI_AGENT blocks
+- Pre-fill all configurations with sensible defaults`;
+
+      case "advanced":
+        return `
+🔴 **ADVANCED MODE**:
+- Create sophisticated, multi-step workflows (5+ blocks allowed)
+- Use advanced tool combinations and complex chaining
+- Implement error handling, retries, and fallback mechanisms  
+- Use advanced AI_AGENT configurations with multiple tools
+- Include CONDITION blocks for complex logic flows
+- Optimize for performance and scalability`;
+
+      default: // intermediate
+        return `
+🟡 **INTERMEDIATE MODE**:
+- Create balanced workflows (3-6 blocks)
+- Use common tool combinations with moderate complexity
+- Include basic error handling and validation
+- Combine AI_AGENT blocks with supporting infrastructure
+- Provide good defaults while allowing customization`;
+    }
+  }
+
+  /**
+   * Generate security-specific instructions
+   */
+  private getSecurityInstructions(): string {
+    return `
+🔒 **SECURITY VALIDATION ENABLED**:
+- Validate all user inputs and parameters
+- Sanitize API keys and sensitive configuration
+- Use placeholder values for sensitive fields (e.g., "your-api-key")
+- Avoid exposing internal system details
+- Implement proper access controls and permissions
+- Add security-focused error handling`;
+  }
+
+  /**
+   * Generate validation-specific instructions
+   */
+  private getValidationInstructions(): string {
+    return `
+✅ **VALIDATION ENABLED**:
+- Include comprehensive input validation for all blocks
+- Add parameter type checking and format validation
+- Implement data transformation and sanitization
+- Use CONDITION blocks to verify prerequisites
+- Add validation steps before critical operations
+- Provide clear error messages for validation failures`;
+  }
+
+  /**
+   * Generate auto-heal specific instructions
+   */
+  private getAutoHealInstructions(): string {
+    return `
+🚑 **AUTO-HEAL ENABLED**:
+- Include retry mechanisms with exponential backoff
+- Add fallback tools and alternative execution paths
+- Implement circuit breakers for external dependencies
+- Use error recovery blocks and rollback procedures
+- Add health checks and monitoring blocks
+- Design self-correcting workflows that adapt to failures`;
+  }
+
+  /**
+   * Pre-fill block configuration with intelligent defaults
+   */
+  private prefillBlockConfiguration(
+    blockType: string,
+    existingConfig: any,
+    options?: GenerationOptions
+  ): any {
+    const config = { ...existingConfig };
+    const userLevel = options?.userLevel || "intermediate";
+    const enableSecurity = options?.enableSecurity ?? true;
+
+    switch (blockType) {
+      case "HTTP_REQUEST":
+        return {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "User-Agent": "Zyra-Workflow/1.0",
+          },
+          timeout: userLevel === "beginner" ? 10000 : 30000,
+          retries: options?.autoHeal ? 3 : 1,
+          ...config,
+        };
+
+      case "AI_AGENT":
+        return {
+          provider: {
+            type: "openrouter",
+            model: "openai/gpt-4o-mini",
+            temperature: 0.7,
+            maxTokens: userLevel === "beginner" ? 1000 : 2000,
+          },
+          execution: {
+            mode: "autonomous",
+            timeout: userLevel === "beginner" ? 60000 : 120000,
+            requireApproval: userLevel === "beginner",
+            saveThinking: true,
+          },
+          ...config,
+        };
+
+      case "EMAIL":
+        return {
+          smtp: {
+            host: enableSecurity ? "smtp.gmail.com" : "localhost",
+            port: 587,
+            secure: false,
+            auth: {
+              user: "your-email@gmail.com",
+              pass: "your-app-password",
+            },
+          },
+          from: "noreply@zyra.ai",
+          retries: options?.autoHeal ? 3 : 1,
+          ...config,
+        };
+
+      case "NOTIFICATION":
+        return {
+          channels: ["email"],
+          priority: "normal",
+          template: "default",
+          retries: options?.autoHeal ? 2 : 1,
+          ...config,
+        };
+
+      case "CONDITION":
+        return {
+          operator: "equals",
+          caseSensitive: false,
+          timeout: 5000,
+          ...config,
+        };
+
+      case "DELAY":
+        return {
+          duration: userLevel === "beginner" ? 1000 : 5000,
+          unit: "milliseconds",
+          ...config,
+        };
+
+      case "SEI_PAYMENT":
+        return {
+          network: "sei-testnet",
+          gasLimit: "200000",
+          gasPrice: "auto",
+          confirmations: 1,
+          timeout: 60000,
+          ...config,
+        };
+
+      case "CUSTOM":
+        return {
+          timeout: 30000,
+          retries: 1,
+          ...config,
+        };
+
+      default:
+        return config;
+    }
+  }
+
+  // Private methods (with MCP integration)
+  private async generateSystemPrompt(
+    options?: GenerationOptions
+  ): Promise<string> {
+    // Get available tools using the established MCP system
+    const availableToolsContext = await this.generateAvailableToolsContext();
+
+    // Build dynamic prompt based on user options
+    const userLevel = options?.userLevel || "intermediate";
+    const detailedMode = options?.detailedMode ?? true;
+    const enableSecurity = options?.enableSecurity ?? true;
+    const enableValidation = options?.enableValidation ?? true;
+    const autoHeal = options?.autoHeal ?? true;
+
+    // Dynamic prompts based on user level
+    const levelInstructions = this.getUserLevelInstructions(userLevel);
+    const securityInstructions = enableSecurity
+      ? this.getSecurityInstructions()
+      : "";
+    const validationInstructions = enableValidation
+      ? this.getValidationInstructions()
+      : "";
+    const autoHealInstructions = autoHeal ? this.getAutoHealInstructions() : "";
+    const detailLevel = detailedMode ? "COMPREHENSIVE" : "CONCISE";
+
     return `You are an EXPERT WORKFLOW AI for Zyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
 
 🎯 **CORE MISSION**: Transform ANY natural language into sophisticated, executable workflows using our comprehensive block system.
+
+👤 **USER LEVEL**: ${userLevel.toUpperCase()}
+${levelInstructions}
+
+📋 **DETAIL LEVEL**: ${detailLevel}
+${detailedMode ? "Provide comprehensive configurations with detailed descriptions and validation." : "Create efficient, streamlined workflows with essential configurations only."}
+
+${securityInstructions}
+${validationInstructions}
+${autoHealInstructions}
 
 🔥 **AVAILABLE BLOCK TYPES**:
 ${JSON.stringify(Object.values(BlockType), null, 2)}
 
 📊 **AVAILABLE DATA TYPES**: 
 ${JSON.stringify(Object.values(DataType), null, 2)}
+
+🛠️ **AVAILABLE MCP TOOLS & INTEGRATIONS**:
+${availableToolsContext}
 
 🚨 **STRICT JSON RULES**:
 - Do NOT include any comments (// or /* ... */) in the JSON.
@@ -765,6 +1157,79 @@ ${JSON.stringify(Object.values(DataType), null, 2)}
   "animated": false
 }
 
+🚨 **MANDATORY AI_AGENT BLOCK CONFIGURATION** 🚨:
+EVERY AI_AGENT block MUST include selectedTools from availableMCPServers above. NO EXCEPTIONS!
+
+{
+  "blockType": "AI_AGENT",
+  "config": {
+    "provider": {
+      "type": "openrouter",
+      "model": "openai/gpt-4o-mini",
+      "temperature": 0.7,
+      "maxTokens": 2000
+    },
+    "agent": {
+      "name": "Descriptive agent name based on function",
+      "systemPrompt": "Detailed system prompt explaining the agent's role and capabilities",
+      "userPrompt": "Dynamic user prompt or use context from workflow",
+      "maxSteps": 10,
+      "thinkingMode": "deliberate"
+    },
+    "selectedTools": [
+      /* REQUIRED: MUST COPY exact selectedToolFormat objects from availableMCPServers above */
+      /* NEVER LEAVE THIS ARRAY EMPTY - ALWAYS SELECT RELEVANT MCP SERVERS */
+    ],
+    "execution": {
+      "mode": "autonomous",
+      "timeout": 120000,
+      "requireApproval": false,
+      "saveThinking": true
+    }
+  }
+}
+
+⛔ **CRITICAL:** AI_AGENT blocks without selectedTools array are INVALID and BROKEN!
+
+**EXAMPLE: For "Search crypto news, analyze sentiment, and execute trades":**
+"selectedTools": [
+  {
+    "id": "brave-search",
+    "name": "Brave Search", 
+    "type": "mcp",
+    "config": { "apiKey": "your-brave-api-key" },
+    "description": "Search the web using Brave Search API",
+    "category": "web",
+    "enabled": true
+  },
+  {
+    "id": "fetch",
+    "name": "HTTP Requests",
+    "type": "mcp", 
+    "config": { "userAgent": "Zyra-AI-Agent/1.0", "timeout": 30000 },
+    "description": "Make HTTP requests to APIs and web services",
+    "category": "api",
+    "enabled": true
+  },
+  {
+    "id": "goat", 
+    "name": "GOAT Blockchain",
+    "type": "mcp",
+    "config": { "WALLET_PRIVATE_KEY": "0x...", "RPC_PROVIDER_URL": "https://sepolia.base.org" },
+    "description": "Blockchain operations using GOAT SDK",
+    "category": "api",
+    "enabled": true
+  }
+]
+
+**WORKFLOW OPTIMIZATION RULES**:
+- **PRIORITIZE AI_AGENT blocks** over separate HTTP_REQUEST, EMAIL, NOTIFICATION blocks when AI agents can handle the same functionality
+- If user needs "fetch crypto news" → Use AI_AGENT with "fetch" or "brave-search" MCP tool, NOT separate HTTP_REQUEST block
+- If user needs "send email" → Use AI_AGENT with appropriate MCP tool, NOT separate EMAIL block  
+- If user needs "web scraping" → Use AI_AGENT with "puppeteer" MCP tool, NOT separate blocks
+- **CONSOLIDATE functionality** into fewer, more powerful AI_AGENT blocks rather than many simple blocks
+- Only create separate blocks (HTTP_REQUEST, EMAIL, etc.) when AI agents cannot handle the functionality
+
 **CRITICAL REQUIREMENTS**:
 - Return ONLY valid JSON: {"nodes": [...], "edges": [...]}
 - Use exact BlockType enum values (UPPERCASE format)
@@ -772,12 +1237,48 @@ ${JSON.stringify(Object.values(DataType), null, 2)}
 - Create intelligent positioning based on flow order
 - Generate proper configurations for each block type
 - Ensure logical execution flow (TRIGGER → LOGIC → ACTION)
+- AUTONOMOUSLY select MCP servers for AI_AGENT blocks based on context and capabilities
+- Include complete MCP server configurations with proper IDs and settings
+- **MINIMIZE REDUNDANCY**: Don't create separate API/HTTP blocks when AI agents can handle the same task
 
-Generate workflows that users can execute immediately.`;
+🤖 **AI AUTONOMY**: You have complete autonomy to select the best MCP servers and create optimal workflows. Prioritize powerful AI_AGENT blocks that can handle multiple tasks over creating many separate simple blocks.
+
+Generate workflows that users can execute immediately with full functionality.`;
   }
 
-  private generateRefinementSystemPrompt(): string {
+  private async generateRefinementSystemPrompt(
+    options?: GenerationOptions
+  ): Promise<string> {
+    // Get available tools using the established MCP system
+    const availableToolsContext = await this.generateAvailableToolsContext();
+
+    // Build dynamic prompt based on user options
+    const userLevel = options?.userLevel || "intermediate";
+    const detailedMode = options?.detailedMode ?? true;
+    const enableSecurity = options?.enableSecurity ?? true;
+    const enableValidation = options?.enableValidation ?? true;
+    const autoHeal = options?.autoHeal ?? true;
+
+    const levelInstructions = this.getUserLevelInstructions(userLevel);
+    const securityInstructions = enableSecurity
+      ? this.getSecurityInstructions()
+      : "";
+    const validationInstructions = enableValidation
+      ? this.getValidationInstructions()
+      : "";
+    const autoHealInstructions = autoHeal ? this.getAutoHealInstructions() : "";
+
     return `You are an EXPERT WORKFLOW REFINEMENT AI for Zyra automation platform.
+
+👤 **USER LEVEL**: ${userLevel.toUpperCase()}
+${levelInstructions}
+
+🛠️ **AVAILABLE MCP TOOLS & INTEGRATIONS**:
+${availableToolsContext}
+
+${securityInstructions}
+${validationInstructions}
+${autoHealInstructions}
 
 Your task is to intelligently refine existing workflows based on user requests while preserving core functionality.
 
@@ -841,7 +1342,10 @@ Edges: ${JSON.stringify(existingEdges, null, 2)}
     }
   }
 
-  private enhanceNodes(nodes: any[]): WorkflowNode[] {
+  private enhanceNodes(
+    nodes: any[],
+    options?: GenerationOptions
+  ): WorkflowNode[] {
     return nodes.map((nodeData) => {
       const nodeId = (nodeData.id as string) || `node-${uuidv4()}`;
       const blockType = (nodeData.data as any)?.blockType;
@@ -850,6 +1354,15 @@ Edges: ${JSON.stringify(existingEdges, null, 2)}
       const nodeType = validBlockTypes.includes(blockType)
         ? blockType
         : "CUSTOM";
+
+      // Get base config from AI response
+      let config = (nodeData.data as any)?.config || {};
+
+      // Pre-fill config with defaults if enabled
+      if (options?.prefillConfig) {
+        config = this.prefillBlockConfiguration(blockType, config, options);
+      }
+
       return {
         id: nodeId,
         type: nodeType,
@@ -861,7 +1374,7 @@ Edges: ${JSON.stringify(existingEdges, null, 2)}
           nodeType: (nodeData.data as any)?.nodeType || "ACTION",
           iconName: (nodeData.data as any)?.iconName || "block",
           isEnabled: true,
-          config: (nodeData.data as any)?.config || {},
+          config: config,
           inputs: [],
           outputs: [],
           inputCount: 1,

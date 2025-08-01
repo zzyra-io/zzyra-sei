@@ -528,18 +528,35 @@ export class ReasoningEngine {
             needsOverride = true;
           }
 
-          // Special validation for addresses - but be more lenient with user-provided addresses
+          // Special validation for addresses - be more lenient with user-provided addresses
           if (paramName.toLowerCase().includes('address')) {
-            // If it's a valid Ethereum address, don't override
+            // If it's a valid Ethereum address (0x + 40 hex chars), don't override
             if (currentValue.startsWith('0x') && currentValue.length === 42) {
+              // Additional check: ensure it's actually hex
+              const hexPart = currentValue.slice(2);
+              if (/^[a-fA-F0-9]{40}$/.test(hexPart)) {
+                this.logger.log(
+                  `Respecting user-provided Ethereum address: ${currentValue}`,
+                );
+                needsOverride = false;
+              } else {
+                this.logger.log(
+                  `Invalid Ethereum address hex format: ${currentValue}, will override`,
+                );
+                needsOverride = true;
+              }
+            } else if (
+              currentValue.startsWith('sei1') && 
+              currentValue.length >= 39 && 
+              currentValue.length <= 59
+            ) {
+              // Support Sei bech32 addresses (sei1...)
               this.logger.log(
-                `Respecting user-provided address: ${currentValue}`,
+                `Respecting user-provided Sei address: ${currentValue}`,
               );
               needsOverride = false;
-            } else if (
-              !currentValue.startsWith('0x') ||
-              currentValue.length !== 42
-            ) {
+            } else {
+              // Only override if it's clearly not a valid address format
               this.logger.log(
                 `Invalid address format: ${currentValue}, will override`,
               );
@@ -1638,25 +1655,21 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
     const paramNameLower = paramName.toLowerCase();
     const paramType = paramSchema?.type || 'string';
 
-    // Check for invalid patterns that indicate poor extraction
+    // Check for invalid patterns that indicate poor extraction - but be more lenient
     const invalidPatterns = [
-      /^\[.*\]$/, // [placeholder] style
-      /^\{.*\}$/, // {placeholder} style
-      /^`.*`$/, // `placeholder` style
-      /^".*"$/, // "placeholder" style
-      /^'.*'$/, // 'placeholder' style
       /^placeholder$/i,
-      /^default$/i,
-      /^balance$/i,
+      /^default_?value$/i,
+      /^test_?value$/i,
+      /^example$/i,
+      /^sample$/i,
+      /^dummy$/i,
+      /^null$/i,
+      /^undefined$/i,
       /^retrieved_.*$/i, // retrieved_address, retrieved_value, etc.
-      /^\[.*\]`$/, // [retrieved_address]` style
-      /^\{.*\}`$/, // {retrieved_address}` style
-      /^".*"`$/, // "retrieved_address"` style
-      /^'.*'`$/, // 'retrieved_address'` style
-      /^`.*"$/, // `retrieved_address" style
-      /^`.*'$/, // `retrieved_address' style
-      /^".*`$/, // "retrieved_address` style
-      /^'.*`$/, // 'retrieved_address` style
+      /^\[placeholder\]$/i,
+      /^\{placeholder\}$/i,
+      /^"placeholder"$/i,
+      /^'placeholder'$/i,
     ];
 
     for (const pattern of invalidPatterns) {
@@ -1668,12 +1681,18 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
       }
     }
 
-    // Validate Ethereum addresses
-    if (
-      paramNameLower.includes('address') &&
-      paramNameLower.includes('wallet')
-    ) {
-      return /^0x[a-fA-F0-9]{40}$/.test(value);
+    // Validate addresses (Ethereum and Sei)
+    if (paramNameLower.includes('address')) {
+      // Ethereum addresses (0x + 40 hex chars)
+      if (/^0x[a-fA-F0-9]{40}$/.test(value)) {
+        return true;
+      }
+      // Sei bech32 addresses (sei1... with length 39-59)
+      if (value.startsWith('sei1') && value.length >= 39 && value.length <= 59) {
+        return true;
+      }
+      // Other valid blockchain address formats can be added here
+      return false;
     }
 
     // Validate URLs
@@ -1696,18 +1715,16 @@ Your accuracy in tool selection and parameter extraction is vital to the user's 
       return /^(true|false|yes|no|on|off)$/i.test(value);
     }
 
-    // For strings, check it's not empty and not a placeholder
+    // For strings, be more lenient - just check basic validity
     if (paramType === 'string') {
       return (
         value.length > 0 &&
-        !value.includes('placeholder') &&
-        !value.includes('default') &&
-        !value.includes('retrieved_') &&
-        !value.includes('[retrieved_') &&
-        !value.includes('{retrieved_') &&
-        !value.includes('"retrieved_') &&
-        !value.includes("'retrieved_") &&
-        !value.includes('`retrieved_')
+        value.length <= 1000 && // Reasonable length limit
+        !value.includes('undefined') &&
+        !value.includes('null') &&
+        value !== 'placeholder' &&
+        value !== 'default_value' &&
+        value !== 'test_value'
       );
     }
 

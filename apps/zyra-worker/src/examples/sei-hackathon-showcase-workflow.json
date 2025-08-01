@@ -1,0 +1,243 @@
+{
+  "id": "sei-hackathon-showcase-workflow",
+  "name": "Sei Hackathon Showcase",
+  "description": "Complete showcase of Zyra's Sei Network integration capabilities for hackathon demo",
+  "version": 1,
+  "active": true,
+  "tags": ["sei", "hackathon", "showcase", "demo", "comprehensive"],
+  "nodes": [
+    {
+      "id": "welcome-introduction",
+      "type": "AI_AGENT",
+      "position": { "x": 100, "y": 50 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are a Zyra platform demonstrator for the Sei Network hackathon. Provide an engaging introduction to the demo.",
+          "tools": [],
+          "maxSteps": 2,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Welcome to the Zyra x Sei Network Hackathon Demo! Introduce what we'll be showcasing: AI-powered workflow automation on Sei Network, including native Sei tools, GOAT SDK integration, and real-time blockchain operations."
+        },
+        "label": "Demo Introduction"
+      }
+    },
+    {
+      "id": "sei-network-overview",
+      "type": "AI_AGENT",
+      "position": { "x": 300, "y": 50 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are a Sei Network expert. Use the tools to get live network data and explain Sei's capabilities.",
+          "tools": ["get_sei_network_info"],
+          "maxSteps": 5,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Get current Sei Network information and explain why Sei is perfect for high-frequency trading and DeFi applications. Highlight the current network status, gas prices, and block times."
+        },
+        "label": "Sei Network Overview"
+      }
+    },
+    {
+      "id": "wallet-setup-demo",
+      "type": "AI_AGENT",
+      "position": { "x": 100, "y": 150 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are demonstrating Zyra's wallet integration capabilities on Sei Network.",
+          "tools": ["get_sei_address", "get_sei_balance"],
+          "maxSteps": 5,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Demonstrate wallet setup: get my Sei wallet address and check the current SEI balance. Explain how Zyra seamlessly connects to Sei Network for automated operations."
+        },
+        "label": "Wallet Setup Demo"
+      }
+    },
+    {
+      "id": "goat-sdk-comparison",
+      "type": "AI_AGENT",
+      "position": { "x": 300, "y": 150 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are showcasing GOAT SDK integration on Sei Network.",
+          "tools": ["get_address", "get_balance"],
+          "maxSteps": 5,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Demonstrate GOAT SDK integration: get wallet address and balance using GOAT tools. Show how Zyra supports multiple blockchain SDK approaches on Sei Network."
+        },
+        "label": "GOAT SDK Integration"
+      }
+    },
+    {
+      "id": "transaction-capabilities",
+      "type": "AI_AGENT",
+      "position": { "x": 500, "y": 150 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are demonstrating Zyra's transaction capabilities on Sei Network.",
+          "tools": ["estimate_sei_gas"],
+          "maxSteps": 5,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Demonstrate transaction capabilities: estimate gas for sending 0.01 SEI to address {{demoRecipient}}. Explain how Zyra provides cost estimates before executing transactions."
+        },
+        "label": "Transaction Cost Demo"
+      }
+    },
+    {
+      "id": "ai-reasoning-showcase",
+      "type": "AI_AGENT",
+      "position": { "x": 100, "y": 250 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are demonstrating Zyra's AI reasoning capabilities for blockchain operations.",
+          "tools": [],
+          "maxSteps": 3,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Analyze all the data we've gathered so far: network info {{sei-network-overview.response}}, wallet setup {{wallet-setup-demo.response}}, GOAT comparison {{goat-sdk-comparison.response}}, and transaction estimates {{transaction-capabilities.response}}. Provide intelligent insights about optimal strategies for this user's Sei operations."
+        },
+        "label": "AI Analysis & Insights"
+      }
+    },
+    {
+      "id": "automation-example",
+      "type": "AI_AGENT",
+      "position": { "x": 300, "y": 250 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are showcasing Zyra's automation capabilities for Sei Network.",
+          "tools": [],
+          "maxSteps": 3,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Demonstrate how this workflow could be automated. Based on the AI analysis {{ai-reasoning-showcase.response}}, explain how users could set up automated DeFi strategies, portfolio rebalancing, or trading bots on Sei Network using Zyra's workflow system."
+        },
+        "label": "Automation Possibilities"
+      }
+    },
+    {
+      "id": "real-world-scenarios",
+      "type": "AI_AGENT",
+      "position": { "x": 500, "y": 250 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are a blockchain strategist explaining real-world use cases.",
+          "tools": [],
+          "maxSteps": 3,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Present 3 compelling real-world scenarios where Zyra + Sei Network would excel: 1) High-frequency trading automation, 2) Cross-chain DeFi strategies, 3) GameFi token management. Use the technical capabilities we've demonstrated to support each scenario."
+        },
+        "label": "Real-World Use Cases"
+      }
+    },
+    {
+      "id": "hackathon-summary",
+      "type": "AI_AGENT",
+      "position": { "x": 300, "y": 350 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are concluding the Zyra x Sei Network hackathon demonstration.",
+          "tools": [],
+          "maxSteps": 3,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Create a compelling hackathon summary highlighting: 1) What we built (native Sei integration + GOAT SDK support), 2) Technical achievements (AI tool discovery fixes, parameter validation improvements), 3) Impact potential (democratizing blockchain automation), 4) Next steps for Sei ecosystem growth. Reference key demo points: {{automation-example.response}} and {{real-world-scenarios.response}}"
+        },
+        "label": "Hackathon Demo Summary"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "welcome-introduction",
+      "target": "sei-network-overview",
+      "type": "default"
+    },
+    {
+      "id": "e2",
+      "source": "sei-network-overview",
+      "target": "wallet-setup-demo",
+      "type": "default"
+    },
+    {
+      "id": "e3",
+      "source": "wallet-setup-demo",
+      "target": "goat-sdk-comparison",
+      "type": "default"
+    },
+    {
+      "id": "e4",
+      "source": "goat-sdk-comparison",
+      "target": "transaction-capabilities",
+      "type": "default"
+    },
+    {
+      "id": "e5",
+      "source": "transaction-capabilities",
+      "target": "ai-reasoning-showcase",
+      "type": "default"
+    },
+    {
+      "id": "e6",
+      "source": "ai-reasoning-showcase",
+      "target": "automation-example",
+      "type": "default"
+    },
+    {
+      "id": "e7",
+      "source": "automation-example",
+      "target": "real-world-scenarios",
+      "type": "default"
+    },
+    {
+      "id": "e8",
+      "source": "real-world-scenarios",
+      "target": "hackathon-summary",
+      "type": "default"
+    }
+  ],
+  "metadata": {
+    "createdAt": "2025-01-31T10:00:00Z",
+    "updatedAt": "2025-01-31T10:00:00Z",
+    "category": "demo",
+    "difficulty": "showcase",
+    "estimatedDuration": "5-7 minutes",
+    "requirements": [
+      "Both Sei Network and GOAT MCP servers configured",
+      "Valid wallet private key with some SEI balance",
+      "Stable internet connection for live demo"
+    ],
+    "description": "This is the flagship hackathon demonstration workflow showcasing Zyra's complete Sei Network integration. It demonstrates native Sei tools, GOAT SDK integration, AI-powered analysis, and real-world automation scenarios.",
+    "variables": {
+      "demoRecipient": {
+        "type": "string",
+        "description": "Safe recipient address for demo transaction estimates",
+        "default": "0x742d35Cc6634C0532925a3b8b4C3dd8e4B1c1234",
+        "required": true
+      }
+    }
+  }
+}

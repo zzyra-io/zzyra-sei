@@ -1,0 +1,115 @@
+{
+  "id": "sei-balance-check-workflow",
+  "name": "Sei Balance Monitoring",
+  "description": "Check SEI token balance and network information on Sei Network",
+  "version": 1,
+  "active": true,
+  "tags": ["sei", "balance", "monitoring", "demo"],
+  "nodes": [
+    {
+      "id": "get-sei-address",
+      "type": "AI_AGENT",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are a Sei Network assistant. Use the available tools to help users interact with Sei Network.",
+          "tools": ["get_sei_address"],
+          "maxSteps": 5,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Get my wallet address for Sei Network operations"
+        },
+        "label": "Get Sei Wallet Address"
+      }
+    },
+    {
+      "id": "check-sei-balance",
+      "type": "AI_AGENT",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are a Sei Network assistant. Use the available tools to help users interact with Sei Network.",
+          "tools": ["get_sei_balance"],
+          "maxSteps": 5,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Check the SEI token balance for my wallet address"
+        },
+        "label": "Check SEI Balance"
+      }
+    },
+    {
+      "id": "get-network-info",
+      "type": "AI_AGENT",
+      "position": { "x": 500, "y": 100 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are a Sei Network assistant. Use the available tools to help users interact with Sei Network.",
+          "tools": ["get_sei_network_info"],
+          "maxSteps": 5,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Get current Sei Network information including gas prices and block number"
+        },
+        "label": "Get Network Info"
+      }
+    },
+    {
+      "id": "format-results",
+      "type": "AI_AGENT",
+      "position": { "x": 300, "y": 300 },
+      "data": {
+        "config": {
+          "systemPrompt": "You are a helpful assistant that formats blockchain data in a user-friendly way.",
+          "tools": [],
+          "maxSteps": 3,
+          "provider": "openrouter",
+          "model": "meta-llama/llama-3.1-70b-instruct"
+        },
+        "inputs": {
+          "prompt": "Format the wallet balance and network information in a clear, user-friendly summary. Include: wallet address from {{get-sei-address.response}}, balance from {{check-sei-balance.response}}, and network info from {{get-network-info.response}}"
+        },
+        "label": "Format Balance Report"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "get-sei-address",
+      "target": "check-sei-balance",
+      "type": "default"
+    },
+    {
+      "id": "e2",
+      "source": "check-sei-balance",
+      "target": "get-network-info",
+      "type": "default"
+    },
+    {
+      "id": "e3",
+      "source": "get-network-info",
+      "target": "format-results",
+      "type": "default"
+    }
+  ],
+  "metadata": {
+    "createdAt": "2025-01-31T10:00:00Z",
+    "updatedAt": "2025-01-31T10:00:00Z",
+    "category": "demo",
+    "difficulty": "beginner",
+    "estimatedDuration": "30s",
+    "requirements": [
+      "Sei Network MCP server configured",
+      "Valid wallet private key in environment"
+    ],
+    "description": "This demo workflow shows how to check your SEI token balance and get current network information. It's a simple introduction to Sei Network operations.",
+    "variables": {}
+  }
+}

@@ -188,21 +188,26 @@ export class AIAgentHandler implements BlockHandler {
       const processedResult =
         (result as any).text || (result as any).content || result;
 
+      // Convert processedResult to string if it's an object
+      const resultString =
+        typeof processedResult === 'string'
+          ? processedResult
+          : JSON.stringify(processedResult);
+
       // Format toolCalls to match the expected schema
-      const formattedToolCalls = ((result as any).toolCalls || []).map(
-        (call: any) => ({
+      const formattedToolCalls =
+        (result as any).toolCalls?.map((call: any) => ({
           name: call.name || call.tool || 'unknown',
           parameters: call.parameters || call.args || {},
           result: call.result || call.output || null,
-        }),
-      );
+        })) || [];
 
       const output = {
         success: true,
-        result: processedResult,
-        response: processedResult, // Add 'response' field for {data.response} templates
-        data: processedResult, // Add 'data' field for generic data access
-        output: processedResult, // Add 'output' field for {previousBlock.output} templates
+        result: resultString,
+        response: resultString, // Add 'response' field for {data.response} templates
+        data: resultString, // Add 'data' field for generic data access
+        output: resultString, // Add 'output' field for {previousBlock.output} templates
         steps: (result as any).steps || [],
         toolCalls: formattedToolCalls,
         thinkingSteps:
@@ -210,9 +215,9 @@ export class AIAgentHandler implements BlockHandler {
         executionTime: Date.now() - startTime,
         sessionId: session.id,
         // Additional fields for template consumption
-        text: processedResult,
-        content: processedResult,
-        summary: processedResult,
+        text: resultString,
+        content: resultString,
+        summary: resultString,
       };
 
       this.logger.log(

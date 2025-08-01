@@ -1,19 +1,77 @@
 import { ethers } from 'ethers';
-import axios from 'axios';
 import { validateSeiAddress } from '@zyra/types';
+import {
+  http,
+  createWalletClient,
+  createPublicClient,
+  parseEther,
+  formatEther,
+} from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+
+// Sei Network configuration
+const seiTestnet = {
+  id: 1328,
+  name: 'Sei Testnet',
+  network: 'sei-testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'SEI',
+    symbol: 'SEI',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://evm-rpc-testnet.sei-apis.com'],
+    },
+    public: {
+      http: ['https://evm-rpc-testnet.sei-apis.com'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Seitrace',
+      url: 'https://seitrace.com',
+    },
+  },
+  testnet: true,
+} as const;
 
 /**
- * Sei Wallet Service for transaction delegation using Magic SDK
- * All transactions are executed through Magic's delegation pattern
- * No private keys are stored in the worker - all signing happens through Magic
+ * Sei Wallet Service for direct transaction execution using viem
+ * Uses private key for signing transactions directly on Sei Network
  */
 export class SeiWalletService {
-  constructor(private provider: ethers.JsonRpcProvider) {}
+  private walletClient: any;
+  private publicClient: any;
+  private account: any;
+
+  constructor(private provider?: ethers.JsonRpcProvider) {
+    // Create account from private key
+    this.account = privateKeyToAccount(
+      process.env.WALLET_PRIVATE_KEY as `0x${string}`,
+    );
+
+    // Create wallet client for transaction signing
+    this.walletClient = createWalletClient({
+      account: this.account,
+      transport: http(
+        process.env.RPC_PROVIDER_URL || seiTestnet.rpcUrls.default.http[0],
+      ),
+      chain: seiTestnet,
+    });
+
+    // Create public client for reading blockchain data
+    this.publicClient = createPublicClient({
+      transport: http(
+        process.env.RPC_PROVIDER_URL || seiTestnet.rpcUrls.default.http[0],
+      ),
+      chain: seiTestnet,
+    });
+  }
 
   /**
-   * Delegate transaction execution to Magic SDK
-   * This method sends the transaction details to the API/admin service
-   * which handles signing through Magic SDK delegation
+   * Execute transaction directly on Sei Network using wallet client
+   * Signs and sends transaction using the configured private key
    */
   async delegateTransaction(
     userId: string,
@@ -24,76 +82,79 @@ export class SeiWalletService {
     status: 'pending' | 'confirmed' | 'failed';
   }> {
     try {
-      // Call the Magic delegation API endpoint
-      const response = await axios.post(
-        '/api/magic/delegate-transaction',
-        {
-          userId,
-          transaction,
-          network,
-          timestamp: new Date().toISOString(),
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 60000, // 60 second timeout for transaction execution
-        },
-      );
+      console.log(`Executing transaction for user ${userId} on ${network}`);
+
+      // Validate transaction parameters
+      this.validateTransaction(transaction);
+
+      // Convert addresses if needed (sei1... to 0x...)
+      const toAddress = this.convertAddressFormat(transaction.to);
+
+      // Prepare transaction parameters
+      const txParams: any = {
+        to: toAddress,
+        value: transaction.value || 0n,
+        data: transaction.data || '0x',
+      };
+
+      // Add gas parameters if provided
+      if (transaction.gasLimit) {
+        txParams.gas = BigInt(transaction.gasLimit);
+      }
+      if (transaction.gasPrice) {
+        txParams.gasPrice = BigInt(transaction.gasPrice);
+      }
+
+      // Send the transaction
+      const hash = await this.walletClient.sendTransaction(txParams);
+
+      console.log(`Transaction sent with hash: ${hash}`);
 
       return {
-        txHash: response.data.txHash,
-        status: response.data.status || 'pending',
+        txHash: hash,
+        status: 'pending',
       };
     } catch (error: any) {
-      throw new Error(
-        `Transaction delegation failed: ${error.response?.data?.message || error.message}`,
-      );
+      console.error('Transaction execution failed:', error);
+      throw new Error(`Transaction execution failed: ${error.message}`);
     }
   }
 
   /**
-   * Get user's wallet address through Magic delegation
+   * Get the wallet address (returns the configured wallet address)
+   * In direct wallet mode, all operations use the same wallet
    */
   async getUserWalletAddress(userId: string): Promise<string> {
-    try {
-      const response = await axios.get(`/api/magic/wallet-address/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
-        },
-      });
-
-      return response.data.address;
-    } catch (error: any) {
-      throw new Error(
-        `Failed to get user wallet address: ${error.response?.data?.message || error.message}`,
-      );
-    }
+    console.log(`Getting wallet address for user ${userId}`);
+    return this.account.address;
   }
 
   /**
-   * Get user's wallet balance through Magic delegation
+   * Get wallet balance directly from Sei Network
    */
   async getUserWalletBalance(
     userId: string,
     tokenAddress?: string,
   ): Promise<bigint> {
     try {
-      const response = await axios.get(`/api/magic/wallet-balance/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
-        },
-        params: {
-          tokenAddress,
-        },
-      });
+      console.log(`Getting balance for user ${userId}, token: ${tokenAddress}`);
 
-      return BigInt(response.data.balance);
+      if (tokenAddress) {
+        // For ERC20 tokens, we'd need to call the contract
+        // For now, throw an error as this requires contract interaction
+        throw new Error('ERC20 token balance checking not yet implemented');
+      } else {
+        // Get native SEI balance
+        const balance = await this.publicClient.getBalance({
+          address: this.account.address,
+        });
+
+        console.log(`Balance: ${balance} wei`);
+        return balance;
+      }
     } catch (error: any) {
-      throw new Error(
-        `Failed to get wallet balance: ${error.response?.data?.message || error.message}`,
-      );
+      console.error('Failed to get wallet balance:', error);
+      throw new Error(`Failed to get wallet balance: ${error.message}`);
     }
   }
 
@@ -114,7 +175,7 @@ export class SeiWalletService {
   }
 
   /**
-   * Estimate gas for user transaction through Magic delegation
+   * Estimate gas for transaction using direct wallet operations
    */
   async estimateGasForUser(
     userId: string,
@@ -125,28 +186,39 @@ export class SeiWalletService {
     estimatedCost: bigint;
   }> {
     try {
-      const response = await axios.post(
-        '/api/magic/estimate-gas',
-        {
-          userId,
-          transaction,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
-          },
-        },
+      console.log(`Estimating gas for user ${userId}`);
+
+      // Convert address format if needed
+      const toAddress = this.convertAddressFormat(transaction.to);
+
+      // Prepare transaction for gas estimation
+      const txParams: any = {
+        account: this.account,
+        to: toAddress,
+        value: transaction.value || 0n,
+        data: transaction.data || '0x',
+      };
+
+      // Estimate gas limit
+      const gasLimit = await this.publicClient.estimateGas(txParams);
+
+      // Get current gas price
+      const gasPrice = await this.publicClient.getGasPrice();
+
+      const estimatedCost = BigInt(gasLimit) * BigInt(gasPrice);
+
+      console.log(
+        `Gas estimate - Limit: ${gasLimit}, Price: ${gasPrice}, Cost: ${estimatedCost}`,
       );
 
       return {
-        gasLimit: BigInt(response.data.gasLimit),
-        gasPrice: BigInt(response.data.gasPrice),
-        estimatedCost: BigInt(response.data.estimatedCost),
+        gasLimit: BigInt(gasLimit),
+        gasPrice: BigInt(gasPrice),
+        estimatedCost,
       };
     } catch (error: any) {
-      throw new Error(
-        `Failed to estimate gas: ${error.response?.data?.message || error.message}`,
-      );
+      console.error('Failed to estimate gas:', error);
+      throw new Error(`Failed to estimate gas: ${error.message}`);
     }
   }
 
@@ -182,7 +254,7 @@ export class SeiWalletService {
   }
 
   /**
-   * Wait for transaction confirmation through Magic delegation
+   * Wait for transaction confirmation using direct wallet operations
    */
   async waitForTransaction(
     txHash: string,
@@ -190,132 +262,173 @@ export class SeiWalletService {
     timeout: number = 60000,
   ): Promise<any> {
     try {
-      const response = await axios.post(
-        '/api/magic/wait-transaction',
-        {
-          txHash,
-          confirmations,
-          timeout,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
-          },
-        },
+      console.log(
+        `Waiting for transaction ${txHash} with ${confirmations} confirmations`,
       );
 
-      return response.data.receipt;
-    } catch (error: any) {
-      throw new Error(
-        `Transaction confirmation failed: ${error.response?.data?.message || error.message}`,
+      const receipt = await this.publicClient.waitForTransactionReceipt({
+        hash: txHash as `0x${string}`,
+        confirmations,
+        timeout,
+      });
+
+      console.log(
+        `Transaction ${txHash} confirmed in block ${receipt.blockNumber}`,
       );
+
+      return {
+        transactionHash: receipt.transactionHash,
+        blockNumber: receipt.blockNumber.toString(),
+        gasUsed: receipt.gasUsed.toString(),
+        status: receipt.status === 'success' ? 'confirmed' : 'failed',
+        from: receipt.from,
+        to: receipt.to,
+        effectiveGasPrice: receipt.effectiveGasPrice?.toString(),
+      };
+    } catch (error: any) {
+      console.error('Transaction confirmation failed:', error);
+      throw new Error(`Transaction confirmation failed: ${error.message}`);
     }
   }
 
   /**
-   * Get transaction status through Magic delegation
+   * Get transaction status using direct blockchain query
    */
   async getTransactionStatus(
     txHash: string,
   ): Promise<'pending' | 'confirmed' | 'failed'> {
     try {
-      const response = await axios.get(
-        `/api/magic/transaction-status/${txHash}`,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
-          },
-        },
-      );
+      console.log(`Getting status for transaction ${txHash}`);
 
-      return response.data.status;
+      const receipt = await this.publicClient.getTransactionReceipt({
+        hash: txHash as `0x${string}`,
+      });
+
+      if (receipt) {
+        return receipt.status === 'success' ? 'confirmed' : 'failed';
+      } else {
+        return 'pending';
+      }
     } catch (error) {
+      console.warn(`Could not get transaction status for ${txHash}:`, error);
       return 'pending';
     }
   }
 
   /**
-   * Get transaction details through Magic delegation
+   * Get transaction details using direct blockchain query
    */
   async getTransactionDetails(txHash: string): Promise<any> {
     try {
-      const response = await axios.get(
-        `/api/magic/transaction-details/${txHash}`,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
-          },
-        },
-      );
+      console.log(`Getting details for transaction ${txHash}`);
 
-      return response.data;
+      const [transaction, receipt] = await Promise.all([
+        this.publicClient.getTransaction({ hash: txHash as `0x${string}` }),
+        this.publicClient
+          .getTransactionReceipt({ hash: txHash as `0x${string}` })
+          .catch(() => null),
+      ]);
+
+      return {
+        hash: transaction.hash,
+        from: transaction.from,
+        to: transaction.to,
+        value: transaction.value.toString(),
+        gasLimit: transaction.gas?.toString(),
+        gasPrice: transaction.gasPrice?.toString(),
+        data: transaction.input,
+        nonce: transaction.nonce,
+        blockNumber: transaction.blockNumber?.toString(),
+        blockHash: transaction.blockHash,
+        transactionIndex: transaction.transactionIndex,
+        status: receipt
+          ? receipt.status === 'success'
+            ? 'confirmed'
+            : 'failed'
+          : 'pending',
+        gasUsed: receipt?.gasUsed?.toString(),
+        effectiveGasPrice: receipt?.effectiveGasPrice?.toString(),
+        receipt,
+      };
     } catch (error: any) {
-      throw new Error(
-        `Failed to get transaction details: ${error.response?.data?.message || error.message}`,
-      );
+      console.error('Failed to get transaction details:', error);
+      throw new Error(`Failed to get transaction details: ${error.message}`);
     }
   }
 
   /**
-   * Request transaction approval from user through Magic
-   * This adds an extra security layer for high-value transactions
+   * Request transaction approval from user
+   * In direct wallet mode, we auto-approve for demo purposes
+   * In production, this should integrate with a user approval system
    */
   async requestTransactionApproval(
     userId: string,
     transaction: any,
     reason: string,
   ): Promise<boolean> {
-    try {
-      const response = await axios.post(
-        '/api/magic/request-approval',
-        {
-          userId,
-          transaction,
-          reason,
-          timestamp: new Date().toISOString(),
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
-          },
-        },
-      );
+    console.log(`Auto-approving transaction for user ${userId}: ${reason}`);
+    console.log('Transaction details:', transaction);
 
-      return response.data.approved === true;
-    } catch (error: any) {
-      console.error('Approval request failed:', error);
-      return false; // Default to not approved on error
-    }
+    // For demo purposes, auto-approve all transactions
+    // In production, this should show a UI approval dialog or similar
+    return true;
   }
 
   /**
-   * Get user's Magic session info
+   * Get user session info
+   * In direct wallet mode, we simulate a valid session
    */
   async getUserSession(userId: string): Promise<any> {
-    try {
-      const response = await axios.get(`/api/magic/user-session/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${process.env.WORKER_API_KEY}`,
-        },
-      });
+    console.log(`Getting session for user ${userId}`);
 
-      return response.data;
-    } catch (error: any) {
-      throw new Error(
-        `Failed to get user session: ${error.response?.data?.message || error.message}`,
-      );
-    }
+    // Simulate a valid session for direct wallet mode
+    return {
+      userId,
+      walletAddress: this.account.address,
+      isValid: true,
+      chainId: seiTestnet.id,
+      network: 'sei-testnet',
+      timestamp: new Date().toISOString(),
+    };
   }
 
   /**
-   * Validate user's Magic session
+   * Validate user session
+   * In direct wallet mode, always return true for demo purposes
    */
   async validateUserSession(userId: string): Promise<boolean> {
-    try {
-      const session = await this.getUserSession(userId);
-      return session && session.isValid;
-    } catch (error) {
-      return false;
+    console.log(`Validating session for user ${userId}`);
+    // For direct wallet mode, always consider the session valid
+    return true;
+  }
+
+  /**
+   * Convert address format from sei1... to 0x... if needed
+   * For Sei Network, we primarily work with 0x addresses for EVM compatibility
+   */
+  private convertAddressFormat(address: string): string {
+    if (!address) {
+      throw new Error('Address is required');
     }
+
+    // If already in 0x format, return as-is
+    if (address.startsWith('0x')) {
+      return address;
+    }
+
+    // If in sei1 format, we'd need proper bech32 decoding
+    // For now, just validate and pass through - full conversion requires bech32 library
+    if (address.startsWith('sei1')) {
+      // For demo purposes, just validate it looks like a proper sei1 address
+      if (address.length >= 39 && address.length <= 59) {
+        return address; // Pass through sei1 addresses as-is for now
+      } else {
+        throw new Error(`Invalid sei1 address format: ${address}`);
+      }
+    }
+
+    throw new Error(
+      `Unsupported address format: ${address}. Use 0x... or sei1... format`,
+    );
   }
 }
