@@ -42,7 +42,7 @@
     "@goat-sdk/wallet-viem": "^0.2.12",
     "@langchain/core": "^0.3.49",
     "@magic-sdk/admin": "^2.4.1",
-    "@modelcontextprotocol/sdk": "^1.17.0",
+    "@modelcontextprotocol/sdk": "^1.17.1",
     "@modelcontextprotocol/server-sequential-thinking": "^2025.7.1",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^4.0.2",
@@ -91,9 +91,9 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "uuid": "^11.1.0",
-    "viem": "^2.31.0",
+    "viem": "^2.30.5",
     "winston": "^3.11.0",
-    "zod": "^4.0.0"
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

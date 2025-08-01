@@ -515,10 +515,17 @@ const TEST_SCENARIOS = {
     tools: [
       {
         id: 'sei',
-        name: 'SEI Network Operations',
+        name: 'SEI Atlantic-2 Testnet',
         type: 'mcp',
         config: {
+          WALLET_MODE: 'private-key',
           PRIVATE_KEY: process.env.EVM_WALLET_PRIVATE_KEY,
+          SEI_NETWORK: 'testnet',
+          SEI_TESTNET_RPC:
+            'https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32',
+          SEI_TESTNET_NETWORK: 'atlantic-2',
+          SEI_TESTNET_EXPLORER_URL: 'https://testnet.seistream.app',
+          SEI_TESTNET_NAME: 'Sei Atlantic-2 Testnet',
         },
       },
       {

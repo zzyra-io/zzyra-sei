@@ -124,15 +124,13 @@ export class StabilityEnhancer {
         };
 
         validTools.push(sanitizedTool);
-              } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          const errorStack = error instanceof Error ? error.stack : undefined;
-          this.logger.error(
-            `Error validating tool: ${errorMessage}`,
-            errorStack,
-          );
-          invalidTools.push({ error: errorMessage, tool });
-        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        this.logger.error(`Error validating tool: ${errorMessage}`, errorStack);
+        invalidTools.push({ error: errorMessage, tool });
+      }
     }
 
     return { validTools, invalidTools };
@@ -211,7 +209,8 @@ export class StabilityEnhancer {
       // Clean up any hanging resources
       await this.cleanupExecutionResources(executionId);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
         `Error handling execution timeout: ${errorMessage}`,
