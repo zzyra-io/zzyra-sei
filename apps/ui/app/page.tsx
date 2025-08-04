@@ -174,7 +174,7 @@ export default function HomePage() {
     {
       title: "Multi-Chain Compatibility (Planned)",
       description:
-        "Designed for cross-chain automation across Ethereum, Polygon, Solana and more. Currently supporting basic single-chain operations with multi-chain roadmap.",
+        "Designed for Sei Network automation with advanced blockchain workflows. Currently supporting Sei Network operations with cross-chain roadmap.",
       icon: Workflow,
       color: "from-orange-500 to-amber-400",
     },
@@ -652,7 +652,7 @@ export default function HomePage() {
 
                   <div className='bg-muted/50 rounded-lg p-4 mb-4'>
                     <p className='text-sm font-mono text-green-600'>
-                      ✓ Monitor USDC price on Ethereum, Polygon, Arbitrum
+                      ✓ Monitor USDC price on Sei Network
                       <br />✓ Execute trades when spread {">"} 0.1%
                       <br />
                       ✓ Account for gas fees automatically
@@ -744,7 +744,7 @@ export default function HomePage() {
                   </div>
                   <h4 className='font-semibold mb-2'>Describe Your Goal</h4>
                   <p className='text-sm text-muted-foreground'>
-                    "I want to automatically buy ETH when it drops 10% in a day"
+                    "I want to automatically buy SEI when it drops 10% in a day"
                   </p>
                 </div>
 

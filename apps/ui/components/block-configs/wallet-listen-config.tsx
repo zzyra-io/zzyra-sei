@@ -18,9 +18,6 @@ import { walletListenerSchema } from "@zyra/types";
 
 const NETWORKS = [
   { value: "sei", label: "Sei" },
-  { value: "ethereum", label: "Ethereum" },
-  { value: "polygon", label: "Polygon" },
-  { value: "solana", label: "Solana" },
 ];
 
 const EVENT_TYPES = [

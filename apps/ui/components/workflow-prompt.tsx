@@ -58,13 +58,6 @@ const SUGGESTION_CATEGORIES = {
 // Available templates
 const TEMPLATES = [
   {
-    id: "defi-portfolio-management",
-    name: "DeFi Portfolio Management",
-    description:
-      "Automate portfolio monitoring, rebalancing, and execution on Base Sepolia",
-    category: "defi",
-  },
-  {
     id: "price-monitor",
     name: "Price Monitor",
     description: "Track crypto prices with smart alerts",

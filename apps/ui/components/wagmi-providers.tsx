@@ -30,7 +30,33 @@ export function WagmiProviders({ children }: ZyraProvidersProps) {
       <QueryClientProvider client={queryClient}>
         <ConnectKitProvider
           mode={theme === "dark" ? "dark" : "light"}
-          theme='soft'>
+          theme='soft'
+          customChains={[
+            {
+              id: 1328,
+              name: "Sei Testnet",
+              network: "sei-testnet",
+              nativeCurrency: {
+                name: "SEI",
+                symbol: "SEI",
+                decimals: 18,
+              },
+              rpcUrls: {
+                default: {
+                  http: ["https://evm-rpc-testnet.sei-apis.com"],
+                },
+                public: {
+                  http: ["https://evm-rpc-testnet.sei-apis.com"],
+                },
+              },
+              blockExplorers: {
+                default: {
+                  name: "Sei Testnet Explorer",
+                  url: "https://testnet.seistream.app",
+                },
+              },
+            },
+          ]}>
           {children}
         </ConnectKitProvider>
       </QueryClientProvider>

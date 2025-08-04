@@ -20,7 +20,12 @@ import {
 const SUPPORTED_NETWORKS = ACTIVE_NETWORKS.map((chain) => ({
   id: chain.id,
   name: chain.name,
-  symbol: chain.name.toLowerCase().includes("polygon") ? "MATIC" : "ETH",
+  symbol:
+    chain.id === 1328
+      ? "SEI"
+      : chain.name.toLowerCase().includes("polygon")
+        ? "MATIC"
+        : "ETH",
 }));
 
 /**

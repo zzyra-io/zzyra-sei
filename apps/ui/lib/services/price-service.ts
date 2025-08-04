@@ -5,6 +5,8 @@ export async function fetchCryptoPrice(
   // Map UI asset symbols to CoinGecko IDs
   const mapAssetToCoinGeckoId = (asset: string): string => {
     const mapping: Record<string, string> = {
+      SEI: "sei-network",
+      SEI_NETWORK: "sei-network",
       ETH: "ethereum",
       ETHEREUM: "ethereum",
       BTC: "bitcoin",
@@ -39,7 +41,7 @@ export async function fetchCryptoPrice(
   const endpoints = (
     process.env.PRICE_RPC_ENDPOINTS?.split(",") || defaultEndpoints
   ).map((url) => url.trim());
-  let lastError: any;
+  let lastError: Error | unknown;
   for (const url of endpoints) {
     try {
       const resp = await fetch(url);
@@ -57,14 +59,14 @@ export async function fetchCryptoPrice(
         throw new Error(`Invalid price data from ${url}`);
       }
       return { price, timestamp: new Date().toISOString() };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn(`fetchCryptoPrice endpoint failed (${url}):`, err);
       lastError = err;
       continue;
     }
   }
   console.error(`All RPC endpoints failed for ${asset}:`, lastError);
-  throw new Error(
-    `All RPC endpoints failed for ${asset}: ${lastError?.message}`
-  );
+  const errorMessage =
+    lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(`All RPC endpoints failed for ${asset}: ${errorMessage}`);
 }

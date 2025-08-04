@@ -262,7 +262,7 @@ export default function SettingsPage() {
                 </TabsTrigger>
                 <TabsTrigger value='wallet' className='flex items-center gap-2'>
                   <Zap className='h-4 w-4' />
-                  <span className='hidden sm:inline'>Wallet</span>
+                  <span className='hidden sm:inline'>Wallets</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value='appearance'

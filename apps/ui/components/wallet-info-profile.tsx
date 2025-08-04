@@ -31,6 +31,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useUserWallets } from "@/hooks/useUserWallets";
 import { useWalletIntegration } from "@/hooks/useWalletIntegration";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
+import { getBlockExplorer } from "@/lib/utils/network";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -55,20 +56,10 @@ const getChainSymbol = (chainId: number | string): string => {
   const chainIdNum = typeof chainId === "string" ? parseInt(chainId) : chainId;
 
   switch (chainIdNum) {
-    case 1: // Ethereum Mainnet
-      return "ETH";
-    case 137: // Polygon
-      return "MATIC";
-    case 56: // BSC
-      return "BNB";
-    case 42161: // Arbitrum
-      return "ETH";
-    case 10: // Optimism
-      return "ETH";
-    case 43114: // Avalanche
-      return "AVAX";
+    case 1328: // Sei Testnet (Atlantic-2)
+      return "SEI";
     default:
-      return "ETH";
+      return "SEI";
   }
 };
 
@@ -152,6 +143,7 @@ export default function WalletInfoProfile() {
     walletCount: wallets?.length || 0,
     isConnected,
     address,
+    chain,
   });
 
   // Add effect to listen for wallet connections and address changes
@@ -448,7 +440,7 @@ export default function WalletInfoProfile() {
                                   className='h-8 w-8 p-0'
                                   asChild>
                                   <a
-                                    href={`https://etherscan.io/tx/${tx.hash}`}
+                                    href={getBlockExplorer(tx.hash)}
                                     target='_blank'
                                     rel='noopener noreferrer'>
                                     <ExternalLink className='h-4 w-4' />
@@ -653,7 +645,9 @@ export default function WalletInfoProfile() {
                       Current Network
                     </div>
                     <div className='text-sm text-slate-500 dark:text-slate-400'>
-                      {chain?.name || "Not Connected"}
+                      {chain?.id === 1328
+                        ? "Sei Testnet"
+                        : chain?.name || "Not Connected"}
                     </div>
                   </div>
                   <Select

@@ -38,6 +38,8 @@ export function createWagmiConfig(
   isDarkMode = false
 ): Config {
   const chains = supportedNetworks;
+  console.log("Wagmi config - chains:", chains);
+  console.log("Wagmi config - seiTestnet:", chains[0]);
   const activeConnectors = [];
 
   // Add Magic connector only if API key is provided

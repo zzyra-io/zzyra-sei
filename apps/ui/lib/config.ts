@@ -27,7 +27,7 @@ export const config: EnvVars = {
   magicPublishableKey: process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY || "",
 
   // Blockchain Network
-  blockchainNetwork: process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || "1313",
+  blockchainNetwork: process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || "1328",
 
   // Worker URL for WebSocket connections (optional in development)
   workerUrl:
