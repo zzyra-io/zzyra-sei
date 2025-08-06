@@ -1,0 +1,1113 @@
+---
+title: "MCP Tools"
+description: "Model Context Protocol (MCP) tools for AI agents - comprehensive toolkit for development, blockchain, and web automation"
+---
+
+## MCP Tools Overview
+
+<Info>
+  **Production Status**: 11+ MCP servers available in production with dynamic
+  discovery, real-time testing, and secure configuration management.
+</Info>
+
+Model Context Protocol (MCP) tools provide AI agents with powerful capabilities across development, blockchain, web automation, and utility functions. Zyra's MCP integration enables dynamic tool discovery, secure configuration, and real-time execution monitoring.
+
+## Available MCP Servers
+
+### **Development Tools**
+
+<CardGroup cols={2}>
+  <Card title="Git Repository" icon="git-branch">
+    **Server ID**: `git`
+    **Category**: Development
+    
+    **Capabilities**:
+    - Repository management and operations
+    - Commit history analysis
+    - Branch operations and merging
+    - Diff generation and analysis
+    
+    **Configuration**:
+    ```json
+    {
+      "repository": "/path/to/git/repo"
+    }
+    ```
+  </Card>
+  
+  <Card title="PostgreSQL Database" icon="database">
+    **Server ID**: `postgres`
+    **Category**: Database
+    
+    **Capabilities**:
+    - SQL query execution
+    - Schema introspection
+    - Data manipulation and analysis
+    - Performance optimization
+    
+    **Configuration**:
+    ```json
+    {
+      "databaseUrl": "postgresql://user:pass@host:5432/db"
+    }
+    ```
+  </Card>
+  
+  <Card title="HTTP Requests" icon="globe">
+    **Server ID**: `fetch`
+    **Category**: API
+    
+    **Capabilities**:
+    - REST API interactions
+    - HTTP method support (GET, POST, PUT, DELETE)
+    - Custom headers and authentication
+    - Response processing and validation
+    
+    **Configuration**:
+    ```json
+    {
+      "userAgent": "Zyra-AI-Agent/1.0",
+      "timeout": 30000
+    }
+    ```
+  </Card>
+  
+  <Card title="Sequential Thinking" icon="brain">
+    **Server ID**: `sequential-thinking`
+    **Category**: Reasoning
+    
+    **Capabilities**:
+    - Advanced multi-step reasoning
+    - Problem decomposition
+    - Logical chain construction
+    - Complex decision trees
+    
+    **Configuration**:
+    ```json
+    {
+      "maxSteps": 10,
+      "temperature": 0.3
+    }
+    ```
+  </Card>
+</CardGroup>
+
+### **Blockchain Tools**
+
+<CardGroup cols={2}>
+  <Card title="GOAT Blockchain SDK" icon="link">
+    **Server ID**: `goat`
+    **Category**: Blockchain
+    
+    **Capabilities**:
+    - Multi-chain wallet management
+    - DeFi protocol interactions
+    - Token transfers and swaps
+    - NFT operations
+    - Smart contract interactions
+    
+    **Supported Networks**:
+    - Sei Network (Testnet/Mainnet)
+    - Base Sepolia
+    - Ethereum networks
+    
+    **Configuration**:
+    ```json
+    {
+      "EVM_WALLET_PRIVATE_KEY": "0x...",
+      "RPC_PROVIDER_URL": "https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32",
+      "USE_BASE_SEPOLIA": "false"
+    }
+    ```
+  </Card>
+  
+  <Card title="Sei Network" icon="zap">
+    **Server ID**: `sei`
+    **Category**: Blockchain
+    
+    **Capabilities**:
+    - Native Sei blockchain operations
+    - CosmWasm smart contracts
+    - Sei-specific token management
+    - Network configuration management
+    
+    **Configuration**:
+    ```json
+    {
+      "WALLET_MODE": "private-key",
+      "PRIVATE_KEY": "0x...",
+      "SEI_NETWORK": "mainnet",
+      "CUSTOM_RPC_URL": "https://rpc.sei.io"
+    }
+    ```
+  </Card>
+  
+  <Card title="BlockScout Explorer" icon="magnifying-glass">
+    **Server ID**: `blockScout`
+    **Category**: Database
+    
+    **Capabilities**:
+    - Blockchain data queries
+    - Transaction analysis
+    - Smart contract verification
+    - Network statistics
+    
+    **Configuration**:
+    ```json
+    {
+      "endpoint": "https://mcp.blockscout.com/mcp/"
+    }
+    ```
+  </Card>
+</CardGroup>
+
+### **Web Automation Tools**
+
+<CardGroup cols={2}>
+  <Card title="Puppeteer Browser" icon="robot">
+    **Server ID**: `puppeteer`
+    **Category**: Automation
+    
+    **Capabilities**:
+    - Web scraping and data extraction
+    - Form automation and submission
+    - Screenshot and PDF generation
+    - Performance monitoring
+    
+    **Configuration**:
+    ```json
+    {
+      "headless": true,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      }
+    }
+    ```
+  </Card>
+  
+  <Card title="Brave Search" icon="magnifying-glass">
+    **Server ID**: `brave-search`
+    **Category**: Web
+    
+    **Capabilities**:
+    - Real-time web search
+    - News and information gathering
+    - Content research and analysis
+    - Search result processing
+    
+    **Configuration**:
+    ```json
+    {
+      "apiKey": "your-brave-api-key"
+    }
+    ```
+  </Card>
+</CardGroup>
+
+### **Utility Tools**
+
+<CardGroup cols={2}>
+  <Card title='Time Services' icon='clock'>
+    **Server ID**: `time` **Category**: Time **Capabilities**: - Current time
+    and date - Timezone conversions - Temporal calculations - Schedule planning
+    **Configuration**: None required
+  </Card>
+
+  <Card title='Weather Services' icon='cloud-sun'>
+    **Server ID**: `weather` **Category**: Weather **Capabilities**: - Current
+    weather conditions - Weather forecasts - Location-based data - Climate
+    analysis **Configuration**: None required
+  </Card>
+</CardGroup>
+
+## MCP Server Management
+
+### **Dynamic Server Discovery**
+
+Zyra automatically discovers and configures available MCP servers:
+
+```typescript
+// MCP server discovery and management
+interface MCPServerManager {
+  // Discover available servers
+  discoverServers(): Promise<MCPServerConfig[]>;
+
+  // Test server connectivity
+  testConnection(serverId: string): Promise<ConnectionTest>;
+
+  // Configure server with validation
+  configureServer(serverId: string, config: any): Promise<void>;
+
+  // Get server status
+  getServerStatus(serverId: string): Promise<ServerStatus>;
+}
+
+// Server configuration with schema validation
+interface MCPServerConfig {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  category: string;
+
+  connection: {
+    type: "stdio" | "http" | "websocket";
+    command?: string;
+    args?: string[];
+    env?: Record<string, string>;
+  };
+
+  configSchema: {
+    type: "object";
+    properties: Record<string, any>;
+    required?: string[];
+  };
+
+  examples: ConfigExample[];
+}
+```
+
+### **Configuration Management**
+
+<Tabs>
+  <Tab title="Schema Validation">
+    ```typescript
+    // Configuration validation using Zod schemas
+    const serverConfig = z.object({
+      EVM_WALLET_PRIVATE_KEY: z.string().min(1),
+      RPC_PROVIDER_URL: z.string().url(),
+      USE_BASE_SEPOLIA: z.enum(["true", "false"]).optional()
+    });
+    
+    // Validate configuration before applying
+    const validation = serverConfig.safeParse(userConfig);
+    if (!validation.success) {
+      throw new ConfigurationError(validation.error.message);
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Secure Credentials">
+    ```typescript
+    // Secure credential management
+    interface SecureCredentialManager {
+      // Store sensitive configuration securely
+      storeCredentials(serverId: string, credentials: any): Promise<void>;
+      
+      // Retrieve credentials for server execution
+      getCredentials(serverId: string): Promise<any>;
+      
+      // Rotate credentials periodically
+      rotateCredentials(serverId: string): Promise<void>;
+      
+      // Audit credential access
+      auditAccess(serverId: string, operation: string): void;
+    }
+    
+    // Environment variable handling for sensitive data
+    const sensitiveFields = ["apiKey", "privateKey", "password", "secret"];
+    const secureConfig = filterSensitiveFields(config, sensitiveFields);
+    ```
+  </Tab>
+  
+  <Tab title="Connection Testing">
+    ```typescript
+    // Real-time connection testing
+    interface ConnectionTester {
+      testMCPServer(
+        serverId: string,
+        config: Record<string, any>
+      ): Promise<ConnectionTestResult>;
+    }
+    
+    interface ConnectionTestResult {
+      success: boolean;
+      tools: MCPTool[];
+      error?: string;
+      responseTime?: number;
+      serverVersion?: string;
+    }
+    
+    // Test server before adding to agent
+    const testResult = await testMCPServer("goat", {
+      EVM_WALLET_PRIVATE_KEY: "0x...",
+      RPC_PROVIDER_URL: "https://sepolia.base.org"
+    });
+    
+    if (testResult.success) {
+      addServerToAgent(serverId, config);
+    } else {
+      showConfigurationError(testResult.error);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Tool Integration Patterns
+
+### **AI Agent Tool Access**
+
+MCP tools are seamlessly integrated into AI agent workflows:
+
+```typescript
+// AI agent with configured MCP tools
+interface AIAgentWithTools {
+  config: AIAgentConfig;
+  selectedTools: {
+    id: string;
+    name: string;
+    type: "mcp" | "goat" | "builtin";
+    config: Record<string, any>;
+    enabled: boolean;
+  }[];
+
+  // Tool execution interface
+  executeTool(toolName: string, parameters: any): Promise<ToolResult>;
+
+  // Tool availability checking
+  isToolAvailable(toolName: string): boolean;
+
+  // Tool configuration validation
+  validateToolConfig(toolId: string, config: any): ValidationResult;
+}
+
+// Example tool execution in agent workflow
+const agentPrompt = `
+You have access to the following tools:
+- goat: Blockchain operations (Sei Network, Base, Ethereum)
+- fetch: HTTP requests to APIs
+- sequential-thinking: Advanced reasoning capabilities
+- brave-search: Web search and research
+
+Task: Analyze the current DeFi market conditions and execute a portfolio rebalancing strategy.
+
+1. Use brave-search to gather recent market news
+2. Use fetch to get current token prices from APIs  
+3. Use sequential-thinking to analyze the data
+4. Use goat to execute necessary transactions
+`;
+```
+
+### **Cross-Tool Data Flow**
+
+<Tabs>
+  <Tab title="Sequential Processing">
+    ```typescript
+    // Tools process data sequentially
+    const workflow = [
+      {
+        tool: "brave-search",
+        params: { query: "DeFi market conditions latest news" },
+        output: "marketNews"
+      },
+      {
+        tool: "fetch",
+        params: { url: "https://api.coingecko.com/api/v3/simple/price" },
+        output: "priceData"  
+      },
+      {
+        tool: "sequential-thinking",
+        params: { 
+          context: "{{marketNews}} {{priceData}}",
+          task: "Analyze market conditions for portfolio decisions"
+        },
+        output: "analysis"
+      },
+      {
+        tool: "goat",
+        params: {
+          operation: "portfolio_rebalance",
+          strategy: "{{analysis.recommendation}}"
+        },
+        output: "transactions"
+      }
+    ];
+    ```
+  </Tab>
+  
+  <Tab title="Parallel Execution">
+    ```typescript
+    // Execute independent tools in parallel
+    const parallelTasks = await Promise.all([
+      executeTool("fetch", { 
+        url: "https://api.defipulse.com/v1/egs" 
+      }),
+      executeTool("brave-search", { 
+        query: "Ethereum gas prices today" 
+      }),
+      executeTool("time", { 
+        timezone: "UTC" 
+      })
+    ]);
+    
+    // Combine results for decision making
+    const context = {
+      defiData: parallelTasks[0],
+      gasInfo: parallelTasks[1], 
+      currentTime: parallelTasks[2]
+    };
+    
+    // Make informed decision with all data
+    const decision = await executeTool("sequential-thinking", {
+      context: JSON.stringify(context),
+      task: "Determine optimal transaction timing"
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Conditional Execution">
+    ```typescript
+    // Execute tools based on conditions
+    interface ConditionalExecution {
+      condition: string;
+      trueBranch: ToolExecution[];
+      falseBranch: ToolExecution[];
+    }
+    
+    const conditionalWorkflow: ConditionalExecution = {
+      condition: "{{priceData.ethereum.usd}} > 2000",
+      trueBranch: [
+        {
+          tool: "goat",
+          params: { operation: "sell_eth", amount: "0.5" }
+        }
+      ],
+      falseBranch: [
+        {
+          tool: "goat", 
+          params: { operation: "buy_eth", amount: "1000" }
+        }
+      ]
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Advanced Configuration
+
+### **Custom MCP Server Development**
+
+Create custom MCP servers for specialized functionality:
+
+```typescript
+// Custom MCP server interface
+interface CustomMCPServer {
+  id: string;
+  version: string;
+  capabilities: {
+    tools: boolean;
+    resources: boolean;
+    prompts: boolean;
+  };
+
+  tools: MCPTool[];
+  resources?: MCPResource[];
+  prompts?: MCPPrompt[];
+}
+
+// Example custom analytics server
+class AnalyticsMCPServer implements CustomMCPServer {
+  id = "custom-analytics";
+  version = "1.0.0";
+  capabilities = { tools: true, resources: false, prompts: false };
+
+  tools = [
+    {
+      name: "analyze_portfolio",
+      description: "Analyze portfolio performance and risks",
+      inputSchema: {
+        type: "object",
+        properties: {
+          portfolioData: { type: "object" },
+          timeframe: { type: "string", enum: ["1d", "1w", "1m", "1y"] },
+        },
+        required: ["portfolioData"],
+      },
+    },
+    {
+      name: "generate_report",
+      description: "Generate comprehensive portfolio report",
+      inputSchema: {
+        type: "object",
+        properties: {
+          analysisData: { type: "object" },
+          format: { type: "string", enum: ["json", "html", "pdf"] },
+        },
+      },
+    },
+  ];
+
+  async executeTool(name: string, params: any): Promise<any> {
+    switch (name) {
+      case "analyze_portfolio":
+        return this.analyzePortfolio(params);
+      case "generate_report":
+        return this.generateReport(params);
+      default:
+        throw new Error(`Unknown tool: ${name}`);
+    }
+  }
+
+  private async analyzePortfolio(params: any): Promise<any> {
+    // Custom portfolio analysis logic
+    const { portfolioData, timeframe } = params;
+
+    // Perform analysis
+    const analysis = {
+      totalValue: this.calculateTotalValue(portfolioData),
+      performance: this.calculatePerformance(portfolioData, timeframe),
+      risks: this.assessRisks(portfolioData),
+      recommendations: this.generateRecommendations(portfolioData),
+    };
+
+    return analysis;
+  }
+}
+```
+
+### **Server Registry Management**
+
+```typescript
+// MCP server registry for dynamic management
+class MCPServerRegistry {
+  private servers = new Map<string, MCPServerConfig>();
+  private activeConnections = new Map<string, MCPConnection>();
+
+  // Register new server
+  async registerServer(config: MCPServerConfig): Promise<void> {
+    // Validate server configuration
+    const validation = await this.validateServerConfig(config);
+    if (!validation.success) {
+      throw new Error(`Invalid server config: ${validation.error}`);
+    }
+
+    // Test server connection
+    const connectionTest = await this.testServerConnection(config);
+    if (!connectionTest.success) {
+      throw new Error(`Server connection failed: ${connectionTest.error}`);
+    }
+
+    // Register server
+    this.servers.set(config.id, config);
+
+    // Start server if needed
+    if (config.connection.type === "stdio") {
+      await this.startStdioServer(config);
+    }
+  }
+
+  // Get available tools from all servers
+  async getAvailableTools(): Promise<MCPTool[]> {
+    const allTools: MCPTool[] = [];
+
+    for (const [serverId, config] of this.servers) {
+      try {
+        const connection = await this.getConnection(serverId);
+        const tools = await connection.listTools();
+        allTools.push(...tools.map((tool) => ({ ...tool, serverId })));
+      } catch (error) {
+        console.warn(`Failed to get tools from server ${serverId}:`, error);
+      }
+    }
+
+    return allTools;
+  }
+
+  // Execute tool on appropriate server
+  async executeTool(toolName: string, params: any): Promise<any> {
+    const tool = await this.findTool(toolName);
+    if (!tool) {
+      throw new Error(`Tool not found: ${toolName}`);
+    }
+
+    const connection = await this.getConnection(tool.serverId);
+    return await connection.callTool(toolName, params);
+  }
+}
+```
+
+## Performance Optimization
+
+### **Connection Pooling**
+
+<Tabs>
+  <Tab title="Connection Management">
+    ```typescript
+    // MCP connection pool for performance
+    class MCPConnectionPool {
+      private pools = new Map<string, ConnectionPool>();
+      
+      async getConnection(serverId: string): Promise<MCPConnection> {
+        let pool = this.pools.get(serverId);
+        
+        if (!pool) {
+          pool = new ConnectionPool({
+            serverId,
+            minConnections: 1,
+            maxConnections: 5,
+            acquireTimeoutMillis: 10000,
+            idleTimeoutMillis: 30000
+          });
+          this.pools.set(serverId, pool);
+        }
+        
+        return await pool.acquire();
+      }
+      
+      async releaseConnection(
+        serverId: string, 
+        connection: MCPConnection
+      ): Promise<void> {
+        const pool = this.pools.get(serverId);
+        if (pool) {
+          await pool.release(connection);
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Caching Strategy">
+    ```typescript
+    // Tool result caching for performance
+    interface ToolCache {
+      get(key: string): Promise<any>;
+      set(key: string, value: any, ttl?: number): Promise<void>;
+      invalidate(pattern: string): Promise<void>;
+    }
+    
+    class MCPToolExecutor {
+      constructor(private cache: ToolCache) {}
+      
+      async executeTool(
+        toolName: string, 
+        params: any,
+        options: { cache?: boolean } = {}
+      ): Promise<any> {
+        const cacheKey = this.generateCacheKey(toolName, params);
+        
+        // Check cache first
+        if (options.cache !== false) {
+          const cached = await this.cache.get(cacheKey);
+          if (cached) {
+            return cached;
+          }
+        }
+        
+        // Execute tool
+        const result = await this.executeToolDirect(toolName, params);
+        
+        // Cache result if cacheable
+        if (this.isCacheable(toolName, params)) {
+          const ttl = this.getCacheTTL(toolName);
+          await this.cache.set(cacheKey, result, ttl);
+        }
+        
+        return result;
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Load Balancing">
+    ```typescript
+    // Load balancing across multiple server instances
+    class LoadBalancedMCPManager {
+      private serverPools = new Map<string, MCPServerInstance[]>();
+      private loadBalancer: LoadBalancer;
+      
+      constructor() {
+        this.loadBalancer = new RoundRobinLoadBalancer();
+      }
+      
+      async executeTool(toolName: string, params: any): Promise<any> {
+        const tool = await this.findTool(toolName);
+        const serverInstances = this.serverPools.get(tool.serverId) || [];
+        
+        if (serverInstances.length === 0) {
+          throw new Error(`No available instances for server: ${tool.serverId}`);
+        }
+        
+        // Select server instance using load balancer
+        const instance = this.loadBalancer.select(serverInstances);
+        
+        try {
+          return await instance.callTool(toolName, params);
+        } catch (error) {
+          // Try another instance on failure
+          const fallbackInstance = this.loadBalancer.selectFallback(
+            serverInstances, 
+            instance
+          );
+          
+          if (fallbackInstance) {
+            return await fallbackInstance.callTool(toolName, params);
+          }
+          
+          throw error;
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Security Considerations
+
+### **Credential Management**
+
+<CardGroup cols={2}>
+  <Card title='Secure Storage' icon='lock'>
+    **Encrypted credential storage** - API keys encrypted at rest - Private keys
+    in secure vaults - Access logging and auditing - Credential rotation
+    policies
+  </Card>
+
+  <Card title='Access Controls' icon='shield-check'>
+    **Fine-grained access permissions** - Tool-level access controls -
+    User-based permissions - Rate limiting and quotas - Audit trails for
+    compliance
+  </Card>
+
+  <Card title='Network Security' icon='globe-lock'>
+    **Secure communication protocols** - TLS encryption for all connections -
+    Certificate validation - Network isolation for sensitive tools - VPN support
+    for private networks
+  </Card>
+
+  <Card title='Input Validation' icon='filter'>
+    **Robust input sanitization** - Schema validation for all inputs - SQL
+    injection prevention - Command injection protection - Output sanitization
+  </Card>
+</CardGroup>
+
+### **Best Security Practices**
+
+```typescript
+// Security middleware for MCP tools
+class MCPSecurityManager {
+  // Validate and sanitize tool inputs
+  async validateInput(toolName: string, params: any): Promise<any> {
+    const tool = await this.getTool(toolName);
+    const schema = tool.inputSchema;
+
+    // Schema validation
+    const validation = validateSchema(params, schema);
+    if (!validation.valid) {
+      throw new SecurityError(`Invalid input: ${validation.errors}`);
+    }
+
+    // Sanitize potentially dangerous inputs
+    const sanitized = this.sanitizeParams(params);
+
+    // Check against security policies
+    await this.checkSecurityPolicies(toolName, sanitized);
+
+    return sanitized;
+  }
+
+  // Rate limiting for tool execution
+  async checkRateLimit(userId: string, toolName: string): Promise<void> {
+    const key = `rate_limit:${userId}:${toolName}`;
+    const current = await this.redis.get(key);
+
+    if (current && parseInt(current) >= this.getRateLimit(toolName)) {
+      throw new RateLimitError("Rate limit exceeded");
+    }
+
+    await this.redis.incr(key);
+    await this.redis.expire(key, 3600); // 1 hour window
+  }
+
+  // Audit logging
+  async logToolExecution(
+    userId: string,
+    toolName: string,
+    params: any,
+    result: any,
+    success: boolean
+  ): Promise<void> {
+    const auditLog = {
+      timestamp: new Date().toISOString(),
+      userId,
+      toolName,
+      params: this.sanitizeForLogging(params),
+      resultSize: JSON.stringify(result).length,
+      success,
+      ip: this.getClientIP(),
+      userAgent: this.getUserAgent(),
+    };
+
+    await this.auditLogger.log(auditLog);
+  }
+}
+```
+
+## Monitoring and Debugging
+
+### **Tool Execution Monitoring**
+
+<Tabs>
+  <Tab title="Performance Metrics">
+    ```typescript
+    // Tool performance monitoring
+    interface ToolMetrics {
+      toolName: string;
+      executionCount: number;
+      averageLatency: number;
+      successRate: number;
+      errorRate: number;
+      lastExecution: Date;
+    }
+    
+    class ToolMetricsCollector {
+      private metrics = new Map<string, ToolMetrics>();
+      
+      async recordExecution(
+        toolName: string,
+        latency: number,
+        success: boolean
+      ): Promise<void> {
+        const metric = this.metrics.get(toolName) || {
+          toolName,
+          executionCount: 0,
+          averageLatency: 0,
+          successRate: 0,
+          errorRate: 0,
+          lastExecution: new Date()
+        };
+        
+        // Update metrics
+        metric.executionCount++;
+        metric.averageLatency = (
+          (metric.averageLatency * (metric.executionCount - 1)) + latency
+        ) / metric.executionCount;
+        
+        if (success) {
+          metric.successRate = (metric.successRate * (metric.executionCount - 1) + 1) / metric.executionCount;
+        } else {
+          metric.errorRate = (metric.errorRate * (metric.executionCount - 1) + 1) / metric.executionCount;
+        }
+        
+        metric.lastExecution = new Date();
+        this.metrics.set(toolName, metric);
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Error Tracking">
+    ```typescript
+    // Comprehensive error tracking
+    interface ToolError {
+      toolName: string;
+      errorType: string;
+      errorMessage: string;
+      timestamp: Date;
+      params: any;
+      stackTrace?: string;
+      userId?: string;
+    }
+    
+    class ToolErrorTracker {
+      private errors: ToolError[] = [];
+      
+      async trackError(
+        toolName: string,
+        error: Error,
+        params: any,
+        userId?: string
+      ): Promise<void> {
+        const toolError: ToolError = {
+          toolName,
+          errorType: error.constructor.name,
+          errorMessage: error.message,
+          timestamp: new Date(),
+          params: this.sanitizeParams(params),
+          stackTrace: error.stack,
+          userId
+        };
+        
+        this.errors.push(toolError);
+        
+        // Send to error reporting service
+        await this.reportError(toolError);
+        
+        // Check for error patterns
+        await this.analyzeErrorPatterns(toolName);
+      }
+      
+      async analyzeErrorPatterns(toolName: string): Promise<void> {
+        const recentErrors = this.errors
+          .filter(e => e.toolName === toolName)
+          .filter(e => Date.now() - e.timestamp.getTime() < 3600000); // Last hour
+          
+        if (recentErrors.length > 10) { // High error rate
+          await this.alertHighErrorRate(toolName, recentErrors);
+        }
+        
+        // Look for common error patterns
+        const errorTypes = recentErrors.reduce((acc, error) => {
+          acc[error.errorType] = (acc[error.errorType] || 0) + 1;
+          return acc;
+        }, {});
+        
+        // Alert if specific error type is frequent
+        for (const [errorType, count] of Object.entries(errorTypes)) {
+          if (count > 5) {
+            await this.alertFrequentError(toolName, errorType, count);
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Health Checks">
+    ```typescript
+    // Tool health monitoring
+    interface ToolHealthStatus {
+      toolName: string;
+      status: "healthy" | "degraded" | "unhealthy";
+      lastCheck: Date;
+      responseTime: number;
+      availability: number;
+      issues: string[];
+    }
+    
+    class ToolHealthMonitor {
+      private healthStatus = new Map<string, ToolHealthStatus>();
+      
+      async checkToolHealth(toolName: string): Promise<ToolHealthStatus> {
+        const startTime = Date.now();
+        const issues: string[] = [];
+        
+        try {
+          // Test basic connectivity
+          await this.testToolConnectivity(toolName);
+          
+          // Test with sample parameters
+          await this.testToolExecution(toolName);
+          
+          const responseTime = Date.now() - startTime;
+          
+          // Determine health status
+          let status: "healthy" | "degraded" | "unhealthy" = "healthy";
+          
+          if (responseTime > 10000) { // > 10 seconds
+            status = "degraded";
+            issues.push("High response time");
+          }
+          
+          const healthStatus: ToolHealthStatus = {
+            toolName,
+            status,
+            lastCheck: new Date(),
+            responseTime,
+            availability: this.calculateAvailability(toolName),
+            issues
+          };
+          
+          this.healthStatus.set(toolName, healthStatus);
+          return healthStatus;
+          
+        } catch (error) {
+          const healthStatus: ToolHealthStatus = {
+            toolName,
+            status: "unhealthy",
+            lastCheck: new Date(),
+            responseTime: Date.now() - startTime,
+            availability: this.calculateAvailability(toolName),
+            issues: [error.message]
+          };
+          
+          this.healthStatus.set(toolName, healthStatus);
+          return healthStatus;
+        }
+      }
+      
+      async performHealthChecks(): Promise<Map<string, ToolHealthStatus>> {
+        const tools = await this.getAllTools();
+        const healthChecks = tools.map(tool => this.checkToolHealth(tool.name));
+        
+        await Promise.all(healthChecks);
+        return this.healthStatus;
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting Guide
+
+### **Common Issues**
+
+<AccordionGroup>
+  <Accordion title='Server Connection Failures' icon='plug-disconnected'>
+    **Symptoms**: MCP servers showing as disconnected or unreachable
+    **Troubleshooting Steps**: 1. Verify network connectivity and firewall
+    settings 2. Check server configuration and environment variables 3. Validate
+    API keys and authentication credentials 4. Review server logs for error
+    messages 5. Test connection manually using curl or similar tools 6. Check
+    server dependencies and required services **Common Solutions**: - Update
+    expired API keys - Fix network routing or proxy settings - Restart dependent
+    services (databases, etc.) - Update server configuration with correct
+    endpoints
+  </Accordion>
+
+  <Accordion title='Tool Execution Timeouts' icon='clock'>
+    **Symptoms**: Tools timing out during execution **Troubleshooting Steps**:
+    1. Check tool-specific timeout settings 2. Verify server resource
+    availability 3. Monitor network latency and bandwidth 4. Review tool
+    parameters for complexity 5. Check for blocking operations in tool code
+    **Common Solutions**: - Increase timeout values for complex operations -
+    Optimize tool parameters and reduce data size - Implement connection pooling
+    and caching - Scale server resources or add load balancing
+  </Accordion>
+
+  <Accordion
+    title='Configuration Validation Errors'
+    icon='exclamation-triangle'>
+    **Symptoms**: Server configuration failing validation **Troubleshooting
+    Steps**: 1. Review configuration schema requirements 2. Validate JSON syntax
+    and structure 3. Check for missing required fields 4. Verify data types and
+    formats 5. Test with minimal configuration first **Common Solutions**: - Use
+    configuration examples as templates - Validate JSON format using online
+    validators - Check environment variable expansion - Review server
+    documentation for requirements
+  </Accordion>
+
+  <Accordion title='Performance Issues' icon='gauge'>
+    **Symptoms**: Slow tool execution or high resource usage **Troubleshooting
+    Steps**: 1. Monitor server resource utilization 2. Check for connection
+    pooling and caching 3. Review tool execution patterns and frequency 4.
+    Analyze network latency and throughput 5. Profile tool execution for
+    bottlenecks **Common Solutions**: - Implement result caching for frequently
+    accessed data - Use connection pooling to reduce overhead - Optimize tool
+    parameters and batch operations - Scale horizontally with load balancing
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title='AI Agents' icon='brain' href='/platform/ai-agents/overview'>
+    Learn how AI agents use MCP tools for intelligent automation
+  </Card>
+
+  <Card
+    title='Blockchain Tools'
+    icon='link'
+    href='/platform/blockchain/overview'>
+    Explore blockchain-specific MCP tools and DeFi capabilities
+  </Card>
+
+  <Card title='Custom Development' icon='code' href='/developers/mcp-servers'>
+    Build custom MCP servers for specialized functionality
+  </Card>
+
+  <Card title='API Reference' icon='book' href='/api-reference/mcp-tools'>
+    Technical API documentation for MCP tool integration
+  </Card>
+</CardGroup>

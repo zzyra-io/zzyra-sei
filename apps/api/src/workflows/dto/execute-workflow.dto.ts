@@ -29,6 +29,37 @@ export class ExecuteWorkflowDto {
   })
   @IsOptional()
   input?: Record<string, any>;
+
+  @ApiProperty({
+    description:
+      "Blockchain authorization configuration for workflows with blockchain operations",
+    example: {
+      selectedChains: [
+        {
+          chainId: "sei-testnet",
+          chainName: "SEI Testnet",
+          maxDailySpending: "1.0",
+          allowedOperations: ["trade", "transfer"],
+          tokenSymbol: "SEI",
+        },
+      ],
+      duration: 24,
+      timestamp: 1640995200000,
+    },
+    required: false,
+  })
+  @IsOptional()
+  blockchainAuthorization?: {
+    selectedChains: Array<{
+      chainId: string;
+      chainName: string;
+      maxDailySpending: string;
+      allowedOperations: string[];
+      tokenSymbol: string;
+    }>;
+    duration: number;
+    timestamp: number;
+  };
 }
 
 export class ExecuteWorkflowResponseDto {

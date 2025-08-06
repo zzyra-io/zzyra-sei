@@ -459,7 +459,13 @@ export class ExecutionWorker implements OnModuleInit {
 
   private async processJob(job: any): Promise<void> {
     try {
-      const { executionId, workflowId, userId, payload } = job;
+      const {
+        executionId,
+        workflowId,
+        userId,
+        payload,
+        blockchainAuthorization,
+      } = job;
       const isRetry = payload?.retried === true;
       const isResume = payload?.resumed === true;
       const resumeData = isResume ? payload?.resumeData || {} : {};
@@ -523,6 +529,7 @@ export class ExecutionWorker implements OnModuleInit {
         userId,
         isResume ? payload?.lastCompletedNodeId : undefined,
         resumeData,
+        blockchainAuthorization,
       );
 
       // Update final status

@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { JwtModule } from "@nestjs/jwt";
 import { APP_GUARD, APP_FILTER } from "@nestjs/core";
@@ -19,6 +19,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
 import { HealthModule } from "./health/health.module";
 import { TransformationsModule } from "./transformations/transformations.module";
 import { AIAgentModule } from "./ai-agent/ai-agent.module";
+import { SessionKeysModule } from "./session-keys/session-keys.module";
 import { TemplateController, TemplateService } from "./templates";
 // import { AppController } from "./app.controller";
 
@@ -28,6 +29,12 @@ import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 // Exception Filters
 import { DatabaseExceptionFilter } from "./filters/database-exception.filter";
 import { PrismaExceptionFilter } from "./filters/prisma-exception.filter";
+
+// Middleware
+import {
+  SecurityMiddleware,
+  AdminSecurityMiddleware,
+} from "./shared/middleware/security.middleware";
 
 @Module({
   imports: [
@@ -52,6 +59,7 @@ import { PrismaExceptionFilter } from "./filters/prisma-exception.filter";
     HealthModule,
     TransformationsModule,
     AIAgentModule,
+    SessionKeysModule,
   ],
   controllers: [TemplateController],
   providers: [
@@ -68,6 +76,16 @@ import { PrismaExceptionFilter } from "./filters/prisma-exception.filter";
       useClass: PrismaExceptionFilter,
     },
     TemplateService,
+    SecurityMiddleware,
+    AdminSecurityMiddleware,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply security middleware to all routes
+    consumer.apply(SecurityMiddleware).forRoutes("*");
+
+    // Apply admin security middleware to admin routes
+    consumer.apply(AdminSecurityMiddleware).forRoutes("*/admin/*");
+  }
+}

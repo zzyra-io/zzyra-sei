@@ -23,6 +23,7 @@ import {
   Loader2,
   Moon,
   Palette,
+  Shield,
   User,
   Zap,
 } from "lucide-react";
@@ -253,7 +254,7 @@ export default function SettingsPage() {
 
           <Tabs defaultValue='profile' className='space-y-6'>
             <div className='sticky top-0 z-10 bg-gradient-to-b from-slate-50 to-slate-50/95 dark:from-slate-950 dark:to-slate-950/95 pt-2 pb-4'>
-              <TabsList className='grid w-full grid-cols-4 max-w-xl mx-auto'>
+              <TabsList className='grid w-full grid-cols-5 max-w-2xl mx-auto'>
                 <TabsTrigger
                   value='profile'
                   className='flex items-center gap-2'>
@@ -275,6 +276,12 @@ export default function SettingsPage() {
                   className='flex items-center gap-2'>
                   <Bell className='h-4 w-4' />
                   <span className='hidden sm:inline'>Notifications</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value='sessions'
+                  className='flex items-center gap-2'>
+                  <Shield className='h-4 w-4' />
+                  <span className='hidden sm:inline'>Sessions</span>
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -659,6 +666,38 @@ export default function SettingsPage() {
                   <NotificationPreferencesForm />
                 </CardContent>
                 <Separator />
+              </Card>
+            </TabsContent>
+
+            <TabsContent value='sessions' className='space-y-6'>
+              <Card className='overflow-hidden border-none shadow-md'>
+                <CardHeader className='bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-900 dark:to-slate-800'>
+                  <div className='flex items-center gap-2'>
+                    <Shield className='h-5 w-5 text-slate-600 dark:text-slate-400' />
+                    <CardTitle>Session Management</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Manage your blockchain session keys and security settings
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className='p-6'>
+                  <div className='text-center py-8'>
+                    <Shield className='h-12 w-12 text-gray-400 mx-auto mb-4' />
+                    <h3 className='text-lg font-semibold mb-2'>
+                      Advanced Session Management
+                    </h3>
+                    <p className='text-gray-500 mb-4'>
+                      For detailed session management, visit the dedicated
+                      sessions page.
+                    </p>
+                    <Button
+                      onClick={() => router.push("/settings/sessions")}
+                      className='bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700'>
+                      <Shield className='h-4 w-4 mr-2' />
+                      Manage Sessions
+                    </Button>
+                  </div>
+                </CardContent>
               </Card>
             </TabsContent>
           </Tabs>

@@ -85,4 +85,12 @@ export { BlockGroup, ConnectionType, PropertyType } from "./workflow/execution";
 export { getBlockMetadata, getBlockType } from "./workflow/metadata";
 
 // Export MCP configurations
-export { defaultMCPs, sequentialThinking, fetch, puppeteer } from "./mcp-configs";
+export {
+  defaultMCPs,
+  sequentialThinking,
+  fetch,
+  puppeteer,
+} from "./mcp-configs";
+
+// Export session key types
+export * from "./session";

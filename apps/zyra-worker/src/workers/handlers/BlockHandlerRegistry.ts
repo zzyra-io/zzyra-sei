@@ -48,6 +48,7 @@ export class BlockHandlerRegistry {
       templateProcessor,
       this.databaseService,
       this.executionLogger,
+      this.configService,
     );
 
     this.handlers = {

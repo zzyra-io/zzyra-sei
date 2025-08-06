@@ -50,8 +50,9 @@ const MagicProvider = ({ children }: { children: ReactNode }) => {
             {
               extensions: [new OAuthExtension()],
               network: {
-                chainId: getChainId(),
-                rpcUrl: getNetworkUrl(),
+                chainId: 1328, // Official SEI testnet chain ID (atlantic-2)
+                rpcUrl:
+                  "https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32", // Your custom QuikNode RPC
               },
             }
           );

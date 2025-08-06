@@ -23,6 +23,12 @@ import SeiOnchainDataFetchConfig from "@/components/block-configs/sei/SeiOnchain
 import SeiPaymentConfig from "@/components/block-configs/sei/SeiPaymentConfig";
 import SeiNftConfig from "@/components/block-configs/sei/SeiNftConfig";
 
+// Blockchain operation config imports
+import { SendTransactionConfig } from "@/components/block-configs/blockchain/send-transaction-config";
+import { CheckBalanceConfig } from "@/components/block-configs/blockchain/check-balance-config";
+import { SwapTokensConfig } from "@/components/block-configs/blockchain/swap-tokens-config";
+import { CreateWalletConfig } from "@/components/block-configs/blockchain/create-wallet-config";
+
 interface BlockConfigComponent {
   config: Record<string, unknown>;
   onChange: (config: Record<string, unknown>) => void;
@@ -89,6 +95,12 @@ blockConfigRegistry.register(
 );
 blockConfigRegistry.register(BlockType.SEI_PAYMENT, SeiPaymentConfig);
 blockConfigRegistry.register(BlockType.SEI_NFT, SeiNftConfig);
+
+// Register blockchain operation block components
+blockConfigRegistry.register(BlockType.SEND_TRANSACTION, SendTransactionConfig);
+blockConfigRegistry.register(BlockType.CHECK_BALANCE, CheckBalanceConfig);
+blockConfigRegistry.register(BlockType.SWAP_TOKENS, SwapTokensConfig);
+blockConfigRegistry.register(BlockType.CREATE_WALLET, CreateWalletConfig);
 
 export { blockConfigRegistry };
 export type { BlockConfigComponentType };

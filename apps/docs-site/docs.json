@@ -41,6 +41,20 @@
             ]
           },
           {
+            "group": "Features & Capabilities",
+            "pages": [
+              "platform/features/overview",
+              "platform/ai-agents/overview",
+              "platform/blockchain/overview"
+            ]
+          },
+          {
+            "group": "Security & Infrastructure",
+            "pages": [
+              "platform/security/session-keys"
+            ]
+          },
+          {
             "group": "Use Cases",
             "pages": [
               "platform/use-cases/overview",

@@ -1,0 +1,807 @@
+---
+title: "Session Keys & Account Abstraction"
+description: "Planned session key system for secure, automated blockchain operations - Advanced security framework in development"
+---
+
+## Session Keys Overview
+
+<Alert type="info">
+  **Development Status**: Session key system and account abstraction features are in active development. This represents Zzyra's planned security framework for automated blockchain operations.
+</Alert>
+
+Zzyra is designing a comprehensive **Account Abstraction (AA)** system using session keys that will enable secure, automated blockchain operations while maintaining user control and implementing enterprise-grade security measures.
+
+## What are Session Keys?
+
+Session Keys are **cryptographic key pairs** that enable **delegated transaction signing** - allowing automated systems to execute blockchain transactions on behalf of users without requiring manual approval for each transaction.
+
+### **Key Benefits**
+
+<CardGroup cols={2}>
+  <Card title="Non-Custodial Security" icon="shield-check">
+    **User maintains full control**
+    - Users retain ownership of their primary wallet
+    - Session keys have limited permissions and lifetime
+    - Automatic expiry prevents long-term exposure
+    - Emergency revocation capabilities
+  </Card>
+  
+  <Card title="Automated Operations" icon="robot">
+    **Seamless automation**
+    - Execute transactions without manual approval
+    - Enable complex multi-step workflows
+    - Support for DeFi automation strategies
+    - Real-time portfolio management
+  </Card>
+  
+  <Card title="Granular Permissions" icon="settings">
+    **Fine-grained control**
+    - Operation-specific permissions
+    - Spending limits per transaction and daily
+    - Contract address whitelisting
+    - Emergency stop functionality
+  </Card>
+  
+  <Card title="Enterprise Security" icon="building">
+    **Production-grade features**
+    - AES-256-GCM encryption
+    - Comprehensive audit trails
+    - Multi-layer validation
+    - Real-time monitoring
+  </Card>
+</CardGroup>
+
+## How Session Keys Work
+
+### **Architecture Overview**
+
+<Steps>
+  <Step title="Key Generation">
+    Secure session key pair generated using cryptographically secure random number generation
+  </Step>
+  <Step title="User Authorization">
+    User signs delegation message using Magic SDK, authorizing session key for specific operations
+  </Step>
+  <Step title="Secure Storage">
+    Session private key encrypted with user's signature and stored securely in database
+  </Step>
+  <Step title="Permission Configuration">
+    Granular permissions configured for operations, spending limits, and time bounds
+  </Step>
+  <Step title="Automated Execution">
+    Session key signs transactions automatically within configured parameters
+  </Step>
+  <Step title="Continuous Monitoring">
+    All operations tracked, logged, and validated against security policies
+  </Step>
+</Steps>
+
+### **Cryptographic Security**
+
+```typescript
+// Session key encryption using AES-256-GCM
+interface SessionKeyEncryption {
+  algorithm: "aes-256-gcm";
+  keyDerivation: "scrypt";
+  keyLength: 32;      // 256 bits
+  ivLength: 16;       // 128 bits
+  tagLength: 16;      // 128 bits
+  saltLength: 32;     // 256 bits
+}
+
+// Encryption process
+class SessionKeyCrypto {
+  async encryptSessionKey(
+    privateKey: string,
+    userSignature: string
+  ): Promise<string> {
+    // Generate random salt and IV
+    const salt = randomBytes(this.saltLength);
+    const iv = randomBytes(this.ivLength);
+    
+    // Derive encryption key from user signature
+    const key = await scrypt(userSignature, salt, this.keyLength);
+    
+    // Encrypt with AES-256-GCM
+    const cipher = createCipheriv(this.algorithm, key, iv);
+    let encrypted = cipher.update(privateKey, "utf8", "hex");
+    encrypted += cipher.final("hex");
+    
+    // Get authentication tag
+    const tag = cipher.getAuthTag();
+    
+    // Combine all components
+    return Buffer.concat([salt, iv, tag, Buffer.from(encrypted, "hex")])
+      .toString("base64");
+  }
+}
+```
+
+## Session Key Configuration
+
+### **Security Levels**
+
+<Tabs>
+  <Tab title="BASIC">
+    **Standard Protection**
+    - Standard spending limits
+    - Basic operation monitoring
+    - Daily usage reporting
+    - Automatic expiry enforcement
+    
+    **Best for**: Personal automation, simple workflows
+  </Tab>
+  
+  <Tab title="ENHANCED">
+    **Additional Monitoring**
+    - Enhanced spending controls
+    - Real-time security alerts
+    - Behavioral analysis
+    - Advanced audit logging
+    
+    **Best for**: Business operations, higher value transactions
+  </Tab>
+  
+  <Tab title="MAXIMUM">
+    **Highest Security**
+    - Multi-factor validation
+    - Advanced threat detection
+    - Immediate alert systems
+    - Comprehensive forensic logging
+    
+    **Best for**: Enterprise treasury, high-value automation
+  </Tab>
+</Tabs>
+
+### **Permission System**
+
+Each session key has granular permissions controlling what operations can be performed:
+
+```typescript
+interface SessionPermission {
+  operation: string;           // "send", "swap", "stake", "approve"
+  maxAmountPerTx: string;     // Maximum per transaction (in wei/native units)
+  maxDailyAmount: string;     // Daily spending limit
+  allowedContracts: string[]; // Whitelisted contract addresses
+  requireConfirmation: boolean; // Manual approval for large amounts
+  emergencyStop: boolean;     // Emergency suspension flag
+}
+
+// Example permission configurations
+const permissions: SessionPermission[] = [
+  {
+    operation: "send",
+    maxAmountPerTx: "0.1",      // 0.1 ETH per transaction
+    maxDailyAmount: "1.0",      // 1.0 ETH per day
+    allowedContracts: ["*"],    // Any recipient address
+    requireConfirmation: false,
+    emergencyStop: false
+  },
+  {
+    operation: "swap",
+    maxAmountPerTx: "1000",     // $1000 worth per swap
+    maxDailyAmount: "5000",     // $5000 per day
+    allowedContracts: [
+      "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506", // Sushiswap
+      "0xE592427A0AEce92De3Edee1F18E0157C05861564"  // Uniswap V3
+    ],
+    requireConfirmation: true,  // Require approval for large swaps
+    emergencyStop: false
+  }
+];
+```
+
+### **Time-Based Controls**
+
+```typescript
+interface SessionKeyTimeBounds {
+  validUntil: Date;           // Absolute expiration time
+  dailyResetAt: Date;         // Daily limit reset time
+  createdAt: Date;            // Creation timestamp
+  lastUsedAt?: Date;          // Last usage timestamp
+  
+  // Usage tracking
+  totalUsedAmount: string;    // Lifetime usage
+  dailyUsedAmount: string;    // Current day usage
+}
+
+// Example time configuration
+const timeBounds = {
+  validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+  dailyResetAt: new Date(),   // Reset at midnight UTC
+  maxIdleTime: 2 * 60 * 60 * 1000, // 2 hours idle timeout
+};
+```
+
+## Enhanced Authorization Modal
+
+### **Workflow Detection**
+
+The authorization modal automatically analyzes workflows to detect blockchain operations:
+
+```typescript
+interface BlockchainDetection {
+  // Detects AI agents with blockchain tools
+  detectAIAgentBlockchain(node: WorkflowNode): boolean;
+  
+  // Detects direct blockchain blocks  
+  detectDirectBlockchain(node: WorkflowNode): boolean;
+  
+  // Estimates spending requirements
+  estimateSpending(nodes: BlockchainNode[]): SpendingEstimate;
+  
+  // Determines required chains
+  detectRequiredChains(nodes: BlockchainNode[]): string[];
+}
+
+interface BlockchainNode {
+  node: WorkflowNode;
+  chains: string[];           // Required blockchain networks
+  tools: MCPTool[];          // Required MCP tools
+  estimatedSpending: string; // Estimated spending amount
+}
+```
+
+### **Configuration Interface**
+
+<AccordionGroup>
+  <Accordion title="Basic Settings Tab" icon="settings">
+    **Network Configuration**
+    - Enable/disable specific blockchain networks
+    - Configure spending limits per chain
+    - Set estimated vs. maximum amounts
+    - Select session duration (1 hour to 7 days)
+    
+    **Spending Controls**
+    - Daily spending limits per network
+    - Per-transaction maximums
+    - USD value integration
+    - Emergency spending caps
+  </Accordion>
+  
+  <Accordion title="Security Tab" icon="shield">
+    **Security Level Selection**
+    - Choose from BASIC, ENHANCED, or MAXIMUM
+    - Configure confirmation requirements
+    - Set up spending alerts (50%, 80% thresholds)
+    - Emergency contact configuration
+    
+    **Advanced Options**
+    - Multi-factor authentication
+    - Behavioral monitoring
+    - Anomaly detection thresholds
+  </Accordion>
+  
+  <Accordion title="Operations Tab" icon="list">
+    **Operation Review**
+    - Visual summary of detected blockchain operations
+    - Block-by-block operation breakdown
+    - Estimated gas costs and fees
+    - Risk assessment display
+    
+    **Final Authorization**
+    - Review all settings before creation
+    - Magic SDK signature prompt
+    - Session key generation confirmation
+  </Accordion>
+</AccordionGroup>
+
+## Magic SDK Integration
+
+### **Secure Signing Process**
+
+```typescript
+// Session key creation with Magic SDK
+class MagicSessionKeyCreation {
+  async createSessionKey(
+    request: CreateSessionKeyRequest,
+    magic: Magic
+  ): Promise<SessionKeyResult> {
+    
+    // Get user wallet address from Magic
+    const userMetadata = await magic.user.getInfo();
+    const walletAddress = userMetadata.publicAddress;
+    
+    // Create delegation message
+    const delegationMessage = {
+      userAddress: walletAddress,
+      sessionPublicKey: request.sessionPublicKey,
+      chainId: request.chainId,
+      securityLevel: request.securityLevel,
+      validUntil: request.validUntil.toISOString(),
+      permissions: request.permissions,
+      timestamp: new Date().toISOString(),
+      nonce: generateNonce()
+    };
+    
+    // Sign delegation with Magic's secure UI
+    const provider = new ethers.BrowserProvider(magic.rpcProvider);
+    const signer = await provider.getSigner();
+    const signature = await signer.signMessage(
+      JSON.stringify(delegationMessage)
+    );
+    
+    // Create session key via API
+    return await this.sessionKeyAPI.create({
+      delegationMessage,
+      signature,
+      sessionKeyData: request
+    });
+  }
+}
+```
+
+### **User Experience Flow**
+
+<Steps>
+  <Step title="Workflow Analysis">
+    System automatically detects blockchain operations and calculates requirements
+  </Step>
+  <Step title="Configuration">
+    User configures spending limits, security level, and time bounds through intuitive UI
+  </Step>
+  <Step title="Magic Signature">
+    Magic SDK prompts user to sign delegation message with secure, familiar interface
+  </Step>
+  <Step title="Session Creation">
+    Encrypted session key stored securely with configured permissions
+  </Step>
+  <Step title="Workflow Execution">
+    Automated blockchain operations execute within configured security boundaries
+  </Step>
+</Steps>
+
+## Real-Time Monitoring
+
+### **Session Usage Tracking**
+
+<CardGroup cols={2}>
+  <Card title="Usage Analytics" icon="chart-line">
+    **Comprehensive Metrics**
+    - Total transactions executed
+    - Spending amounts by time period
+    - Operation type breakdown
+    - Success/failure rates
+    - Average transaction values
+  </Card>
+  
+  <Card title="Security Monitoring" icon="shield-check">
+    **Real-Time Alerts**
+    - Spending threshold alerts
+    - Unusual activity detection
+    - Failed transaction monitoring
+    - Permission violation attempts
+    - Emergency event notifications
+  </Card>
+</CardGroup>
+
+### **Event Tracking System**
+
+```typescript
+enum SessionEventType {
+  CREATED = "created",
+  USED = "used",
+  VALIDATED = "validated", 
+  REVOKED = "revoked",
+  EXPIRED = "expired",
+  SECURITY_ALERT = "security_alert",
+  SPENDING_ALERT = "spending_alert"
+}
+
+interface SessionEvent {
+  sessionKeyId: string;
+  eventType: SessionEventType;
+  eventData: {
+    operation?: string;
+    amount?: string;
+    transactionHash?: string;
+    reason?: string;
+    metadata?: Record<string, any>;
+  };
+  severity: "info" | "warning" | "error" | "critical";
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: Date;
+}
+
+// Automatic event logging
+class SessionEventLogger {
+  async logTransactionAttempt(
+    sessionKeyId: string,
+    operation: string,
+    amount: string,
+    success: boolean
+  ): Promise<void> {
+    await this.createEvent({
+      sessionKeyId,
+      eventType: success ? SessionEventType.USED : SessionEventType.SECURITY_ALERT,
+      eventData: { operation, amount, success },
+      severity: success ? "info" : "warning"
+    });
+  }
+}
+```
+
+## Validation & Security
+
+### **Multi-Layer Validation**
+
+Every transaction undergoes comprehensive validation before execution:
+
+```typescript
+interface SessionKeyValidator {
+  // Basic validation
+  validateSessionExists(sessionKeyId: string): Promise<boolean>;
+  validateNotExpired(sessionKey: SessionKeyData): boolean;
+  validateNotRevoked(sessionKey: SessionKeyData): boolean;
+  
+  // Permission validation  
+  validateOperationAllowed(operation: string, permissions: SessionPermission[]): boolean;
+  validateAmountLimits(amount: string, permission: SessionPermission): boolean;
+  validateDailyLimits(amount: string, currentUsage: string, limit: string): boolean;
+  validateContractAddress(address: string, allowedContracts: string[]): boolean;
+  
+  // Security validation
+  validateSpendingPatterns(usage: UsagePattern): SecurityResult;
+  validateTransactionContext(context: TransactionContext): SecurityResult;
+  detectAnomalousActivity(sessionKey: SessionKeyData): SecurityResult;
+}
+
+// Example validation flow
+class TransactionValidator {
+  async validateTransaction(
+    sessionKeyId: string,
+    operation: string,
+    amount: string,
+    toAddress: string
+  ): Promise<ValidationResult> {
+    
+    const sessionKey = await this.getSessionKey(sessionKeyId);
+    const errors: string[] = [];
+    
+    // Basic checks
+    if (!sessionKey) errors.push("Session key not found");
+    if (sessionKey.status !== "ACTIVE") errors.push(`Session is ${sessionKey.status}`);
+    if (new Date() > sessionKey.validUntil) errors.push("Session expired");
+    
+    // Permission checks
+    const permission = sessionKey.permissions.find(p => p.operation === operation);
+    if (!permission) errors.push(`Operation '${operation}' not permitted`);
+    
+    if (permission) {
+      // Amount limits
+      if (parseFloat(amount) > parseFloat(permission.maxAmountPerTx)) {
+        errors.push(`Amount exceeds per-transaction limit`);
+      }
+      
+      // Daily limits
+      const dailyUsed = parseFloat(sessionKey.dailyUsedAmount);
+      const dailyLimit = parseFloat(permission.maxDailyAmount);
+      if (dailyUsed + parseFloat(amount) > dailyLimit) {
+        errors.push(`Would exceed daily spending limit`);
+      }
+      
+      // Contract whitelist
+      if (permission.allowedContracts.length > 0 && 
+          !permission.allowedContracts.includes(toAddress) &&
+          !permission.allowedContracts.includes("*")) {
+        errors.push(`Address not in whitelist`);
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      remainingDailyAmount: permission ? 
+        (parseFloat(permission.maxDailyAmount) - parseFloat(sessionKey.dailyUsedAmount)).toString() :
+        undefined
+    };
+  }
+}
+```
+
+### **Spending Limit Enforcement**
+
+```typescript
+// Real-time spending tracking
+interface SpendingTracker {
+  // Track usage by session key
+  recordTransaction(
+    sessionKeyId: string, 
+    amount: string, 
+    transactionHash: string
+  ): Promise<void>;
+  
+  // Get current usage statistics
+  getCurrentUsage(sessionKeyId: string): Promise<UsageStats>;
+  
+  // Check if transaction would exceed limits
+  wouldExceedLimits(
+    sessionKeyId: string,
+    operation: string, 
+    amount: string
+  ): Promise<boolean>;
+  
+  // Reset daily limits (automated)
+  resetDailyLimits(): Promise<void>;
+}
+
+interface UsageStats {
+  totalTransactions: number;
+  totalAmount: string;
+  dailyTransactions: number;
+  dailyAmount: string;
+  remainingDailyAmount: string;
+  largestTransaction: string;
+  averageTransactionSize: string;
+}
+```
+
+## Advanced Features
+
+### **Emergency Controls**
+
+<Tabs>
+  <Tab title="Emergency Stop">
+    **Immediate Operation Suspension**
+    - Stop all operations for specific session key
+    - Global emergency stop for all sessions
+    - Operation-specific suspension
+    - Automatic threat response triggers
+    
+    ```typescript
+    interface EmergencyControls {
+      emergencyStopSession(sessionKeyId: string, reason: string): Promise<void>;
+      emergencyStopOperation(operation: string, reason: string): Promise<void>;
+      emergencyStopAllSessions(userId: string, reason: string): Promise<void>;
+      activateGlobalEmergencyStop(reason: string): Promise<void>;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Session Revocation">
+    **Manual Session Termination**
+    - Immediate session key revocation
+    - Revocation with reason logging
+    - Bulk session revocation
+    - Scheduled revocation
+    
+    ```typescript
+    interface SessionRevocation {
+      revokeSession(sessionKeyId: string, reason?: string): Promise<void>;
+      revokeAllUserSessions(userId: string, reason?: string): Promise<void>;
+      scheduleRevocation(sessionKeyId: string, revokeAt: Date): Promise<void>;
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Audit & Recovery">
+    **Forensic Analysis**
+    - Complete transaction history
+    - Security event analysis
+    - Usage pattern investigation
+    - Recovery recommendations
+    
+    ```typescript
+    interface ForensicAnalysis {
+      generateAuditReport(sessionKeyId: string): Promise<AuditReport>;
+      analyzeSecurityEvents(timeRange: TimeRange): Promise<SecurityAnalysis>;
+      investigateAnomalousActivity(sessionKeyId: string): Promise<Investigation>;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### **Integration Patterns**
+
+<AccordionGroup>
+  <Accordion title="Workflow Integration" icon="sitemap">
+    **Seamless Workflow Integration**
+    - Automatic session key detection in workflows
+    - Cross-block session key sharing
+    - Template variable support for session data
+    - Error handling and retry logic
+    
+    ```typescript
+    // Using session keys in workflows
+    const workflowWithSessions = {
+      blocks: [
+        {
+          type: "SESSION_KEY_CREATE",
+          config: { securityLevel: "ENHANCED", duration: "24h" }
+        },
+        {
+          type: "AI_AGENT", 
+          config: {
+            systemPrompt: "Analyze portfolio and execute trades",
+            sessionKeyId: "{{sessionKey.id}}"
+          }
+        },
+        {
+          type: "SWAP_TOKENS",
+          config: {
+            sessionKeyId: "{{sessionKey.id}}",
+            amount: "{{aiAgent.recommendedAmount}}"
+          }
+        }
+      ]
+    };
+    ```
+  </Accordion>
+  
+  <Accordion title="API Integration" icon="code">
+    **Programmatic Access**
+    - RESTful API for session management
+    - Webhook notifications for events
+    - Real-time WebSocket updates
+    - SDK for common programming languages
+    
+    ```typescript
+    // Session Key API client
+    class SessionKeyAPI {
+      async createSession(config: CreateSessionKeyRequest): Promise<SessionKeyData>;
+      async validateTransaction(params: ValidationRequest): Promise<ValidationResult>;
+      async revokeSession(sessionKeyId: string): Promise<void>;
+      async getUsageStats(sessionKeyId: string): Promise<UsageStats>;
+      async listSessions(filters?: SessionFilters): Promise<SessionKeyData[]>;
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Third-Party Integration" icon="plug">
+    **External System Integration**
+    - Portfolio management platforms
+    - Risk management systems  
+    - Compliance monitoring tools
+    - Accounting and tax software
+    
+    ```typescript
+    // Webhook notifications
+    interface SessionKeyWebhook {
+      eventType: "session.created" | "session.used" | "session.revoked" | "spending.alert";
+      sessionKeyId: string;
+      userId: string;
+      data: Record<string, any>;
+      timestamp: string;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+### **Security Best Practices**
+
+<CardGroup cols={2}>
+  <Card title="Permission Design" icon="shield-check">
+    **Principle of Least Privilege**
+    - Grant minimum required permissions
+    - Use specific contract addresses when possible
+    - Set conservative spending limits initially
+    - Regular permission review and updates
+    - Monitor usage patterns for optimization
+  </Card>
+  
+  <Card title="Time Management" icon="clock">
+    **Session Duration Strategy**
+    - Use shortest practical session duration
+    - Regular session rotation for long-term automation
+    - Monitor for idle sessions and revoke
+    - Plan for session renewal in automation
+  </Card>
+  
+  <Card title="Monitoring Setup" icon="eye">
+    **Comprehensive Monitoring**
+    - Set up spending threshold alerts
+    - Monitor for unusual usage patterns
+    - Regular security event review
+    - Automated anomaly detection
+    - Emergency response procedures
+  </Card>
+  
+  <Card title="Recovery Planning" icon="refresh">
+    **Incident Response**
+    - Document emergency procedures
+    - Test revocation processes
+    - Maintain emergency contact lists
+    - Plan for service disruptions
+    - Regular security audits
+  </Card>
+</CardGroup>
+
+### **Operational Best Practices**
+
+```typescript
+// Example production configuration
+const productionSessionConfig = {
+  securityLevel: SecurityLevel.ENHANCED,
+  permissions: [
+    {
+      operation: "swap",
+      maxAmountPerTx: "100.0",        // Conservative per-tx limit
+      maxDailyAmount: "1000.0",       // Reasonable daily limit
+      allowedContracts: [
+        "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506" // Only trusted DEX
+      ],
+      requireConfirmation: true,       // Require approval for large amounts
+      emergencyStop: false
+    }
+  ],
+  duration: 24 * 60 * 60 * 1000,     // 24 hours maximum
+  alerts: [
+    { threshold: 50, method: "push" }, // 50% spending alert
+    { threshold: 80, method: "email" }  // 80% spending alert
+  ],
+  emergencyContacts: ["admin@company.com", "+1234567890"]
+};
+```
+
+## Troubleshooting
+
+### **Common Issues & Solutions**
+
+<AccordionGroup>
+  <Accordion title="Session Creation Fails" icon="x-circle">
+    **Symptoms**: Unable to create session keys
+    
+    **Common Causes & Solutions**:
+    - **Magic SDK not initialized**: Ensure Magic SDK is properly configured
+    - **Insufficient permissions**: Check user wallet permissions  
+    - **Network connectivity**: Verify connection to blockchain networks
+    - **Invalid configuration**: Validate all session parameters
+    - **Rate limiting**: Check for too many creation attempts
+  </Accordion>
+  
+  <Accordion title="Transaction Validation Errors" icon="shield-x">
+    **Symptoms**: Transactions rejected during validation
+    
+    **Common Causes & Solutions**:
+    - **Spending limits exceeded**: Check current usage vs. limits
+    - **Session expired**: Create new session key
+    - **Permission denied**: Verify operation is allowed
+    - **Contract not whitelisted**: Add contract to allowed list
+    - **Emergency stop active**: Check for emergency stop status
+  </Accordion>
+  
+  <Accordion title="Performance Issues" icon="gauge">
+    **Symptoms**: Slow transaction processing or validation
+    
+    **Common Causes & Solutions**:
+    - **Database performance**: Optimize session key queries
+    - **Encryption overhead**: Consider caching for frequently used keys
+    - **Network latency**: Use appropriate RPC endpoints
+    - **Complex validation**: Simplify permission structures
+    - **High usage patterns**: Implement usage optimization
+  </Accordion>
+  
+  <Accordion title="Security Alerts" icon="exclamation-triangle">
+    **Symptoms**: Unexpected security alerts or events
+    
+    **Common Causes & Solutions**:
+    - **Anomalous usage**: Review usage patterns and adjust thresholds
+    - **Failed validations**: Check for configuration mismatches
+    - **Suspicious activity**: Investigate and potentially revoke sessions
+    - **Alert fatigue**: Fine-tune alert thresholds
+    - **False positives**: Adjust anomaly detection parameters
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Blockchain Operations" icon="link" href="/platform/blockchain/overview">
+    Learn about blockchain blocks and operations that use session keys
+  </Card>
+  
+  <Card title="AI + Session Keys" icon="brain" href="/platform/ai-agents/blockchain">
+    Combine AI agents with automated blockchain operations
+  </Card>
+  
+  <Card title="Security Framework" icon="shield" href="/platform/architecture/security">
+    Comprehensive security architecture and best practices
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api-reference/session-keys">
+    Technical API documentation for session key management
+  </Card>
+</CardGroup>

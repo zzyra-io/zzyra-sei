@@ -96,11 +96,17 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   async addExecutionJob(
     executionId: string,
     workflowId: string,
-    userId: string
+    userId: string,
+    blockchainAuthorization?: any
   ): Promise<void> {
     try {
       const ch = await this.initQueue();
-      const payload = { executionId, workflowId, userId };
+      const payload = {
+        executionId,
+        workflowId,
+        userId,
+        blockchainAuthorization,
+      };
 
       console.log("[Queue] Enqueue job:", payload);
 

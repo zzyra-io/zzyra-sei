@@ -8,8 +8,8 @@ export const DEFAULT_NETWORK = defaultNetworkFromEnv || 'sei-testnet';
 export const DEFAULT_RPC_URL =
   defaultNetworkFromEnv === 'sei'
     ? 'https://evm-rpc.sei-apis.com'
-    : 'https://evm-rpc-testnet.sei-apis.com';
-export const DEFAULT_CHAIN_ID = defaultNetworkFromEnv === 'sei' ? 1329 : 1328;
+    : 'https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32';
+export const DEFAULT_CHAIN_ID = defaultNetworkFromEnv === 'sei' ? 1329 : 713715;
 
 // Map chain IDs to chains
 export const chainMap: Record<number, Chain> = {
@@ -28,7 +28,9 @@ export const networkNameMap: Record<string, number> = {
 // Map chain IDs to RPC URLs with environment variable overrides
 export const rpcUrlMap: Record<number, string> = {
   1329: process.env.SEI_MAINNET_RPC || 'https://evm-rpc.sei-apis.com',
-  1328: process.env.SEI_TESTNET_RPC || 'https://evm-rpc-testnet.sei-apis.com',
+  1328:
+    process.env.SEI_TESTNET_RPC ||
+    'https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32',
   713715: process.env.SEI_DEVNET_RPC || 'https://evm-rpc-arctic-1.sei-apis.com',
 };
 

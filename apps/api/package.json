@@ -28,6 +28,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/schedule": "^6.0.0",
     "@nestjs/swagger": "^7.1.16",
     "@openrouter/ai-sdk-provider": "^0.7.2",
     "@zyra/database": "workspace:*",

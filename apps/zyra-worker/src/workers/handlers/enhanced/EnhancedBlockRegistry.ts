@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   BlockHandler,
   EnhancedBlockHandler,
@@ -20,6 +21,12 @@ import { PriceMonitorBlockHandler } from '../PriceMonitorBlockHandler';
 import { CalculatorBlockHandler } from './CalculatorBlockHandler';
 import { MagicWalletBlockHandler } from './MagicWalletBlockHandler';
 
+// Import blockchain blocks
+import { SendTransactionBlock } from './blockchain/SendTransactionBlock';
+import { CheckBalanceBlock } from './blockchain/CheckBalanceBlock';
+import { SwapTokensBlock } from './blockchain/SwapTokensBlock';
+import { CreateWalletBlock } from './blockchain/CreateWalletBlock';
+
 // Import legacy blocks
 import { EmailBlockHandler } from '../EmailBlockHandler';
 import { HttpRequestHandler } from '../HttpRequestHandler';
@@ -35,6 +42,7 @@ export class EnhancedBlockRegistry {
     private templateProcessor: ZyraTemplateProcessor,
     private databaseService: DatabaseService,
     private executionLogger: ExecutionLogger,
+    private configService: ConfigService,
   ) {
     this.initializeBlocks();
   }
@@ -51,6 +59,12 @@ export class EnhancedBlockRegistry {
     );
     this.registerEnhancedBlock(new CalculatorBlockHandler());
     this.registerEnhancedBlock(new MagicWalletBlockHandler());
+
+    // Register blockchain blocks
+    this.registerEnhancedBlock(new SendTransactionBlock(this.configService));
+    this.registerEnhancedBlock(new CheckBalanceBlock());
+    this.registerEnhancedBlock(new SwapTokensBlock());
+    this.registerEnhancedBlock(new CreateWalletBlock());
 
     // Register legacy blocks for backward compatibility
     this.registerLegacyBlock(

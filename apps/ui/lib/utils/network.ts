@@ -2,8 +2,23 @@ import { seiTestnet } from "wagmi/chains";
 import type { Chain } from "wagmi/chains";
 import { config } from "../config";
 
+// Override seiTestnet with correct chain ID and RPC URL
+const customSeiTestnet = {
+  ...seiTestnet,
+  id: 1328, // Official SEI testnet chain ID (atlantic-2)
+  rpcUrls: {
+    ...seiTestnet.rpcUrls,
+    default: {
+      ...seiTestnet.rpcUrls.default,
+      http: [
+        "https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32",
+      ],
+    },
+  },
+};
+
 // Single source of truth for supported networks
-export const supportedNetworks = [seiTestnet] as const;
+export const supportedNetworks = [customSeiTestnet] as const;
 
 // Type for supported networks
 export type SupportedNetwork = (typeof supportedNetworks)[number];
@@ -11,14 +26,14 @@ export type SupportedNetwork = (typeof supportedNetworks)[number];
 // Network configuration mapping chain ID to RPC URLs
 export const NETWORK_CONFIG: Record<number, { chain: Chain; rpcUrl: string }> =
   {
-    [seiTestnet.id]: {
-      chain: seiTestnet,
-      rpcUrl: seiTestnet.rpcUrls.default.http[0],
+    [customSeiTestnet.id]: {
+      chain: customSeiTestnet,
+      rpcUrl: customSeiTestnet.rpcUrls.default.http[0],
     },
   };
 
 // Active networks - only Sei testnet for now
-export const ACTIVE_NETWORKS = [seiTestnet] as const;
+export const ACTIVE_NETWORKS = [customSeiTestnet] as const;
 
 // Get the default network (first in ACTIVE_NETWORKS)
 export const getDefaultNetwork = (): Chain => {
@@ -89,7 +104,7 @@ export const getNetworkToken = (chainIdOrChain?: number | Chain): string => {
       : (chainIdOrChain?.id ?? getCurrentNetwork().id);
 
   switch (chainId) {
-    case seiTestnet.id:
+    case customSeiTestnet.id:
       return "SEI";
     default:
       return "SEI";
@@ -106,7 +121,7 @@ export const getFaucetUrl = (
       : (chainIdOrChain?.id ?? getCurrentNetwork().id);
 
   switch (chainId) {
-    case seiTestnet.id:
+    case customSeiTestnet.id:
       return undefined; // Use wagmi default
     default:
       return undefined;
@@ -155,7 +170,7 @@ export const isEip1559Supported = (
       : (chainIdOrChain?.id ?? getCurrentNetwork().id);
 
   switch (chainId) {
-    case seiTestnet.id:
+    case customSeiTestnet.id:
       return false;
     default:
       return false;

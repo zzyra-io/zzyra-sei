@@ -69,6 +69,21 @@ export interface BlockExecutionContext {
   };
   // Used by custom blocks to access additional services
   services?: Record<string, any>;
+  // Blockchain authorization for workflows with blockchain operations
+  blockchainAuthorization?: {
+    selectedChains: Array<{
+      chainId: string;
+      chainName: string;
+      maxDailySpending: string;
+      allowedOperations: string[];
+      tokenSymbol: string;
+      enabled?: boolean;
+    }>;
+    duration: number;
+    timestamp: number;
+    sessionKeyId?: string;
+    delegationSignature?: string;
+  };
 }
 
 /**
@@ -108,13 +123,16 @@ export interface EnhancedBlockExecutionContext extends BlockExecutionContext {
   getNodeParameter(parameterName: string, itemIndex?: number): any;
   getCredentials?(type: string): Promise<any>;
   getWorkflowStaticData?(type: string): any;
-  
+
   // Helper methods
   helpers: {
     httpRequest: (options: HttpRequestOptions) => Promise<any>;
     processTemplate: (template: string, data: any) => string;
     formatValue: (value: any, format?: string) => string;
-    constructExecutionMetaData: (inputData: ZyraNodeData[], outputData: any[]) => ZyraNodeData[];
+    constructExecutionMetaData: (
+      inputData: ZyraNodeData[],
+      outputData: any[]
+    ) => ZyraNodeData[];
     normalizeItems: (items: any) => ZyraNodeData[];
     returnJsonArray: (jsonData: any[]) => ZyraNodeData[];
   };
@@ -122,7 +140,7 @@ export interface EnhancedBlockExecutionContext extends BlockExecutionContext {
 
 export interface HttpRequestOptions {
   url: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
+  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS";
   headers?: Record<string, string>;
   body?: any;
   timeout?: number;
@@ -143,26 +161,26 @@ export interface EnhancedBlockDefinition {
   name: string;
   version: number;
   description: string;
-  
+
   // Visual properties
   icon: string;
   color: string;
   group: BlockGroup[];
-  
+
   // Configuration
   properties: BlockProperty[];
   defaults?: Record<string, any>;
-  
+
   // Connections
   inputs: ConnectionType[];
   outputs: ConnectionType[];
-  
+
   // Advanced features
   credentials?: CredentialDefinition[];
   webhooks?: WebhookDefinition[];
   polling?: boolean;
   subtitle?: string;
-  
+
   // Documentation
   documentation?: {
     examples: BlockExample[];
@@ -171,20 +189,20 @@ export interface EnhancedBlockDefinition {
 }
 
 export enum BlockGroup {
-  TRIGGER = 'trigger',
-  ACTION = 'action',
-  CONDITION = 'condition',
-  TRANSFORM = 'transform',
-  AI = 'ai',
-  BLOCKCHAIN = 'blockchain',
-  COMMUNICATION = 'communication',
-  DATA = 'data',
-  UTILITY = 'utility'
+  TRIGGER = "trigger",
+  ACTION = "action",
+  CONDITION = "condition",
+  TRANSFORM = "transform",
+  AI = "ai",
+  BLOCKCHAIN = "blockchain",
+  COMMUNICATION = "communication",
+  DATA = "data",
+  UTILITY = "utility",
 }
 
 export enum ConnectionType {
-  MAIN = 'main',
-  AI = 'ai'
+  MAIN = "main",
+  AI = "ai",
 }
 
 export interface BlockProperty {
@@ -200,16 +218,16 @@ export interface BlockProperty {
 }
 
 export enum PropertyType {
-  STRING = 'string',
-  NUMBER = 'number',
-  BOOLEAN = 'boolean',
-  OPTIONS = 'options',
-  MULTI_OPTIONS = 'multiOptions',
-  COLLECTION = 'collection',
-  JSON = 'json',
-  DATETIME = 'dateTime',
-  CREDENTIALS = 'credentials',
-  HIDDEN = 'hidden'
+  STRING = "string",
+  NUMBER = "number",
+  BOOLEAN = "boolean",
+  OPTIONS = "options",
+  MULTI_OPTIONS = "multiOptions",
+  COLLECTION = "collection",
+  JSON = "json",
+  DATETIME = "dateTime",
+  CREDENTIALS = "credentials",
+  HIDDEN = "hidden",
 }
 
 export interface PropertyOption {
@@ -241,7 +259,7 @@ export interface CredentialDefinition {
 export interface WebhookDefinition {
   name: string;
   httpMethod: string;
-  responseMode: 'onReceived' | 'lastNode';
+  responseMode: "onReceived" | "lastNode";
   path: string;
 }
 
@@ -261,7 +279,10 @@ export interface DocumentationResource {
  */
 export interface BlockHandler {
   // Updated signature to match worker implementation with 2 parameters
-  execute(node: any, context: BlockExecutionContext): Promise<Record<string, any>>;
+  execute(
+    node: any,
+    context: BlockExecutionContext
+  ): Promise<Record<string, any>>;
   validate?(config: Record<string, any>): boolean;
   getDefaultConfig?(): Record<string, any>;
 }
@@ -273,8 +294,14 @@ export interface EnhancedBlockHandler {
   definition: EnhancedBlockDefinition;
   execute(context: EnhancedBlockExecutionContext): Promise<ZyraNodeData[]>;
   validate?(config: Record<string, any>): Promise<ValidationResult>;
-  loadOptions?(methodName: string, context: EnhancedBlockExecutionContext): Promise<PropertyOption[]>;
-  credentialTest?(credentials: any, context: EnhancedBlockExecutionContext): Promise<boolean>;
+  loadOptions?(
+    methodName: string,
+    context: EnhancedBlockExecutionContext
+  ): Promise<PropertyOption[]>;
+  credentialTest?(
+    credentials: any,
+    context: EnhancedBlockExecutionContext
+  ): Promise<boolean>;
   webhook?(context: EnhancedBlockExecutionContext): Promise<any>;
   poll?(context: EnhancedBlockExecutionContext): Promise<ZyraNodeData[]>;
   trigger?(context: EnhancedBlockExecutionContext): Promise<ZyraNodeData[]>;
@@ -282,6 +309,7 @@ export interface EnhancedBlockHandler {
 
 export interface ValidationResult {
   valid: boolean;
+  isValid?: boolean; // Alias for backward compatibility
   errors?: string[];
   warnings?: string[];
 }
@@ -312,6 +340,6 @@ export interface FieldMapping {
 }
 
 export interface DataTransformation {
-  type: 'format' | 'calculate' | 'filter' | 'aggregate';
+  type: "format" | "calculate" | "filter" | "aggregate";
   config: Record<string, any>;
 }

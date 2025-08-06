@@ -23,7 +23,12 @@ import { DataTransformationService } from '../services/data-transformation.servi
 import { DataStateService } from '../services/data-state.service';
 import { ParallelExecutionService } from '../services/parallel-execution.service';
 import { BlockchainDataSyncService } from '../services/blockchain-data-sync.service';
-import { BlockType, getEnhancedBlockSchema } from '@zyra/types';
+import {
+  BlockType,
+  getEnhancedBlockSchema,
+  BlockchainNode,
+  SUPPORTED_CHAINS,
+} from '@zyra/types';
 import { z } from 'zod';
 
 @Injectable()
@@ -43,6 +48,134 @@ export class WorkflowExecutor {
     private readonly parallelExecutionService: ParallelExecutionService,
     private readonly blockchainDataSyncService: BlockchainDataSyncService,
   ) {}
+
+  /**
+   * Detect blockchain operations in workflow nodes
+   */
+  private detectBlockchainOperations(nodes: any[]): {
+    hasBlockchainOperations: boolean;
+    blockchainNodes: BlockchainNode[];
+    supportedChains: string[];
+    estimatedSpending: Record<string, string>;
+  } {
+    const blockchainNodes: BlockchainNode[] = [];
+    const supportedChains = new Set<string>();
+
+    nodes.forEach((node) => {
+      // AI_AGENT blocks with blockchain tools
+      if (node.data?.blockType === 'AI_AGENT') {
+        const blockchainTools = node.data?.config?.selectedTools?.filter(
+          (tool) =>
+            tool.id === 'goat' ||
+            tool.name?.toLowerCase().includes('blockchain') ||
+            tool.description?.toLowerCase().includes('sei') ||
+            tool.description?.toLowerCase().includes('ethereum') ||
+            tool.description?.toLowerCase().includes('base'),
+        );
+
+        if (blockchainTools?.length > 0) {
+          // Detect chain from tool configs or default to SEI
+          const chains = this.detectChainsFromTools(blockchainTools);
+          chains.forEach((chain) => supportedChains.add(chain));
+
+          blockchainNodes.push({
+            node,
+            type: 'AI_AGENT',
+            chains,
+            tools: blockchainTools,
+          });
+        }
+      }
+
+      // Direct blockchain blocks
+      if (node.data?.blockType === 'AI_BLOCKCHAIN') {
+        const chain = node.data?.blockchain || 'sei-testnet'; // Default to SEI
+        supportedChains.add(chain);
+
+        blockchainNodes.push({
+          node,
+          type: 'BLOCKCHAIN',
+          chains: [chain],
+          tools: [],
+        });
+      }
+    });
+
+    return {
+      hasBlockchainOperations: blockchainNodes.length > 0,
+      blockchainNodes,
+      supportedChains: Array.from(supportedChains),
+      estimatedSpending:
+        this.calculateEstimatedSpendingByChain(blockchainNodes),
+    };
+  }
+
+  /**
+   * Detect blockchain chains from tools configuration
+   */
+  private detectChainsFromTools(tools: any[]): string[] {
+    const chains = new Set<string>();
+
+    tools.forEach((tool) => {
+      // Check tool config for chain info
+      if (tool.config?.RPC_PROVIDER_URL) {
+        if (tool.config.RPC_PROVIDER_URL.includes('sei')) {
+          chains.add('sei-testnet');
+        } else if (tool.config.RPC_PROVIDER_URL.includes('base')) {
+          chains.add('base-sepolia');
+        } else if (tool.config.RPC_PROVIDER_URL.includes('ethereum')) {
+          chains.add('ethereum-sepolia');
+        }
+      }
+
+      // Check for SEI-specific tools by default (our focus)
+      if (
+        tool.name?.toLowerCase().includes('sei') ||
+        tool.description?.toLowerCase().includes('sei')
+      ) {
+        chains.add('sei-testnet');
+      }
+    });
+
+    // Default to SEI if no specific chain detected (our focus)
+    if (chains.size === 0) {
+      chains.add('sei-testnet');
+    }
+
+    return Array.from(chains);
+  }
+
+  /**
+   * Calculate estimated spending by chain
+   */
+  private calculateEstimatedSpendingByChain(
+    blockchainNodes: BlockchainNode[],
+  ): Record<string, string> {
+    const spending: Record<string, string> = {};
+
+    blockchainNodes.forEach(({ node, chains }) => {
+      chains.forEach((chain) => {
+        if (!spending[chain]) spending[chain] = '0';
+
+        // Calculate based on node configurations
+        if (node.data?.config?.maxSpendPerTrade) {
+          const current = parseFloat(spending[chain]);
+          const additional = parseFloat(node.data.config.maxSpendPerTrade);
+          spending[chain] = (current + additional).toString();
+        } else {
+          // Default estimates by chain (focusing on SEI)
+          const defaults = {
+            'sei-testnet': '1.0',
+            'base-sepolia': '0.01',
+            'ethereum-sepolia': '0.001',
+          };
+          spending[chain] = defaults[chain] || '1.0';
+        }
+      });
+    });
+
+    return spending;
+  }
 
   /**
    * Build a dependency map for nodes based on edges
@@ -303,6 +436,7 @@ export class WorkflowExecutor {
     userId: string,
     resumeFromNodeId?: string,
     resumeData: Record<string, any> = {},
+    blockchainAuthorization?: any,
   ): Promise<{
     status: string;
     outputs: Record<string, any>;
@@ -775,6 +909,7 @@ export class WorkflowExecutor {
               executionId,
               userId,
               edgeProcessedOutputs,
+              blockchainAuthorization,
             );
 
             const nodeDuration = Date.now() - nodeStartTime;

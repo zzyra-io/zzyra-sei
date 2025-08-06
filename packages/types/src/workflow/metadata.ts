@@ -200,6 +200,71 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
       minAmount: 0,
     },
   },
+
+  // Blockchain operation blocks
+  [BlockType.SEND_TRANSACTION]: {
+    type: BlockType.SEND_TRANSACTION,
+    label: "Send Transaction",
+    description: "Send tokens or native currency to another wallet address",
+    category: NodeCategory.ACTION,
+    icon: "send",
+    defaultConfig: {
+      chainId: "sei-testnet",
+      recipientAddress: "",
+      amount: "",
+      tokenAddress: "",
+      gasLimit: 21000,
+    },
+  },
+
+  [BlockType.CHECK_BALANCE]: {
+    type: BlockType.CHECK_BALANCE,
+    label: "Check Balance",
+    description: "Check wallet balance for native currency or specific tokens",
+    category: NodeCategory.ACTION,
+    icon: "wallet",
+    defaultConfig: {
+      chainId: "sei-testnet",
+      walletAddress: "",
+      tokenAddresses: "",
+      includeUsdValue: false,
+    },
+  },
+
+  [BlockType.SWAP_TOKENS]: {
+    type: BlockType.SWAP_TOKENS,
+    label: "Swap Tokens",
+    description:
+      "Swap tokens on decentralized exchanges with slippage protection",
+    category: NodeCategory.ACTION,
+    icon: "refresh",
+    defaultConfig: {
+      chainId: "sei-testnet",
+      fromToken: "",
+      toToken: "",
+      amountIn: "",
+      minAmountOut: "",
+      slippageTolerance: 1.0,
+      dexPlatform: "auto",
+      deadline: 20,
+    },
+  },
+
+  [BlockType.CREATE_WALLET]: {
+    type: BlockType.CREATE_WALLET,
+    label: "Create Wallet",
+    description: "Create a new blockchain wallet address with optional funding",
+    category: NodeCategory.ACTION,
+    icon: "plus",
+    defaultConfig: {
+      chainId: "sei-testnet",
+      walletType: "eoa",
+      autoFund: true,
+      fundingAmount: "1.0",
+      walletLabel: "",
+      saveToDb: true,
+    },
+  },
 };
 
 /**

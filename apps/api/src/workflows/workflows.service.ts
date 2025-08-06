@@ -276,7 +276,8 @@ export class WorkflowsService {
     id: string,
     userId: string,
     scheduledTime?: Date,
-    input?: Record<string, any>
+    input?: Record<string, any>,
+    blockchainAuthorization?: any
   ): Promise<{ executionId: string }> {
     // First verify the user owns this workflow
     const existingWorkflow = await this.workflowRepository.findById(id, userId);
@@ -293,7 +294,12 @@ export class WorkflowsService {
     );
 
     // Queue the execution
-    await this.queueService.addExecutionJob(execution.id, id, userId);
+    await this.queueService.addExecutionJob(
+      execution.id,
+      id,
+      userId,
+      blockchainAuthorization
+    );
 
     return { executionId: execution.id };
   }

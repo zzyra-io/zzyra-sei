@@ -19,7 +19,13 @@ export enum BlockType {
   CALCULATOR = "CALCULATOR",
   MAGIC_WALLET = "MAGIC_WALLET",
 
-  // Sei blockchain operations now available through @sei-js/mcp-server via AI_AGENT blocks
+  // Blockchain operation blocks - direct transaction capabilities
+  SEND_TRANSACTION = "SEND_TRANSACTION",
+  CHECK_BALANCE = "CHECK_BALANCE",
+  SWAP_TOKENS = "SWAP_TOKENS",
+  CREATE_WALLET = "CREATE_WALLET",
+
+  // Sei blockchain operations also available through @sei-js/mcp-server via AI_AGENT blocks
 
   // Default/unknown
   UNKNOWN = "UNKNOWN",
@@ -29,6 +35,60 @@ export enum BlockType {
  * Generic, domain-agnostic block types
  * These blocks can be configured for any use case through their parameters
  */
+
+/**
+ * Blockchain-related interfaces for authorization
+ */
+export interface BlockchainAuthConfig {
+  selectedChains: ChainAuthConfig[];
+  duration: number; // hours
+  timestamp: number;
+}
+
+export interface ChainAuthConfig {
+  chainId: string;
+  chainName: string;
+  maxDailySpending: string;
+  allowedOperations: string[];
+  tokenSymbol: string;
+  enabled: boolean;
+  rpcUrl?: string;
+}
+
+export interface BlockchainNode {
+  node: any;
+  type: "AI_AGENT" | "BLOCKCHAIN";
+  chains: string[];
+  tools: any[];
+}
+
+export const SUPPORTED_CHAINS = {
+  "sei-testnet": {
+    name: "SEI Testnet",
+    symbol: "SEI",
+    rpcUrl: "https://rpc-testnet.sei-labs.org",
+    explorer: "https://testnet.seitrace.com",
+    faucet: "https://faucet.sei-testnet.org",
+  },
+  "base-sepolia": {
+    name: "Base Sepolia",
+    symbol: "ETH",
+    rpcUrl: "https://sepolia.base.org",
+    explorer: "https://sepolia.basescan.org",
+    faucet: "https://faucet.quicknode.com/base/sepolia",
+  },
+  "ethereum-sepolia": {
+    name: "Ethereum Sepolia",
+    symbol: "ETH",
+    rpcUrl: "https://sepolia.infura.io/v3/",
+    explorer: "https://sepolia.etherscan.io",
+    faucet: "https://faucet.sepolia.dev",
+  },
+} as const;
+
+export * from "./metadata";
+
+// Note: blockchain types are defined inline above and exported automatically
 
 export const BLOCK_TYPES = [
   "HTTP_REQUEST",

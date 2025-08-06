@@ -241,7 +241,8 @@ class WorkflowService {
         updateData.description = workflow.description;
       if (workflow.nodes !== undefined) updateData.nodes = workflow.nodes;
       if (workflow.edges !== undefined) updateData.edges = workflow.edges;
-      if (workflow.is_public !== undefined) updateData.isPublic = workflow.is_public;
+      if (workflow.is_public !== undefined)
+        updateData.isPublic = workflow.is_public;
 
       const response = await api.put(`/workflows/${id}`, updateData);
       console.log("updateData", updateData);
@@ -279,6 +280,7 @@ class WorkflowService {
     description?: string;
     nodes: any[];
     edges: any[];
+    blockchainAuthorization?: any;
   }): Promise<{ id: string }> {
     try {
       let workflowId = workflow.id;
@@ -296,7 +298,16 @@ class WorkflowService {
       }
 
       // Use the API endpoint to execute the workflow
-      const response = await api.post(`/workflows/${workflowId}/execute`);
+      const executePayload: any = {};
+      if (workflow.blockchainAuthorization) {
+        executePayload.blockchainAuthorization =
+          workflow.blockchainAuthorization;
+      }
+
+      const response = await api.post(
+        `/workflows/${workflowId}/execute`,
+        executePayload
+      );
 
       if (response.status !== 200 && response.status !== 201) {
         const errorData = response.data;

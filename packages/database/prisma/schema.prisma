@@ -40,6 +40,23 @@ enum WorkflowStatus {
   @@map("workflow_status")
 }
 
+enum SessionKeyStatus {
+  active
+  expired
+  revoked
+  paused
+
+  @@map("session_key_status")
+}
+
+enum SecurityLevel {
+  basic
+  enhanced
+  maximum
+
+  @@map("security_level")
+}
+
 // ================ Authentication & Users ================
 
 model User {
@@ -63,6 +80,7 @@ model User {
   mcpServers           McpServer[]
   aiAgentSecurityEvents AiAgentSecurityEvent[]
   goatWalletConfigs    GoatWalletConfig[]
+  sessionKeys          SessionKey[]
 
   @@map("users")
 }
@@ -178,6 +196,7 @@ model WorkflowExecution {
   workflowPauses       WorkflowPause[]
   aiAgentExecutions    AiAgentExecution[]
   aiAgentSecurityEvents AiAgentSecurityEvent[]
+  sessionTransactions  SessionTransaction[]
   
   @@map("workflow_executions")
   @@index([workflowId])
@@ -1185,4 +1204,143 @@ model McpToolCall {
   @@index([toolName])
   @@index([startedAt])
   @@index([success])
+}
+
+// ================ Session Keys & Security ================
+
+model SessionKey {
+  id                   String            @id @default(uuid())
+  userId               String            @map("user_id")
+  walletAddress        String            @map("wallet_address")
+  chainId              String            @map("chain_id")
+  
+  // Session key data
+  sessionPublicKey     String            @map("session_public_key")
+  encryptedPrivateKey  String            @map("encrypted_private_key")
+  nonce                BigInt            @default(autoincrement())
+  
+  // Security and permissions
+  securityLevel        SecurityLevel     @default(basic) @map("security_level")
+  status               SessionKeyStatus  @default(active)
+  
+  // Time bounds
+  validUntil           DateTime          @map("valid_until")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  revokedAt            DateTime?         @map("revoked_at")
+  
+  // Usage tracking
+  totalUsedAmount      Decimal           @default(0) @map("total_used_amount") @db.Decimal(20, 8)
+  dailyUsedAmount      Decimal           @default(0) @map("daily_used_amount") @db.Decimal(20, 8)
+  lastUsedAt           DateTime?         @map("last_used_at")
+  dailyResetAt         DateTime          @default(now()) @map("daily_reset_at")
+  
+  // Relations
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions          SessionPermission[]
+  transactions         SessionTransaction[]
+  events               SessionEvent[]
+  
+  @@map("session_keys")
+  @@index([userId])
+  @@index([walletAddress])
+  @@index([chainId])
+  @@index([status])
+  @@index([validUntil])
+  @@index([createdAt])
+}
+
+model SessionPermission {
+  id                   String            @id @default(uuid())
+  sessionKeyId         String            @map("session_key_id")
+  
+  // Permission details
+  operation            String            // send, swap, stake, etc.
+  maxAmountPerTx       Decimal           @map("max_amount_per_tx") @db.Decimal(20, 8)
+  maxDailyAmount       Decimal           @map("max_daily_amount") @db.Decimal(20, 8)
+  allowedContracts     String[]          @map("allowed_contracts")
+  
+  // Security settings
+  requireConfirmation  Boolean           @default(false) @map("require_confirmation")
+  emergencyStop        Boolean           @default(false) @map("emergency_stop")
+  
+  // Time bounds
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  
+  // Relations
+  sessionKey           SessionKey        @relation(fields: [sessionKeyId], references: [id], onDelete: Cascade)
+  
+  @@map("session_permissions")
+  @@index([sessionKeyId])
+  @@index([operation])
+  @@unique([sessionKeyId, operation])
+}
+
+model SessionTransaction {
+  id                   String            @id @default(uuid())
+  sessionKeyId         String            @map("session_key_id")
+  workflowExecutionId  String?           @map("workflow_execution_id")
+  
+  // Transaction details
+  transactionHash      String?           @map("transaction_hash")
+  chainId              String            @map("chain_id")
+  fromAddress          String            @map("from_address")
+  toAddress            String            @map("to_address")
+  amount               Decimal           @map("amount") @db.Decimal(20, 8)
+  operation            String            // send, swap, stake, etc.
+  
+  // Status and timing
+  status               String            @default("pending") // pending, confirmed, failed
+  gasUsed              BigInt?           @map("gas_used")
+  gasPrice             BigInt?           @map("gas_price")
+  blockNumber          BigInt?           @map("block_number")
+  
+  // Metadata
+  metadata             Json?
+  errorMessage         String?           @map("error_message")
+  
+  // Timestamps
+  createdAt            DateTime          @default(now()) @map("created_at")
+  confirmedAt          DateTime?         @map("confirmed_at")
+  failedAt             DateTime?         @map("failed_at")
+  
+  // Relations
+  sessionKey           SessionKey        @relation(fields: [sessionKeyId], references: [id], onDelete: Cascade)
+  workflowExecution    WorkflowExecution? @relation(fields: [workflowExecutionId], references: [id])
+  
+  @@map("session_transactions")
+  @@index([sessionKeyId])
+  @@index([workflowExecutionId])
+  @@index([transactionHash])
+  @@index([chainId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SessionEvent {
+  id                   String            @id @default(uuid())
+  sessionKeyId         String            @map("session_key_id")
+  
+  // Event details
+  eventType            String            @map("event_type") // created, used, revoked, expired, security_alert
+  eventData            Json              @map("event_data")
+  severity             String            @default("info") // info, warning, error, critical
+  
+  // Context
+  ipAddress            String?           @map("ip_address")
+  userAgent            String?           @map("user_agent")
+  location             Json?             // Geographic data if available
+  
+  // Timestamp
+  createdAt            DateTime          @default(now()) @map("created_at")
+  
+  // Relations
+  sessionKey           SessionKey        @relation(fields: [sessionKeyId], references: [id], onDelete: Cascade)
+  
+  @@map("session_events")
+  @@index([sessionKeyId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([createdAt])
 }

@@ -153,7 +153,8 @@ export class WorkflowsController {
       id,
       req.user.id,
       scheduledTime,
-      executeDto.input
+      executeDto.input,
+      executeDto.blockchainAuthorization
     );
 
     return {

@@ -55,6 +55,7 @@ export class NodeExecutor {
       templateProcessor,
       this.databaseService,
       this.executionLogger,
+      this.configService,
     );
     this.handlers = this.blockHandlerRegistry.getAllHandlers();
   }
@@ -64,6 +65,7 @@ export class NodeExecutor {
     executionId: string,
     userId: string,
     previousOutputs: Record<string, any>,
+    blockchainAuthorization?: any,
   ): Promise<any> {
     const span = this.tracer.startSpan('execute_node', {
       attributes: { nodeId: node.id, executionId, userId },
@@ -211,6 +213,7 @@ export class NodeExecutor {
             nodeType: blockType,
             executionTime: new Date().toISOString(),
           },
+          blockchainAuthorization,
         };
 
         // Update node with prepared data

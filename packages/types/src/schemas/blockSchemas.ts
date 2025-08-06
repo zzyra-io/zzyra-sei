@@ -584,7 +584,14 @@ export const blockSchemas: Record<BlockType, z.ZodTypeAny> = {
   [BlockType.CALCULATOR]: enhancedCalculatorSchema.configSchema,
   [BlockType.MAGIC_WALLET]: enhancedMagicWalletSchema.configSchema,
   [BlockType.WALLET_LISTEN]: walletListenerSchema.configSchema,
-  // Sei blockchain operations now available through @sei-js/mcp-server via AI_AGENT blocks
+
+  // Blockchain operation blocks - use generic schema as enhanced blocks handle validation
+  [BlockType.SEND_TRANSACTION]: z.any(),
+  [BlockType.CHECK_BALANCE]: z.any(),
+  [BlockType.SWAP_TOKENS]: z.any(),
+  [BlockType.CREATE_WALLET]: z.any(),
+
+  // Sei blockchain operations also available through @sei-js/mcp-server via AI_AGENT blocks
   [BlockType.UNKNOWN]: z.any(),
 };
 

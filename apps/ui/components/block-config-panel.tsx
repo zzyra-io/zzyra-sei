@@ -405,6 +405,8 @@ export function BlockConfigPanel({
       const updatedData = {
         ...currentData,
         config: config,
+        // Preserve isValid if it's in the config (set by blockchain components)
+        ...(config.isValid !== undefined && { isValid: config.isValid }),
       };
       onChange(updatedData);
     },

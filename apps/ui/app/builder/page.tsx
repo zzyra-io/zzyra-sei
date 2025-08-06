@@ -1,7 +1,6 @@
 "use client";
 
 import { BuilderSidebar } from "@/components/builder-sidebar";
-import { ExecutionStatusPanel } from "@/components/execution-status-panel";
 import { FlowCanvas } from "@/components/flow-canvas";
 import { SaveNewWorkflowDialog } from "@/components/save-workflow-dialog";
 import {
@@ -29,11 +28,7 @@ import NlWorkflowGenerator from "@/components/workflow/enhanced-nl-workflow-gene
 import { useSaveAndExecute } from "@/hooks/use-save-and-execute";
 import { useCreateCustomBlock } from "@/hooks/use-custom-blocks";
 import { useWorkflowExecution } from "@/hooks/use-workflow-execution";
-import { useExecutionWebSocket } from "@/hooks/use-execution-websocket";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
-import { CheckCircle2, Clock, XCircle, AlertCircle, Zap } from "lucide-react";
+
 import { generateFlow } from "@/lib/api";
 import { refineWorkflow } from "@/lib/api/workflow-generation";
 import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
@@ -42,13 +37,9 @@ import { WorkflowValidationProvider } from "@/lib/contexts/workflow-validation-c
 import { workflowService } from "@/lib/services/workflow-service";
 import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
 import { BlockType, CustomBlockDefinition } from "@zyra/types";
-import type { UnifiedWorkflowNode, UnifiedWorkflowEdge } from "@zyra/types";
-import {
-  ensureValidWorkflowNode,
-  prepareNodesForApi,
-  prepareEdgesForApi,
-} from "@zyra/types";
-import { ArrowLeft, Loader2, Play, RefreshCw, Save } from "lucide-react";
+import type { UnifiedWorkflowNode } from "@zyra/types";
+import { ensureValidWorkflowNode, prepareNodesForApi } from "@zyra/types";
+import { ArrowLeft, Loader2, Play, Save, AlertCircle } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -56,6 +47,16 @@ import type { Node, Edge } from "@xyflow/react";
 import { logsService } from "@/lib/services/logs-service";
 import { DraftManager } from "@/lib/utils/draft-manager";
 import { ExecutionTimeline } from "@/components/execution/execution-timeline";
+import {
+  EnhancedBlockchainAuthorizationModal,
+  useBlockchainDetection,
+} from "@/components/enhanced-blockchain-authorization-modal";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Simplified save state interface
 interface SaveState {
@@ -71,7 +72,7 @@ export default function BuilderPage() {
     addNode,
     setNodes,
     setEdges,
-    updateNode,
+
     workflowId,
     workflowName,
     workflowDescription,
@@ -99,7 +100,7 @@ export default function BuilderPage() {
 
   const toolbar = useFlowToolbar();
   const { validateWorkflow } = useWorkflowValidation();
-  const { validateWorkflow: validateWorkflowExecution, canExecuteWorkflow } =
+  const { validateWorkflow: validateWorkflowExecution } =
     useWorkflowExecutionValidation();
   useSaveAndExecute();
   const { mutateAsync: createCustomBlock } = useCreateCustomBlock();
@@ -112,9 +113,13 @@ export default function BuilderPage() {
   // Debug search params (simplified)
   useEffect(() => {
     const currentId = searchParams.get("id");
-    if (currentId !== (window as any).__prevSearchId) {
+    if (
+      currentId !==
+      (window as Window & { __prevSearchId?: string }).__prevSearchId
+    ) {
       console.log("BuilderPage: Search params changed - ID:", currentId);
-      (window as any).__prevSearchId = currentId;
+      (window as Window & { __prevSearchId?: string }).__prevSearchId =
+        currentId || undefined;
     }
   }, [searchParams]);
 
@@ -134,6 +139,10 @@ export default function BuilderPage() {
 
   // Add back exit dialog state
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
+
+  // Blockchain authorization state
+  const [showBlockchainAuth, setShowBlockchainAuth] = useState(false);
+  const blockchainDetection = useBlockchainDetection(nodes);
 
   // Set isClient to true only after the component mounts on the client
   useEffect(() => {
@@ -451,19 +460,14 @@ export default function BuilderPage() {
     executeWorkflow,
     isExecuting: isExecutionPending,
     executionStatus,
-    isLoadingStatus,
-    executionMetrics,
-    isRealTimeConnected,
-    connectionError,
     executionId,
     executionLogs,
+    isRealTimeConnected,
+    connectionError,
   } = useWorkflowExecution();
 
   // State to control execution panel visibility
   const [showExecutionPanel, setShowExecutionPanel] = useState(false);
-  const [workerConnectionStatus, setWorkerConnectionStatus] = useState<
-    "connected" | "disconnected" | "connecting"
-  >("disconnected");
 
   // WebSocket connection handled by useWorkflowExecution hook
   // Logs are collected via API fallback
@@ -474,9 +478,8 @@ export default function BuilderPage() {
 
     try {
       // Use the unified logs service
-      const executionLogs = await logsService.getExecutionLevelLogs(
-        executionId
-      );
+      const executionLogs =
+        await logsService.getExecutionLevelLogs(executionId);
 
       // Transform execution logs to ExecutionLog format
       const logs = executionLogs.map((log) => ({
@@ -505,14 +508,6 @@ export default function BuilderPage() {
       }
     }
   }, [executionId, toast]);
-
-  // Add a fallback to create mock logs for testing when no real logs are available
-  const createMockLogs = useCallback(() => {
-    if (executionLogs.length === 0 && executionId) {
-      console.log("Creating mock logs for testing");
-      // Mock logs are now handled by useWorkflowExecution hook
-    }
-  }, [executionLogs.length, executionId]);
 
   useEffect(() => {
     // Fetch logs after a delay to allow WebSocket to connect first
@@ -793,7 +788,15 @@ export default function BuilderPage() {
         return;
       }
 
-      // 4. Execute workflow
+      // 4. Check for blockchain operations
+      console.log("Blockchain detection result:", blockchainDetection);
+      if (blockchainDetection.hasBlockchainOperations) {
+        console.log("Blockchain operations detected, showing auth modal");
+        setShowBlockchainAuth(true);
+        return; // Wait for authorization
+      }
+
+      // 5. Execute workflow
       setShowExecutionPanel(true);
       await executeWorkflow();
     } catch (error: unknown) {
@@ -814,7 +817,60 @@ export default function BuilderPage() {
     initialId,
     executeWorkflow,
     toast,
+    blockchainDetection.hasBlockchainOperations,
   ]);
+
+  const handleBlockchainAuthorization = useCallback(
+    async (authConfig: Record<string, unknown>) => {
+      try {
+        // Store authorization config for execution
+        console.log("Blockchain authorization received:", authConfig);
+        console.log("Real-time connection status:", {
+          isRealTimeConnected,
+          connectionError,
+        });
+
+        // Execute workflow with authorization - need to update executeWorkflow to accept auth
+        setShowExecutionPanel(true);
+
+        // Create modified executeWorkflow with authorization
+        const { workflowService } = await import(
+          "@/lib/services/workflow-service"
+        );
+        const data = await workflowService.executeWorkflow({
+          id: workflowId,
+          nodes: nodes || [],
+          edges: edges || [],
+          blockchainAuthorization: authConfig,
+        });
+
+        console.log("Execution with authorization started:", data);
+
+        toast({
+          title: "Workflow Authorized",
+          description:
+            "Blockchain operations authorized. Executing workflow...",
+        });
+      } catch (error: unknown) {
+        const err = error as Error;
+        toast({
+          title: "Execution Error",
+          description:
+            err.message || "Failed to execute workflow after authorization",
+          variant: "destructive",
+        });
+      }
+    },
+    [workflowId, nodes, edges, toast]
+  );
+
+  const handleBlockchainCancel = useCallback(() => {
+    setShowBlockchainAuth(false);
+    toast({
+      title: "Authorization Cancelled",
+      description: "Workflow execution cancelled.",
+    });
+  }, [toast]);
 
   const handleNlGenerate = useCallback(
     async (e: { preventDefault: () => void }) => {
@@ -971,6 +1027,68 @@ export default function BuilderPage() {
     { enableOnFormTags: true }
   );
 
+  // Get detailed validation errors for tooltip
+  const getValidationErrors = useCallback(() => {
+    if (!Array.isArray(nodes)) return [];
+
+    const errors: Array<{
+      nodeId: string;
+      nodeName: string;
+      errors: string[];
+    }> = [];
+
+    nodes.forEach((node) => {
+      if (!node.data?.isValid) {
+        const nodeName = node.data?.label || node.data?.name || node.id;
+        const nodeErrors: string[] = [];
+
+        // Check for specific validation issues
+        if (node.data?.blockType === "SEND_TRANSACTION") {
+          const config = (node.data?.config as Record<string, unknown>) || {};
+          if (
+            !config.recipientAddress ||
+            !(config.recipientAddress as string)?.trim()
+          ) {
+            nodeErrors.push("Recipient address is required");
+          } else if (
+            typeof config.recipientAddress === "string" &&
+            !(
+              config.recipientAddress.startsWith("0x") ||
+              config.recipientAddress.startsWith("sei")
+            )
+          ) {
+            nodeErrors.push("Invalid recipient address format");
+          }
+          if (!config.amount || parseFloat(String(config.amount)) <= 0) {
+            nodeErrors.push("Amount must be greater than 0");
+          }
+        } else if (node.data?.blockType === "CHECK_BALANCE") {
+          const config = (node.data?.config as Record<string, unknown>) || {};
+          if (
+            !config.walletAddress ||
+            !(config.walletAddress as string)?.trim()
+          ) {
+            nodeErrors.push("Wallet address is required");
+          } else if (
+            typeof config.walletAddress === "string" &&
+            config.walletAddress.length < 20
+          ) {
+            nodeErrors.push("Invalid wallet address format");
+          }
+        } else {
+          // Generic validation for other blocks
+          nodeErrors.push("Configuration is incomplete");
+        }
+
+        if (nodeErrors.length > 0) {
+          errors.push({ nodeId: node.id, nodeName, errors: nodeErrors });
+        }
+      }
+    });
+
+    return errors;
+  }, [nodes]);
+
   // Validation (example) - with null check to prevent errors during drag operations
   const hasInvalidConfig = Array.isArray(nodes)
     ? nodes.some((node) => !node.data?.isValid)
@@ -1015,22 +1133,67 @@ export default function BuilderPage() {
               <Save className='h-4 w-4 mr-2' />
               <span>{workflowId && initialId ? "Save" : "Save As..."}</span>
             </Button>
-            <Button
-              onClick={handleExecuteWorkflow}
-              disabled={isExecutionPending || hasInvalidConfig}
-              className='bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm hover:shadow-md transition-all'>
-              {isExecutionPending ? (
-                <>
-                  <Loader2 className='h-4 w-4 mr-2 animate-spin' />
-                  <span>Executing...</span>
-                </>
-              ) : (
-                <>
-                  <Play className='h-4 w-4 mr-2' />
-                  <span>Execute</span>
-                </>
-              )}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleExecuteWorkflow}
+                    // disabled={isExecutionPending || hasInvalidConfig}
+                    className='bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-sm hover:shadow-md transition-all'>
+                    {isExecutionPending ? (
+                      <>
+                        <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                        <span>Executing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className='h-4 w-4 mr-2' />
+                        <span>Execute</span>
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                {(isExecutionPending || hasInvalidConfig) && (
+                  <TooltipContent side='bottom' className='max-w-sm'>
+                    <div className='space-y-2'>
+                      {isExecutionPending ? (
+                        <div className='flex items-center space-x-2'>
+                          <Loader2 className='h-4 w-4 animate-spin' />
+                          <span>Workflow is currently executing...</span>
+                        </div>
+                      ) : hasInvalidConfig ? (
+                        <div className='space-y-2'>
+                          <div className='flex items-center space-x-2'>
+                            <AlertCircle className='h-4 w-4 text-destructive' />
+                            <span className='font-medium'>
+                              Configuration Issues
+                            </span>
+                          </div>
+                          <div className='text-xs space-y-1'>
+                            {getValidationErrors().map((nodeError, index) => (
+                              <div
+                                key={index}
+                                className='border-l-2 border-destructive/50 pl-2'>
+                                <div className='font-medium text-destructive'>
+                                  {nodeError.nodeName}
+                                </div>
+                                {nodeError.errors.map((error, errorIndex) => (
+                                  <div
+                                    key={errorIndex}
+                                    className='text-destructive/80'>
+                                    • {error}
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
@@ -1242,6 +1405,7 @@ export default function BuilderPage() {
                   console.log("Focus on node:", nodeId);
                 }}
                 onClose={() => setShowExecutionPanel(false)}
+                // Note: Real-time connection status available via isRealTimeConnected and connectionError
               />
             )}
           </ResizablePanelGroup>
@@ -1348,6 +1512,15 @@ export default function BuilderPage() {
           currentDescription={workflowDescription || ""}
           currentTags={[]}
         />
+
+        {/* Enhanced Blockchain Authorization Modal */}
+        {showBlockchainAuth && (
+          <EnhancedBlockchainAuthorizationModal
+            nodes={nodes}
+            onAuthorize={handleBlockchainAuthorization}
+            onCancel={handleBlockchainCancel}
+          />
+        )}
 
         {/* Exit Confirmation Dialog */}
         <AlertDialog open={isExitDialogOpen} onOpenChange={setIsExitDialogOpen}>

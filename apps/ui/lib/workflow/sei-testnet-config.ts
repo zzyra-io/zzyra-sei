@@ -4,7 +4,8 @@
 export const SEI_TESTNET_CONFIG = {
   networkId: "sei-testnet",
   chainId: 1328,
-  rpcUrl: "https://evm-rpc-testnet.sei-apis.com",
+  rpcUrl:
+    "https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32",
   blockExplorer: "https://testnet.seistream.app",
   nativeCurrency: "SEI",
   // Supported protocols on Sei Testnet

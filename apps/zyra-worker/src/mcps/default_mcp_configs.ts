@@ -157,7 +157,8 @@ export const goat = {
       description: 'Connect to Sei testnet (default)',
       configuration: {
         EVM_WALLET_PRIVATE_KEY: '0x...',
-        RPC_PROVIDER_URL: 'https://evm-rpc-testnet.sei-apis.com',
+        RPC_PROVIDER_URL:
+          'https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32',
       },
     },
     {

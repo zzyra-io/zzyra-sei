@@ -16,6 +16,7 @@ This document outlines the critical fixes and improvements made to the Zyra plat
 - **Fixed Invalid Patterns**: Removed overly broad regex patterns that were rejecting valid inputs
 
 **Key Changes**:
+
 - Lines 531-565: Enhanced address validation for both Ethereum and Sei formats
 - Lines 1658-1673: Simplified invalid pattern detection
 - Lines 1684-1696: Added multi-format address support
@@ -28,6 +29,7 @@ This document outlines the critical fixes and improvements made to the Zyra plat
 **Solution**: Created comprehensive Sei-specific MCP server at `/apps/zyra-worker/src/mcps/sei/sei-mcp-server.ts`:
 
 **Sei Network Tools Implemented**:
+
 - `get_sei_balance` - Check SEI token balances with support for both address formats
 - `get_sei_address` - Get wallet address for Sei operations
 - `get_sei_network_info` - Real-time network status, gas prices, block information
@@ -36,6 +38,7 @@ This document outlines the critical fixes and improvements made to the Zyra plat
 - `estimate_sei_gas` - Estimate gas costs for transactions
 
 **Features**:
+
 - Native Sei testnet configuration (Chain ID 1328)
 - Support for both 0x and sei1 address formats
 - Comprehensive error handling and validation
@@ -54,13 +57,20 @@ This document outlines the critical fixes and improvements made to the Zyra plat
 - **Updated Default**: Changed default from Base Sepolia to Sei testnet
 
 **Configuration**:
+
 ```typescript
 const seiTestnet = {
   id: 1328,
-  name: 'Sei Testnet',
-  rpcUrls: { default: { http: ['https://evm-rpc-testnet.sei-apis.com'] } },
+  name: "Sei Testnet",
+  rpcUrls: {
+    default: {
+      http: [
+        "https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32",
+      ],
+    },
+  },
   // ... complete chain configuration
-}
+};
 ```
 
 ### 4. ✅ MCP Configuration Updates
@@ -81,17 +91,21 @@ const seiTestnet = {
 **Solution**: Created 5 comprehensive demo workflows in `/apps/zyra-worker/src/examples/`:
 
 #### 5.1 Basic Operations
+
 - **`sei-balance-check-workflow.json`**: Simple balance and network info checking
 - **`sei-transaction-workflow.json`**: Complete transaction lifecycle with verification
 
 #### 5.2 Advanced Integration
+
 - **`sei-goat-integration-workflow.json`**: Native Sei vs GOAT SDK comparison
 - **`sei-defi-monitoring-workflow.json`**: Automated DeFi portfolio management
 
 #### 5.3 Hackathon Showcase
+
 - **`sei-hackathon-showcase-workflow.json`**: Complete demonstration for hackathon
 
 **Workflow Features**:
+
 - Real-time Sei Network operations
 - AI-powered analysis and decision making
 - Risk assessment and conditional logic
@@ -101,16 +115,19 @@ const seiTestnet = {
 ### 6. ✅ Production Readiness Improvements
 
 **Enhanced Error Handling**:
+
 - Graceful fallbacks for network issues
 - Comprehensive validation before operations
 - Clear error messages for debugging
 
 **Security Improvements**:
+
 - Proper parameter sanitization
 - Address format validation
 - Transaction amount verification
 
 **Performance Optimizations**:
+
 - Efficient parameter extraction
 - Reduced false positive rejections
 - Streamlined tool selection logic
@@ -118,6 +135,7 @@ const seiTestnet = {
 ## Technical Architecture
 
 ### MCP (Model Context Protocol) Integration
+
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   AI Agent      │───▶│  MCP Tools       │───▶│  Sei Network    │
@@ -132,6 +150,7 @@ const seiTestnet = {
 ```
 
 ### Workflow Execution Flow
+
 ```
 User Request ──▶ AI Agent ──▶ Tool Selection ──▶ Parameter Extraction
      ▲                                                    │
@@ -142,41 +161,48 @@ Formatted Response ◀── Tool Execution ◀── Sei Network API
 ## Deployment Requirements
 
 ### Environment Variables
+
 ```bash
 # Required for both Sei and GOAT MCP servers
 WALLET_PRIVATE_KEY=0x...
 
 # Optional - defaults to Sei testnet
-RPC_PROVIDER_URL=https://evm-rpc-testnet.sei-apis.com
+RPC_PROVIDER_URL=https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32
 
 # For GOAT SDK flexibility
 USE_BASE_SEPOLIA=false  # Set to true for Base Sepolia instead of Sei
 ```
 
 ### MCP Server Configuration
+
 Both servers need to be registered in the user's MCP configuration:
+
 - **Sei Native**: For direct Sei Network operations
 - **GOAT SDK**: For cross-chain compatibility and advanced DeFi features
 
 ## Hackathon Demo Scenarios
 
 ### 1. Basic Sei Operations (30 seconds)
+
 - Check wallet balance
 - Get network information
 - Demonstrate real-time data fetching
 
 ### 2. Transaction Management (2-3 minutes)
+
 - Balance verification
 - Gas estimation
 - Transaction execution
 - Result verification
 
 ### 3. AI-Powered Analysis (1-2 minutes)
+
 - Compare native vs GOAT SDK results
 - Risk assessment
 - Strategy recommendations
 
 ### 4. Full Automation Demo (5-7 minutes)
+
 - Complete workflow execution
 - Real-time decision making
 - Comprehensive reporting
@@ -197,13 +223,16 @@ Both servers need to be registered in the user's MCP configuration:
 ### Files Modified/Created:
 
 #### Core AI Engine Fixes:
+
 1. `/apps/zyra-worker/src/workers/handlers/ai-agent/ReasoningEngine.ts`
    - Fixed parameter validation (lines 531-565, 1658-1729)
    - Added Sei address format support
    - Improved error handling and fallback mechanisms
 
 #### Sei Network Integration:
+
 2. `/apps/zyra-worker/src/mcps/sei/sei-mcp-server.ts` (NEW)
+
    - Complete Sei MCP server implementation
    - 6 comprehensive tools for Sei operations
    - Production-ready error handling
@@ -213,12 +242,14 @@ Both servers need to be registered in the user's MCP configuration:
    - Updated GOAT SDK for Sei support
 
 #### GOAT SDK Updates:
+
 4. `/apps/zyra-worker/src/mcps/goat/goat-mcp-server.ts`
    - Added Sei testnet configuration
    - Flexible chain selection
    - Maintained backward compatibility
 
 #### Demo Workflows:
+
 5. `/apps/zyra-worker/src/examples/sei-balance-check-workflow.json` (NEW)
 6. `/apps/zyra-worker/src/examples/sei-transaction-workflow.json` (NEW)
 7. `/apps/zyra-worker/src/examples/sei-goat-integration-workflow.json` (NEW)
@@ -228,12 +259,14 @@ Both servers need to be registered in the user's MCP configuration:
 ## Known Limitations & Future Work
 
 ### Current State
+
 - ✅ Sei testnet fully supported
 - ✅ Transaction execution working
 - ✅ Real-time network data integration
 - ✅ AI tool discovery fixed
 
 ### Future Enhancements
+
 - [ ] Sei mainnet configuration (when launched)
 - [ ] Advanced DeFi protocol integrations
 - [ ] Cross-chain bridge operations
@@ -242,12 +275,14 @@ Both servers need to be registered in the user's MCP configuration:
 ## Testing Strategy
 
 ### Manual Testing Completed
+
 - ✅ Parameter validation with various address formats
 - ✅ Tool discovery with complex blockchain operations
 - ✅ Network connectivity and error handling
 - ✅ Workflow execution end-to-end
 
 ### Recommended Testing
+
 1. **Balance Checks**: Verify both native and GOAT tools return consistent results
 2. **Transaction Simulation**: Test gas estimation and transaction preparation
 3. **Error Scenarios**: Network failures, invalid parameters, insufficient balance
@@ -256,36 +291,43 @@ Both servers need to be registered in the user's MCP configuration:
 ## Setup Instructions
 
 ### 1. Environment Setup
+
 ```bash
 # Set required environment variables
 export WALLET_PRIVATE_KEY="0x..."
-export RPC_PROVIDER_URL="https://evm-rpc-testnet.sei-apis.com"
+export RPC_PROVIDER_URL="https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32"
 
 # Optional: Use Base Sepolia instead
 export USE_BASE_SEPOLIA="false"
 ```
 
 ### 2. Start MCP Servers
+
 The system now supports both MCP servers:
 
 #### Sei Native MCP Server
+
 ```bash
 cd apps/zyra-worker
 ts-node src/mcps/sei/sei-mcp-server.ts
 ```
 
 #### GOAT SDK MCP Server (with Sei support)
+
 ```bash
 cd apps/zyra-worker
 ts-node src/mcps/goat/goat-mcp-server.ts
 ```
 
 ### 3. Configure AI Agent
+
 When creating AI agent blocks, you can now select from:
+
 - **Sei Network tools** (native implementation)
 - **GOAT SDK tools** (cross-chain compatible)
 
 ### 4. Run Demo Workflows
+
 Import any of the 5 demo workflows and execute them to see Sei Network integration in action.
 
 ## Conclusion
