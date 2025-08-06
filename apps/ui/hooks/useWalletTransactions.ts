@@ -30,9 +30,9 @@ export const useWalletTransactions = (
     error,
     refetch,
   } = useQuery<WalletTransaction[]>({
-    queryKey: ["walletTransactions", user?.issuer, walletAddress, limit],
+    queryKey: ["walletTransactions", user?.userId, walletAddress, limit],
     queryFn: async () => {
-      if (!isAuthenticated || !user?.issuer) {
+      if (!isLoggedIn || !user?.userId) {
         throw new Error("User not authenticated");
       }
 
@@ -50,7 +50,7 @@ export const useWalletTransactions = (
 
       return response.json();
     },
-    enabled: !!isAuthenticated && !!user?.issuer,
+    enabled: !!isLoggedIn && !!user?.userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
   });

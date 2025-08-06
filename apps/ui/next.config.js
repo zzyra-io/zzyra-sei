@@ -39,12 +39,14 @@ const nextConfig = {
         net: false,
         tls: false,
         child_process: false,
+        // Ignore React Native dependencies that MetaMask SDK tries to import
+        "@react-native-async-storage/async-storage": false,
       };
     }
     return config;
   },
   experimental: {
-    optimizeCss: true,
+    optimizeCss: false, // Disable CSS optimization to fix critters issue
     optimizePackageImports: [
       "lucide-react",
       "framer-motion",

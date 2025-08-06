@@ -20,9 +20,9 @@ export const useUserUsage = () => {
     error,
     refetch,
   } = useQuery<UserUsage>({
-    queryKey: ["userUsage", user?.issuer],
+    queryKey: ["userUsage", user?.userId],
     queryFn: async () => {
-      if (!isAuthenticated || !user?.issuer) {
+      if (!isLoggedIn || !user?.userId) {
         throw new Error("User not authenticated");
       }
 
