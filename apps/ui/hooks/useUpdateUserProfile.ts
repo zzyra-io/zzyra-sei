@@ -1,6 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useMagicAuth } from '@/lib/hooks/use-magic-auth';
-import { UserProfile } from './useUserProfile';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
+import { UserProfile } from "./useUserProfile";
 
 export interface UpdateProfileData {
   full_name?: string;
@@ -15,7 +15,7 @@ export interface UpdateProfileData {
  * Uses React Query for data mutations and cache invalidation
  */
 export const useUpdateUserProfile = () => {
-  const { user, isAuthenticated } = useMagicAuth();
+  const { user, isLoggedIn } = useDynamicAuth();
   const queryClient = useQueryClient();
 
   const {
@@ -25,33 +25,37 @@ export const useUpdateUserProfile = () => {
     isSuccess,
     reset,
   } = useMutation({
-    mutationKey: ['updateUserProfile', user?.issuer],
-    mutationFn: async (profileData: UpdateProfileData): Promise<UserProfile> => {
-      if (!isAuthenticated || !user?.issuer) {
-        throw new Error('User not authenticated');
+    mutationKey: ["updateUserProfile", user?.userId],
+    mutationFn: async (
+      profileData: UpdateProfileData
+    ): Promise<UserProfile> => {
+      if (!isLoggedIn || !user?.userId) {
+        throw new Error("User not authenticated");
       }
 
-      const response = await fetch('/api/user/profile', {
-        method: 'PUT',
+      const response = await fetch("/api/user/profile", {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(profileData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update user profile');
+        throw new Error(errorData.message || "Failed to update user profile");
       }
 
       return response.json();
     },
     onSuccess: (data) => {
       // Invalidate and refetch user profile query
-      queryClient.invalidateQueries({ queryKey: ['userProfile', user?.issuer] });
-      
+      queryClient.invalidateQueries({
+        queryKey: ["userProfile", user?.userId],
+      });
+
       // Optionally update the cache directly
-      queryClient.setQueryData(['userProfile', user?.issuer], data);
+      queryClient.setQueryData(["userProfile", user?.userId], data);
     },
   });
 

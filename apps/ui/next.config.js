@@ -1,4 +1,19 @@
 const nextConfig = {
+  // Enable Turbopack for faster development builds
+  turbopack: {
+    // Optimize package imports for better performance
+    rules: {
+      // Optimize SVG imports
+      "*.svg": {
+        loaders: ["@svgr/webpack"],
+        as: "*.js",
+      },
+    },
+    // Resolve aliases for better module resolution
+    resolveAlias: {
+      // Add any custom aliases here if needed
+    },
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -28,10 +43,15 @@ const nextConfig = {
     }
     return config;
   },
-  // experimental: {
-  //   optimizeCss: true,
-  //   optimizePackageImports: ["lucide-react", "framer-motion", "wagmi"],
-  // },
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: [
+      "lucide-react",
+      "framer-motion",
+      "wagmi",
+      "@dynamic-labs/sdk-react-core",
+    ],
+  },
   // Enable brotli compression
   // compress: true,
   // poweredByHeader: false,

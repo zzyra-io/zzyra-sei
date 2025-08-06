@@ -71,8 +71,11 @@ export class DynamicJwtService {
 
       return decodedToken;
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
       this.logger.error("Dynamic JWT validation failed", {
-        error: error.message,
+        error: errorMessage,
       });
 
       if (error instanceof UnauthorizedException) {

@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { useMagicAuth } from '@/lib/hooks/use-magic-auth';
+import { useQuery } from "@tanstack/react-query";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 
 export interface UserUsage {
   monthly_execution_quota: number;
@@ -12,7 +12,7 @@ export interface UserUsage {
  * Uses React Query for data fetching and caching
  */
 export const useUserUsage = () => {
-  const { user, isAuthenticated } = useMagicAuth();
+  const { user, isLoggedIn } = useDynamicAuth();
 
   const {
     data: usage,
@@ -20,16 +20,16 @@ export const useUserUsage = () => {
     error,
     refetch,
   } = useQuery<UserUsage>({
-    queryKey: ['userUsage', user?.issuer],
+    queryKey: ["userUsage", user?.issuer],
     queryFn: async () => {
       if (!isAuthenticated || !user?.issuer) {
-        throw new Error('User not authenticated');
+        throw new Error("User not authenticated");
       }
 
-      const response = await fetch('/api/user/usage');
+      const response = await fetch("/api/user/usage");
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch usage data');
+        throw new Error(errorData.message || "Failed to fetch usage data");
       }
 
       return response.json();

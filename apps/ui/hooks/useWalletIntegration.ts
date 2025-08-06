@@ -6,7 +6,7 @@ import {
   useSwitchChain,
   useConfig,
 } from "wagmi";
-import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 import { useUserWallets, CreateWalletInput } from "./useUserWallets";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -32,8 +32,8 @@ const SUPPORTED_NETWORKS = ACTIVE_NETWORKS.map((chain) => ({
  * Hook to integrate wallet functionality with Magic Link and wagmi
  */
 export const useWalletIntegration = () => {
-  // Magic Auth
-  const { user, isAuthenticated, magicInstance } = useMagicAuth();
+  // Dynamic Auth
+  const { user, isLoggedIn, dynamicContext } = useDynamicAuth();
 
   // Wagmi hooks
   const { address, isConnected, connector, chainId } = useAccount();

@@ -13,7 +13,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { NotificationBell } from "./NotificationBell";
-import { ConnectKitButton } from "connectkit";
+import {
+  DynamicMultiWalletPromptsWidget,
+  DynamicWidget,
+} from "@dynamic-labs/sdk-react-core";
 
 export function DashboardHeader() {
   const pathname = usePathname();
@@ -83,6 +86,7 @@ export function DashboardHeader() {
             })}
           </ul>
         </nav>
+        <DynamicMultiWalletPromptsWidget />
 
         {/* Search Bar - Desktop */}
         <div className='ml-auto   w-auto  hidden md:flex items-center relative max-w-md  mr-4'>
@@ -99,7 +103,7 @@ export function DashboardHeader() {
           <NotificationBell />
 
           {/* Theme Toggle */}
-          <ConnectKitButton showAvatar={true} showBalance={true} />
+          <DynamicWidget variant='dropdown' />
           <ModeToggle />
 
           {/* User Menu */}

@@ -10,7 +10,7 @@ import { WorkflowExecutionProvider } from "@/components/workflow/BlockExecutionM
 import "@/styles/flow-components.css";
 import { Montserrat } from "next/font/google";
 import type React from "react";
-import { WagmiProviders } from "../components/wagmi-providers";
+
 import "./globals.css";
 import { AutoWalletConnect } from "@/components/auto-wallet-connect";
 
@@ -44,27 +44,25 @@ export default function RootLayout({
       <body className='min-h-screen bg-background font-montserrat antialiased'>
         <PostHogProvider>
           <SkipLink />
-          <WagmiProviders>
-            <Providers>
-              <ThemeProvider
-                attribute='class'
-                defaultTheme='system'
-                enableSystem
-                disableTransitionOnChange>
-                <WorkflowExecutionProvider>
-                  <NotificationSocketProvider>
-                    <div className='fixed inset-0 pointer-events-none z-0'>
-                      <FloatingParticles />
-                    </div>
-                    <main id='main-content'>{children}</main>
-                    <Toaster />
-                    <NotificationToastContainer />
-                    <AutoWalletConnect />
-                  </NotificationSocketProvider>
-                </WorkflowExecutionProvider>
-              </ThemeProvider>
-            </Providers>
-          </WagmiProviders>
+          <Providers>
+            <ThemeProvider
+              attribute='class'
+              defaultTheme='system'
+              enableSystem
+              disableTransitionOnChange>
+              <WorkflowExecutionProvider>
+                <NotificationSocketProvider>
+                  <div className='fixed inset-0 pointer-events-none z-0'>
+                    <FloatingParticles />
+                  </div>
+                  <main id='main-content'>{children}</main>
+                  <Toaster />
+                  <NotificationToastContainer />
+                  <AutoWalletConnect />
+                </NotificationSocketProvider>
+              </WorkflowExecutionProvider>
+            </ThemeProvider>
+          </Providers>
         </PostHogProvider>
       </body>
     </html>

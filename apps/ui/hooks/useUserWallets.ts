@@ -1,8 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
-import { useMagic } from "@/lib/magic-provider";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 import { toast as showToast } from "@/components/ui/use-toast";
 import api from "@/lib/services/api";
 import { useState, useEffect } from "react";
@@ -32,8 +31,8 @@ export interface CreateWalletInput {
  * Uses React Query for data fetching and caching
  */
 export const useUserWallets = () => {
-  const { user, isAuthenticated } = useMagicAuth();
-  const { magic: magicInstance } = useMagic();
+  const { user, isLoggedIn } = useDynamicAuth();
+
   const queryClient = useQueryClient();
 
   // Use wallet connection state as fallback for authentication

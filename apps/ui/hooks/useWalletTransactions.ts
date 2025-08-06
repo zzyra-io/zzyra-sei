@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { useMagicAuth } from '@/lib/hooks/use-magic-auth';
+import { useQuery } from "@tanstack/react-query";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 
 export interface WalletTransaction {
   id: string;
@@ -18,8 +18,11 @@ export interface WalletTransaction {
  * Hook to fetch wallet transactions
  * Uses React Query for data fetching and caching
  */
-export const useWalletTransactions = (walletAddress?: string, limit: number = 10) => {
-  const { user, isAuthenticated } = useMagicAuth();
+export const useWalletTransactions = (
+  walletAddress?: string,
+  limit: number = 10
+) => {
+  const { user, isLoggedIn } = useDynamicAuth();
 
   const {
     data: transactions,
@@ -27,20 +30,22 @@ export const useWalletTransactions = (walletAddress?: string, limit: number = 10
     error,
     refetch,
   } = useQuery<WalletTransaction[]>({
-    queryKey: ['walletTransactions', user?.issuer, walletAddress, limit],
+    queryKey: ["walletTransactions", user?.issuer, walletAddress, limit],
     queryFn: async () => {
       if (!isAuthenticated || !user?.issuer) {
-        throw new Error('User not authenticated');
+        throw new Error("User not authenticated");
       }
 
-      const url = walletAddress 
+      const url = walletAddress
         ? `/api/user/wallets/transactions?address=${walletAddress}&limit=${limit}`
         : `/api/user/wallets/transactions?limit=${limit}`;
-        
+
       const response = await fetch(url);
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch wallet transactions');
+        throw new Error(
+          errorData.message || "Failed to fetch wallet transactions"
+        );
       }
 
       return response.json();

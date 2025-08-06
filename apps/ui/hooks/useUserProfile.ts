@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 import axios from "axios";
 
 // Configure axios instance
@@ -31,7 +31,7 @@ export interface UserProfile {
  * Uses React Query for data fetching and caching
  */
 export const useUserProfile = () => {
-  const { user, isAuthenticated } = useMagicAuth();
+  const { user, isLoggedIn } = useDynamicAuth();
 
   const {
     data: profile,
