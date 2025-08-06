@@ -10,11 +10,11 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
-import { useMagicAuth } from "@/lib/hooks/use-magic-auth";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUpdateUserProfile } from "@/hooks/useUpdateUserProfile";
 import { useUserUsage } from "@/hooks/useUserUsage";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useAccount } from "wagmi";
 import {
   BadgeCheck,
   Bell,
@@ -76,25 +76,24 @@ export default function SettingsPage() {
   const { updateProfile } = useUpdateUserProfile();
 
   const {
-    isAuthenticated: isMagicAuthenticated,
-    isLoading: isMagicAuthLoading,
-  } = useMagicAuth();
+    isLoading: isDynamicAuthLoading,
+  } = useDynamicAuth();
   const { address, connector, isConnected, chain } = useAccount();
   console.log("address", address);
   console.log("connector", connector);
   console.log("isConnected", isConnected);
   console.log("chain", chain);
-  const {
-    connect,
-    connectors,
-    error: connectError,
-    status: connectStatus,
-  } = useConnect();
-  const { disconnect, status: disconnectStatus } = useDisconnect();
+  // const {
+  //   connect,
+  //   connectors,
+  //   error: connectError,
+  //   status: connectStatus,
+  // } = useConnect();
+  // const { disconnect, status: disconnectStatus } = useDisconnect();
   // Use wagmi hooks for wallet functionality instead of useWallet
 
-  const isConnectingWagmi = connectStatus === "pending";
-  const isDisconnectingWagmi = disconnectStatus === "pending";
+  // const isConnectingWagmi = connectStatus === "pending";
+  // const isDisconnectingWagmi = disconnectStatus === "pending";
 
   // Update local state when profile data is loaded
   useEffect(() => {
@@ -118,8 +117,8 @@ export default function SettingsPage() {
     }
   }, [usage]);
 
-  // Set user email from Magic Auth
-  const { user } = useMagicAuth();
+  // Set user email from Dynamic Auth
+  const { user } = useDynamicAuth();
   useEffect(() => {
     if (user?.email) {
       setEmail(user.email);
@@ -213,7 +212,7 @@ export default function SettingsPage() {
   };
 
   // Show loading state when authentication or profile data is loading
-  if (isMagicAuthLoading || profileIsLoading) {
+  if (isDynamicAuthLoading || profileIsLoading) {
     return (
       <div className='flex min-h-screen items-center justify-center'>
         <Loader2 className='h-12 w-12 animate-spin' />

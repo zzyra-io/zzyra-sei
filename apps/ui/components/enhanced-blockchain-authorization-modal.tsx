@@ -34,7 +34,7 @@ import {
   SecureBlockchainAuthConfig,
 } from "@zyra/types";
 import { useToast } from "@/components/ui/use-toast";
-import { useMagic } from "@/lib/magic-provider";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 import { useSessionKeyCreation } from "@/hooks/use-session-keys";
 
 interface BlockchainNode {
@@ -163,7 +163,7 @@ export function EnhancedBlockchainAuthorizationModal({
   onCancel,
 }: EnhancedBlockchainAuthorizationModalProps) {
   const { toast } = useToast();
-  const { magic } = useMagic();
+  const { dynamicContext, isLoggedIn } = useDynamicAuth();
   const { createWithMagic, isCreating } = useSessionKeyCreation();
   const [open, setOpen] = useState(true);
 
@@ -226,8 +226,8 @@ export function EnhancedBlockchainAuthorizationModal({
         return;
       }
 
-      if (!magic) {
-        throw new Error("Magic SDK not initialized");
+      if (!isLoggedIn || !dynamicContext.user) {
+        throw new Error("Dynamic wallet not connected");
       }
       console.log("selectedChains", selectedChains);
 
@@ -251,7 +251,10 @@ export function EnhancedBlockchainAuthorizationModal({
       };
 
       // Create session key using the hook
-      const sessionKeyResult = await createWithMagic(sessionKeyRequest, magic);
+      const sessionKeyResult = await createWithMagic(
+        sessionKeyRequest,
+        dynamicContext
+      );
 
       // Create enhanced auth config
       const config: SecureBlockchainAuthConfig = {

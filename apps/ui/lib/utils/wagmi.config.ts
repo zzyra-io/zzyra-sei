@@ -32,37 +32,19 @@ export const queryClient = new QueryClient({
   },
 });
 
-// Create wagmi config with Magic connector
+// Create wagmi config with standard connectors (Dynamic handles wallet connections)
 export function createWagmiConfig(
-  apiKey: string | undefined,
+  environmentId: string | undefined,
   isDarkMode = false
 ): Config {
   const chains = supportedNetworks;
   console.log("Wagmi config - chains:", chains);
-  console.log("Wagmi config - seiTestnet:", chains[0]);
+  console.log("Wagmi config - Dynamic environment:", environmentId);
+  
+  // Use standard connectors since Dynamic handles wallet connections through its own provider
   const activeConnectors = [];
 
-  // Add Magic connector only if API key is provided
-  if (typeof window !== "undefined" && apiKey && apiKey.trim() !== "") {
-    activeConnectors.push(
-      dedicatedWalletConnector({
-        chains,
-        options: {
-          apiKey,
-          isDarkMode,
-          networks: getActiveNetworkConfigs(),
-          magicSdkConfiguration: {
-            network: {
-              rpcUrl: getNetworkUrl(),
-              chainId: getChainId(),
-            },
-          },
-        },
-      })
-    );
-  }
-
-  // Always add injected connector
+  // Add injected connector for standard wallet connections
   // activeConnectors.push(injected());
 
   const transports = Object.fromEntries(
@@ -71,7 +53,7 @@ export function createWagmiConfig(
 
   return createConfig(
     getDefaultConfig({
-      appName: "Zzyra",
+      appName: "Zyra",
       walletConnectProjectId: "",
       syncConnectedChain: true,
       chains,

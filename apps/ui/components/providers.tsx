@@ -1,15 +1,13 @@
 "use client";
 
 import { ReactNode } from "react";
-import MagicProvider from "@/lib/magic-provider";
+import { DynamicProvider } from "../lib/dynamic-provider";
 
 /**
- * Root providers component that combines Magic Link and NextAuth.js
+ * Root providers component that provides Dynamic wallet authentication
  *
- * This setup allows both authentication systems to work together:
- * - Magic Link handles the actual authentication flow
- * - NextAuth.js provides session management and middleware capabilities
+ * This setup provides Direct Dynamic wallet integration without compatibility layers
  */
 export function Providers({ children }: { children: ReactNode }) {
-  return <MagicProvider>{children}</MagicProvider>;
+  return <DynamicProvider>{children}</DynamicProvider>;
 }

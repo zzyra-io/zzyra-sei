@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useMagic } from "@/lib/magic-provider";
+import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
 import useAuthStore, { type User } from "@/lib/store/auth-store";
 import api from "@/lib/services/api";
 
@@ -26,10 +26,12 @@ interface AuthHook {
   executeLogin: (credentials: LoginCredentials) => Promise<void>;
   executeLogout: () => Promise<void>;
   clearError: () => void;
+  authenticateWithBackend: () => Promise<void>;
 }
 
 export const useAuth = (): AuthHook => {
-  const { magic } = useMagic();
+  const dynamicContext = useDynamicContext();
+  const isLoggedIn = useIsLoggedIn();
   const router = useRouter();
   const {
     user,
@@ -45,47 +47,23 @@ export const useAuth = (): AuthHook => {
 
   const executeLogin = useCallback(
     async ({ email }: LoginCredentials): Promise<void> => {
-      if (!magic) {
-        setError("Magic Link not initialized");
-        return;
-      }
-
       setIsLoading(true);
       setError(null);
 
       try {
-        // Step 1: Authenticate with Magic Link
-        await magic.auth.loginWithMagicLink({
-          email,
-          showUI: true,
-        });
+        // Step 1: Trigger Dynamic auth flow
+        dynamicContext.setShowAuthFlow(true);
 
-        // Step 2: Generate DID token for backend authentication
-        const didToken = await magic.user.generateIdToken();
+        // Wait for Dynamic authentication to complete
+        // This will be handled by the DynamicWidget UI flow
+        // Once user connects, we need to get the auth token and authenticate with backend
 
-        // Step 3: Get user metadata for public address
-        const userMetadata = await magic.user.getInfo();
-
-        // Step 4: Authenticate with backend
-        const response = await api.post<LoginResponse>("/auth/login", {
-          email,
-          didToken,
-          publicAddress: userMetadata?.publicAddress,
-        });
-
-        if (!response.data.success) {
-          throw new Error("Authentication failed");
-        }
-
-        // Step 5: Update auth store
-        storeLogin(response.data.user, response.data.token);
-
-        // Step 6: Redirect if callback URL provided
-        if (response.data.callbackUrl) {
-          router.push(response.data.callbackUrl);
-        } else {
-          router.push("/dashboard");
-        }
+        // Note: This approach assumes the actual backend authentication
+        // will be handled in a useEffect or callback when Dynamic auth completes
+        // For now, we'll show the auth flow and let the user connect
+        
+        console.log("Dynamic auth flow triggered for email:", email);
+        
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "Login failed";
@@ -93,8 +71,57 @@ export const useAuth = (): AuthHook => {
         setIsLoading(false);
       }
     },
-    [magic, setIsLoading, setError, storeLogin, router]
+    [dynamicContext, setIsLoading, setError]
   );
+
+  // Helper function to authenticate with backend once Dynamic auth is complete
+  const authenticateWithBackend = useCallback(async () => {
+    if (!isLoggedIn || !dynamicContext.user || !dynamicContext.primaryWallet) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Step 1: Get Dynamic auth token
+      const contextWithToken = dynamicContext as unknown as { 
+        getAuthToken?: () => Promise<string> | string;
+      };
+      const authToken = await contextWithToken.getAuthToken?.();
+      if (!authToken) {
+        throw new Error("No Dynamic auth token available");
+      }
+
+      // Step 2: Get user and wallet info
+      const user = dynamicContext.user;
+      const wallet = dynamicContext.primaryWallet;
+
+      // Step 3: Authenticate with backend
+      const response = await api.post<LoginResponse>("/auth/login", {
+        email: user.email || "",
+        authToken,
+        publicAddress: wallet.address,
+      });
+
+      if (!response.data.success) {
+        throw new Error("Authentication failed");
+      }
+
+      // Step 4: Update auth store
+      storeLogin(response.data.user, response.data.token || "");
+
+      // Step 5: Redirect
+      router.push("/dashboard");
+      
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Backend authentication failed";
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoggedIn, dynamicContext, setIsLoading, setError, storeLogin, router]);
 
   const executeLogout = useCallback(async (): Promise<void> => {
     setIsLoading(true);
@@ -111,15 +138,12 @@ export const useAuth = (): AuthHook => {
         console.warn("Backend logout failed:", err);
       }
 
-      // Logout from Magic if available
-      if (magic) {
+      // Logout from Dynamic
+      if (isLoggedIn && dynamicContext.handleLogOut) {
         try {
-          const isLoggedIn = await magic.user.isLoggedIn();
-          if (isLoggedIn) {
-            await magic.user.logout();
-          }
+          await dynamicContext.handleLogOut();
         } catch (err) {
-          console.warn("Magic logout failed:", err);
+          console.warn("Dynamic logout failed:", err);
         }
       }
 
@@ -131,7 +155,7 @@ export const useAuth = (): AuthHook => {
       setError(errorMessage);
       setIsLoading(false);
     }
-  }, [magic, setError, setIsLoading, storeLogout, router]);
+  }, [isLoggedIn, dynamicContext, setError, setIsLoading, storeLogout, router]);
 
   return {
     user,
@@ -141,5 +165,6 @@ export const useAuth = (): AuthHook => {
     executeLogin,
     executeLogout,
     clearError,
+    authenticateWithBackend, // Expose this for use in components
   };
 };

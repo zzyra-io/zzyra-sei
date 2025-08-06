@@ -2,259 +2,308 @@ import {
   Controller,
   Post,
   Body,
-  Request,
-  Response,
   HttpException,
   HttpStatus,
+  HttpCode,
+  Logger,
+  UnauthorizedException,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation } from "@nestjs/swagger";
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from "@nestjs/swagger";
 import { JwtService } from "@nestjs/jwt";
-import { AuthService as DatabaseAuthService } from "@zyra/database";
 import { Public } from "./decorators/public.decorator";
+import { DynamicJwtService } from "./dynamic-jwt.service";
+import { PrismaService } from "../database/prisma.service";
 
-interface MagicAuthPayload {
-  email: string;
-  didToken: string;
-  publicAddress?: string;
-  isOAuth?: boolean;
-  oauthProvider?: string;
-  oauthUserInfo?: any;
+interface DynamicAuthPayload {
+  email?: string;
+  authToken: string; // Dynamic JWT token
+}
+
+interface AuthResponseDto {
+  success: boolean;
+  user: {
+    id: string;
+    email: string;
+    walletAddress: string;
+    chainId: string;
+  };
+  session: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: Date;
+  };
+  callbackUrl?: string;
 }
 
 @ApiTags("auth")
 @Controller("auth")
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
-    private readonly authService: DatabaseAuthService,
-    private readonly jwtService: JwtService
+    private readonly dynamicJwtService: DynamicJwtService,
+    private readonly jwtService: JwtService,
+    private readonly prismaService: PrismaService
   ) {}
 
   @Public()
   @Post("login")
-  @ApiOperation({ summary: "User login with Magic Link" })
-  async login(
-    @Body()
-    body: {
-      email: string;
-      didToken: string;
-      publicAddress?: string;
-      isOAuth?: boolean;
-      oauthProvider?: string;
-      oauthUserInfo?: any;
-      callbackUrl?: string;
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "User login with Dynamic wallet",
+    description:
+      "Authenticate user using Dynamic JWT token from wallet connection",
+  })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        email: { type: "string" },
+        authToken: { type: "string", description: "Dynamic JWT token" },
+        callbackUrl: { type: "string" },
+      },
+      required: ["authToken"],
     },
-    @Request() req: any,
-    @Response() res: any
-  ) {
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Authentication successful",
+    schema: {
+      type: "object",
+      properties: {
+        success: { type: "boolean" },
+        user: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            email: { type: "string" },
+            walletAddress: { type: "string" },
+            chainId: { type: "string" },
+          },
+        },
+        session: {
+          type: "object",
+          properties: {
+            accessToken: { type: "string" },
+            refreshToken: { type: "string" },
+            expiresAt: { type: "string", format: "date-time" },
+          },
+        },
+        callbackUrl: { type: "string" },
+      },
+    },
+  })
+  async login(
+    @Body() body: DynamicAuthPayload & { callbackUrl?: string }
+  ): Promise<AuthResponseDto> {
     try {
-      const {
-        email,
-        didToken,
-        publicAddress,
-        isOAuth,
-        oauthProvider,
-        oauthUserInfo,
-        callbackUrl,
-      } = body;
+      const { authToken, callbackUrl, email } = body;
 
-      if (!email || !didToken) {
+      if (!authToken) {
         throw new HttpException(
-          "Email and DID token are required",
+          "Dynamic auth token is required",
           HttpStatus.BAD_REQUEST
         );
       }
 
-      console.log("Login route: Received authentication data", {
-        email,
-        didToken: didToken ? "[PRESENT]" : "[MISSING]",
-        isOAuth,
-        oauthProvider,
-        hasOAuthUserInfo: !!oauthUserInfo,
+      this.logger.log("Processing Dynamic authentication", {
+        hasToken: !!authToken,
+        hasEmail: !!email,
         callbackUrl,
       });
 
-      // Create Magic Auth payload - match the exact structure from Next.js
-      const magicPayload: MagicAuthPayload = {
-        email,
-        didToken,
-        publicAddress,
-        isOAuth,
-        oauthProvider,
-        oauthUserInfo,
-      };
+      // Step 1: Validate Dynamic JWT token
+      const dynamicPayload =
+        await this.dynamicJwtService.validateDynamicJwt(authToken);
 
-      const { session, user } =
-        await this.authService.authenticateWithMagic(magicPayload);
+      // Step 2: Extract wallet and user information
+      const walletAddress =
+        this.dynamicJwtService.extractWalletAddress(dynamicPayload);
+      const { chain, walletProvider } =
+        this.dynamicJwtService.extractChainInfo(dynamicPayload);
+      const userEmail = email || dynamicPayload.email;
 
-      console.log("Auth Result:", { user, session });
+      this.logger.log("Dynamic token validated", {
+        userId: dynamicPayload.sub,
+        walletAddress,
+        chain,
+        walletProvider,
+      });
 
-      if (!session || !session.accessToken || !user) {
-        console.error(
-          "Login route: Authentication successful but no session tokens or user returned"
+      // Step 3: Find or create user based on wallet address or email
+      let user = await this.prismaService.client.user.findFirst({
+        where: {
+          OR: [
+            ...(userEmail ? [{ email: userEmail }] : []),
+            {
+              userWallets: {
+                some: { walletAddress },
+              },
+            },
+          ],
+        },
+        include: {
+          userWallets: true,
+          profile: true,
+        },
+      });
+
+      if (!user) {
+        // Create new user with wallet
+        user = await this.prismaService.client.user.create({
+          data: {
+            email: userEmail || `${walletAddress}@dynamic.wallet`,
+            userWallets: {
+              create: {
+                walletAddress,
+                chainId: chain,
+                walletType: "dynamic",
+                chainType: "evm",
+                metadata: {
+                  walletProvider,
+                  dynamicUserId: dynamicPayload.sub,
+                  dynamicPayload: {
+                    sub: dynamicPayload.sub,
+                    verified_credentials: dynamicPayload.verified_credentials,
+                  },
+                },
+              },
+            },
+          },
+          include: {
+            userWallets: true,
+            profile: true,
+          },
+        });
+
+        this.logger.log("Created new user from Dynamic auth", {
+          userId: user.id,
+          walletAddress,
+        });
+      } else {
+        // Update user and ensure wallet is linked
+        const existingWallet = user.userWallets.find(
+          (w) => w.walletAddress === walletAddress
         );
-        throw new HttpException(
-          "Authentication failed: Invalid session",
-          HttpStatus.UNAUTHORIZED
-        );
-      }
 
-      // Create JWT token structure matching Next.js implementation
-      const tokenPayload = {
-        sub: user.id,
-        email: user.email || "",
-        name: user.email ? user.email.split("@")[0] : "User",
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        expiresAt: session.expiresAt,
-      };
+        if (!existingWallet) {
+          await this.prismaService.client.userWallet.create({
+            data: {
+              userId: user.id,
+              walletAddress,
+              chainId: chain,
+              walletType: "dynamic",
+              chainType: "evm",
+              metadata: {
+                walletProvider,
+                dynamicUserId: dynamicPayload.sub,
+                dynamicPayload: {
+                  sub: dynamicPayload.sub,
+                  verified_credentials: dynamicPayload.verified_credentials,
+                },
+              },
+            },
+          });
+        }
 
-      console.log("Creating JWT token with payload:", {
-        ...tokenPayload,
-        accessToken: "[REDACTED]",
-        refreshToken: "[REDACTED]",
-      });
+        // Update user's last activity
+        user = await this.prismaService.client.user.update({
+          where: { id: user.id },
+          data: {
+            updatedAt: new Date(),
+          },
+          include: {
+            userWallets: true,
+            profile: true,
+          },
+        });
 
-      // Create session token using NestJS JWT service
-      const sessionToken = this.jwtService.sign(tokenPayload, {
-        expiresIn: "30d", // Match Next.js behavior
-      });
-
-      console.log(
-        "Created Session Token:",
-        sessionToken.substring(0, 20) + "..."
-      );
-
-      // Set cookies matching Next.js behavior
-      const cookieName =
-        process.env.NODE_ENV === "production"
-          ? "__Secure-next-auth.session-token"
-          : "next-auth.session-token";
-
-      // Set session cookie
-      res.cookie(cookieName, sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/",
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      });
-
-      // Set access token cookie
-      res.cookie("token", session.accessToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 1000, // 1 day
-      });
-
-      // Set refresh token cookie if available
-      if (session.refreshToken) {
-        res.cookie("refresh_token", session.refreshToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "strict",
-          path: "/",
-          maxAge: 60 * 60 * 24 * 7 * 1000, // 7 days
+        this.logger.log("Updated existing user with Dynamic auth", {
+          userId: user.id,
+          walletAddress,
         });
       }
 
-      // Clean callbackUrl matching Next.js logic
-      let finalCallbackUrl = "/dashboard";
-      try {
-        if (callbackUrl) {
-          const url = new URL(
-            callbackUrl,
-            req.headers.origin || "http://localhost:3000"
-          );
-          if (!url.pathname.startsWith("/login")) {
-            finalCallbackUrl = url.toString();
-          }
-        }
-      } catch {
-        // Use default if invalid
-      }
+      // Step 4: Generate JWT tokens for session
+      const primaryWallet =
+        user.userWallets.find((w) => w.walletAddress === walletAddress) ||
+        user.userWallets[0];
 
-      // Create response object
-      const responseData = {
-        token: sessionToken, // Include the JWT token at top level
-        session: {
-          expiresAt: session.expiresAt,
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.email ? user.email.split("@")[0] : "User",
-          },
-          token: sessionToken, // Include token in session object
-          accessToken: session.accessToken,
-          refreshToken: session.refreshToken,
-        },
-        user,
-        success: true,
-        callbackUrl: finalCallbackUrl,
+      const tokenPayload = {
+        sub: user.id,
+        email: user.email,
+        walletAddress: primaryWallet?.walletAddress,
+        chainId: primaryWallet?.chainId,
+        dynamicUserId: dynamicPayload.sub,
       };
 
-      // Log the response we're sending (with sensitive data redacted)
-      console.log("Sending login response:", {
-        token: responseData.token.substring(0, 20) + "...",
-        session: {
-          ...responseData.session,
-          token: responseData.session.token.substring(0, 20) + "...",
-          accessToken: "[REDACTED]",
-          refreshToken: "[REDACTED]",
-        },
-        success: responseData.success,
-        callbackUrl: responseData.callbackUrl,
+      const accessToken = this.jwtService.sign(tokenPayload, {
+        expiresIn: "1h",
+      });
+      const refreshToken = this.jwtService.sign(tokenPayload, {
+        expiresIn: "7d",
+      });
+      const expiresAt = new Date(Date.now() + 3600000); // 1 hour
+
+      this.logger.log("Dynamic authentication successful", {
+        userId: user.id,
+        walletAddress: primaryWallet?.walletAddress,
       });
 
-      // Return response matching Next.js format with token included
-      return res.status(200).json(responseData);
-    } catch (error) {
-      console.error("Login error:", error);
+      return {
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email || "",
+          walletAddress: primaryWallet?.walletAddress || "",
+          chainId: primaryWallet?.chainId || chain,
+        },
+        session: {
+          accessToken,
+          refreshToken,
+          expiresAt,
+        },
+        callbackUrl,
+      };
+    } catch (error: unknown) {
       const errorMessage =
-        error instanceof Error ? error.message : "Authentication failed";
-      throw new HttpException(errorMessage, HttpStatus.UNAUTHORIZED);
+        error instanceof Error ? error.message : "Unknown error";
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error("Dynamic authentication failed", {
+        error: errorMessage,
+        stack: errorStack,
+      });
+
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        `Authentication failed: ${errorMessage}`,
+        HttpStatus.UNAUTHORIZED
+      );
     }
   }
 
   @Public()
   @Post("logout")
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "User logout" })
-  async logout(@Request() req: any, @Response() res: any) {
+  async logout(@Body() body: { refreshToken?: string }) {
     try {
-      // Clear all cookies matching Next.js logout behavior
-      res.clearCookie("token");
-      res.clearCookie("refresh_token");
-      res.clearCookie("next-auth.session-token");
-      res.clearCookie("__Secure-next-auth.session-token");
-
-      // Invalidate tokens in the auth service
-      try {
-        const token = req.cookies?.token;
-        if (token) {
-          const userId = this.authService.verifySession(token);
-          if (userId) {
-            await this.authService.signOut(userId);
-            console.log(`Logged out user with ID: ${userId}`);
-          }
-        }
-      } catch (serviceError) {
-        console.error(
-          "Failed to invalidate tokens during logout:",
-          serviceError
-        );
-      }
-
-      return res.json({
-        success: true,
-        message: "Logged out successfully",
+      // For now, we just return success since we don't have persistent sessions
+      // In the future, we could implement token blacklisting or session management
+      this.logger.log("User logout request", {
+        hasRefreshToken: !!body.refreshToken,
       });
-    } catch (error) {
-      console.error("Logout error:", error);
-      throw new HttpException(
-        "Failed to logout",
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
+
+      return { success: true, message: "Logged out successfully" };
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      this.logger.error("Logout failed", errorMessage);
+      return { success: true, message: "Logged out successfully" }; // Always succeed
     }
   }
 }

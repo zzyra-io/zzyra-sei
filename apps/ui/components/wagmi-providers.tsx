@@ -20,13 +20,16 @@ type ZyraProvidersProps = PropsWithChildren;
 
 // This wrapper ensures we only render the web3 providers on the client
 export function WagmiProviders({ children }: ZyraProvidersProps) {
-  const magicApiKey = process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY;
   const { theme } = useTheme();
 
-  // Now mounted. Render WalletProvider, passing wagmiConfig (which might still be null initially).
-  // WalletProvider will need to handle the null wagmiConfig case gracefully.
+  // Use Dynamic environment ID instead of Magic API key
+  const dynamicEnvironmentId =
+    process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID ||
+    "4610f76b-ca5b-4e06-b048-d70f669055c2";
+
   return (
-    <WagmiProvider config={createWagmiConfig(magicApiKey, theme === "dark")}>
+    <WagmiProvider
+      config={createWagmiConfig(dynamicEnvironmentId, theme === "dark")}>
       <QueryClientProvider client={queryClient}>
         <ConnectKitProvider
           mode={theme === "dark" ? "dark" : "light"}

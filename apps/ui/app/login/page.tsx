@@ -1,16 +1,17 @@
 /**
  * Login Page
  *
- * This page provides authentication options including Magic Link login.
+ * This page provides authentication options using Dynamic Wallet.
  */
 
 "use client";
 
-import { MagicLoginForm } from "@/components/auth/MagicLoginForm";
+import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
 import { Logo } from "@/components/logo";
-import MagicConnectButton from "@/components/magic-connect";
 import { ModeToggle } from "@/components/mode-toggle";
 import { WelcomeSteps } from "@/components/onboarding/welcome-steps";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -19,10 +20,14 @@ import { useRouter } from "next/navigation";
  */
 export default function LoginPage() {
   const router = useRouter();
+  const { isLoggedIn, isLoading, error } = useDynamicAuth();
 
-  const handleLoginSuccess = () => {
-    router.push("/dashboard");
-  };
+  // Redirect to dashboard if already logged in
+  useEffect(() => {
+    if (isLoggedIn && !isLoading) {
+      router.push("/dashboard");
+    }
+  }, [isLoggedIn, isLoading, router]);
 
   return (
     <div className='flex min-h-screen flex-col'>
@@ -45,19 +50,22 @@ export default function LoginPage() {
                 Welcome back
               </h1>
               <p className='text-sm text-muted-foreground'>
-                Sign in to your account to continue building workflows
+                Connect your wallet to continue building workflows
               </p>
             </div>
-            {/* <MagicConnectButton/> */}
-            <MagicLoginForm onSuccess={handleLoginSuccess} />
+            
+            {/* Dynamic Wallet Widget */}
+            <div className='flex justify-center'>
+              <DynamicWidget />
+            </div>
 
-            {/* {error && (
-              <Alert variant='destructive' className='mb-4'>
-                <AlertDescription>
-                  Authentication error: {error.message}. Please log in again.
-                </AlertDescription>
-              </Alert>
-            )} */}
+            {error && (
+              <div className='rounded-md bg-destructive/15 p-3'>
+                <div className='text-sm text-destructive'>
+                  Authentication error: {error}. Please try again.
+                </div>
+              </div>
+            )}
 
             <p className='px-8 text-center text-sm text-muted-foreground'>
               By continuing, you agree to our{" "}

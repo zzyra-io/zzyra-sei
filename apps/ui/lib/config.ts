@@ -6,8 +6,8 @@
 
 // Define required environment variables
 interface EnvVars {
-  // Magic Link
-  magicPublishableKey: string;
+  // Dynamic Wallet
+  dynamicEnvironmentId: string;
 
   // Blockchain Network
   blockchainNetwork: string;
@@ -23,8 +23,8 @@ interface EnvVars {
 
 // Get environment variables with validation
 export const config: EnvVars = {
-  // Magic Link
-  magicPublishableKey: process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY || "",
+  // Dynamic Wallet
+  dynamicEnvironmentId: process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID || "",
 
   // Blockchain Network
   blockchainNetwork: process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || "1328",
@@ -46,8 +46,8 @@ export const config: EnvVars = {
 export function validateEnvVars(): string[] {
   const missingVars: string[] = [];
 
-  if (!config.magicPublishableKey) {
-    missingVars.push("NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY");
+  if (!config.dynamicEnvironmentId) {
+    missingVars.push("NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID");
   }
 
   return missingVars;
