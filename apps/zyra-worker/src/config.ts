@@ -45,3 +45,11 @@ export const WORKFLOW_SETTINGS = {
   ), // 1 hour
   maxRetries: Number(process.env.MAX_NODE_RETRIES || 3),
 };
+
+// Account Abstraction settings
+export const AA_CONFIG = {
+  bundlerUrl: process.env.AA_BUNDLER_URL || 'https://bundler.biconomy.io/api/v2/1329', // SEI testnet
+  paymasterUrl: process.env.AA_PAYMASTER_URL,
+  entryPointAddress: process.env.AA_ENTRY_POINT || '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  enabled: process.env.ENABLE_AA !== 'false', // Default enabled
+};

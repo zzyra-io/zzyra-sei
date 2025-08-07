@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   SessionKeyData,
   CreateSessionKeyRequest,
   SessionUsageStats,
   SessionKeyValidationResult,
-  SecurityLevel,
 } from "@zyra/types";
 import api from "@/lib/services/api";
 import { toast } from "@/hooks/use-toast";
@@ -162,19 +161,20 @@ export function useSessionKeyMetrics() {
 export function useSessionKeyCreation() {
   const [isCreating, setIsCreating] = useState(false);
   const { createSessionKey } = useSessionKeys();
-  const { user, isLoggedIn, getAuthToken } = useDynamicAuth();
+  const { isLoggedIn, getCurrentUser } = useDynamicAuth();
 
   const createWithDynamic = useCallback(
     async (request: CreateSessionKeyRequest) => {
       setIsCreating(true);
       try {
-        if (!isLoggedIn || !user?.walletAddress) {
+        const currentUser = getCurrentUser();
+        if (!isLoggedIn || !currentUser?.walletAddress) {
           throw new Error("No wallet address found");
         }
 
         // Create delegation message
         const delegationMessage = {
-          userAddress: request.walletAddress,
+          userAddress: currentUser.walletAddress,
           chainId: request.chainId,
           securityLevel: request.securityLevel,
           validUntil: request.validUntil.toISOString(),
@@ -185,22 +185,17 @@ export function useSessionKeyCreation() {
         // Sign the delegation message with the user's wallet using Dynamic SDK
         const messageToSign = JSON.stringify(delegationMessage);
 
-        // Convert message to hex for signing
-        const messageHex = `0x${Buffer.from(messageToSign, "utf8").toString("hex")}`;
-
-        // Get auth token for API authentication
-        const authToken = await getAuthToken();
-        if (!authToken) {
-          throw new Error("Authentication required");
-        }
+        // For now, use a simple signature mechanism
+        // In production, you would use Dynamic's wallet signing
+        const signature = Buffer.from(messageToSign).toString("base64");
 
         // Create session key via API with Dynamic authentication
         const result = await createSessionKey({
           request: {
             ...request,
-            walletAddress: user.walletAddress,
+            walletAddress: currentUser.walletAddress,
           },
-          signature: authToken, // Use auth token as signature for now
+          signature: signature,
         });
 
         return result;
@@ -208,7 +203,7 @@ export function useSessionKeyCreation() {
         setIsCreating(false);
       }
     },
-    [createSessionKey, isLoggedIn, user, getAuthToken]
+    [createSessionKey, isLoggedIn, getCurrentUser]
   );
 
   return {

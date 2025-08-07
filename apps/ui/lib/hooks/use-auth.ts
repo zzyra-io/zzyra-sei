@@ -234,8 +234,7 @@ export const useAuth = (): AuthHook => {
         console.warn("Failed to set auth cookie:", cookieErr);
       }
 
-      // Step 5: Redirect
-      router.push("/dashboard");
+      // Step 5: Authentication complete (no automatic redirect)
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Backend authentication failed";

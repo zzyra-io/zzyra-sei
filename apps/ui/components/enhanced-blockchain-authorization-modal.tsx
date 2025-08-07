@@ -35,7 +35,7 @@ import {
 } from "@zyra/types";
 import { useToast } from "@/components/ui/use-toast";
 import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
-import { useSessionKeyCreation } from "@/hooks/use-session-keys";
+import { useAccountAbstraction } from "@/hooks/use-account-abstraction";
 
 interface BlockchainNode {
   node: any;
@@ -163,8 +163,9 @@ export function EnhancedBlockchainAuthorizationModal({
   onCancel,
 }: EnhancedBlockchainAuthorizationModalProps) {
   const { toast } = useToast();
-  const { dynamicContext, isLoggedIn } = useDynamicAuth();
-  const { createWithMagic, isCreating } = useSessionKeyCreation();
+  const { isLoggedIn, getCurrentUser } = useDynamicAuth();
+  const { createSmartWalletDelegation, isCreatingDelegation } =
+    useAccountAbstraction();
   const [open, setOpen] = useState(true);
 
   // Detect blockchain operations
@@ -175,8 +176,8 @@ export function EnhancedBlockchainAuthorizationModal({
     SecurityLevel.BASIC
   );
   const [requireConfirmation, setRequireConfirmation] = useState(false);
-  const [emergencyContacts, setEmergencyContacts] = useState<string[]>([]);
-  const [spendingAlerts, setSpendingAlerts] = useState([
+  const [emergencyContacts] = useState<string[]>([]);
+  const [spendingAlerts] = useState([
     { threshold: 50, method: "push" as const },
     { threshold: 80, method: "email" as const },
   ]);
@@ -226,60 +227,49 @@ export function EnhancedBlockchainAuthorizationModal({
         return;
       }
 
-      if (!isLoggedIn || !dynamicContext.user) {
+      const currentUser = getCurrentUser();
+      if (!isLoggedIn || !currentUser) {
         throw new Error("Dynamic wallet not connected");
       }
       console.log("selectedChains", selectedChains);
 
       // Create session key request
-      const sessionKeyRequest = {
-        walletAddress: "", // Will be filled by the hook
-        chainId:
-          selectedChains[0].chainId === "sei-testnet"
-            ? "1328"
-            : selectedChains[0].chainId,
-        securityLevel,
-        validUntil: new Date(Date.now() + parseInt(duration) * 60 * 60 * 1000),
-        permissions: selectedChains.map((chain) => ({
-          operation: "send",
-          maxAmountPerTx: chain.maxDailySpending,
-          maxDailyAmount: chain.maxDailySpending,
-          allowedContracts: ["*"],
-          requireConfirmation,
-          emergencyStop: false,
-        })),
-      };
+      // Create Smart Wallet (AA) delegation - Single production path
+      const delegationResult = await createSmartWalletDelegation({
+        chainId: selectedChains[0].chainId,
+        operations: ["send", "trade"],
+        maxAmountPerTx: selectedChains[0].maxDailySpending,
+        maxDailyAmount: selectedChains[0].maxDailySpending,
+        duration: parseInt(duration),
+      });
 
-      // Create session key using the hook
-      const sessionKeyResult = await createWithMagic(
-        sessionKeyRequest,
-        dynamicContext
-      );
-
-      // Create enhanced auth config
+      // Create AA authorization config
       const config: SecureBlockchainAuthConfig = {
-        // Backward compatibility fields
         selectedChains,
         duration: parseInt(duration),
         timestamp: Date.now(),
-
-        // Enhanced security fields
         securityLevel,
         requireConfirmation,
         emergencyContacts,
         spendingAlerts,
-
-        // Session key specific
-        sessionKeyId: sessionKeyResult.sessionKey.id,
-        delegationSignature: sessionKeyResult.delegationMessage,
+        // Store AA data in delegation signature as JSON
+        delegationSignature: JSON.stringify({
+          useAA: true,
+          provider: "zerodev",
+          smartWalletAddress: delegationResult.smartWalletAddress,
+          signature: delegationResult.delegationSignature,
+          expiresAt: new Date(
+            Date.now() + parseInt(duration) * 60 * 60 * 1000
+          ).toISOString(),
+        }),
       };
 
       setOpen(false);
       onAuthorize(config);
 
       toast({
-        title: "Session Key Created",
-        description: `Secure session created for ${selectedChains.length} chain(s) with ${securityLevel} security level.`,
+        title: "Smart Wallet Created",
+        description: `AA delegation created for ${selectedChains.length} chain(s) with ${securityLevel} security level.`,
       });
     } catch (error) {
       console.error("Authorization error:", error);
@@ -567,14 +557,14 @@ export function EnhancedBlockchainAuthorizationModal({
             <Button
               onClick={handleAuthorize}
               className='flex-1'
-              disabled={isCreating}>
-              {isCreating ? (
+              disabled={isCreatingDelegation}>
+              {isCreatingDelegation ? (
                 <>
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
-                  Creating Session...
+                  Creating Smart Wallet...
                 </>
               ) : (
-                "Create Session & Execute"
+                "Create Smart Wallet & Execute"
               )}
             </Button>
           </div>
