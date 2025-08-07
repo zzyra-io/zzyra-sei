@@ -34,7 +34,7 @@ export const useUserUsage = () => {
 
       return response.json();
     },
-    enabled: !!isAuthenticated && !!user?.issuer,
+    enabled: !!isLoggedIn && !!user?.userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
   });

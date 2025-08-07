@@ -3,13 +3,13 @@
  *
  * This page provides authentication options using Dynamic Wallet.
  */
-
 "use client";
 
 import { DynamicEmbeddedWidget } from "@dynamic-labs/sdk-react-core";
 import { Logo } from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
 import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
+import { DynamicLoadingState } from "@/components/auth/dynamic-loading-state";
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,7 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Zap, Layers, Wallet, CheckCircle2, AlertCircle } from "lucide-react";
+import { Zap, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
 
 /**
  * Login Page Component
@@ -37,109 +37,121 @@ export default function LoginPage() {
   }, [isLoggedIn, isLoading, router]);
 
   return (
-    <div className='flex min-h-screen flex-col'>
-      <header className='flex h-14 items-center px-4 lg:px-6 border-b'>
-        <Link href='/' className='flex items-center'>
-          <Logo className='h-8 w-auto' variant='full' />
-        </Link>
-        <div className='ml-auto flex items-center'>
-          <ModeToggle />
-        </div>
+    <div className='min-h-screen bg-background'>
+      {/* Header */}
+      <header className='absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-6'>
+        <Logo />
+        <ModeToggle />
       </header>
-      <main className='flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0'>
-        {/* Left side - Features */}
-        <div className='hidden lg:flex flex-col justify-center items-center bg-gradient-to-br from-primary/5 via-primary/3 to-transparent p-12'>
-          <div className='max-w-md space-y-8'>
-            <div className='text-center mb-8'>
-              <Zap className='h-16 w-16 text-primary mx-auto mb-4' />
-              <h2 className='text-3xl font-bold'>Welcome to Zzyra</h2>
-              <p className='text-lg text-muted-foreground mt-2'>
-                Build powerful Web3 automation workflows
-              </p>
-            </div>
 
-            <div className='space-y-6'>
-              <div className='flex items-start gap-4'>
-                <div className='p-2 rounded-lg bg-primary/10'>
-                  <Layers className='h-6 w-6 text-primary' />
-                </div>
-                <div>
-                  <h3 className='font-semibold'>No-Code Workflows</h3>
-                  <p className='text-sm text-muted-foreground'>
-                    Drag and drop to create powerful automation
-                  </p>
-                </div>
-              </div>
+      {/* Main Content */}
+      <div className='min-h-screen flex'>
+        {/* Left Side - Welcome/Onboarding */}
+        <div className='hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/10 via-primary/5 to-background relative overflow-hidden'>
+          {/* Background Pattern */}
+          <div className='absolute inset-0 bg-grid-white/[0.02] bg-grid-16' />
 
-              <div className='flex items-start gap-4'>
-                <div className='p-2 rounded-lg bg-primary/10'>
-                  <Wallet className='h-6 w-6 text-primary' />
+          <div className='relative z-10 flex items-center justify-center p-12'>
+            <Card className='w-full max-w-md bg-card/80 backdrop-blur-sm border-border/50'>
+              <CardHeader className='text-center pb-6'>
+                {/* Step Indicator */}
+                <div className='flex items-center justify-center gap-2 mb-6'>
+                  <div className='h-2 w-8 bg-primary rounded-full' />
+                  <div className='h-2 w-8 bg-muted rounded-full' />
+                  <div className='h-2 w-8 bg-muted rounded-full' />
                 </div>
-                <div>
-                  <h3 className='font-semibold'>Smart Wallet Integration</h3>
-                  <p className='text-sm text-muted-foreground'>
-                    Account abstraction with session keys
-                  </p>
-                </div>
-              </div>
+                <div className='text-sm text-muted-foreground mb-4'>1 of 3</div>
 
-              <div className='flex items-start gap-4'>
-                <div className='p-2 rounded-lg bg-primary/10'>
-                  <CheckCircle2 className='h-6 w-6 text-primary' />
+                {/* Logo Icon */}
+                <div className='w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6'>
+                  <Zap className='w-8 h-8 text-primary' />
                 </div>
-                <div>
-                  <h3 className='font-semibold'>Secure & Reliable</h3>
-                  <p className='text-sm text-muted-foreground'>
-                    Enterprise-grade security and monitoring
-                  </p>
-                </div>
-              </div>
-            </div>
+
+                <CardTitle className='text-2xl font-semibold mb-2'>
+                  Welcome to Zyra
+                </CardTitle>
+                <CardDescription className='text-base text-muted-foreground'>
+                  Your all-in-one platform for building powerful Web3 automation
+                  workflows with no-code required.
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className='pt-0'>
+                <button className='w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors'>
+                  Next
+                  <ArrowRight className='w-4 h-4' />
+                </button>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
-        {/* Right side - Login */}
-        <div className='flex flex-col justify-center items-center p-8 lg:p-12'>
-          <Card className='w-full max-w-md bg-background/50 backdrop-blur-sm border-border/50 shadow-lg'>
-            <CardHeader className='text-center space-y-2'>
-              <CardTitle className='text-2xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent'>
-                Welcome to Zzyra
-              </CardTitle>
-              <CardDescription className='text-muted-foreground'>
-                Connect your wallet to start building AI-powered workflows
-              </CardDescription>
-            </CardHeader>
-            <CardContent className='space-y-6'>
-              {/* Dynamic Wallet Widget - Optimized for performance */}
-              <div className='w-full'>
-                <DynamicEmbeddedWidget
-                  background='with-border'
-                  className='w-full max-w-md mx-auto'
-                  style={{
-                    borderRadius: "12px",
-                    border: "1px solid hsl(var(--border))",
-                    backgroundColor: "hsl(var(--background))",
-                    boxShadow:
-                      "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
-                    backdropFilter: "blur(8px)",
-                    minHeight: "400px",
-                  }}
-                />
+        {/* Right Side - Authentication */}
+        <div className='w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12'>
+          <div className='w-full max-w-md space-y-8'>
+            {/* Mobile Logo - Only show on small screens */}
+            <div className='lg:hidden text-center'>
+              <div className='w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4'>
+                <Zap className='w-6 h-6 text-primary' />
               </div>
+            </div>
 
-              {error && (
-                <div className='rounded-md bg-destructive/10 border border-destructive/20 p-4'>
-                  <div className='flex items-center gap-2'>
-                    <AlertCircle className='h-4 w-4 text-destructive' />
-                    <div className='text-sm text-destructive font-medium'>
-                      Authentication error: {error}. Please try again.
+            {/* Welcome Back Section */}
+            <div className='text-center space-y-2'>
+              <h1 className='text-3xl font-semibold tracking-tight'>
+                Welcome back
+              </h1>
+              <p className='text-muted-foreground'>
+                Sign in to your account to continue building workflows
+              </p>
+            </div>
+
+            {/* Authentication Card */}
+            <Card className='border-border/50'>
+              <CardHeader className='pb-4'>
+                <CardTitle className='text-xl'>Connect Your Wallet</CardTitle>
+                <CardDescription>
+                  Secure, passwordless authentication with your wallet
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className='space-y-6'>
+                {/* Error Display */}
+                {error && (
+                  <div className='flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive'>
+                    <AlertCircle className='h-4 w-4 flex-shrink-0' />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                {/* Dynamic Loading State */}
+                <DynamicLoadingState
+                  fallback={
+                    <div className='space-y-4'>
+                      <div className='bg-muted/30 rounded-lg p-6'>
+                        <DynamicEmbeddedWidget />
+                      </div>
+                    </div>
+                  }>
+                  {/* Authenticated State */}
+                  <div className='text-center space-y-4'>
+                    <div className='w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto'>
+                      <CheckCircle2 className='w-6 h-6 text-green-600 dark:text-green-400' />
+                    </div>
+                    <div>
+                      <h3 className='font-medium'>Authentication Complete</h3>
+                      <p className='text-sm text-muted-foreground'>
+                        Redirecting to dashboard...
+                      </p>
+                    </div>
+                    <div className='flex items-center justify-center'>
+                      <div className='animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent'></div>
                     </div>
                   </div>
-                </div>
-              )}
+                </DynamicLoadingState>
 
-              <div className='text-center text-xs text-muted-foreground space-y-1'>
-                <p>
+                {/* Terms and Privacy */}
+                <div className='text-center text-xs text-muted-foreground'>
                   By continuing, you agree to our{" "}
                   <Link
                     href='/terms'
@@ -153,33 +165,25 @@ export default function LoginPage() {
                     Privacy Policy
                   </Link>
                   .
-                </p>
-                <p className='text-xs opacity-75'>
-                  Powered by Dynamic Wallet & SEI Network
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Show mobile features below on small screens */}
-          <div className='lg:hidden mt-8 max-w-md space-y-4'>
-            <div className='flex items-center gap-3 text-sm p-3 rounded-lg bg-primary/5 border border-primary/10'>
-              <Layers className='h-5 w-5 text-primary' />
-              <span className='font-medium'>No-code workflow builder</span>
-            </div>
-            <div className='flex items-center gap-3 text-sm p-3 rounded-lg bg-primary/5 border border-primary/10'>
-              <Wallet className='h-5 w-5 text-primary' />
-              <span className='font-medium'>
-                Smart wallet & account abstraction
-              </span>
-            </div>
-            <div className='flex items-center gap-3 text-sm p-3 rounded-lg bg-primary/5 border border-primary/10'>
-              <CheckCircle2 className='h-5 w-5 text-primary' />
-              <span className='font-medium'>Secure automation platform</span>
+            {/* Additional Features - Mobile Only */}
+            <div className='lg:hidden space-y-3 text-center'>
+              <div className='text-sm text-muted-foreground'>
+                ✨ Build AI-powered workflows
+              </div>
+              <div className='text-sm text-muted-foreground'>
+                🔗 Connect with blockchain networks
+              </div>
+              <div className='text-sm text-muted-foreground'>
+                ⚡ Automate complex tasks
+              </div>
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

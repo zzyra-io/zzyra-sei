@@ -5,15 +5,15 @@ import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 import useAuthStore from "@/lib/store/auth-store";
 
 export function useAutoWalletConnect() {
-  const { isLoggedIn, dynamicContext } = useDynamicAuth();
+  const { isLoggedIn, user, primaryWallet } = useDynamicAuth();
   const { isAuthenticated: storeIsAuthenticated } = useAuthStore();
 
   useEffect(() => {
     console.log("Auto wallet connect hook state:", {
       isLoggedIn,
       storeIsAuthenticated,
-      hasDynamicUser: !!dynamicContext.user,
-      hasWallet: !!dynamicContext.primaryWallet,
+      hasDynamicUser: !!user,
+      hasWallet: !!primaryWallet,
     });
 
     // With Dynamic, wallet connection is handled automatically through the Dynamic provider
@@ -25,10 +25,5 @@ export function useAutoWalletConnect() {
         "User authenticated with Dynamic, wallet should be auto-connected"
       );
     }
-  }, [
-    isLoggedIn,
-    storeIsAuthenticated,
-    dynamicContext.user,
-    dynamicContext.primaryWallet,
-  ]);
+  }, [isLoggedIn, storeIsAuthenticated, user, primaryWallet]);
 }

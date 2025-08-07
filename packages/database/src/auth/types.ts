@@ -40,19 +40,6 @@ export type AuthUser = User & {
 };
 
 /**
- * Magic link authentication payload
- */
-export interface MagicAuthPayload {
-  didToken: string;
-  provider?: string;
-  email?: string;
-  publicAddress?: string;
-  isOAuth?: boolean;
-  oauthProvider?: string;
-  oauthUserInfo?: Record<string, any>;
-}
-
-/**
  * Authentication result
  */
 export interface AuthResult {

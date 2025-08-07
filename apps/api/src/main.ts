@@ -5,7 +5,9 @@ import * as cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ["error", "warn", "log", "verbose", "debug"],
+  });
 
   // Enable cookie parser for authentication
   app.use(cookieParser());
@@ -27,7 +29,6 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     })
   );
-
   // API prefix
   app.setGlobalPrefix("api");
 

@@ -1,6 +1,4 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import { DatabaseModule } from "../database/database.module";
 import { AuthController } from "./auth.controller";
@@ -10,19 +8,9 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-    DatabaseModule,
-    PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || "your-secret-key",
-      signOptions: { expiresIn: "24h" },
-    }),
-  ],
+  imports: [DatabaseModule, PassportModule],
   controllers: [AuthController],
-  providers: [AuthService, DynamicJwtService, JwtStrategy, JwtAuthGuard],
-  exports: [AuthService, DynamicJwtService, JwtAuthGuard],
+  providers: [AuthService, JwtStrategy, DynamicJwtService, JwtAuthGuard],
+  exports: [AuthService, DynamicJwtService],
 })
 export class AuthModule {}

@@ -22,7 +22,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { useNotifications } from "./notification/notification-socket-provider";
+// import { useNotifications } from "./notification/notification-socket-provider";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -35,8 +35,14 @@ import {
 import Link from "next/link";
 
 export function NotificationBell() {
-  const { notifications, unreadCount, markAsRead, markAllAsRead } =
-    useNotifications();
+  // TODO: Remove this once we have a real notifications system
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = {
+    notifications: [],
+    unreadCount: 0,
+    markAsRead: () => {},
+    markAllAsRead: () => {},
+  };
+
   console.log("notifications", notifications);
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");

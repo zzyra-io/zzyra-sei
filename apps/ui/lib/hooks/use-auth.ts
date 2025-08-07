@@ -8,12 +8,13 @@ interface LoginCredentials {
   email: string;
 }
 
-interface LoginResponse {
+interface BackendAuthResponse {
   success: boolean;
   user: User;
-  token: {
+  session: {
     accessToken: string;
     refreshToken: string;
+    expiresAt: string | Date;
   };
   callbackUrl?: string;
 }
@@ -92,6 +93,11 @@ export const useAuth = (): AuthHook => {
   // Helper function to authenticate with backend once Dynamic auth is complete
   const authenticateWithBackend = useCallback(async () => {
     if (!isLoggedIn || !dynamicContext.user || !dynamicContext.primaryWallet) {
+      console.log("Cannot authenticate with backend - missing required data:", {
+        isLoggedIn,
+        hasUser: !!dynamicContext.user,
+        hasWallet: !!dynamicContext.primaryWallet,
+      });
       return;
     }
 
@@ -99,39 +105,141 @@ export const useAuth = (): AuthHook => {
     setError(null);
 
     try {
-      // Step 1: Get Dynamic auth token
-      const contextWithToken = dynamicContext as unknown as {
-        getAuthToken?: () => Promise<string> | string;
-      };
-      const authToken = await contextWithToken.getAuthToken?.();
-      if (!authToken) {
-        throw new Error("No Dynamic auth token available");
-      }
+      console.log("Starting backend authentication...");
 
-      // Step 2: Get user and wallet info
+      // Step 1: Get Dynamic auth token if available
+      console.log("🔑 Getting Dynamic auth token for backend auth...");
+
       const user = dynamicContext.user;
       const wallet = dynamicContext.primaryWallet;
+      let authToken: string | null = null;
+
+      // Try to get a JWT token, but don't fail if we can't
+      try {
+        // Method 1: Try wallet authentication methods
+        if (wallet) {
+          const walletAuth = wallet as unknown as {
+            signIn?: () => Promise<{ token: string }>;
+            authenticate?: () => Promise<string>;
+            getAuthToken?: () => Promise<string>;
+          };
+
+          if (walletAuth.signIn) {
+            const result = await walletAuth.signIn();
+            authToken = result.token;
+          } else if (walletAuth.authenticate) {
+            authToken = await walletAuth.authenticate();
+          } else if (walletAuth.getAuthToken) {
+            authToken = await walletAuth.getAuthToken();
+          }
+        }
+
+        // Method 2: Try Dynamic context methods
+        if (!authToken) {
+          const contextAuth = dynamicContext as unknown as {
+            getAuthToken?: () => Promise<string>;
+            authToken?: string;
+            user?: { getAuthToken?: () => Promise<string> };
+          };
+
+          if (contextAuth.getAuthToken) {
+            authToken = await contextAuth.getAuthToken();
+          } else if (contextAuth.authToken) {
+            authToken = contextAuth.authToken;
+          } else if (contextAuth.user?.getAuthToken) {
+            authToken = await contextAuth.user.getAuthToken();
+          }
+        }
+
+        // Method 3: Try embedded wallet methods
+        if (!authToken && user) {
+          const embeddedAuth = user as unknown as {
+            generateAuthToken?: () => Promise<string>;
+            getJWT?: () => Promise<string>;
+            accessToken?: string;
+          };
+
+          if (embeddedAuth.generateAuthToken) {
+            authToken = await embeddedAuth.generateAuthToken();
+          } else if (embeddedAuth.getJWT) {
+            authToken = await embeddedAuth.getJWT();
+          } else if (embeddedAuth.accessToken) {
+            authToken = embeddedAuth.accessToken;
+          }
+        }
+      } catch (error) {
+        console.log("⚠️ Failed to get Dynamic auth token:", error);
+      }
+
+      if (authToken) {
+        console.log("✅ Got Dynamic auth token");
+      } else {
+        console.log("ℹ️ No Dynamic auth token available, proceeding anyway");
+      }
+
+      if (!authToken) {
+        console.log(
+          "ℹ️ No auth token available, proceeding with backend auth anyway"
+        );
+        // Don't throw error - let the backend handle authentication
+      } else {
+        console.log("✅ Got auth token for backend auth");
+      }
+
+      // Step 2: User and wallet info already available from above
 
       // Step 3: Authenticate with backend
-      const response = await api.post<LoginResponse>("/auth/login", {
+      const payload: {
+        email: string;
+        publicAddress: string;
+        authToken?: string;
+      } = {
         email: user.email || "",
-        authToken,
         publicAddress: wallet.address,
-      });
+      };
+
+      if (authToken) {
+        payload.authToken = authToken;
+      }
+
+      const response = await api.post<BackendAuthResponse>(
+        "/auth/login",
+        payload
+      );
 
       if (!response.data.success) {
         throw new Error("Authentication failed");
       }
 
-      // Step 4: Update auth store
+      console.log("Backend authentication successful");
+
+      // Step 4: Update auth store and set auth cookie for middleware
+      const { accessToken, refreshToken, expiresAt } = response.data.session;
+
       const authStore = useAuthStore.getState();
-      authStore.executeLogin(response.data.user, response.data.token || "");
+      authStore.executeLogin(response.data.user, { accessToken, refreshToken });
+
+      // Best-effort: set a cookie that Next.js middleware can read
+      try {
+        let maxAge = 3600; // default 1 hour
+        if (expiresAt) {
+          const expiryMs =
+            new Date(expiresAt as unknown as string).getTime() - Date.now();
+          if (Number.isFinite(expiryMs) && expiryMs > 0) {
+            maxAge = Math.floor(expiryMs / 1000);
+          }
+        }
+        document.cookie = `token=${accessToken}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+      } catch (cookieErr) {
+        console.warn("Failed to set auth cookie:", cookieErr);
+      }
 
       // Step 5: Redirect
       router.push("/dashboard");
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Backend authentication failed";
+      console.error("Backend authentication error:", err);
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -146,6 +254,13 @@ export const useAuth = (): AuthHook => {
       // Clear auth store first
       const authStore = useAuthStore.getState();
       authStore.executeLogout();
+
+      // Clear auth cookie used by middleware
+      try {
+        document.cookie = "token=; Path=/; Max-Age=0; SameSite=Lax";
+      } catch (err) {
+        console.warn("Failed to clear auth cookie:", err);
+      }
 
       // Logout from backend
       try {

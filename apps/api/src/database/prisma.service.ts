@@ -1,12 +1,5 @@
-import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
-import {
-  prisma as defaultPrisma,
-  createDevelopmentExtensionManager,
-  createProductionExtensionManager,
-  createExtendedPrismaClient,
-  DatabaseCacheProvider,
-  DatabaseRateLimitStore,
-} from "@zyra/database";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { prisma as defaultPrisma } from "@zyra/database";
 
 interface QueryMetrics {
   totalQueries: number;

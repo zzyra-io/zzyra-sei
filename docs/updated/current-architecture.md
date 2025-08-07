@@ -214,7 +214,7 @@ apps/zyra-worker/src/
 - **Repositories**: Data access layer for all entities
 - **AuthService**: Authentication and session management
 - **JwtService**: JWT token management
-- **MagicService**: Magic SDK integration
+- **DynamicService**: Dynamic SDK integration
 
 **Database Models:**
 
@@ -242,8 +242,8 @@ apps/zyra-worker/src/
 
 ### Authentication Flow
 
-1. **Magic SDK**: User authenticates via Magic SDK (email or wallet)
-2. **Token Validation**: Backend validates Magic DID token
+1. **Dynamic SDK**: User authenticates via Dynamic SDK (wallet connection)
+2. **Token Validation**: Backend validates Dynamic JWT token
 3. **User Creation**: User created/retrieved from database
 4. **JWT Generation**: Backend generates JWT access token
 5. **Session Management**: Refresh tokens managed for session persistence
@@ -301,8 +301,8 @@ apps/zyra-worker/src/
    # JWT
    JWT_SECRET="your-jwt-secret-key"
 
-   # Magic SDK
-   MAGIC_SECRET_KEY="your-magic-secret-key"
+   # Dynamic SDK
+   NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID="your-dynamic-environment-id"
 
    # AI Services
    OPENROUTER_API_KEY="your-openrouter-key"

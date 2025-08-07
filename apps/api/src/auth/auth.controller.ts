@@ -16,7 +16,8 @@ import { PrismaService } from "../database/prisma.service";
 
 interface DynamicAuthPayload {
   email?: string;
-  authToken: string; // Dynamic JWT token
+  authToken?: string; // Dynamic JWT token (optional)
+  publicAddress: string; // Wallet address (required)
 }
 
 interface AuthResponseDto {
@@ -59,10 +60,14 @@ export class AuthController {
       type: "object",
       properties: {
         email: { type: "string" },
-        authToken: { type: "string", description: "Dynamic JWT token" },
+        authToken: {
+          type: "string",
+          description: "Dynamic JWT token (optional)",
+        },
+        publicAddress: { type: "string", description: "Wallet address" },
         callbackUrl: { type: "string" },
       },
-      required: ["authToken"],
+      required: ["publicAddress"],
     },
   })
   @ApiResponse({
@@ -97,11 +102,11 @@ export class AuthController {
     @Body() body: DynamicAuthPayload & { callbackUrl?: string }
   ): Promise<AuthResponseDto> {
     try {
-      const { authToken, callbackUrl, email } = body;
+      const { authToken, callbackUrl, email, publicAddress } = body;
 
-      if (!authToken) {
+      if (!publicAddress) {
         throw new HttpException(
-          "Dynamic auth token is required",
+          "Wallet address is required",
           HttpStatus.BAD_REQUEST
         );
       }
@@ -109,26 +114,55 @@ export class AuthController {
       this.logger.log("Processing Dynamic authentication", {
         hasToken: !!authToken,
         hasEmail: !!email,
+        publicAddress,
         callbackUrl,
       });
 
-      // Step 1: Validate Dynamic JWT token
-      const dynamicPayload =
-        await this.dynamicJwtService.validateDynamicJwt(authToken);
+      let walletAddress = publicAddress;
+      let chain = "1"; // Default to Ethereum mainnet
+      let walletProvider = "dynamic";
+      let walletName = "Dynamic Wallet";
+      let userEmail = email;
+      let dynamicUserId = null;
 
-      // Step 2: Extract wallet and user information
-      const walletAddress =
-        this.dynamicJwtService.extractWalletAddress(dynamicPayload);
-      const { chain, walletProvider } =
-        this.dynamicJwtService.extractChainInfo(dynamicPayload);
-      const userEmail = email || dynamicPayload.email;
+      // Step 1: Validate Dynamic JWT token if provided
+      if (authToken) {
+        try {
+          const dynamicPayload =
+            await this.dynamicJwtService.validateDynamicJwt(authToken);
 
-      this.logger.log("Dynamic token validated", {
-        userId: dynamicPayload.sub,
-        walletAddress,
-        chain,
-        walletProvider,
-      });
+          // Extract wallet and user information from JWT
+          walletAddress =
+            this.dynamicJwtService.extractWalletAddress(dynamicPayload);
+          const chainInfo =
+            this.dynamicJwtService.extractChainInfo(dynamicPayload);
+          chain = chainInfo.chain;
+          walletProvider = chainInfo.walletProvider;
+          walletName = chainInfo.walletName;
+          userEmail = email || dynamicPayload.email;
+          dynamicUserId = dynamicPayload.sub;
+
+          this.logger.log("Dynamic token validated", {
+            userId: dynamicUserId,
+            walletAddress,
+            chain,
+            walletProvider,
+            walletName,
+          });
+        } catch (error) {
+          this.logger.warn(
+            "Failed to validate Dynamic JWT token, proceeding with wallet address only",
+            {
+              error: error instanceof Error ? error.message : "Unknown error",
+            }
+          );
+          // Continue with wallet address authentication
+        }
+      } else {
+        this.logger.log(
+          "No Dynamic JWT token provided, using wallet address authentication"
+        );
+      }
 
       // Step 3: Find or create user based on wallet address or email
       let user = await this.prismaService.client.user.findFirst({
@@ -150,6 +184,18 @@ export class AuthController {
 
       if (!user) {
         // Create new user with wallet
+        const walletMetadata: any = {
+          walletProvider,
+        };
+
+        if (dynamicUserId) {
+          walletMetadata.dynamicUserId = dynamicUserId;
+          walletMetadata.dynamicPayload = {
+            sub: dynamicUserId,
+            verified_credentials: [], // We don't have this without JWT
+          };
+        }
+
         user = await this.prismaService.client.user.create({
           data: {
             email: userEmail || `${walletAddress}@dynamic.wallet`,
@@ -159,14 +205,7 @@ export class AuthController {
                 chainId: chain,
                 walletType: "dynamic",
                 chainType: "evm",
-                metadata: {
-                  walletProvider,
-                  dynamicUserId: dynamicPayload.sub,
-                  dynamicPayload: {
-                    sub: dynamicPayload.sub,
-                    verified_credentials: dynamicPayload.verified_credentials,
-                  },
-                },
+                metadata: walletMetadata,
               },
             },
           },
@@ -187,6 +226,18 @@ export class AuthController {
         );
 
         if (!existingWallet) {
+          const walletMetadata: any = {
+            walletProvider,
+          };
+
+          if (dynamicUserId) {
+            walletMetadata.dynamicUserId = dynamicUserId;
+            walletMetadata.dynamicPayload = {
+              sub: dynamicUserId,
+              verified_credentials: [], // We don't have this without JWT
+            };
+          }
+
           await this.prismaService.client.userWallet.create({
             data: {
               userId: user.id,
@@ -194,14 +245,7 @@ export class AuthController {
               chainId: chain,
               walletType: "dynamic",
               chainType: "evm",
-              metadata: {
-                walletProvider,
-                dynamicUserId: dynamicPayload.sub,
-                dynamicPayload: {
-                  sub: dynamicPayload.sub,
-                  verified_credentials: dynamicPayload.verified_credentials,
-                },
-              },
+              metadata: walletMetadata,
             },
           });
         }
@@ -234,7 +278,7 @@ export class AuthController {
         email: user.email,
         walletAddress: primaryWallet?.walletAddress,
         chainId: primaryWallet?.chainId,
-        dynamicUserId: dynamicPayload.sub,
+        dynamicUserId: dynamicUserId,
       };
 
       const accessToken = this.jwtService.sign(tokenPayload, {

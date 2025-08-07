@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
 import { useAuth } from "./use-auth";
 
@@ -15,17 +15,67 @@ export const useDynamicAuth = () => {
   const isLoggedIn = useIsLoggedIn();
   const { authenticateWithBackend, isLoading, error } = useAuth();
 
+  // Get SDK loading state from Dynamic context
+  const { sdkHasLoaded } = dynamicContext;
+
+  // Track if we've already attempted backend authentication
+  const [hasAttemptedBackendAuth, setHasAttemptedBackendAuth] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const authAttemptRef = useRef(false);
+
   // Automatically authenticate with backend when Dynamic auth completes
   useEffect(() => {
-    if (isLoggedIn && dynamicContext.user && dynamicContext.primaryWallet) {
-      authenticateWithBackend();
+    // Check if we have all required data
+    if (
+      !sdkHasLoaded ||
+      !isLoggedIn ||
+      !dynamicContext.user ||
+      !dynamicContext.primaryWallet ||
+      hasAttemptedBackendAuth ||
+      isAuthenticating ||
+      authAttemptRef.current
+    ) {
+      return;
     }
-  }, [
-    isLoggedIn,
-    dynamicContext.user,
-    dynamicContext.primaryWallet,
-    authenticateWithBackend,
-  ]);
+
+    console.log("🔍 Checking auth conditions:", {
+      sdkHasLoaded,
+      isLoggedIn,
+      hasUser: !!dynamicContext.user,
+      hasWallet: !!dynamicContext.primaryWallet,
+      hasAttemptedBackendAuth,
+      isAuthenticating,
+    });
+
+    console.log("✅ All conditions met, attempting backend auth");
+
+    // Mark that we're attempting authentication
+    authAttemptRef.current = true;
+    setIsAuthenticating(true);
+    setHasAttemptedBackendAuth(true);
+
+    const performAuth = async () => {
+      try {
+        await authenticateWithBackend();
+        console.log("✅ Backend authentication completed");
+      } catch (error) {
+        console.error("❌ Backend authentication failed:", error);
+      } finally {
+        setIsAuthenticating(false);
+      }
+    };
+
+    void performAuth();
+  }, [sdkHasLoaded, isLoggedIn, hasAttemptedBackendAuth, isAuthenticating]);
+
+  // Reset backend auth attempt when user logs out
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setHasAttemptedBackendAuth(false);
+      setIsAuthenticating(false);
+      authAttemptRef.current = false;
+    }
+  }, [isLoggedIn]);
 
   /**
    * Trigger Dynamic authentication flow
@@ -68,69 +118,22 @@ export const useDynamicAuth = () => {
     };
   }, [isLoggedIn, dynamicContext.user, dynamicContext.primaryWallet]);
 
-  /**
-   * Get Dynamic auth token (JWT)
-   */
-  const getAuthToken = useCallback(async (): Promise<string | null> => {
-    if (!isLoggedIn || !dynamicContext.user) {
-      return null;
-    }
-
-    try {
-      // Try multiple approaches to get the auth token
-      const contextWithToken = dynamicContext as {
-        getAuthToken?: () => Promise<string> | string;
-        authToken?: string;
-      };
-
-      if (contextWithToken.getAuthToken) {
-        return await contextWithToken.getAuthToken();
-      }
-
-      if (contextWithToken.authToken) {
-        return contextWithToken.authToken;
-      }
-
-      // Check user object for access token
-      if (
-        "accessToken" in dynamicContext.user &&
-        dynamicContext.user.accessToken
-      ) {
-        return dynamicContext.user.accessToken as string;
-      }
-
-      console.warn("No auth token method found in Dynamic context");
-      return null;
-    } catch (error) {
-      console.error("Failed to get Dynamic auth token:", error);
-      return null;
-    }
-  }, [isLoggedIn, dynamicContext]);
-
-  /**
-   * Check if user has a wallet connected
-   */
-  const hasWallet = useCallback(() => {
-    return Boolean(dynamicContext.primaryWallet?.address);
-  }, [dynamicContext.primaryWallet]);
-
   return {
-    // State
+    // Dynamic state
     isLoggedIn,
+    sdkHasLoaded,
+    user: dynamicContext.user,
+    primaryWallet: dynamicContext.primaryWallet,
+
+    // Backend auth state
+    hasAttemptedBackendAuth,
+    isAuthenticating,
     isLoading,
     error,
-    user: getCurrentUser(),
-    hasWallet: hasWallet(),
 
     // Actions
     login,
     logout,
-    getAuthToken,
     getCurrentUser,
-
-    // Dynamic context (for advanced usage)
-    dynamicContext,
   };
 };
-
-export default useDynamicAuth;

@@ -37,14 +37,16 @@ interface SessionKeyListProps {
 
 export function SessionKeyList({ refreshKey }: SessionKeyListProps) {
   const { toast } = useToast();
-  const { 
-    sessionKeys, 
-    isLoading: loading, 
-    revokeSessionKey, 
+  const {
+    sessionKeys,
+    isLoading: loading,
+    revokeSessionKey,
     isRevoking,
-    refetch 
+    refetch,
   } = useSessionKeys();
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     if (refreshKey) {
@@ -53,14 +55,16 @@ export function SessionKeyList({ refreshKey }: SessionKeyListProps) {
   }, [refreshKey, refetch]);
 
   // Individual session usage hook for selected session
-  const { data: selectedUsageStats } = useSessionKeyUsage(selectedSessionId || undefined);
+  const { data: selectedUsageStats } = useSessionKeyUsage(
+    selectedSessionId || undefined
+  );
 
   const handleRevokeSessionKey = async (sessionKeyId: string) => {
     try {
       await revokeSessionKey(sessionKeyId);
-    } catch (error) {
+    } catch {
       // Error handling is done in the hook
-      console.error("Failed to revoke session key:", error);
+      console.error("Failed to revoke session key");
     }
   };
 
@@ -198,7 +202,7 @@ export function SessionKeyList({ refreshKey }: SessionKeyListProps) {
                       variant='outline'
                       size='sm'
                       onClick={() => handleRevokeSessionKey(sessionKey.id)}
-                  disabled={isRevoking}
+                      disabled={isRevoking}
                       className='text-red-600 hover:text-red-700'>
                       <Trash2 className='h-4 w-4' />
                     </Button>

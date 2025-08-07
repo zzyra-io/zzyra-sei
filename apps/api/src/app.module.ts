@@ -1,5 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { join } from "path";
 import { JwtModule } from "@nestjs/jwt";
 import { APP_GUARD, APP_FILTER } from "@nestjs/core";
 
@@ -40,6 +41,13 @@ import {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // Load env from multiple locations to support monorepo setups
+      envFilePath: [
+        join(process.cwd(), ".env"),
+        join(process.cwd(), ".env.local"),
+        join(process.cwd(), "../../.env"),
+        join(process.cwd(), "../../.env.local"),
+      ],
     }),
     JwtModule.register({
       global: true,

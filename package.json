@@ -34,8 +34,5 @@
     "docs:build": "turbo run docs:build --filter @zyra/api",
     "docs:serve": "turbo run docs:serve --filter @zyra/api",
     "clean": "find . -name 'node_modules' -type d -prune -exec rm -rf '{}' + && find . -name 'dist' -exec rm -rf '{}' + && find . -name '.next' -exec rm -rf '{}' + && find . -name '.turbo' -exec rm -rf '{}' +"
-  },
-  "dependencies": {
-    "jose": "^4.14.4"
   }
 }

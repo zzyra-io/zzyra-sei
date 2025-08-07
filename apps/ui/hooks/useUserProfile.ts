@@ -39,9 +39,9 @@ export const useUserProfile = () => {
     error,
     refetch,
   } = useQuery<UserProfile>({
-    queryKey: ["userProfile", user?.issuer],
+    queryKey: ["userProfile", user?.userId],
     queryFn: async () => {
-      if (!isAuthenticated || !user?.issuer) {
+      if (!isLoggedIn || !user?.userId) {
         throw new Error("User not authenticated");
       }
 
@@ -57,7 +57,7 @@ export const useUserProfile = () => {
         throw new Error("Failed to fetch user profile");
       }
     },
-    enabled: !!isAuthenticated && !!user?.issuer,
+    enabled: !!isLoggedIn && !!user?.userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
   });

@@ -78,6 +78,15 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
               ZeroDevSmartWalletConnectors,
             ],
             detectNewWalletsForLinking: true,
+            // Event handlers for authentication lifecycle
+            events: {
+              onAuthSuccess: () => {
+                console.log("Dynamic: Authentication successful");
+              },
+              onAuthFailure: () => {
+                console.log("Dynamic: Authentication failed");
+              },
+            },
           }}>
           <WagmiProvider config={wagmiConfig}>
             <DynamicWagmiConnector>{children}</DynamicWagmiConnector>

@@ -2,41 +2,24 @@
  * Authentication Service
  *
  * This service provides authentication functionality for the Zzyra platform.
- * It integrates with the JWT service, Magic service, and user repository to manage user authentication.
+ * It integrates with the JWT service and user repository to manage user authentication.
  */
 
 import { PrismaClient, User } from "@prisma/client";
 import { JwtService } from "./jwt.service";
-import { MagicService, getMagicService } from "./magic.service";
-import {
-  AuthError,
-  AuthResult,
-  JwtPayload,
-  MagicAuthPayload,
-  Session,
-} from "./types";
+import { AuthError, AuthResult, JwtPayload, Session } from "./types";
 import { UserRepository } from "../repositories/user.repository";
 import { BlockType } from "@zyra/types";
 
 export class AuthService {
   private jwtService: JwtService;
   private userRepository: UserRepository;
-  private magicService: MagicService | null = null;
   private prisma: PrismaClient;
 
   constructor(prismaClient?: PrismaClient) {
     this.prisma = prismaClient || new PrismaClient();
     this.jwtService = new JwtService();
     this.userRepository = new UserRepository(prismaClient);
-
-    try {
-      this.magicService = getMagicService();
-    } catch (error) {
-      console.warn(
-        "Magic Service initialization failed, some auth features may be limited",
-        error
-      );
-    }
   }
 
   /**
@@ -121,235 +104,6 @@ export class AuthService {
   }
 
   /**
-   * Authenticate with Magic Link
-   * @param payload The Magic authentication payload
-   * @returns The authentication result
-   */
-  async authenticateWithMagic(payload: MagicAuthPayload): Promise<AuthResult> {
-    try {
-      console.log("AuthService: Starting Magic authentication");
-
-      // Validate required parameters
-      if (!payload.didToken) {
-        console.error("DID token is missing");
-        throw new AuthError(
-          "DID token is required for Magic Link authentication",
-          "auth/missing-token"
-        );
-      }
-
-      if (!payload.email) {
-        console.error("Email is missing");
-        throw new AuthError(
-          "Email is required for Magic Link authentication",
-          "auth/missing-email"
-        );
-      }
-
-      // Verify DID token with Magic Admin SDK
-      if (!this.magicService) {
-        console.error("Magic service is not available");
-        throw new AuthError(
-          "Magic service is not available",
-          "auth/service-unavailable"
-        );
-      }
-
-      try {
-        // Basic validation of DID token
-        await this.magicService.validateToken(payload.didToken);
-        console.log("DID token validation successful");
-      } catch (validationError) {
-        console.error("DID token validation failed:", validationError);
-        throw new AuthError(
-          "Failed to validate Magic Link token",
-          "auth/invalid-token"
-        );
-      }
-
-      // Use the email from the payload
-      const email = payload.email;
-      console.log("AuthService: Using email for authentication:", email);
-
-      // Detect if this is an OAuth login
-      const isOAuth = payload.isOAuth === true;
-      const oauthProvider = payload.oauthProvider || "unknown";
-      const oauthUserInfo = payload.oauthUserInfo;
-
-      if (isOAuth) {
-        console.log(
-          `AuthService: Processing OAuth login from provider: ${oauthProvider}`
-        );
-        if (oauthUserInfo) {
-          console.log("OAuth user info available:", {
-            name: oauthUserInfo.name,
-            email: oauthUserInfo.email,
-            hasProfilePicture: !!oauthUserInfo.picture,
-          });
-        }
-      }
-
-      // Find user
-      let user;
-      try {
-        user = await this.userRepository.findByEmail(email);
-        console.log("User lookup result:", user ? "Found" : "Not found");
-      } catch (dbError) {
-        console.error("Error finding user:", dbError);
-        throw new AuthError(
-          "Database error while looking up user",
-          "auth/database-error"
-        );
-      }
-
-      // Create user if not found
-      if (!user) {
-        console.log("Creating new user with email:", email);
-        try {
-          // Prepare user data - include OAuth info if available
-          const userData: { email: string; authProvider?: string } = { email };
-
-          // Prepare profile data
-          const profileData: any = {
-            email,
-            subscriptionTier: "free",
-            subscriptionStatus: "inactive",
-            monthlyExecutionQuota: 100,
-            monthlyExecutionCount: 0,
-          };
-
-          // Enhance with OAuth information if available
-          if (isOAuth && oauthUserInfo) {
-            // Add OAuth provider information
-            userData.authProvider = oauthProvider;
-
-            // Add name from OAuth if available
-            if (oauthUserInfo.name) {
-              profileData.name = oauthUserInfo.name;
-            }
-
-            // Add profile picture from OAuth if available
-            if (oauthUserInfo.picture) {
-              profileData.avatarUrl = oauthUserInfo.picture;
-            }
-
-            console.log(`Creating new user with OAuth ${oauthProvider} data`, {
-              provider: oauthProvider,
-              hasName: !!profileData.name,
-              hasAvatar: !!profileData.avatarUrl,
-            });
-          }
-
-          user = await this.userRepository.createWithProfile(
-            userData,
-            profileData
-          );
-
-          console.log("New user created:", user?.id);
-        } catch (createError) {
-          console.error("Error creating new user:", createError);
-          throw new AuthError(
-            "Failed to create new user account",
-            "auth/user-creation-failed"
-          );
-        }
-      } else if (isOAuth && oauthUserInfo) {
-        // User exists but might need profile updates from OAuth
-        try {
-          console.log(
-            `Updating existing user with OAuth data from ${oauthProvider}`
-          );
-
-          // Get user profile
-          const profile = await this.prisma.profile.findFirst({
-            where: { user: { id: user.id } },
-          });
-
-          if (profile) {
-            // Only update if fields are empty or missing
-            const updates: { fullName?: string; avatarUrl?: string } = {};
-
-            // Add name if not set
-            if (
-              oauthUserInfo.name &&
-              (!profile.fullName || profile.fullName === "")
-            ) {
-              updates.fullName = oauthUserInfo.name;
-            }
-
-            // Add avatar if not set
-            if (
-              oauthUserInfo.picture &&
-              (!profile.avatarUrl || profile.avatarUrl === "")
-            ) {
-              updates.avatarUrl = oauthUserInfo.picture;
-            }
-
-            // Apply updates if needed
-            if (Object.keys(updates).length > 0) {
-              await this.prisma.profile.update({
-                where: { id: profile.id },
-                data: updates,
-              });
-              console.log("Updated user profile with OAuth data", {
-                fields: Object.keys(updates),
-              });
-            }
-          }
-        } catch (updateError) {
-          // Log but don't fail authentication
-          console.error(
-            "Error updating user profile with OAuth data:",
-            updateError
-          );
-        }
-      }
-
-      // Verify user exists before proceeding
-      if (!user) {
-        console.error("User is null after find/create operations");
-        throw new AuthError(
-          "User account could not be accessed or created",
-          "auth/user-not-found"
-        );
-      }
-
-      // Auto-save Magic wallet if publicAddress is provided
-      if (payload.publicAddress) {
-        try {
-          await this.ensureMagicWalletSaved(user.id, payload.publicAddress);
-          console.log("Magic wallet auto-saved for user:", user.id);
-        } catch (walletError) {
-          console.error("Error auto-saving Magic wallet:", walletError);
-          // Don't fail authentication if wallet save fails
-        }
-      }
-
-      // Create session
-      try {
-        const result = await this.createSession(user);
-        console.log("Session created successfully for user:", user.id);
-        return result;
-      } catch (sessionError) {
-        console.error("Error creating session:", sessionError);
-        throw new AuthError(
-          "Failed to create authentication session",
-          "auth/session-creation-failed"
-        );
-      }
-    } catch (error) {
-      console.error("Authentication error:", error);
-      if (error instanceof AuthError) {
-        throw error;
-      }
-      throw new AuthError(
-        "Failed to authenticate with Magic Link",
-        "auth/magic-link-failed"
-      );
-    }
-  }
-
-  /**
    * Authenticate with wallet
    * @param walletAddress The wallet address
    * @param chainId The blockchain chain ID
@@ -405,42 +159,6 @@ export class AuthService {
         "Failed to authenticate with wallet",
         "auth/wallet-auth-failed"
       );
-    }
-  }
-
-  /**
-   * Ensure Magic wallet is saved for user
-   * @param userId The user ID
-   * @param publicAddress The Magic wallet public address
-   */
-  private async ensureMagicWalletSaved(
-    userId: string,
-    publicAddress: string
-  ): Promise<void> {
-    try {
-      // Check if wallet already exists
-      const existingWallet =
-        await this.userRepository.findByWalletAddress(publicAddress);
-
-      if (!existingWallet) {
-        // Add new Magic wallet
-        await this.userRepository.addWallet(userId, {
-          walletAddress: publicAddress,
-          chainId: "1", // Default to Ethereum mainnet
-          chainType: "evm",
-          walletType: "magic",
-        });
-        console.log("Magic wallet saved:", publicAddress);
-      } else if (existingWallet.id === userId) {
-        // Wallet already exists for this user, update metadata if needed
-        console.log("Magic wallet already exists for user:", userId);
-      } else {
-        // Wallet exists for different user - this shouldn't happen with Magic
-        console.warn("Magic wallet exists for different user:", publicAddress);
-      }
-    } catch (error) {
-      console.error("Error ensuring Magic wallet saved:", error);
-      throw error;
     }
   }
 
