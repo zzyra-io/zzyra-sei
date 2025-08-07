@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import useAuthStore from "@/lib/store/auth-store";
@@ -7,30 +8,58 @@ import useAuthStore from "@/lib/store/auth-store";
 interface GuestRouteProps {
   children: React.ReactNode;
   fallback?: React.ReactNode;
+  redirectPath?: string;
 }
 
-export function GuestRoute({ children, fallback = null }: GuestRouteProps) {
+export function GuestRoute({
+  children,
+  fallback = null,
+  redirectPath = "/dashboard",
+}: GuestRouteProps) {
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
-  const { isAuthenticated, isLoading, error } = useAuthStore();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Set client-side flag
+  // Client-side auth store access
   useEffect(() => {
     setIsClient(true);
+    const authStore = useAuthStore.getState();
+    setIsAuthenticated(authStore.isAuthenticated);
+    setIsLoading(authStore.isLoading);
+    setError(authStore.error);
   }, []);
 
-  // Handle authenticated users by redirecting to dashboard
+  // Subscribe to auth store changes
+  useEffect(() => {
+    if (!isClient) return;
+
+    const unsubscribe = useAuthStore.subscribe((state) => {
+      setIsAuthenticated(state.isAuthenticated);
+      setIsLoading(state.isLoading);
+      setError(state.error);
+    });
+
+    return unsubscribe;
+  }, [isClient]);
+
+  // Handle authenticated users with redirect
   useEffect(() => {
     if (isClient && isAuthenticated && !isLoading) {
-      // Don't redirect if we're already on the login page
-      if (window.location.pathname === "/login") {
-        return;
-      }
+      try {
+        // Don't redirect if we're already on the dashboard
+        if (window.location.pathname === redirectPath) {
+          return;
+        }
 
-      // Simple redirect to dashboard
-      router.push("/dashboard");
+        router.push(redirectPath);
+      } catch (err) {
+        console.error("Navigation error:", err);
+        router.push(redirectPath);
+      }
     }
-  }, [isClient, isAuthenticated, isLoading, router]);
+  }, [isClient, isAuthenticated, isLoading, router, redirectPath]);
 
   if (!isClient || isLoading) {
     return fallback;

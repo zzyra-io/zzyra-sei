@@ -38,36 +38,35 @@ export const useUserWallets = () => {
   // Use wallet connection state as fallback for authentication
   const sessionAuthState =
     typeof window !== "undefined"
-      ? sessionStorage.getItem("MAGIC_AUTH_STATE")
+      ? sessionStorage.getItem("DYNAMIC_AUTH_STATE")
       : null;
 
-  // Check Magic SDK directly for authentication state
-  const [magicAuthState, setMagicAuthState] = useState<boolean | null>(null);
+  // Check Dynamic SDK directly for authentication state
+  const [dynamicAuthState, setDynamicAuthState] = useState<boolean | null>(
+    null
+  );
 
   useEffect(() => {
-    const checkMagicAuth = async () => {
-      if (magicInstance) {
-        try {
-          const isLoggedIn = await magicInstance.user.isLoggedIn();
-          setMagicAuthState(isLoggedIn);
-          console.log("UserWallets - Direct Magic SDK check:", isLoggedIn);
-        } catch (error) {
-          console.error("UserWallets - Error checking Magic auth:", error);
-          setMagicAuthState(false);
-        }
+    const checkDynamicAuth = async () => {
+      try {
+        setDynamicAuthState(isLoggedIn);
+        console.log("UserWallets - Dynamic SDK check:", isLoggedIn);
+      } catch (error) {
+        console.error("UserWallets - Error checking Dynamic auth:", error);
+        setDynamicAuthState(false);
       }
     };
 
-    checkMagicAuth();
-  }, [magicInstance]);
+    checkDynamicAuth();
+  }, [isLoggedIn]);
 
   const isUserConnected =
-    isAuthenticated || sessionAuthState === "true" || magicAuthState === true;
+    isLoggedIn || sessionAuthState === "true" || dynamicAuthState === true;
 
   console.log("UserWallets - Auth state debug:", {
-    isAuthenticated,
+    isLoggedIn,
     sessionAuthState,
-    magicAuthState,
+    dynamicAuthState,
     isUserConnected,
     hasWindow: typeof window !== "undefined",
   });
@@ -81,8 +80,8 @@ export const useUserWallets = () => {
     queryKey: ["user-wallets"],
     queryFn: async () => {
       console.log("Fetching user wallets, auth status:", {
-        isAuthenticated,
-        userId: user?.issuer,
+        isLoggedIn,
+        userId: user?.userId,
         userEmail: user?.email,
         timestamp: new Date().toISOString(),
       });
@@ -178,20 +177,18 @@ export const useUserWallets = () => {
   // Mutation to save a wallet
   const saveWallet = useMutation({
     mutationFn: async (data: CreateWalletInput) => {
-      console.log("Saving wallet:", {
-        address: data.walletAddress,
-        chainId: data.chainId,
-        walletType: data.walletType,
+      console.log("Creating wallet, auth status:", {
+        isLoggedIn,
+        userId: user?.userId,
+        userEmail: user?.email,
+        timestamp: new Date().toISOString(),
       });
 
-      if (!isUserConnected) {
-        console.error("Cannot save wallet: User not connected");
-        showToast({
-          title: "Authentication required",
-          description: "Please log in to save your wallet.",
-          variant: "destructive",
-        });
-        throw new Error("User not connected");
+      if (!isUserConnected || !user?.userId) {
+        console.log(
+          "User not connected or no user ID, skipping wallet creation"
+        );
+        return;
       }
 
       // Add retry logic for saving wallet
@@ -281,7 +278,7 @@ export const useUserWallets = () => {
   // Mutation to delete a wallet
   const deleteWallet = useMutation({
     mutationFn: async (walletId: string): Promise<{ success: boolean }> => {
-      if (!isUserConnected || !user?.issuer) {
+      if (!isUserConnected || !user?.userId) {
         console.error("Cannot delete wallet: User not connected");
         throw new Error("User not connected");
       }

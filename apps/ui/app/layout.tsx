@@ -1,5 +1,5 @@
 import { SkipLink } from "@/components/a11y/skip-link";
-import { Providers } from "@/components/providers";
+import { DynamicProvider } from "@/lib/dynamic-provider";
 import { FloatingParticles } from "@/components/floating-particles";
 import { NotificationSocketProvider } from "@/components/notification/notification-socket-provider";
 import { NotificationToastContainer } from "@/components/NotificationToast";
@@ -44,7 +44,7 @@ export default function RootLayout({
       <body className='min-h-screen bg-background font-montserrat antialiased'>
         <PostHogProvider>
           <SkipLink />
-          <Providers>
+          <DynamicProvider>
             <ThemeProvider
               attribute='class'
               defaultTheme='system'
@@ -62,7 +62,7 @@ export default function RootLayout({
                 </NotificationSocketProvider>
               </WorkflowExecutionProvider>
             </ThemeProvider>
-          </Providers>
+          </DynamicProvider>
         </PostHogProvider>
       </body>
     </html>

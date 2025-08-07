@@ -112,7 +112,7 @@ export default function SessionsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <SessionKeyList key={refreshKey} userId={user.id} />
+              <SessionKeyList key={refreshKey} />
             </CardContent>
           </Card>
         </TabsContent>

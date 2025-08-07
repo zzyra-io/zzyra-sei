@@ -5,18 +5,44 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", ".next/**"],
+      "cache": true,
+      "inputs": [
+        "src/**",
+        "public/**",
+        "next.config.*",
+        "package.json",
+        "tsconfig.json"
+      ]
     },
     "dev": {
       "cache": false,
       "persistent": true,
       "dependsOn": ["^build"],
-      "inputs": [".env*", "src/**", "prisma/**"]
+      "inputs": [
+        ".env*",
+        "src/**",
+        "prisma/**",
+        "next.config.*",
+        "package.json"
+      ],
+      "outputs": [".next/**"]
     },
-    "lint": {},
+    "lint": {
+      "cache": true,
+      "inputs": ["src/**", "*.config.*", "package.json"],
+      "outputs": []
+    },
     "test": {
       "dependsOn": ["build"],
-      "outputs": ["coverage/**"]
+      "outputs": ["coverage/**"],
+      "cache": true,
+      "inputs": ["src/**", "test/**", "*.config.*", "package.json"]
+    },
+    "type-check": {
+      "cache": true,
+      "inputs": ["src/**", "*.config.*", "package.json", "tsconfig.json"],
+      "outputs": []
     }
   }
 }

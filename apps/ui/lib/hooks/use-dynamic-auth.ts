@@ -78,7 +78,10 @@ export const useDynamicAuth = () => {
 
     try {
       // Try multiple approaches to get the auth token
-      const contextWithToken = dynamicContext as any;
+      const contextWithToken = dynamicContext as {
+        getAuthToken?: () => Promise<string> | string;
+        authToken?: string;
+      };
 
       if (contextWithToken.getAuthToken) {
         return await contextWithToken.getAuthToken();

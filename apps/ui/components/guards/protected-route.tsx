@@ -18,12 +18,31 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const router = useRouter();
   const [isClient, setIsClient] = useState(false);
-  const { isAuthenticated, isLoading, error } = useAuthStore();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Set client-side flag
+  // Client-side auth store access
   useEffect(() => {
     setIsClient(true);
+    const authStore = useAuthStore.getState();
+    setIsAuthenticated(authStore.isAuthenticated);
+    setIsLoading(authStore.isLoading);
+    setError(authStore.error);
   }, []);
+
+  // Subscribe to auth store changes
+  useEffect(() => {
+    if (!isClient) return;
+
+    const unsubscribe = useAuthStore.subscribe((state) => {
+      setIsAuthenticated(state.isAuthenticated);
+      setIsLoading(state.isLoading);
+      setError(state.error);
+    });
+
+    return unsubscribe;
+  }, [isClient]);
 
   // Handle unauthenticated users with redirect
   useEffect(() => {

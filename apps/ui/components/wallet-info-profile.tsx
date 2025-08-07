@@ -32,6 +32,7 @@ import { useUserWallets } from "@/hooks/useUserWallets";
 import { useWalletIntegration } from "@/hooks/useWalletIntegration";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
 import { getBlockExplorer } from "@/lib/utils/network";
+import { type Connector } from "wagmi";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -118,7 +119,7 @@ export default function WalletInfoProfile() {
     isConnecting,
     disconnect,
     isDisconnecting,
-    connectWithMagic,
+    connectWithDynamic,
     selectedNetwork,
     switchNetwork,
     getNetworkById,
@@ -175,17 +176,14 @@ export default function WalletInfoProfile() {
   }, [address, isConnected, refetch, refreshTrigger]);
 
   // Use wallet transactions hook
-  const {
-    transactions: _rawTransactions, // Prefix with _ to indicate unused
-    isLoading: isLoadingTransactions,
-    refetch: refetchTransactions,
-  } = useWalletTransactions(address);
+  const { isLoading: isLoadingTransactions, refetch: refetchTransactions } =
+    useWalletTransactions(address);
 
   // Format transactions for display - TODO: Fix transaction types
   const transactions: Transaction[] = [];
 
   // Handle wallet connection
-  const handleConnect = async (connector: any) => {
+  const handleConnect = async (connector: Connector) => {
     try {
       await connect({ connector });
       toast({
@@ -610,7 +608,7 @@ export default function WalletInfoProfile() {
                   <Button
                     variant='outline'
                     className='justify-start h-auto py-3'
-                    onClick={() => connectWithMagic()}
+                    onClick={() => connectWithDynamic()}
                     disabled={isConnecting}>
                     <img
                       src='/icons/magic.svg'

@@ -10,12 +10,13 @@ import { useToast } from "@/components/ui/use-toast";
 import { ArrowRight, ExternalLink, Loader2, Mail, Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createMagicAuth } from "../lib/magic-auth";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 
 export function LoginForm() {
   const { supabase } = useSupabase();
   const router = useRouter();
   const { toast } = useToast();
+  const { login } = useDynamicAuth();
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
@@ -69,18 +70,16 @@ export function LoginForm() {
     setIsLoading(true);
 
     try {
-      const magicAuth = createMagicAuth();
-
-      await magicAuth.loginWithMagicLink(email);
+      // Use Dynamic SDK for wallet connection
+      login();
 
       setIsSent(true);
       toast({
-        title: "Check your email",
-        description:
-          "A login link has been sent to your email by Magic. Please check your inbox to complete sign-in.",
+        title: "Wallet connection initiated",
+        description: "Please complete the wallet connection process.",
       });
     } catch (error) {
-      console.error("Wallet connection / Magic Link login error:", error);
+      console.error("Wallet connection error:", error);
       toast({
         title: "Connection Failed",
         description:

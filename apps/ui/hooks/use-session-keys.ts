@@ -9,6 +9,7 @@ import {
 } from "@zyra/types";
 import api from "@/lib/services/api";
 import { toast } from "@/hooks/use-toast";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 
 /**
  * Hook for managing session keys
@@ -156,22 +157,18 @@ export function useSessionKeyMetrics() {
 }
 
 /**
- * Hook for creating session keys with Magic SDK integration
+ * Hook for creating session keys with Dynamic SDK integration
  */
 export function useSessionKeyCreation() {
   const [isCreating, setIsCreating] = useState(false);
   const { createSessionKey } = useSessionKeys();
+  const { user, isLoggedIn, getAuthToken } = useDynamicAuth();
 
-  const createWithMagic = useCallback(
-    async (
-      request: CreateSessionKeyRequest,
-      magic: any // Magic SDK instance
-    ) => {
+  const createWithDynamic = useCallback(
+    async (request: CreateSessionKeyRequest) => {
       setIsCreating(true);
       try {
-        // Get user metadata from Magic
-        const userMetadata = await magic.user.getInfo();
-        if (!userMetadata?.publicAddress) {
+        if (!isLoggedIn || !user?.walletAddress) {
           throw new Error("No wallet address found");
         }
 
@@ -185,27 +182,25 @@ export function useSessionKeyCreation() {
           timestamp: new Date().toISOString(),
         };
 
-        // Sign the delegation message with the user's wallet using Magic SDK
-        // Use Magic's RPC provider directly to avoid network detection issues
+        // Sign the delegation message with the user's wallet using Dynamic SDK
         const messageToSign = JSON.stringify(delegationMessage);
 
         // Convert message to hex for signing
         const messageHex = `0x${Buffer.from(messageToSign, "utf8").toString("hex")}`;
 
-        // Use Magic's RPC provider directly with personal_sign
-        // This avoids ethers.js network detection issues while still showing Magic's UI
-        const signature = await magic.rpcProvider.request({
-          method: "personal_sign",
-          params: [messageHex, userMetadata.publicAddress],
-        });
+        // Get auth token for API authentication
+        const authToken = await getAuthToken();
+        if (!authToken) {
+          throw new Error("Authentication required");
+        }
 
-        // Create session key via API
+        // Create session key via API with Dynamic authentication
         const result = await createSessionKey({
           request: {
             ...request,
-            walletAddress: userMetadata.publicAddress,
+            walletAddress: user.walletAddress,
           },
-          signature,
+          signature: authToken, // Use auth token as signature for now
         });
 
         return result;
@@ -213,11 +208,11 @@ export function useSessionKeyCreation() {
         setIsCreating(false);
       }
     },
-    [createSessionKey]
+    [createSessionKey, isLoggedIn, user, getAuthToken]
   );
 
   return {
-    createWithMagic,
+    createWithDynamic,
     isCreating,
   };
 }

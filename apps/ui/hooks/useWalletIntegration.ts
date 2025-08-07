@@ -33,7 +33,7 @@ const SUPPORTED_NETWORKS = ACTIVE_NETWORKS.map((chain) => ({
  */
 export const useWalletIntegration = () => {
   // Dynamic Auth
-  const { user, isLoggedIn, dynamicContext } = useDynamicAuth();
+  const { user, isLoggedIn } = useDynamicAuth();
 
   // Wagmi hooks
   const { address, isConnected, connector, chainId } = useAccount();
@@ -132,7 +132,7 @@ export const useWalletIntegration = () => {
   // Save wallet to database when connected
   useEffect(() => {
     const saveConnectedWallet = async () => {
-      if (isConnected && address && isAuthenticated && user?.email) {
+      if (isConnected && address && isLoggedIn && user?.email) {
         // Check if wallet is already saved
         const existingWallet = wallets?.find(
           (w) => w.walletAddress.toLowerCase() === address.toLowerCase()
@@ -178,7 +178,7 @@ export const useWalletIntegration = () => {
   }, [
     isConnected,
     address,
-    isAuthenticated,
+    isLoggedIn,
     user?.email,
     connector?.name,
     chainId,
@@ -187,31 +187,31 @@ export const useWalletIntegration = () => {
     toast,
   ]);
 
-  // Connect with Magic Link
-  const connectWithMagic = useCallback(async () => {
-    if (!magicInstance || !isAuthenticated || !user) {
+  // Connect with Dynamic SDK
+  const connectWithDynamic = useCallback(async () => {
+    if (!isLoggedIn || !user) {
       toast({
         title: "Authentication required",
-        description: "Please sign in to connect with Magic Link.",
+        description: "Please sign in to connect with Dynamic SDK.",
         variant: "destructive",
       });
       return false;
     }
 
     try {
-      // Get Magic wallet info - simplified approach
-      const magicAddress = user.publicAddress;
+      // Get Dynamic wallet info
+      const dynamicAddress = user.walletAddress;
 
-      if (magicAddress) {
-        // Save Magic wallet
+      if (dynamicAddress) {
+        // Save Dynamic wallet
         const walletData: CreateWalletInput = {
-          walletAddress: magicAddress,
+          walletAddress: dynamicAddress,
           chainId: chainId?.toString() || getDefaultNetwork().id.toString(),
-          walletType: "magic",
+          walletType: "dynamic",
           chainType: "evm",
           metadata: {
-            name: "Magic Wallet",
-            description: "Magic Link wallet",
+            name: "Dynamic Wallet",
+            description: "Dynamic SDK wallet",
             network: getNetworkName(chainId),
             chainId: chainId || getDefaultNetwork().id,
             connectedAt: new Date().toISOString(),
@@ -220,7 +220,7 @@ export const useWalletIntegration = () => {
 
         // Check if already exists
         const existingWallet = wallets?.find(
-          (w) => w.walletAddress.toLowerCase() === magicAddress.toLowerCase()
+          (w) => w.walletAddress.toLowerCase() === dynamicAddress.toLowerCase()
         );
 
         if (!existingWallet) {
@@ -228,37 +228,29 @@ export const useWalletIntegration = () => {
 
           // Dispatch custom event
           const event = new CustomEvent("wallet-connected", {
-            detail: { address: magicAddress, chainId },
+            detail: { address: dynamicAddress, chainId },
           });
           window.dispatchEvent(event);
 
           toast({
-            title: "Magic wallet connected",
-            description: "Your Magic wallet has been connected.",
+            title: "Dynamic wallet connected",
+            description: "Your Dynamic wallet has been connected.",
           });
         }
 
         return true;
       }
     } catch (error) {
-      console.error("Error connecting Magic wallet:", error);
+      console.error("Error connecting Dynamic wallet:", error);
       toast({
-        title: "Magic connection failed",
-        description: "Failed to connect Magic wallet.",
+        title: "Dynamic connection failed",
+        description: "Failed to connect Dynamic wallet.",
         variant: "destructive",
       });
     }
 
     return false;
-  }, [
-    magicInstance,
-    isAuthenticated,
-    user,
-    chainId,
-    saveWallet,
-    wallets,
-    toast,
-  ]);
+  }, [isLoggedIn, user, chainId, saveWallet, wallets, toast]);
 
   // Switch network
   const handleSwitchNetwork = useCallback(
@@ -326,7 +318,8 @@ export const useWalletIntegration = () => {
 
   return {
     // Authentication state
-    isAuthenticated,
+    isAuthenticated: isLoggedIn,
+    isLoggedIn,
     user,
 
     // Wallet connection state
@@ -347,7 +340,7 @@ export const useWalletIntegration = () => {
     isConnecting,
     disconnect,
     isDisconnecting,
-    connectWithMagic,
+    connectWithDynamic,
 
     // Network operations
     selectedNetwork,

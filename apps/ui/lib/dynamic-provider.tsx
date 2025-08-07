@@ -5,21 +5,38 @@ import { ZeroDevSmartWalletConnectors } from "@dynamic-labs/ethereum-aa";
 import {
   DynamicContextProvider,
   DynamicWidget,
+  IsBrowser,
 } from "@dynamic-labs/sdk-react-core";
 import { DynamicWagmiConnector } from "@dynamic-labs/wagmi-connector";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactNode } from "react";
 import { http } from "viem";
-import { mainnet, sepolia } from "viem/chains";
 import { WagmiProvider, createConfig } from "wagmi";
 
-// Wagmi configuration with commonly used chains for faster initialization
+// SEI Network Configuration (EVM-compatible Layer 1)
+const seiNetwork = {
+  id: 1329, // SEI Pacific-1 mainnet chain ID
+  name: "Sei Network",
+  nativeCurrency: {
+    decimals: 18,
+    name: "SEI",
+    symbol: "SEI",
+  },
+  rpcUrls: {
+    default: {
+      http: ["https://evm-rpc.sei-apis.com"],
+    },
+  },
+  blockExplorers: {
+    default: { name: "Seitrace", url: "https://seitrace.com" },
+  },
+} as const;
+
+// Wagmi configuration for SEI Network
 const wagmiConfig = createConfig({
-  chains: [mainnet, sepolia],
-  multiInjectedProviderDiscovery: false,
+  chains: [seiNetwork],
   transports: {
-    [mainnet.id]: http(),
-    [sepolia.id]: http(),
+    [seiNetwork.id]: http(),
   },
 });
 
@@ -43,6 +60,7 @@ interface DynamicProviderProps {
 /**
  * Clean Dynamic wallet provider following the recommended pattern
  * Enables account abstraction with smart wallet features
+ * Uses IsBrowser to prevent hydration mismatches
  */
 export function DynamicProvider({ children }: DynamicProviderProps) {
   const environmentId =
@@ -51,19 +69,21 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <DynamicContextProvider
-        settings={{
-          environmentId,
-          walletConnectors: [
-            EthereumWalletConnectors,
-            ZeroDevSmartWalletConnectors,
-          ],
-          detectNewWalletsForLinking: true,
-        }}>
-        <WagmiProvider config={wagmiConfig}>
-          <DynamicWagmiConnector>{children}</DynamicWagmiConnector>
-        </WagmiProvider>
-      </DynamicContextProvider>
+      <IsBrowser>
+        <DynamicContextProvider
+          settings={{
+            environmentId,
+            walletConnectors: [
+              EthereumWalletConnectors,
+              ZeroDevSmartWalletConnectors,
+            ],
+            detectNewWalletsForLinking: true,
+          }}>
+          <WagmiProvider config={wagmiConfig}>
+            <DynamicWagmiConnector>{children}</DynamicWagmiConnector>
+          </WagmiProvider>
+        </DynamicContextProvider>
+      </IsBrowser>
     </QueryClientProvider>
   );
 }
@@ -72,7 +92,11 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
  * Simple Dynamic widget component
  */
 export function DynamicLoginWidget() {
-  return <DynamicWidget />;
+  return (
+    <IsBrowser>
+      <DynamicWidget />
+    </IsBrowser>
+  );
 }
 
 export default DynamicProvider;

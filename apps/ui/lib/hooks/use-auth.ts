@@ -1,6 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import useAuthStore, { type User } from "@/lib/store/auth-store";
 import api from "@/lib/services/api";
 
@@ -31,19 +31,35 @@ interface AuthHook {
 
 export const useAuth = (): AuthHook => {
   const dynamicContext = useDynamicContext();
-  const isLoggedIn = useIsLoggedIn();
+  const isLoggedIn = !!dynamicContext.user && !!dynamicContext.primaryWallet;
   const router = useRouter();
-  const {
-    user,
-    isAuthenticated,
-    isLoading,
-    error,
-    setIsLoading,
-    setError,
-    executeLogin: storeLogin,
-    executeLogout: storeLogout,
-    clearError,
-  } = useAuthStore();
+
+  // Client-side state to prevent SSR issues
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Client-side auth store access
+  useEffect(() => {
+    const authStore = useAuthStore.getState();
+    setUser(authStore.user);
+    setIsAuthenticated(authStore.isAuthenticated);
+    setIsLoading(authStore.isLoading);
+    setError(authStore.error);
+  }, []);
+
+  // Subscribe to auth store changes
+  useEffect(() => {
+    const unsubscribe = useAuthStore.subscribe((state) => {
+      setUser(state.user);
+      setIsAuthenticated(state.isAuthenticated);
+      setIsLoading(state.isLoading);
+      setError(state.error);
+    });
+
+    return unsubscribe;
+  }, []);
 
   const executeLogin = useCallback(
     async ({ email }: LoginCredentials): Promise<void> => {
@@ -61,9 +77,8 @@ export const useAuth = (): AuthHook => {
         // Note: This approach assumes the actual backend authentication
         // will be handled in a useEffect or callback when Dynamic auth completes
         // For now, we'll show the auth flow and let the user connect
-        
+
         console.log("Dynamic auth flow triggered for email:", email);
-        
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "Login failed";
@@ -71,7 +86,7 @@ export const useAuth = (): AuthHook => {
         setIsLoading(false);
       }
     },
-    [dynamicContext, setIsLoading, setError]
+    [dynamicContext]
   );
 
   // Helper function to authenticate with backend once Dynamic auth is complete
@@ -85,7 +100,7 @@ export const useAuth = (): AuthHook => {
 
     try {
       // Step 1: Get Dynamic auth token
-      const contextWithToken = dynamicContext as unknown as { 
+      const contextWithToken = dynamicContext as unknown as {
         getAuthToken?: () => Promise<string> | string;
       };
       const authToken = await contextWithToken.getAuthToken?.();
@@ -109,11 +124,11 @@ export const useAuth = (): AuthHook => {
       }
 
       // Step 4: Update auth store
-      storeLogin(response.data.user, response.data.token || "");
+      const authStore = useAuthStore.getState();
+      authStore.executeLogin(response.data.user, response.data.token || "");
 
       // Step 5: Redirect
       router.push("/dashboard");
-      
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Backend authentication failed";
@@ -121,7 +136,7 @@ export const useAuth = (): AuthHook => {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn, dynamicContext, setIsLoading, setError, storeLogin, router]);
+  }, [isLoggedIn, dynamicContext, router]);
 
   const executeLogout = useCallback(async (): Promise<void> => {
     setIsLoading(true);
@@ -129,7 +144,8 @@ export const useAuth = (): AuthHook => {
 
     try {
       // Clear auth store first
-      storeLogout();
+      const authStore = useAuthStore.getState();
+      authStore.executeLogout();
 
       // Logout from backend
       try {
@@ -155,7 +171,11 @@ export const useAuth = (): AuthHook => {
       setError(errorMessage);
       setIsLoading(false);
     }
-  }, [isLoggedIn, dynamicContext, setError, setIsLoading, storeLogout, router]);
+  }, [isLoggedIn, dynamicContext, router]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   return {
     user,

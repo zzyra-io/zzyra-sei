@@ -1,19 +1,7 @@
 const nextConfig = {
   // Enable Turbopack for faster development builds
-  turbopack: {
-    // Optimize package imports for better performance
-    rules: {
-      // Optimize SVG imports
-      "*.svg": {
-        loaders: ["@svgr/webpack"],
-        as: "*.js",
-      },
-    },
-    // Resolve aliases for better module resolution
-    resolveAlias: {
-      // Add any custom aliases here if needed
-    },
-  },
+  // Note: Turbopack configuration is handled automatically by Next.js
+
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -29,22 +17,21 @@ const nextConfig = {
     ],
     unoptimized: true,
   },
+
   webpack: (config, { isServer }) => {
-    // Add fallbacks for Node.js built-in modules
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        crypto: false,
-        fs: false,
-        net: false,
-        tls: false,
-        child_process: false,
-        // Ignore React Native dependencies that MetaMask SDK tries to import
         "@react-native-async-storage/async-storage": false,
+        crypto: require.resolve("crypto-browserify"),
+        stream: require.resolve("stream-browserify"),
+        process: require.resolve("process/browser"),
       };
     }
+    config.externals.push("pino-pretty", "lokijs", "encoding");
     return config;
   },
+
   experimental: {
     optimizeCss: false, // Disable CSS optimization to fix critters issue
     optimizePackageImports: [
@@ -52,11 +39,18 @@ const nextConfig = {
       "framer-motion",
       "wagmi",
       "@dynamic-labs/sdk-react-core",
+      "@radix-ui/react-icons",
+      "@tanstack/react-query",
+      "@dynamic-labs/ethereum",
+      "@dynamic-labs/ethereum-aa",
+      "@dynamic-labs/wagmi-connector",
     ],
   },
-  // Enable brotli compression
-  // compress: true,
-  // poweredByHeader: false,
+
+  // Enable compression for better performance
+  compress: true,
+  poweredByHeader: false,
+
   // Configure webpack to optimize bundle size
   // webpack: (config, { isServer }) => {
   //   // Split chunks more aggressively
@@ -90,6 +84,7 @@ const nextConfig = {
   //   }
   //   return config;
   // },
+
   async rewrites() {
     return [
       {
