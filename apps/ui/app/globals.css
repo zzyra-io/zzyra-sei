@@ -76,7 +76,9 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
     font-family: "Montserrat", sans-serif;
   }
 }
@@ -91,6 +93,204 @@
 .react-flow__node:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* Dynamic Wallet Styling Overrides */
+/* Make Dynamic match your app's design system using official CSS variables */
+
+/* Light theme - matches your app's design */
+.dynamic-shadow-dom {
+  /* Font family */
+  --dynamic-font-family-primary: "Montserrat", sans-serif;
+  --dynamic-font-family-numbers: "Montserrat", sans-serif;
+
+  /* Border radius */
+  --dynamic-border-radius: 12px;
+
+  /* Base colors - light theme */
+  --dynamic-base-1: hsl(0, 0%, 100%);
+  --dynamic-base-2: hsl(240, 4.8%, 95.9%);
+  --dynamic-base-3: hsl(240, 4.8%, 95.9%);
+  --dynamic-base-4: hsl(0, 0%, 98%);
+  --dynamic-base-5: hsl(0, 0%, 100%);
+
+  /* Brand colors - your app's purple */
+  --dynamic-brand-primary-color: hsl(246, 100%, 68%);
+  --dynamic-brand-secondary-color: hsla(246, 100%, 68%, 0.15);
+  --dynamic-brand-hover-color:
+    linear-gradient(0deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.08)),
+    hsl(246, 100%, 68%);
+
+  /* Text colors */
+  --dynamic-text-primary: hsl(240, 10%, 3.9%);
+  --dynamic-text-secondary: hsl(240, 3.8%, 46.1%);
+  --dynamic-text-tertiary: hsla(240, 10%, 3.9%, 0.65);
+  --dynamic-text-link: hsl(246, 100%, 68%);
+
+  /* Hover states */
+  --dynamic-hover: hsla(240, 5.9%, 90%, 0.5);
+
+  /* Success/Error colors */
+  --dynamic-connection-green: hsl(142, 76%, 36%);
+  --dynamic-error-1: hsl(0, 84.2%, 60.2%);
+  --dynamic-error-2: hsla(0, 84.2%, 60.2%, 0.1);
+
+  /* Modal styling */
+  --dynamic-modal-border: 1px solid hsl(240, 5.9%, 90%);
+  --dynamic-modal-width: 22.5rem;
+  --dynamic-modal-padding: 1.5rem;
+
+  /* Footer styling */
+  --dynamic-footer-background-color: hsl(0, 0%, 100%);
+  --dynamic-footer-text-color: hsl(240, 10%, 3.9%);
+  --dynamic-footer-icon-color: hsl(246, 100%, 68%);
+  --dynamic-footer-border: 1px solid hsl(240, 5.9%, 90%);
+  --dynamic-footer-padding: 1.25rem 1.25rem 1.25rem 1.5rem;
+
+  /* Wallet list styling */
+  --dynamic-wallet-list-tile-background: hsl(0, 0%, 100%);
+  --dynamic-wallet-list-tile-border: 1px solid hsl(240, 5.9%, 90%);
+  --dynamic-wallet-list-tile-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1);
+  --dynamic-wallet-list-tile-background-hover: hsl(240, 4.8%, 95.9%);
+  --dynamic-wallet-list-tile-border-hover: 1px solid hsl(240, 5.9%, 90%);
+  --dynamic-wallet-list-tile-shadow-hover: 0px 4px 12px rgba(0, 0, 0, 0.15);
+  --dynamic-wallet-list-tile-padding: 0.75rem;
+  --dynamic-wallet-list-tile-gap: 0.375rem;
+  --dynamic-wallet-list-max-height: 16.25rem;
+
+  /* Connect button styling */
+  --dynamic-connect-button-background: hsl(0, 0%, 100%);
+  --dynamic-connect-button-color: hsl(240, 10%, 3.9%);
+  --dynamic-connect-button-border: 1px solid hsl(240, 5.9%, 90%);
+  --dynamic-connect-button-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1);
+  --dynamic-connect-button-background-hover: hsl(240, 4.8%, 95.9%);
+  --dynamic-connect-button-color-hover: hsl(240, 10%, 3.9%);
+  --dynamic-connect-button-border-hover: 1px solid hsl(240, 5.9%, 90%);
+  --dynamic-connect-button-shadow-hover: 0px 4px 12px rgba(0, 0, 0, 0.15);
+
+  /* Search bar styling */
+  --dynamic-search-bar-background: hsl(0, 0%, 100%);
+  --dynamic-search-bar-background-hover: hsl(240, 4.8%, 95.9%);
+  --dynamic-search-bar-background-focus: hsl(0, 0%, 100%);
+  --dynamic-search-bar-border: 1px solid hsl(240, 5.9%, 90%);
+  --dynamic-search-bar-border-hover: 1px solid hsl(240, 5.9%, 90%);
+  --dynamic-search-bar-border-focus: 1px solid hsl(246, 100%, 68%);
+
+  /* Badge styling */
+  --dynamic-badge-background: hsl(240, 10%, 3.9%);
+  --dynamic-badge-color: hsl(0, 0%, 100%);
+  --dynamic-badge-dot-background: hsl(0, 0%, 100%);
+  --dynamic-badge-primary-background: hsl(246, 100%, 68%);
+  --dynamic-badge-primary-color: hsl(0, 0%, 100%);
+
+  /* Tooltip styling */
+  --dynamic-tooltip-color: hsl(240, 10%, 3.9%);
+  --dynamic-tooltip-text-color: hsl(0, 0%, 100%);
+
+  /* Overlay */
+  --dynamic-overlay: hsla(0, 0%, 100%, 0.8);
+
+  /* Shadows */
+  --dynamic-shadow-down-1: 0px 1px 3px rgba(0, 0, 0, 0.1);
+  --dynamic-shadow-down-2: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  --dynamic-shadow-down-3: 0px 10px 15px rgba(0, 0, 0, 0.1);
+  --dynamic-shadow-up-1: 0px -8px 48px -8px rgba(0, 0, 0, 0.1);
+
+  /* Loading animation */
+  --dynamic-loading-animation-gradient: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0.1) 20%,
+    rgba(0, 0, 0, 0.2) 60%,
+    rgba(0, 0, 0, 0)
+  );
+}
+
+/* Dark theme - matches your app's dark design */
+.dark .dynamic-shadow-dom {
+  /* Base colors - dark theme */
+  --dynamic-base-1: hsl(240, 10%, 3.9%);
+  --dynamic-base-2: hsl(240, 3.7%, 15.9%);
+  --dynamic-base-3: hsl(240, 3.7%, 15.9%);
+  --dynamic-base-4: hsl(240, 10%, 5.9%);
+  --dynamic-base-5: hsl(240, 10%, 3.9%);
+
+  /* Text colors */
+  --dynamic-text-primary: hsl(0, 0%, 98%);
+  --dynamic-text-secondary: hsl(240, 5%, 64.9%);
+  --dynamic-text-tertiary: hsla(0, 0%, 98%, 0.65);
+  --dynamic-text-link: hsl(246, 100%, 68%);
+
+  /* Hover states */
+  --dynamic-hover: hsla(240, 3.7%, 15.9%, 0.5);
+
+  /* Success/Error colors */
+  --dynamic-connection-green: hsl(142, 76%, 45%);
+  --dynamic-error-1: hsl(0, 84.2%, 65.2%);
+  --dynamic-error-2: hsla(0, 84.2%, 65.2%, 0.1);
+
+  /* Modal styling */
+  --dynamic-modal-border: 1px solid hsl(240, 3.7%, 15.9%);
+
+  /* Footer styling */
+  --dynamic-footer-background-color: hsl(240, 10%, 3.9%);
+  --dynamic-footer-text-color: hsl(0, 0%, 98%);
+  --dynamic-footer-border: 1px solid hsl(240, 3.7%, 15.9%);
+
+  /* Wallet list styling */
+  --dynamic-wallet-list-tile-background: hsl(240, 10%, 3.9%);
+  --dynamic-wallet-list-tile-border: 1px solid hsl(240, 3.7%, 15.9%);
+  --dynamic-wallet-list-tile-shadow: 0px 1px 3px rgba(0, 0, 0, 0.3);
+  --dynamic-wallet-list-tile-background-hover: hsl(240, 3.7%, 15.9%);
+  --dynamic-wallet-list-tile-border-hover: 1px solid hsl(240, 3.7%, 15.9%);
+  --dynamic-wallet-list-tile-shadow-hover: 0px 4px 12px rgba(0, 0, 0, 0.4);
+
+  /* Connect button styling */
+  --dynamic-connect-button-background: hsl(240, 10%, 3.9%);
+  --dynamic-connect-button-color: hsl(0, 0%, 98%);
+  --dynamic-connect-button-border: 1px solid hsl(240, 3.7%, 15.9%);
+  --dynamic-connect-button-shadow: 0px 1px 3px rgba(0, 0, 0, 0.3);
+  --dynamic-connect-button-background-hover: hsl(240, 3.7%, 15.9%);
+  --dynamic-connect-button-color-hover: hsl(0, 0%, 98%);
+  --dynamic-connect-button-border-hover: 1px solid hsl(240, 3.7%, 15.9%);
+  --dynamic-connect-button-shadow-hover: 0px 4px 12px rgba(0, 0, 0, 0.4);
+
+  /* Search bar styling */
+  --dynamic-search-bar-background: hsl(240, 10%, 3.9%);
+  --dynamic-search-bar-background-hover: hsl(240, 3.7%, 15.9%);
+  --dynamic-search-bar-background-focus: hsl(240, 10%, 3.9%);
+  --dynamic-search-bar-border: 1px solid hsl(240, 3.7%, 15.9%);
+  --dynamic-search-bar-border-hover: 1px solid hsl(240, 3.7%, 15.9%);
+  --dynamic-search-bar-border-focus: 1px solid hsl(246, 100%, 68%);
+
+  /* Badge styling */
+  --dynamic-badge-background: hsl(0, 0%, 98%);
+  --dynamic-badge-color: hsl(240, 10%, 3.9%);
+  --dynamic-badge-dot-background: hsl(240, 10%, 3.9%);
+  --dynamic-badge-primary-background: hsl(246, 100%, 68%);
+  --dynamic-badge-primary-color: hsl(0, 0%, 98%);
+
+  /* Tooltip styling */
+  --dynamic-tooltip-color: hsl(0, 0%, 98%);
+  --dynamic-tooltip-text-color: hsl(240, 10%, 3.9%);
+
+  /* Overlay */
+  --dynamic-overlay: hsla(240, 10%, 3.9%, 0.8);
+
+  /* Shadows */
+  --dynamic-shadow-down-1: 0px 1px 3px rgba(0, 0, 0, 0.4);
+  --dynamic-shadow-down-2: 0px 4px 6px rgba(0, 0, 0, 0.4);
+  --dynamic-shadow-down-3: 0px 10px 15px rgba(0, 0, 0, 0.4);
+  --dynamic-shadow-up-1: 0px -8px 48px -8px rgba(0, 0, 0, 0.4);
+
+  /* Loading animation */
+  --dynamic-loading-animation-gradient: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.1) 20%,
+    rgba(255, 255, 255, 0.2) 60%,
+    rgba(255, 255, 255, 0)
+  );
 }
 
 .react-flow__handle {
@@ -147,8 +347,11 @@
 
 /* Smooth transitions */
 .theme-transition {
-  transition: background-color 0.3s ease, color 0.3s ease,
-    border-color 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 /* Premium card styles */
@@ -311,21 +514,15 @@
 /* Add this to the end of your globals.css file */
 
 .bg-grid-pattern {
-  background-image: linear-gradient(
-      to right,
-      rgba(0, 0, 0, 0.1) 1px,
-      transparent 1px
-    ),
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.1) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
 .dark .bg-grid-pattern {
-  background-image: linear-gradient(
-      to right,
-      rgba(255, 255, 255, 0.05) 1px,
-      transparent 1px
-    ),
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
 }
 
@@ -362,7 +559,9 @@
 
 /* Button Animations */
 .interactive-btn-hover {
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .interactive-btn-hover:hover {
@@ -413,17 +612,21 @@
 
 /* Subtle hover effect for cards */
 .card-hover-effect {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .card-hover-effect:hover {
   transform: translateY(-4px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.1),
     0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
 .dark .card-hover-effect:hover {
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3),
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.3),
     0 8px 10px -6px rgba(0, 0, 0, 0.2);
 }
 
@@ -477,7 +680,9 @@
 .page-enter-active {
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 300ms, transform 300ms;
+  transition:
+    opacity 300ms,
+    transform 300ms;
 }
 
 .page-exit {
@@ -488,5 +693,7 @@
 .page-exit-active {
   opacity: 0;
   transform: translateY(-10px);
-  transition: opacity 300ms, transform 300ms;
+  transition:
+    opacity 300ms,
+    transform 300ms;
 }
