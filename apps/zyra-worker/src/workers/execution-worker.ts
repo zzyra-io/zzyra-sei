@@ -368,12 +368,26 @@ export class ExecutionWorker implements OnModuleInit {
    * Process a single message from RabbitMQ queue
    */
   private async processMessageFromQueue(message: QueueMessage): Promise<void> {
-    const { executionId, workflowId, userId } = message;
+    const { executionId, workflowId, userId, blockchainAuthorization } =
+      message;
     const workerId = `worker-${process.pid}-${Math.random().toString(36).substring(2, 10)}`;
 
     this.logger.log(
       `Worker ${workerId} processing message for execution ${executionId}`,
     );
+
+    // Log blockchain authorization if present
+    if (blockchainAuthorization) {
+      this.logger.log(
+        `Blockchain authorization received for execution ${executionId}`,
+        {
+          hasBlockchainAuth: true,
+          authType: blockchainAuthorization.delegationSignature
+            ? 'delegation'
+            : 'unknown',
+        },
+      );
+    }
 
     try {
       // Verify execution exists and is in a processable state
@@ -422,6 +436,7 @@ export class ExecutionWorker implements OnModuleInit {
           message_source: 'rabbitmq',
           workflow_id: workflowId,
           user_id: userId,
+          has_blockchain_auth: !!blockchainAuthorization,
         },
       );
 
@@ -432,6 +447,7 @@ export class ExecutionWorker implements OnModuleInit {
         userId,
         id: executionId,
         payload: message.payload || {},
+        blockchainAuthorization,
         status: 'processing',
       };
 

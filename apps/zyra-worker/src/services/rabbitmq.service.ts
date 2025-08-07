@@ -24,6 +24,7 @@ export interface QueueMessage {
   payload?: any;
   retryCount?: number;
   timestamp?: string;
+  blockchainAuthorization?: any;
 }
 
 @Injectable()

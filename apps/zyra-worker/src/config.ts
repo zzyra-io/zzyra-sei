@@ -48,8 +48,29 @@ export const WORKFLOW_SETTINGS = {
 
 // Account Abstraction settings
 export const AA_CONFIG = {
-  bundlerUrl: process.env.AA_BUNDLER_URL || 'https://bundler.biconomy.io/api/v2/1329', // SEI testnet
-  paymasterUrl: process.env.AA_PAYMASTER_URL,
-  entryPointAddress: process.env.AA_ENTRY_POINT || '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789',
+  // ZeroDev bundler and paymaster URLs for production AA (v3 API for SEI)
+  bundlerUrl:
+    process.env.AA_BUNDLER_URL ||
+    'https://rpc.zerodev.app/api/v3/8e6f4057-e935-485f-9b6d-f14696e92654/chain/1328',
+  paymasterUrl:
+    process.env.AA_PAYMASTER_URL ||
+    'https://rpc.zerodev.app/api/v3/8e6f4057-e935-485f-9b6d-f14696e92654/chain/1328',
+  entryPointAddress:
+    process.env.AA_ENTRY_POINT || '0x0000000071727De22E5E9d8BAf0edAc6f37da032', // EntryPoint v0.7
   enabled: process.env.ENABLE_AA !== 'false', // Default enabled
+
+  // ZeroDev project configuration
+  projectId:
+    process.env.ZERODEV_PROJECT_ID || '8e6f4057-e935-485f-9b6d-f14696e92654',
+
+  // ZeroDev paymaster addresses for SEI network
+  verifyingPaymaster:
+    process.env.ZERODEV_VERIFYING_PAYMASTER ||
+    '0x6dcaa49D90033806799eDC614e61A9DFF4b39182',
+  erc20Paymaster:
+    process.env.ZERODEV_ERC20_PAYMASTER ||
+    '0x413eA2Bc98f3eff71091120e9386ed88D31F950A',
+
+  // Disable simulation mode for production with real ZeroDev
+  simulationMode: process.env.AA_SIMULATION_MODE === 'true', // Default to real execution
 };

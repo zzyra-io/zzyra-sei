@@ -243,16 +243,146 @@ export class ExecutionRepository extends BaseRepository<
       }
     }
 
-    return this.prisma.nodeLog.create({
-      data: {
-        nodeExecution: {
-          connect: { id: nodeExecution.id },
+    try {
+      // Validate inputs before creating nodeLog
+      if (!nodeExecution.id) {
+        throw new Error(
+          `NodeExecution ID is missing for execution ${executionId}, node ${nodeId}`
+        );
+      }
+
+      // Validate log level against enum values
+      const validLevels = ["info", "error", "warn"] as const;
+      if (!validLevels.includes(level as any)) {
+        throw new Error(
+          `Invalid log level '${level}'. Must be one of: ${validLevels.join(", ")}`
+        );
+      }
+
+      // Sanitize metadata to ensure valid JSON - remove functions and non-serializable objects
+      const sanitizedMetadata = metadata ? this.sanitizeMetadata(metadata) : {};
+
+      return await this.prisma.nodeLog.create({
+        data: {
+          nodeExecution: {
+            connect: { id: nodeExecution.id },
+          },
+          level,
+          message: message || "",
+          metadata: sanitizedMetadata,
         },
-        level,
-        message,
-        metadata: metadata || {},
-      },
-    });
+      });
+    } catch (createError) {
+      // Enhanced error logging for debugging
+      console.error(
+        `Failed to create nodeLog for execution ${executionId}, node ${nodeId}:`,
+        {
+          error:
+            createError instanceof Error
+              ? createError.message
+              : String(createError),
+          nodeExecutionId: nodeExecution.id,
+          level,
+          messageLength: message?.length || 0,
+          metadataType: typeof metadata,
+          metadata: metadata,
+        }
+      );
+
+      throw new Error(
+        `Failed to create node log: ${createError instanceof Error ? createError.message : String(createError)}`
+      );
+    }
+  }
+
+  /**
+   * Sanitize metadata to remove non-serializable objects like functions
+   * @param metadata The metadata object to sanitize
+   * @returns Sanitized metadata safe for JSON storage
+   */
+  private sanitizeMetadata(metadata: any): Record<string, any> {
+    if (metadata === null || metadata === undefined) {
+      return {};
+    }
+
+    if (typeof metadata === "string") {
+      try {
+        return JSON.parse(metadata);
+      } catch {
+        return { rawString: metadata };
+      }
+    }
+
+    if (typeof metadata !== "object") {
+      return { value: metadata };
+    }
+
+    if (Array.isArray(metadata)) {
+      return { arrayData: metadata.map((item) => this.sanitizeValue(item)) };
+    }
+
+    const sanitized: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(metadata)) {
+      sanitized[key] = this.sanitizeValue(value);
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * Sanitize individual values, removing functions and non-serializable types
+   * @param value The value to sanitize
+   * @returns Sanitized value
+   */
+  private sanitizeValue(value: any): any {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    if (typeof value === "function") {
+      return "[Function]";
+    }
+
+    if (typeof value === "symbol") {
+      return "[Symbol]";
+    }
+
+    if (typeof value === "bigint") {
+      return value.toString();
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    if (value instanceof Error) {
+      return {
+        name: value.name,
+        message: value.message,
+        stack: value.stack,
+      };
+    }
+
+    if (typeof value === "object") {
+      if (Array.isArray(value)) {
+        return value.map((item) => this.sanitizeValue(item));
+      }
+
+      // Handle circular references and complex objects
+      try {
+        JSON.stringify(value);
+        const sanitized: Record<string, any> = {};
+        for (const [k, v] of Object.entries(value)) {
+          sanitized[k] = this.sanitizeValue(v);
+        }
+        return sanitized;
+      } catch {
+        return "[Object - Non-serializable]";
+      }
+    }
+
+    return value;
   }
 
   /**

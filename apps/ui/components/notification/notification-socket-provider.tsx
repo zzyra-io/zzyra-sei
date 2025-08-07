@@ -52,16 +52,23 @@ export const NotificationSocketProvider: React.FC<{
       return;
     }
 
+    // Only connect if socket URL is explicitly configured
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+    if (!socketUrl) {
+      console.log(
+        "Socket notifications disabled - NEXT_PUBLIC_SOCKET_URL not configured"
+      );
+      return;
+    }
+
     const connectSocket = () => {
       try {
-        const socket = io(
-          process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001",
-          {
-            auth: {
-              token: localStorage.getItem("authToken"),
-            },
-          }
-        );
+        const socket = io(socketUrl, {
+          auth: {
+            token: localStorage.getItem("authToken"),
+          },
+          timeout: 5000, // 5 second timeout
+        });
 
         socket.on("connect", () => {
           console.log("Socket connected");
@@ -81,21 +88,20 @@ export const NotificationSocketProvider: React.FC<{
         });
 
         socket.on("connect_error", (error) => {
-          console.error("Socket connection error:", error);
-          if (reconnectAttempts.current < 5) {
-            setTimeout(
-              () => {
-                reconnectAttempts.current += 1;
-                connectSocket();
-              },
-              1000 * Math.pow(2, reconnectAttempts.current)
-            );
+          console.warn(
+            "Socket connection failed (notifications disabled):",
+            error.message
+          );
+          // Don't retry automatically - just log and move on
+          if (socketRef.current) {
+            socketRef.current.disconnect();
+            socketRef.current = null;
           }
         });
 
         socketRef.current = socket;
       } catch (error) {
-        console.error("Failed to connect socket:", error);
+        console.warn("Failed to initialize socket notifications:", error);
       }
     };
 
@@ -109,4 +115,28 @@ export const NotificationSocketProvider: React.FC<{
   }, [isAuthenticated, user, toast]);
 
   return <IsBrowser>{children}</IsBrowser>;
+};
+
+/**
+ * Hook for accessing notifications (placeholder implementation)
+ * TODO: Implement proper notifications state management when Socket.IO is set up
+ */
+export const useNotifications = () => {
+  const [notifications] = useState<Notification[]>([]);
+
+  const markAsRead = (id: string) => {
+    console.log("Mark notification as read:", id);
+    // TODO: Implement when backend notifications API is ready
+  };
+
+  const markAllAsRead = () => {
+    console.log("Mark all notifications as read");
+    // TODO: Implement when backend notifications API is ready
+  };
+
+  return {
+    notifications,
+    markAsRead,
+    markAllAsRead,
+  };
 };
