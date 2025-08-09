@@ -36,6 +36,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 import { useAccountAbstraction } from "@/hooks/use-account-abstraction";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface BlockchainNode {
   node: any;
@@ -164,7 +165,7 @@ export function EnhancedBlockchainAuthorizationModal({
 }: EnhancedBlockchainAuthorizationModalProps) {
   const { toast } = useToast();
   const { isLoggedIn, getCurrentUser } = useDynamicAuth();
-  const { createSmartWalletDelegation, isCreatingDelegation } =
+  const { createSmartWalletDelegation, isCreatingDelegation, getWalletStatus } =
     useAccountAbstraction();
   const [open, setOpen] = useState(true);
 
@@ -196,12 +197,30 @@ export function EnhancedBlockchainAuthorizationModal({
 
   const [duration, setDuration] = useState("24");
 
+  // Get wallet status for better error handling
+  const walletStatus = getWalletStatus();
+  const canCreateDelegation = isLoggedIn && walletStatus.hasSmartWallet;
+
   const handleClose = () => {
     setOpen(false);
     onCancel();
   };
 
   const handleAuthorize = async () => {
+    // Pre-flight wallet status check
+    if (!walletStatus.hasSmartWallet) {
+      const errorMsg = walletStatus.isEmbedded
+        ? "Smart wallet not available. This might be a configuration issue. Please check the wallet status below or try refreshing the page."
+        : "Smart wallet required. Please disconnect your current wallet and login with Email/SMS to create an embedded wallet with Account Abstraction support.";
+
+      toast({
+        title: "Smart Wallet Required",
+        description: errorMsg,
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const selectedChains = authData.supportedChains
         .filter((chain) => chainConfigs[chain].enabled)
@@ -232,12 +251,12 @@ export function EnhancedBlockchainAuthorizationModal({
         throw new Error("Dynamic wallet not connected");
       }
       console.log("selectedChains", selectedChains);
+      console.log("Wallet status:", walletStatus);
 
-      // Create session key request
       // Create Smart Wallet (AA) delegation - Single production path
       const delegationResult = await createSmartWalletDelegation({
         chainId: selectedChains[0].chainId,
-        operations: ["send", "trade"],
+        operations: ["eth_transfer", "erc20_transfer"],
         maxAmountPerTx: selectedChains[0].maxDailySpending,
         maxDailyAmount: selectedChains[0].maxDailySpending,
         duration: parseInt(duration),
@@ -278,7 +297,7 @@ export function EnhancedBlockchainAuthorizationModal({
         description:
           error instanceof Error
             ? error.message
-            : "Failed to create session key.",
+            : "Failed to create smart wallet delegation.",
         variant: "destructive",
       });
     }
@@ -319,6 +338,61 @@ export function EnhancedBlockchainAuthorizationModal({
           </DialogTitle>
         </DialogHeader>
         <div className='space-y-6'>
+          {/* Wallet Status Warning */}
+          {!walletStatus.hasSmartWallet && (
+            <Alert>
+              <AlertTriangle className='h-4 w-4' />
+              <AlertDescription>
+                <strong>Smart Wallet Required</strong>
+                <br />
+                {walletStatus.isEmbedded ? (
+                  <>
+                    You have an embedded wallet but smart wallet is not
+                    available. This might be due to:
+                    <ul className='list-disc list-inside mt-2 space-y-1 text-sm'>
+                      <li>Smart wallets not enabled in Dynamic dashboard</li>
+                      <li>ZeroDev configuration issue</li>
+                      <li>Smart wallet still being created (try refreshing)</li>
+                    </ul>
+                    <div className='mt-2 text-xs text-muted-foreground'>
+                      Current wallet: {walletStatus.walletType} | Status:{" "}
+                      {walletStatus.message}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    Account Abstraction only works with embedded wallets.
+                    Please:
+                    <ol className='list-decimal list-inside mt-2 space-y-1 text-sm'>
+                      <li>
+                        Disconnect your current wallet (
+                        {walletStatus.walletType})
+                      </li>
+                      <li>
+                        Login with Email or SMS to create an embedded wallet
+                      </li>
+                      <li>Smart wallet will be automatically created</li>
+                    </ol>
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+          {walletStatus.hasSmartWallet && (
+            <Alert>
+              <CheckCircle className='h-4 w-4' />
+              <AlertDescription>
+                <strong>Smart Wallet Ready</strong>
+                <br />
+                Your wallet supports Account Abstraction. Ready to create
+                delegation for automated workflows.
+                <div className='mt-1 text-xs text-muted-foreground'>
+                  Smart Wallet: {walletStatus.address?.substring(0, 10)}...
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Tabs defaultValue='basic' className='w-full'>
             <TabsList className='grid w-full grid-cols-3'>
               <TabsTrigger value='basic'>Basic Settings</TabsTrigger>
@@ -557,12 +631,18 @@ export function EnhancedBlockchainAuthorizationModal({
             <Button
               onClick={handleAuthorize}
               className='flex-1'
-              disabled={isCreatingDelegation}>
+              disabled={isCreatingDelegation || !canCreateDelegation}>
               {isCreatingDelegation ? (
                 <>
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
                   Creating Smart Wallet...
                 </>
+              ) : !walletStatus.hasSmartWallet ? (
+                walletStatus.isEmbedded ? (
+                  "Smart Wallet Not Available"
+                ) : (
+                  "Embedded Wallet Required"
+                )
               ) : (
                 "Create Smart Wallet & Execute"
               )}

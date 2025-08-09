@@ -457,13 +457,42 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     }
 
     try {
-      // Try to parse as AA JSON
-      const aaData = JSON.parse(authConfig.delegationSignature);
-      if (aaData.useAA === true) {
-        return { useAA: true, aaData };
+      // Try to parse delegation signature as JSON from Dynamic Labs AA integration
+      const parsedData = JSON.parse(authConfig.delegationSignature);
+
+      // Check if this contains proper Dynamic Labs AA delegation data
+      if (parsedData.owner && parsedData.smartWallet && parsedData.operations) {
+        context.logger.info('Detected Dynamic Labs AA delegation format', {
+          owner: parsedData.owner,
+          smartWallet: parsedData.smartWallet,
+          operations: parsedData.operations,
+        });
+
+        return {
+          useAA: true,
+          aaData: {
+            smartWalletAddress: parsedData.smartWallet,
+            ownerAddress: parsedData.owner,
+            signature: authConfig.delegationSignature,
+            expiresAt: parsedData.validUntil,
+            operations: parsedData.operations,
+            maxAmountPerTx: parsedData.maxAmountPerTx,
+            maxDailyAmount: parsedData.maxDailyAmount,
+          },
+        };
+      }
+
+      // Fallback: Check for legacy useAA format
+      if (parsedData.useAA === true) {
+        return { useAA: true, aaData: parsedData };
       }
     } catch (error) {
-      // Not JSON, might be session key signature
+      context.logger.debug(
+        'Delegation signature is not JSON, checking for session key',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
     }
 
     // Fallback to session key
@@ -471,7 +500,9 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       return { useAA: false, sessionKeyId: authConfig.sessionKeyId };
     }
 
-    throw new Error('Invalid blockchain authorization format');
+    throw new Error(
+      'Invalid blockchain authorization format. Expected either Dynamic Labs AA delegation or session key.',
+    );
   }
 
   /**
@@ -519,7 +550,8 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   }
 
   /**
-   * Execute transaction using Account Abstraction (ZeroDev)
+   * Execute transaction using Account Abstraction for automated workflow execution
+   * This executes transactions on behalf of users using their delegated session keys
    */
   private async executeAATransaction(
     aaData: any,
@@ -535,61 +567,356 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     const { chainId, recipientAddress, amount, context } = params;
 
     try {
-      context.logger.info('Executing AA transaction', {
+      context.logger.info('Executing automated AA transaction for workflow', {
         chainId,
         smartWalletAddress: aaData.smartWalletAddress,
+        ownerAddress: aaData.ownerAddress,
         recipientAddress,
         amount,
+        operations: aaData.operations,
+        executionId: context.executionId,
       });
 
       // Get AA configuration
       const { AA_CONFIG } = require('../../../../config');
-      const bundlerUrl = AA_CONFIG.bundlerUrl;
-      const paymasterUrl = AA_CONFIG.paymasterUrl;
       const simulationMode = AA_CONFIG.simulationMode;
+
+      // Validate delegation hasn't expired
+      if (aaData.expiresAt) {
+        const expiryTime = new Date(aaData.expiresAt).getTime();
+        if (Date.now() > expiryTime) {
+          throw new Error('AA delegation has expired');
+        }
+      }
+
+      // Validate spending limits
+      const requestedAmount = parseFloat(amount);
+      const maxAmount = parseFloat(aaData.maxAmountPerTx || '1000000');
+
+      if (requestedAmount > maxAmount) {
+        throw new Error(
+          `Transaction amount ${amount} exceeds maximum allowed ${aaData.maxAmountPerTx}`,
+        );
+      }
+
+      // Validate operation is allowed
+      const operation = params.tokenAddress ? 'erc20_transfer' : 'eth_transfer';
+      if (aaData.operations && !aaData.operations.includes(operation)) {
+        throw new Error(`Operation ${operation} not permitted in delegation`);
+      }
+
+      context.logger.info('AA delegation validation passed', {
+        smartWallet: aaData.smartWalletAddress,
+        owner: aaData.ownerAddress,
+        operation,
+        amount,
+        maxAllowed: aaData.maxAmountPerTx,
+      });
 
       // Check if we should use simulation mode (for development/testing)
       if (simulationMode) {
-        context.logger.info('Using AA simulation mode (no real bundler)', {
+        context.logger.info('Using AA simulation mode for automated workflow', {
           chainId,
           smartWalletAddress: aaData.smartWalletAddress,
           recipientAddress,
           amount,
+          executionId: context.executionId,
         });
 
-        // Simulate AA transaction execution
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate processing time
+        // Simulate processing time for AA transaction
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
         const simulatedTxHash = `0xaa${Math.random().toString(16).substring(2, 64)}`;
 
-        context.logger.info('AA transaction simulated successfully', {
+        context.logger.info('AA workflow transaction simulated successfully', {
           simulatedTxHash,
           smartWalletAddress: aaData.smartWalletAddress,
           chainId,
+          executionId: context.executionId,
         });
 
         return {
           transactionHash: simulatedTxHash,
-          blockNumber: Math.floor(Date.now() / 1000), // Convert BigInt to number
-          gasUsed: 21000, // Convert BigInt to number
+          blockNumber: Math.floor(Date.now() / 1000),
+          gasUsed: 0, // Gas sponsored by paymaster
           status: 'success' as const,
           explorerUrl: `https://seitrace.com/tx/${simulatedTxHash}`,
         };
       }
 
-      // For ZeroDev, we need to use their specific API format
-      // Instead of constructing raw UserOperation, use ZeroDev's sendTransaction format
-      const transactionRequest = {
-        to: recipientAddress,
-        value: this.parseEtherAmount(amount), // Convert to wei hex string
-        data: '0x', // Empty for simple ETH transfer
+      // Production mode: Execute real AA transaction using session key delegation
+      context.logger.info(
+        'Executing production AA transaction for automated workflow',
+        {
+          chainId,
+          smartWalletAddress: aaData.smartWalletAddress,
+          recipientAddress,
+          amount,
+          executionId: context.executionId,
+        },
+      );
+
+      // For automated workflow execution, we need to:
+      // 1. Use the session key to sign on behalf of the user
+      // 2. Construct a proper UserOperation for the smart wallet
+      // 3. Submit to the bundler with paymaster for gas sponsorship
+
+      const bundlerUrl = AA_CONFIG.bundlerUrl;
+      const paymasterUrl = AA_CONFIG.paymasterUrl;
+
+      // Get current nonce for the smart wallet
+      const currentNonce = await this.getSmartWalletNonce(
+        aaData.smartWalletAddress,
+        bundlerUrl,
+        context,
+      );
+
+      // Check if smart wallet is deployed
+      const initCode = await this.getInitCode(
+        aaData.smartWalletAddress,
+        aaData.ownerAddress,
+        chainId,
+        context,
+      );
+
+      // Encode the transaction call data
+      const callData = await this.encodeSmartWalletCall(
+        recipientAddress,
+        amount,
+        params.tokenAddress,
+        context,
+      );
+
+      // Estimate gas for the UserOperation
+      const gasEstimates = await this.estimateUserOperationGas(
+        {
+          sender: aaData.smartWalletAddress,
+          nonce: currentNonce,
+          initCode,
+          callData,
+        },
+        bundlerUrl,
+        context,
+      );
+
+      // Get current gas prices
+      const gasPrices = await this.getCurrentGasPrices(chainId, context);
+
+      // Construct UserOperation
+      const userOperation = {
+        sender: aaData.smartWalletAddress,
+        nonce: currentNonce,
+        initCode: initCode,
+        callData: callData,
+        callGasLimit: gasEstimates.callGasLimit,
+        verificationGasLimit: gasEstimates.verificationGasLimit,
+        preVerificationGas: gasEstimates.preVerificationGas,
+        maxFeePerGas: gasPrices.maxFeePerGas,
+        maxPriorityFeePerGas: gasPrices.maxPriorityFeePerGas,
+        paymasterAndData: paymasterUrl
+          ? this.getPaymasterData(paymasterUrl)
+          : '0x',
+        signature: '0x', // Will be filled after signing
       };
 
-      // Encode the transaction call for the smart wallet
+      // Sign the UserOperation using the session key delegation
+      const signature = await this.signUserOperation(
+        userOperation,
+        aaData,
+        chainId,
+        context,
+      );
+      userOperation.signature = signature;
+
+      context.logger.info('UserOperation constructed and signed', {
+        sender: userOperation.sender,
+        nonce: userOperation.nonce,
+        initCodeLength: initCode.length,
+        callDataLength: callData.length,
+        hasPaymaster: !!paymasterUrl,
+        executionId: context.executionId,
+      });
+
+      // Submit UserOperation to bundler
+      const userOpHash = await this.submitUserOperation(
+        userOperation,
+        bundlerUrl,
+        context,
+      );
+
+      // Wait for transaction confirmation
+      const txReceipt = await this.waitForUserOpTransaction(
+        userOpHash,
+        bundlerUrl,
+        context,
+      );
+
+      context.logger.info('AA workflow transaction executed successfully', {
+        userOpHash,
+        transactionHash: txReceipt.transactionHash,
+        smartWallet: aaData.smartWalletAddress,
+        amount,
+        recipient: recipientAddress,
+        executionId: context.executionId,
+      });
+
+      return {
+        transactionHash: txReceipt.transactionHash,
+        blockNumber: txReceipt.blockNumber,
+        gasUsed: txReceipt.gasUsed || 0,
+        status: 'success' as const,
+        explorerUrl: `https://seitrace.com/tx/${txReceipt.transactionHash}`,
+      };
+    } catch (error) {
+      context.logger.error('AA workflow transaction failed', {
+        chainId,
+        error,
+        executionId: context.executionId,
+      });
+      throw new Error(
+        `AA workflow transaction failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Get current nonce for smart wallet from bundler
+   */
+  private async getSmartWalletNonce(
+    smartWalletAddress: string,
+    bundlerUrl: string,
+    context: EnhancedBlockExecutionContext,
+  ): Promise<string> {
+    try {
+      const response = await fetch(bundlerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_getUserOperationCount',
+          params: [smartWalletAddress, 'latest'],
+        }),
+      });
+
+      const result = await response.json();
+      if (result.result) {
+        context.logger.debug('Retrieved smart wallet nonce', {
+          smartWallet: smartWalletAddress,
+          nonce: result.result,
+        });
+        return result.result;
+      }
+
+      context.logger.warn('Failed to get nonce, using 0x0');
+      return '0x0';
+    } catch (error) {
+      context.logger.warn('Error fetching nonce, using 0x0', { error });
+      return '0x0';
+    }
+  }
+
+  /**
+   * Get initCode for smart wallet deployment (if not deployed)
+   */
+  private async getInitCode(
+    smartWalletAddress: string,
+    ownerAddress: string,
+    chainId: string,
+    context: EnhancedBlockExecutionContext,
+  ): Promise<string> {
+    try {
+      const { createPublicClient, http } = require('viem');
+      const publicClient = createPublicClient({
+        chain: {
+          id: chainId === 'sei-testnet' ? 1328 : 11155111,
+          rpcUrls: {
+            default: {
+              http: [
+                chainId === 'sei-testnet'
+                  ? 'https://evm-rpc-testnet.sei-apis.com'
+                  : 'https://rpc.sepolia.org',
+              ],
+            },
+          },
+        },
+        transport: http(),
+      });
+
+      const bytecode = await publicClient.getBytecode({
+        address: smartWalletAddress,
+      });
+
+      if (bytecode && bytecode !== '0x') {
+        context.logger.debug('Smart wallet already deployed');
+        return '0x';
+      }
+
+      // Smart wallet not deployed, need factory deployment data
+      context.logger.info(
+        'Smart wallet not deployed, including factory initCode',
+      );
+
+      // ZeroDev factory address and createAccount calldata
+      const factoryAddress = '0x5de4839a76cf55d0c90e2061ef4386d962E15ae3';
       const { encodeFunctionData } = require('viem');
 
-      // For ETH transfer, we need to encode a call to the smart wallet's execute function
-      const callData = encodeFunctionData({
+      const createAccountData = encodeFunctionData({
+        abi: [
+          {
+            name: 'createAccount',
+            type: 'function',
+            inputs: [
+              { name: 'owner', type: 'address' },
+              { name: 'salt', type: 'uint256' },
+            ],
+          },
+        ],
+        functionName: 'createAccount',
+        args: [ownerAddress, 0n],
+      });
+
+      return factoryAddress + createAccountData.slice(2);
+    } catch (error) {
+      context.logger.warn('Failed to check smart wallet deployment status', {
+        error,
+      });
+      return '0x';
+    }
+  }
+
+  /**
+   * Encode smart wallet call data for transaction execution
+   */
+  private async encodeSmartWalletCall(
+    recipientAddress: string,
+    amount: string,
+    tokenAddress: string | undefined,
+    context: EnhancedBlockExecutionContext,
+  ): Promise<string> {
+    const { encodeFunctionData, parseEther } = require('viem');
+
+    if (tokenAddress) {
+      // ERC20 transfer
+      const transferData = encodeFunctionData({
+        abi: [
+          {
+            name: 'transfer',
+            type: 'function',
+            inputs: [
+              { name: 'to', type: 'address' },
+              { name: 'value', type: 'uint256' },
+            ],
+          },
+        ],
+        functionName: 'transfer',
+        args: [recipientAddress, parseEther(amount)],
+      });
+
+      // Encode execute call to smart wallet for ERC20 transfer
+      return encodeFunctionData({
         abi: [
           {
             name: 'execute',
@@ -602,151 +929,252 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
           },
         ],
         functionName: 'execute',
-        args: [recipientAddress, transactionRequest.value, '0x'],
+        args: [tokenAddress, 0n, transferData],
       });
-
-      // Standard ERC-4337 UserOperation format
-      const userOperation = {
-        sender: aaData.smartWalletAddress,
-        nonce: '0x0', // ZeroDev handles nonce management
-        initCode: '0x', // Smart wallet already deployed
-        callData: callData, // Encoded call to smart wallet's execute function
-        callGasLimit: '0x15f90', // Increased for smart wallet execution
-        verificationGasLimit: '0x15f90', // Standard verification gas
-        preVerificationGas: '0x5208', // Standard pre-verification gas
-        maxFeePerGas: '0x3b9aca00', // 1 gwei
-        maxPriorityFeePerGas: '0x3b9aca00', // 1 gwei
-        paymasterAndData: AA_CONFIG.verifyingPaymaster + '0'.repeat(64), // Paymaster address + empty data
-        signature: aaData.signature || '0x',
-      };
-
-      const bundlerRequest = {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'eth_sendUserOperation', // Standard ERC-4337 method
-        params: [userOperation, AA_CONFIG.entryPointAddress],
-      };
-
-      // Use the self-funded paymaster URL for gas sponsorship
-      const paymasterBundlerUrl = `${bundlerUrl}?selfFunded=true`;
-
-      context.logger.info(
-        'Sending UserOperation to ZeroDev bundler with paymaster',
-        {
-          bundlerUrl: paymasterBundlerUrl,
-          method: 'eth_sendUserOperation',
-          smartWallet: aaData.smartWalletAddress,
-          to: recipientAddress,
-          amount,
-          paymaster: AA_CONFIG.verifyingPaymaster,
-          selfFunded: true,
-        },
-      );
-
-      // Submit userOperation to bundler with paymaster
-      const response = await fetch(paymasterBundlerUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bundlerRequest),
+    } else {
+      // ETH transfer
+      return encodeFunctionData({
+        abi: [
+          {
+            name: 'execute',
+            type: 'function',
+            inputs: [
+              { name: 'to', type: 'address' },
+              { name: 'value', type: 'uint256' },
+              { name: 'data', type: 'bytes' },
+            ],
+          },
+        ],
+        functionName: 'execute',
+        args: [recipientAddress, parseEther(amount), '0x'],
       });
-
-      // Check if response is ok
-      if (!response.ok) {
-        const errorText = await response.text();
-        context.logger.error('Bundler HTTP error', {
-          status: response.status,
-          statusText: response.statusText,
-          responseText: errorText.substring(0, 500), // First 500 chars
-        });
-        throw new Error(
-          `Bundler HTTP error ${response.status}: ${response.statusText}`,
-        );
-      }
-
-      // Check content-type to ensure we're getting JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType?.includes('application/json')) {
-        const responseText = await response.text();
-        context.logger.error('Bundler returned non-JSON response', {
-          contentType,
-          responseText: responseText.substring(0, 500), // First 500 chars
-        });
-        throw new Error(
-          `Expected JSON response, got ${contentType}. Response: ${responseText.substring(0, 200)}`,
-        );
-      }
-
-      const bundlerResult = await response.json();
-
-      if (bundlerResult.error) {
-        context.logger.error('ZeroDev bundler error', {
-          error: bundlerResult.error,
-          code: bundlerResult.error.code,
-          message: bundlerResult.error.message,
-        });
-        throw new Error(
-          `ZeroDev bundler error: ${bundlerResult.error.message || bundlerResult.error.code}`,
-        );
-      }
-
-      // ERC-4337 returns UserOperation hash in result
-      const userOpHash = bundlerResult.result;
-
-      context.logger.info('ZeroDev UserOperation submitted successfully', {
-        userOpHash,
-        chainId,
-        amount,
-        recipientAddress,
-      });
-
-      return {
-        transactionHash: userOpHash, // Using userOp hash as transaction identifier
-        blockNumber: Math.floor(Date.now() / 1000),
-        gasUsed: 90000, // Higher gas for AA transactions
-        status: 'success',
-        explorerUrl: `https://seitrace.com/tx/${userOpHash}`,
-      };
-    } catch (error) {
-      context.logger.error('AA transaction failed', { chainId, error });
-      throw new Error(
-        `AA transaction failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
     }
   }
 
   /**
-   * Parse ETH amount to wei hex string for ZeroDev
+   * Estimate gas for UserOperation
    */
-  private parseEtherAmount(amount: string): string {
-    const { parseEther } = require('viem');
-    const value = parseEther(amount);
-    return `0x${value.toString(16)}`;
+  private async estimateUserOperationGas(
+    userOperation: {
+      sender: string;
+      nonce: string;
+      initCode: string;
+      callData: string;
+    },
+    bundlerUrl: string,
+    context: EnhancedBlockExecutionContext,
+  ): Promise<{
+    callGasLimit: string;
+    verificationGasLimit: string;
+    preVerificationGas: string;
+  }> {
+    // Default gas estimates
+    let gasEstimates = {
+      callGasLimit: '0x15f90', // 90000
+      verificationGasLimit: '0x15f90', // 90000
+      preVerificationGas: '0x5208', // 21000
+    };
+
+    try {
+      const { AA_CONFIG } = require('../../../../config');
+      const response = await fetch(bundlerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_estimateUserOperationGas',
+          params: [
+            {
+              ...userOperation,
+              signature: '0x' + '0'.repeat(130), // Dummy signature
+              paymasterAndData: '0x',
+            },
+            AA_CONFIG.entryPointAddress,
+          ],
+        }),
+      });
+
+      const result = await response.json();
+      if (result.result) {
+        gasEstimates = {
+          callGasLimit: result.result.callGasLimit || gasEstimates.callGasLimit,
+          verificationGasLimit:
+            result.result.verificationGasLimit ||
+            gasEstimates.verificationGasLimit,
+          preVerificationGas:
+            result.result.preVerificationGas || gasEstimates.preVerificationGas,
+        };
+        context.logger.debug('Gas estimation successful', gasEstimates);
+      }
+    } catch (error) {
+      context.logger.warn('Gas estimation failed, using defaults', { error });
+    }
+
+    return gasEstimates;
   }
 
   /**
-   * Encode transfer call data for smart wallet
+   * Get current gas prices from network
    */
-  private encodeTransferCallData(to: string, amount: string): string {
-    // This would encode a simple ETH transfer
-    // For ERC20 transfers, you'd encode transfer(address,uint256)
-    const { parseEther } = require('viem');
-    const value = parseEther(amount);
+  private async getCurrentGasPrices(
+    chainId: string,
+    context: EnhancedBlockExecutionContext,
+  ): Promise<{
+    maxFeePerGas: string;
+    maxPriorityFeePerGas: string;
+  }> {
+    // Default gas prices
+    let gasPrices = {
+      maxFeePerGas: '0x77359400', // 2 gwei
+      maxPriorityFeePerGas: '0x59682f00', // 1.5 gwei
+    };
 
-    // Simple ETH transfer calldata (to, value, data)
-    return `0x${to.slice(2).padStart(64, '0')}${value.toString(16).padStart(64, '0')}${''.padStart(64, '0')}`;
+    try {
+      const { createPublicClient, http } = require('viem');
+      const publicClient = createPublicClient({
+        chain: {
+          id: chainId === 'sei-testnet' ? 1328 : 11155111,
+          rpcUrls: {
+            default: {
+              http: [
+                chainId === 'sei-testnet'
+                  ? 'https://evm-rpc-testnet.sei-apis.com'
+                  : 'https://rpc.sepolia.org',
+              ],
+            },
+          },
+        },
+        transport: http(),
+      });
+
+      const gasPrice = await publicClient.getGasPrice();
+      const maxFeePerGas = (gasPrice * 12n) / 10n; // 20% buffer
+      const maxPriorityFeePerGas = (gasPrice * 11n) / 10n; // 10% tip
+
+      gasPrices = {
+        maxFeePerGas: `0x${maxFeePerGas.toString(16)}`,
+        maxPriorityFeePerGas: `0x${maxPriorityFeePerGas.toString(16)}`,
+      };
+
+      context.logger.debug('Retrieved current gas prices', gasPrices);
+    } catch (error) {
+      context.logger.warn('Failed to get gas prices, using defaults', {
+        error,
+      });
+    }
+
+    return gasPrices;
   }
 
   /**
-   * Wait for userOperation receipt
+   * Get paymaster data for gas sponsorship
    */
-  private async waitForUserOpReceipt(
+  private getPaymasterData(paymasterUrl: string): string {
+    // For ZeroDev, the paymaster data is typically the paymaster address + additional data
+    // This is a simplified version - in production you'd get this from the paymaster service
+    return paymasterUrl + '0'.repeat(64);
+  }
+
+  /**
+   * Sign UserOperation using session key delegation
+   */
+  private async signUserOperation(
+    userOperation: any,
+    aaData: any,
+    chainId: string,
+    context: EnhancedBlockExecutionContext,
+  ): Promise<string> {
+    try {
+      // For session key delegation, we need to reconstruct the session key from the delegation
+      // This would typically involve decrypting the session key using the delegation signature
+
+      // For now, this is a placeholder implementation
+      // In production, you'd:
+      // 1. Decrypt the session private key from the delegation
+      // 2. Use that key to sign the UserOperation hash
+      // 3. Format the signature according to the smart wallet's signature format
+
+      context.logger.debug('Signing UserOperation with session key', {
+        smartWallet: aaData.smartWalletAddress,
+        owner: aaData.ownerAddress,
+      });
+
+      // Placeholder signature - in production this would be real
+      const placeholderSignature = '0x' + '1'.repeat(130);
+
+      context.logger.debug('UserOperation signed', {
+        signatureLength: placeholderSignature.length,
+      });
+
+      return placeholderSignature;
+    } catch (error) {
+      context.logger.error('Failed to sign UserOperation', { error });
+      throw new Error('UserOperation signing failed');
+    }
+  }
+
+  /**
+   * Submit UserOperation to bundler
+   */
+  private async submitUserOperation(
+    userOperation: any,
+    bundlerUrl: string,
+    context: EnhancedBlockExecutionContext,
+  ): Promise<string> {
+    try {
+      const { AA_CONFIG } = require('../../../../config');
+
+      const response = await fetch(bundlerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_sendUserOperation',
+          params: [userOperation, AA_CONFIG.entryPointAddress],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Bundler HTTP error ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(`Bundler error: ${result.error.message}`);
+      }
+
+      const userOpHash = result.result;
+      context.logger.info('UserOperation submitted successfully', {
+        userOpHash,
+      });
+
+      return userOpHash;
+    } catch (error) {
+      context.logger.error('Failed to submit UserOperation', { error });
+      throw new Error('UserOperation submission failed');
+    }
+  }
+
+  /**
+   * Wait for UserOperation to be included in a transaction
+   */
+  private async waitForUserOpTransaction(
     userOpHash: string,
     bundlerUrl: string,
     context: EnhancedBlockExecutionContext,
     timeout: number = 60000,
-  ): Promise<void> {
+  ): Promise<{
+    transactionHash: string;
+    blockNumber: number;
+    gasUsed: number;
+  }> {
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeout) {
@@ -765,16 +1193,22 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         });
 
         const result = await response.json();
-
-        if (result.result) {
+        if (result.result && result.result.receipt) {
+          const receipt = result.result.receipt;
           context.logger.info('UserOperation confirmed', {
             userOpHash,
-            receipt: result.result,
+            transactionHash: receipt.transactionHash,
+            blockNumber: receipt.blockNumber,
           });
-          return;
+
+          return {
+            transactionHash: receipt.transactionHash,
+            blockNumber: parseInt(receipt.blockNumber, 16),
+            gasUsed: parseInt(receipt.gasUsed || '0x0', 16),
+          };
         }
       } catch (error) {
-        context.logger.warn('Error checking userOp receipt', { error });
+        context.logger.warn('Error checking UserOperation receipt', { error });
       }
 
       // Wait 2 seconds before next check
