@@ -20,6 +20,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { ConfigService } from '@nestjs/config';
+import { ZeroDevService } from '../../../../services/zerodev.service';
 
 /**
  * SEI Network Configuration
@@ -94,7 +95,10 @@ interface TransactionResult {
 export class SendTransactionBlock implements EnhancedBlockHandler {
   private readonly logger = new Logger(SendTransactionBlock.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly zeroDevService: ZeroDevService,
+  ) {}
 
   definition: EnhancedBlockDefinition = {
     displayName: 'Send Transaction',
@@ -478,6 +482,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
             operations: parsedData.operations,
             maxAmountPerTx: parsedData.maxAmountPerTx,
             maxDailyAmount: parsedData.maxDailyAmount,
+            // Note: kernelClient will be created on-demand using ZeroDev service
           },
         };
       }
@@ -567,19 +572,18 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     const { chainId, recipientAddress, amount, context } = params;
 
     try {
-      context.logger.info('Executing automated AA transaction for workflow', {
-        chainId,
-        smartWalletAddress: aaData.smartWalletAddress,
-        ownerAddress: aaData.ownerAddress,
-        recipientAddress,
-        amount,
-        operations: aaData.operations,
-        executionId: context.executionId,
-      });
-
-      // Get AA configuration
-      const { AA_CONFIG } = require('../../../../config');
-      const simulationMode = AA_CONFIG.simulationMode;
+      context.logger.info(
+        'Executing automated AA transaction using ZeroDev service',
+        {
+          chainId,
+          smartWalletAddress: aaData.smartWalletAddress,
+          ownerAddress: aaData.ownerAddress,
+          recipientAddress,
+          amount,
+          operations: aaData.operations,
+          executionId: context.executionId,
+        },
+      );
 
       // Validate delegation hasn't expired
       if (aaData.expiresAt) {
@@ -613,170 +617,119 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         maxAllowed: aaData.maxAmountPerTx,
       });
 
-      // Check if we should use simulation mode (for development/testing)
-      if (simulationMode) {
-        context.logger.info('Using AA simulation mode for automated workflow', {
-          chainId,
-          smartWalletAddress: aaData.smartWalletAddress,
-          recipientAddress,
-          amount,
-          executionId: context.executionId,
-        });
+      // Use ZeroDev service for the actual transaction
+      const chainIdNumber = this.getChainIdNumber(chainId);
 
-        // Simulate processing time for AA transaction
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        const simulatedTxHash = `0xaa${Math.random().toString(16).substring(2, 64)}`;
-
-        context.logger.info('AA workflow transaction simulated successfully', {
-          simulatedTxHash,
-          smartWalletAddress: aaData.smartWalletAddress,
-          chainId,
-          executionId: context.executionId,
-        });
-
-        return {
-          transactionHash: simulatedTxHash,
-          blockNumber: Math.floor(Date.now() / 1000),
-          gasUsed: 0, // Gas sponsored by paymaster
-          status: 'success' as const,
-          explorerUrl: `https://seitrace.com/tx/${simulatedTxHash}`,
-        };
-      }
-
-      // Production mode: Execute real AA transaction using session key delegation
-      context.logger.info(
-        'Executing production AA transaction for automated workflow',
-        {
-          chainId,
-          smartWalletAddress: aaData.smartWalletAddress,
-          recipientAddress,
-          amount,
-          executionId: context.executionId,
-        },
-      );
-
-      // For automated workflow execution, we need to:
-      // 1. Use the session key to sign on behalf of the user
-      // 2. Construct a proper UserOperation for the smart wallet
-      // 3. Submit to the bundler with paymaster for gas sponsorship
-
-      const bundlerUrl = AA_CONFIG.bundlerUrl;
-      const paymasterUrl = AA_CONFIG.paymasterUrl;
-
-      // Get current nonce for the smart wallet
-      const currentNonce = await this.getSmartWalletNonce(
-        aaData.smartWalletAddress,
-        bundlerUrl,
-        context,
-      );
-
-      // Check if smart wallet is deployed
-      const initCode = await this.getInitCode(
-        aaData.smartWalletAddress,
-        aaData.ownerAddress,
-        chainId,
-        context,
-      );
-
-      // Encode the transaction call data
-      const callData = await this.encodeSmartWalletCall(
-        recipientAddress,
+      // Execute AA transaction using ZeroDev service
+      context.logger.info('Executing AA transaction with ZeroDev service', {
+        smartWallet: aaData.smartWalletAddress,
+        owner: aaData.ownerAddress,
+        operation,
         amount,
-        params.tokenAddress,
-        context,
-      );
-
-      // Estimate gas for the UserOperation
-      const gasEstimates = await this.estimateUserOperationGas(
-        {
-          sender: aaData.smartWalletAddress,
-          nonce: currentNonce,
-          initCode,
-          callData,
-        },
-        bundlerUrl,
-        context,
-      );
-
-      // Get current gas prices
-      const gasPrices = await this.getCurrentGasPrices(chainId, context);
-
-      // Construct UserOperation
-      const userOperation = {
-        sender: aaData.smartWalletAddress,
-        nonce: currentNonce,
-        initCode: initCode,
-        callData: callData,
-        callGasLimit: gasEstimates.callGasLimit,
-        verificationGasLimit: gasEstimates.verificationGasLimit,
-        preVerificationGas: gasEstimates.preVerificationGas,
-        maxFeePerGas: gasPrices.maxFeePerGas,
-        maxPriorityFeePerGas: gasPrices.maxPriorityFeePerGas,
-        paymasterAndData: paymasterUrl
-          ? this.getPaymasterData(paymasterUrl)
-          : '0x',
-        signature: '0x', // Will be filled after signing
-      };
-
-      // Sign the UserOperation using the session key delegation
-      const signature = await this.signUserOperation(
-        userOperation,
-        aaData,
-        chainId,
-        context,
-      );
-      userOperation.signature = signature;
-
-      context.logger.info('UserOperation constructed and signed', {
-        sender: userOperation.sender,
-        nonce: userOperation.nonce,
-        initCodeLength: initCode.length,
-        callDataLength: callData.length,
-        hasPaymaster: !!paymasterUrl,
-        executionId: context.executionId,
       });
 
-      // Submit UserOperation to bundler
-      const userOpHash = await this.submitUserOperation(
-        userOperation,
-        bundlerUrl,
-        context,
-      );
+      // Create kernel client if not provided
+      if (!aaData.kernelClient) {
+        context.logger.info('Creating kernel client for smart wallet', {
+          smartWallet: aaData.smartWalletAddress,
+          chainId,
+        });
 
-      // Wait for transaction confirmation
-      const txReceipt = await this.waitForUserOpTransaction(
-        userOpHash,
-        bundlerUrl,
-        context,
-      );
+        try {
+          // Create a kernel account first using the ZeroDev service
+          // We need to create a new account since we only have the address
+          // The owner private key should come from the delegation data
+          if (!aaData.ownerPrivateKey) {
+            throw new Error(
+              'Owner private key not provided in delegation data',
+            );
+          }
 
-      context.logger.info('AA workflow transaction executed successfully', {
-        userOpHash,
-        transactionHash: txReceipt.transactionHash,
+          const kernelAccount = await this.zeroDevService.createKernelAccount(
+            aaData.ownerPrivateKey,
+            chainIdNumber,
+          );
+
+          // Create the kernel client using the ZeroDev service
+          aaData.kernelClient = await this.zeroDevService.createKernelClient(
+            kernelAccount,
+            chainIdNumber,
+          );
+
+          context.logger.info('Kernel client created successfully', {
+            smartWallet: aaData.smartWalletAddress,
+          });
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          context.logger.error('Failed to create kernel client', {
+            error: errorMessage,
+            smartWallet: aaData.smartWalletAddress,
+          });
+          throw new Error(`Failed to create kernel client: ${errorMessage}`);
+        }
+      }
+
+      let result: TransactionResult;
+
+      if (params.tokenAddress) {
+        // ERC20 transfer using contract interaction
+        const erc20Data = this.encodeERC20Transfer(
+          recipientAddress,
+          amount,
+          params.tokenAddress,
+        );
+
+        result = await this.zeroDevService.executeContractInteraction(
+          aaData.kernelClient,
+          params.tokenAddress,
+          erc20Data,
+          BigInt(0),
+          chainIdNumber,
+        );
+      } else {
+        // Native token transfer
+        result = await this.zeroDevService.executeSimpleTransaction(
+          aaData.kernelClient,
+          recipientAddress,
+          amount,
+          chainIdNumber,
+        );
+      }
+
+      context.logger.info('AA transaction executed successfully', {
+        transactionHash: result.transactionHash,
         smartWallet: aaData.smartWalletAddress,
         amount,
         recipient: recipientAddress,
-        executionId: context.executionId,
+        gasUsed: result.gasUsed,
+        blockNumber: result.blockNumber,
       });
 
-      return {
-        transactionHash: txReceipt.transactionHash,
-        blockNumber: txReceipt.blockNumber,
-        gasUsed: txReceipt.gasUsed || 0,
-        status: 'success' as const,
-        explorerUrl: `https://seitrace.com/tx/${txReceipt.transactionHash}`,
-      };
+      return result;
     } catch (error) {
-      context.logger.error('AA workflow transaction failed', {
+      context.logger.error('Failed to execute AA transaction', {
+        error: error instanceof Error ? error.message : String(error),
         chainId,
-        error,
+        smartWalletAddress: aaData.smartWalletAddress,
         executionId: context.executionId,
       });
-      throw new Error(
-        `AA workflow transaction failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      throw error;
     }
+  }
+
+  /**
+   * Encode ERC20 transfer data
+   */
+  private encodeERC20Transfer(
+    to: string,
+    amount: string,
+    _tokenAddress: string,
+  ): string {
+    const functionSignature = '0xa9059cbb';
+    const toAddress = to.slice(2).padStart(64, '0');
+    const amountHex = parseEther(amount).toString(16).padStart(64, '0');
+    return functionSignature + toAddress + amountHex;
   }
 
   /**
@@ -1127,6 +1080,19 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     try {
       const { AA_CONFIG } = require('../../../../config');
 
+      // Log the UserOperation being submitted for debugging
+      context.logger.info('Submitting UserOperation to bundler', {
+        bundlerUrl,
+        entryPoint: AA_CONFIG.entryPointAddress,
+        userOperation: {
+          sender: userOperation.sender,
+          nonce: userOperation.nonce,
+          callData: userOperation.callData?.substring(0, 100) + '...',
+          maxFeePerGas: userOperation.maxFeePerGas,
+          maxPriorityFeePerGas: userOperation.maxPriorityFeePerGas,
+        },
+      });
+
       const response = await fetch(bundlerUrl, {
         method: 'POST',
         headers: {
@@ -1142,23 +1108,54 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Bundler HTTP error ${response.status}: ${errorText}`);
+        const error = `Bundler HTTP error ${response.status}: ${errorText}`;
+        context.logger.error('Bundler HTTP error', {
+          status: response.status,
+          errorText,
+          bundlerUrl,
+          entryPoint: AA_CONFIG.entryPointAddress,
+        });
+        throw new Error(error);
       }
 
       const result = await response.json();
       if (result.error) {
-        throw new Error(`Bundler error: ${result.error.message}`);
+        const error = `Bundler error: ${result.error.message}`;
+        context.logger.error('Bundler JSON-RPC error', {
+          error: result.error,
+          bundlerUrl,
+          entryPoint: AA_CONFIG.entryPointAddress,
+        });
+        throw new Error(error);
       }
 
       const userOpHash = result.result;
       context.logger.info('UserOperation submitted successfully', {
         userOpHash,
+        bundlerUrl,
+        entryPoint: AA_CONFIG.entryPointAddress,
       });
 
       return userOpHash;
     } catch (error) {
-      context.logger.error('Failed to submit UserOperation', { error });
-      throw new Error('UserOperation submission failed');
+      // Log the full error details before re-throwing
+      context.logger.error('Failed to submit UserOperation', {
+        error: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        bundlerUrl,
+        userOperation: {
+          sender: userOperation.sender,
+          nonce: userOperation.nonce,
+          callData: userOperation.callData?.substring(0, 100) + '...',
+        },
+      });
+
+      // Re-throw with more context
+      if (error instanceof Error) {
+        throw new Error(`UserOperation submission failed: ${error.message}`);
+      } else {
+        throw new Error(`UserOperation submission failed: ${String(error)}`);
+      }
     }
   }
 
@@ -1533,6 +1530,35 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     };
 
     return rpcUrls[chainId as keyof typeof rpcUrls] || '';
+  }
+
+  /**
+   * Get explorer URL for transaction
+   */
+  private getExplorerUrl(chainId: string, transactionHash: string): string {
+    const explorerUrls = {
+      'ethereum-sepolia': 'https://sepolia.etherscan.io',
+      'base-sepolia': 'https://sepolia.basescan.org',
+      'sei-testnet': 'https://seitrace.com',
+    };
+
+    const baseUrl =
+      explorerUrls[chainId as keyof typeof explorerUrls] ||
+      'https://seitrace.com';
+    return `${baseUrl}/tx/${transactionHash}`;
+  }
+
+  /**
+   * Get chain ID as number for ZeroDev service
+   */
+  private getChainIdNumber(chainId: string): number {
+    const chainIds = {
+      'sei-testnet': 713715,
+      'ethereum-sepolia': 11155111,
+      'base-sepolia': 84532,
+    };
+
+    return chainIds[chainId as keyof typeof chainIds] || 713715;
   }
 
   /**

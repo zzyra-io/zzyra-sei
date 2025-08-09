@@ -1,18 +1,15 @@
 "use client";
 
 import { BlockCatalog } from "@/components/block-catalog";
-import { BlockSimulator } from "@/components/block-simulator";
 import {
   generateAiBlock,
   validateAiBlockForm,
 } from "@/components/builder-sidebar-ai-handler";
-import { CustomBlockBuilderDialog } from "@/components/custom-block-builder-dialog";
 import { CustomBlockCatalog } from "@/components/custom-block-catalog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -30,51 +27,37 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type {
-  CustomBlockDefinition,
-  CustomBlockInput,
-  CustomBlockOutput,
-} from "@zyra/types";
+import type { CustomBlockDefinition } from "@zyra/types";
 import { BlockType, NodeCategory } from "@zyra/types";
 import {
   BarChart3,
   Blocks,
   Box,
+  ChevronRight,
   LayoutDashboard,
   Library,
-  Loader2,
   PlusCircle,
   PuzzleIcon as PuzzlePiece,
   Settings,
-  Sparkles,
-  Terminal,
   Workflow,
-  ChevronRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { DragEvent, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 
 // Define scrollbar styles for consistency
 
 // import { AIBlockForm } from "./builders/ai-block-form";
-import { Card, CardContent } from "./ui/card";
 import api from "@/lib/services/api";
+import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
 import CustomBlocksModal from "./custom-blocks-modal";
 
 interface BuilderSidebarProps {
@@ -431,6 +414,7 @@ export function BuilderSidebar({
 
           {mainTab === "settings" && (
             <div className='h-full'>
+              <DynamicWidget variant='modal' />
               <div className='px-4 py-4 border-b bg-muted/10'>
                 <div className='flex items-center gap-2 mb-2'>
                   <LayoutDashboard className='h-4 w-4 text-primary' />

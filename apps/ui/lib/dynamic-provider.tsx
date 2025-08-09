@@ -1,7 +1,7 @@
 "use client";
 
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
-import { ZeroDevSmartWalletConnectorsWithConfig } from "@dynamic-labs/ethereum-aa";
+import { ZeroDevSmartWalletConnectors } from "@dynamic-labs/ethereum-aa";
 import {
   DynamicContextProvider,
   DynamicWidget,
@@ -15,7 +15,7 @@ import { WagmiProvider, createConfig } from "wagmi";
 
 // SEI Network Configuration (EVM-compatible Layer 1)
 const seiNetwork = {
-  id: 1329, // SEI Pacific-1 mainnet chain ID
+  id: 1328, // SEI Pacific-1 mainnet chain ID
   name: "Sei Network",
   nativeCurrency: {
     decimals: 18,
@@ -67,19 +67,6 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
     process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID ||
     "4610f76b-ca5b-4e06-b048-d70f669055c2";
 
-  const zerodevProjectId =
-    process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID ||
-    "8e6f4057-e935-485f-9b6d-f14696e92654";
-
-  // ZeroDev configuration for SEI Network (Chain ID 1328)
-  const bundlerRpc =
-    process.env.NEXT_PUBLIC_ZERODEV_BUNDLER_RPC ||
-    `https://rpc.zerodev.app/api/v2/bundler/${zerodevProjectId}`;
-
-  const paymasterRpc =
-    process.env.NEXT_PUBLIC_ZERODEV_PAYMASTER_RPC ||
-    `https://rpc.zerodev.app/api/v2/paymaster/${zerodevProjectId}`;
-
   return (
     <QueryClientProvider client={queryClient}>
       <IsBrowser>
@@ -88,10 +75,7 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
             environmentId,
             walletConnectors: [
               EthereumWalletConnectors,
-              ZeroDevSmartWalletConnectorsWithConfig({
-                bundlerRpc,
-                paymasterRpc,
-              }),
+              ZeroDevSmartWalletConnectors,
             ],
             detectNewWalletsForLinking: true,
             // Event handlers for authentication lifecycle

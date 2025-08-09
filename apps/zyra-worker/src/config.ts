@@ -48,13 +48,13 @@ export const WORKFLOW_SETTINGS = {
 
 // Account Abstraction settings
 export const AA_CONFIG = {
-  // ZeroDev bundler and paymaster URLs for production AA (v3 API for SEI)
+  // ZeroDev bundler and paymaster URLs for V1 dashboard (v2 API for SEI)
   bundlerUrl:
     process.env.AA_BUNDLER_URL ||
-    'https://rpc.zerodev.app/api/v3/8e6f4057-e935-485f-9b6d-f14696e92654/chain/1328',
+    'https://rpc.zerodev.app/api/v2/bundler/8e6f4057-e935-485f-9b6d-f14696e92654',
   paymasterUrl:
     process.env.AA_PAYMASTER_URL ||
-    'https://rpc.zerodev.app/api/v3/8e6f4057-e935-485f-9b6d-f14696e92654/chain/1328',
+    'https://rpc.zerodev.app/api/v2/paymaster/8e6f4057-e935-485f-9b6d-f14696e92654?selfFunded=true',
   entryPointAddress:
     process.env.AA_ENTRY_POINT || '0x0000000071727De22E5E9d8BAf0edAc6f37da032', // EntryPoint v0.7
   enabled: process.env.ENABLE_AA !== 'false', // Default enabled
