@@ -33,3 +33,5 @@ Thumbs.db
 .turbo
 
 Dockerfile.api-final
+output/
+output-*
