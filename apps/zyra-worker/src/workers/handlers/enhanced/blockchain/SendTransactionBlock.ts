@@ -10,7 +10,7 @@ import {
   ValidationResult,
   SessionKeyValidationResult,
   SecurityViolationError,
-} from '@zyra/types';
+} from '@zzyra/types';
 import {
   createPublicClient,
   createWalletClient,

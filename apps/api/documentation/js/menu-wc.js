@@ -15,7 +15,7 @@ customElements.define('compodoc-menu', class extends HTMLElement {
         <nav>
             <ul class="list">
                 <li class="title">
-                    <a href="index.html" data-type="index-link">@zyra/api documentation</a>
+                    <a href="index.html" data-type="index-link">@zzyra/api documentation</a>
                 </li>
 
                 <li class="divider"></li>

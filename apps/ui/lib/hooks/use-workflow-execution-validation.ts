@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { Node, Edge } from "@xyflow/react";
-import { BlockType, getEnhancedBlockSchema } from "@zyra/types";
+import { BlockType, getEnhancedBlockSchema } from "@zzyra/types";
 import { useBlockValidation } from "./use-block-validation";
 import { z } from "zod";
 

@@ -25,7 +25,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { getNodeSchema, type NodeSchema } from "./schema-aware-connection";
-import { BlockType } from "@zyra/types";
+import { BlockType } from "@zzyra/types";
 
 interface EnhancedNodeData {
   label: string;

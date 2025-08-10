@@ -33,7 +33,7 @@ import {
   SecurityLevel,
   SecureBlockchainAuthConfig,
   UnifiedWorkflowNode,
-} from "@zyra/types";
+} from "@zzyra/types";
 import { useToast } from "@/components/ui/use-toast";
 import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 import {

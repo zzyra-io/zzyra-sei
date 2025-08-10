@@ -9,7 +9,7 @@ import {
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { NotificationsService } from "./notifications.service";
-import { Notification, PaginatedResult } from "@zyra/database";
+import { Notification, PaginatedResult } from "@zzyra/database";
 
 @ApiTags("notifications")
 @Controller("notifications")

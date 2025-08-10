@@ -1,4 +1,4 @@
-import { AIAgentConfig, AIAgentExecution, MCPServerConfig } from "@zyra/types";
+import { AIAgentConfig, AIAgentExecution, MCPServerConfig } from "@zzyra/types";
 import api from "../services/api";
 
 export class AIAgentAPI {

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { ExecutionRepository, WorkflowRepository } from "@zyra/database";
-import type { WorkflowExecution } from "@zyra/database";
+import { ExecutionRepository, WorkflowRepository } from "@zzyra/database";
+import type { WorkflowExecution } from "@zzyra/database";
 
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);

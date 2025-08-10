@@ -496,15 +496,15 @@ Zzyra is building toward a comprehensive AI and blockchain automation platform. 
     
     ```typescript
     // Example SDK usage
-    import { ZyraSDK } from '@zyra/sdk';
+    import { ZyraSDK } from '@zzyra/sdk';
     
-    const zyra = new ZyraSDK({
+    const zzyra = new ZyraSDK({
       apiKey: 'your-api-key',
       environment: 'production'
     });
     
     // Create and execute workflow
-    const workflow = await zyra.workflows.create({
+    const workflow = await zzyra.workflows.create({
       name: "DeFi Portfolio Rebalancer",
       blocks: [
         { type: "AI_AGENT", config: { /* ... */ } },
@@ -512,7 +512,7 @@ Zzyra is building toward a comprehensive AI and blockchain automation platform. 
       ]
     });
     
-    const execution = await zyra.workflows.execute(workflow.id);
+    const execution = await zzyra.workflows.execute(workflow.id);
     ```
   </Tab>
   

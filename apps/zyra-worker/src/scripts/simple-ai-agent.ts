@@ -361,7 +361,7 @@ const TEST_SCENARIOS = {
         type: 'mcp',
         config: {
           databaseUrl:
-            process.env.DATABASE_URL || 'postgresql://localhost/zyra',
+            process.env.DATABASE_URL || 'postgresql://localhost/zzyra',
         },
       },
     ],

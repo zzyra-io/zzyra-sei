@@ -1,6 +1,6 @@
 // lib/prisma.ts
 import { withAccelerate } from "@prisma/extension-accelerate";
-import { PrismaClient } from "@zyra/database";
+import { PrismaClient } from "@zzyra/database";
 
 // Create Prisma client without extension first
 const basePrisma = new PrismaClient({

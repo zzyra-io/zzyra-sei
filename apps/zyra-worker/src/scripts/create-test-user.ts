@@ -2,7 +2,7 @@
 
 import { config } from 'dotenv';
 import * as path from 'path';
-import { prisma } from '@zyra/database';
+import { prisma } from '@zzyra/database';
 
 // Load environment variables
 config({ path: path.join(__dirname, '../../../.env') });

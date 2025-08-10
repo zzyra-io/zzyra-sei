@@ -946,7 +946,7 @@
   WorkflowRepository,
   UserRepository,
   NotificationRepository,
-} from '@zyra/database';
+} from '@zzyra/database';
 <span class="cstat-no" title="statement not covered" >import {</span>
   prisma as defaultPrisma,
   createDevelopmentExtensionManager,
@@ -954,7 +954,7 @@
   createExtendedPrismaClient,
   DatabaseCacheProvider,
   DatabaseRateLimitStore,
-} from '@zyra/database';
+} from '@zzyra/database';
 &nbsp;
 interface WorkerMetrics {
   totalOperations: number;
@@ -981,7 +981,7 @@ export class <span class="cstat-no" title="statement not covered" ><span class="
     averageResponseTime: 0,
   };
 &nbsp;
-  // Repository instances from @zyra/database
+  // Repository instances from @zzyra/database
   public readonly <span class="cstat-no" title="statement not covered" >executions = new ExecutionRepository();</span>
   public readonly <span class="cstat-no" title="statement not covered" >workflows = new WorkflowRepository();</span>
   public readonly <span class="cstat-no" title="statement not covered" >users = new UserRepository();</span>

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { walletListenerSchema } from '@zyra/types';
+import { walletListenerSchema } from '@zzyra/types';
 
 // Explicit type definitions to avoid Zod inference issues
 interface WalletListenerConfig {

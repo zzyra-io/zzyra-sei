@@ -1,13 +1,13 @@
 "use client";
 
-import { BlockType } from "@zyra/types";
+import { BlockType } from "@zzyra/types";
 
 /**
  * Core type definitions for Zzyra workflow system
  */
 
 // Export BlockType from the types package to ensure consistency
-export { BlockType } from "@zyra/types";
+export { BlockType } from "@zzyra/types";
 
 export interface BlockDefinition {
   id: string;

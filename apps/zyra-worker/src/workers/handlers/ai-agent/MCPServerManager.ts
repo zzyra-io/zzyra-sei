@@ -366,7 +366,7 @@ export class MCPServerManager {
       // Create and connect client
       const client = new Client(
         {
-          name: 'zyra-worker',
+          name: 'zzyra-worker',
           version: '1.0.0',
         },
         {

@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { X, Plus, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { walletListenerSchema } from "@zyra/types";
+import { walletListenerSchema } from "@zzyra/types";
 
 const NETWORKS = [
   { value: "sei", label: "Sei" },

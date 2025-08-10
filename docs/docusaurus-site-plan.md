@@ -21,7 +21,7 @@
 ### **URL Structure**
 
 ```
-docs.zyra.com/
+docs.zzyra.com/
 ├── /                           # Smart landing page
 ├── /get-started               # Universal quick start
 ├── /business                  # For investors/clients
@@ -259,16 +259,16 @@ const primaryNav = [
 ## Installation
 
 ```bash
-npm install @zyra/sdk
+npm install @zzyra/sdk
 # or
-yarn add @zyra/sdk
+yarn add @zzyra/sdk
 ```
 ````
 
 ## Authentication
 
 ```javascript
-import { ZyraClient } from "@zyra/sdk";
+import { ZyraClient } from "@zzyra/sdk";
 
 const client = new ZyraClient({
   apiKey: "your-api-key",
@@ -299,7 +299,7 @@ const workflow = await client.workflows.create({
 
 - [Build your first custom block](/developers/block-development)
 - [Explore the API reference](/developers/api-reference)
-- [Join our developer community](https://discord.gg/zyra)
+- [Join our developer community](https://discord.gg/zzyra)
 
 ````
 
@@ -487,7 +487,7 @@ const components = {
 const config = {
   title: "Zzyra Documentation",
   tagline: "AI-Powered Web3 Automation for Everyone",
-  url: "https://docs.zyra.com",
+  url: "https://docs.zzyra.com",
   baseUrl: "/",
 
   presets: [
@@ -497,7 +497,7 @@ const config = {
         docs: {
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
-          editUrl: "https://github.com/zyra/docs/tree/main/",
+          editUrl: "https://github.com/zzyra/docs/tree/main/",
         },
         blog: false, // Disable blog, use external blog
         theme: {
@@ -553,7 +553,7 @@ const config = {
           items: [
             {
               label: "Platform",
-              href: "https://app.zyra.com",
+              href: "https://app.zzyra.com",
             },
             {
               label: "Pricing",
@@ -570,7 +570,7 @@ const config = {
             },
             {
               label: "GitHub",
-              href: "https://github.com/zyra",
+              href: "https://github.com/zzyra",
             },
           ],
         },
@@ -579,7 +579,7 @@ const config = {
           items: [
             {
               label: "Discord",
-              href: "https://discord.gg/zyra",
+              href: "https://discord.gg/zzyra",
             },
             {
               label: "Twitter",
@@ -600,7 +600,7 @@ const config = {
     algolia: {
       appId: "YOUR_APP_ID",
       apiKey: "YOUR_SEARCH_API_KEY",
-      indexName: "zyra-docs",
+      indexName: "zzyra-docs",
     },
   },
 
@@ -622,7 +622,7 @@ const config = {
 ```jsx
 // src/components/InteractiveDemo.jsx
 import React, { useState } from "react";
-import { WorkflowBuilder } from "@zyra/components";
+import { WorkflowBuilder } from "@zzyra/components";
 
 export function InteractiveDemo() {
   const [workflow, setWorkflow] = useState(null);

@@ -28,7 +28,7 @@ import { z } from "zod";
 import {
   seiSmartContractCallSchema,
   type SeiSmartContractCallConfig,
-} from "@zyra/types";
+} from "@zzyra/types";
 
 interface BlockConfigProps {
   config: Record<string, unknown>;

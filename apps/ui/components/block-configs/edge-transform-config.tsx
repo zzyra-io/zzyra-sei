@@ -25,7 +25,7 @@ import {
   Target,
   RefreshCw,
 } from "lucide-react";
-import { edgeTransformSchema } from "@zyra/types";
+import { edgeTransformSchema } from "@zzyra/types";
 
 interface EdgeTransformConfigProps {
   config: Record<string, unknown>;
@@ -59,7 +59,7 @@ export function EdgeTransformConfig({
   const [previewData, setPreviewData] = useState<any>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
-  // Use the schema from @zyra/types
+  // Use the schema from @zzyra/types
   const schema = edgeTransformSchema;
 
   // Initialize field mappings from config

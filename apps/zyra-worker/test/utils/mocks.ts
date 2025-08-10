@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { BlockHandler } from '@zyra/types';
+import { BlockHandler } from '@zzyra/types';
 
 // Mock Supabase client
 export const createMockSupabaseClient = () => {

@@ -63,7 +63,7 @@ export function validateOrphans(nodes: Node[], edges: Edge[]): void {
 
 // Ensure terminal nodes are action blocks (no outgoing, must be action)
 import { BlockType } from '@/types/workflow';
-import { BlockType } from '@zyra/types';
+import { BlockType } from '@zzyra/types';
 
 export function validateTerminals(nodes: Node[], edges: Edge[]): void {
   const hasOutgoing = new Set(edges.map(e => e.source));

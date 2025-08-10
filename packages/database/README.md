@@ -1,4 +1,4 @@
-# @zyra/database
+# @zzyra/database
 
 This package provides a centralized database access layer for the Zzyra platform, replacing Supabase with Prisma. It handles all database operations and is designed to be used by both the UI and worker components.
 
@@ -59,7 +59,7 @@ npm install
 Create a `.env` file in the root of the package with the following variables:
 
 ```
-DATABASE_URL="postgresql://username:password@localhost:5432/zyra?schema=public"
+DATABASE_URL="postgresql://username:password@localhost:5432/zzyra?schema=public"
 JWT_SECRET="your-jwt-secret-key-change-in-production"
 JWT_EXPIRES_IN="1d"
 REFRESH_TOKEN_EXPIRES_IN="7"
@@ -71,10 +71,10 @@ REFRESH_TOKEN_EXPIRES_IN="7"
 
 ```typescript
 // Import the entire package
-import * as db from "@zyra/database";
+import * as db from "@zzyra/database";
 
 // Or import specific components
-import { prisma, UserRepository, WorkflowRepository } from "@zyra/database";
+import { prisma, UserRepository, WorkflowRepository } from "@zzyra/database";
 ```
 
 #### Using repositories
@@ -119,7 +119,7 @@ const userId = authService.verifySession(token);
 
 ```typescript
 // In your API route
-import { authMiddleware, getUserId, getPolicyContext } from "@zyra/database";
+import { authMiddleware, getUserId, getPolicyContext } from "@zzyra/database";
 
 export async function middleware(req: NextRequest) {
   return authMiddleware(req);
@@ -139,7 +139,7 @@ The database package includes a robust policy enforcement system to replace Supa
 ### Using the PolicyService
 
 ```typescript
-import { PolicyService, PolicyContext } from "@zyra/database";
+import { PolicyService, PolicyContext } from "@zzyra/database";
 
 const policyService = new PolicyService();
 
@@ -188,7 +188,7 @@ const newWorkflow = await workflowRepo.create(
 To migrate data from Supabase to Prisma:
 
 ```typescript
-import { MigrationService } from "@zyra/database";
+import { MigrationService } from "@zzyra/database";
 
 const migrationService = new MigrationService({
   supabaseUrl: "https://your-project.supabase.co",

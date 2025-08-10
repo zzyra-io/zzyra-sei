@@ -2,7 +2,7 @@
 
 ## Overview
 
-Zyra is a Web3 automation platform built as a monorepo with three main components: a Next.js frontend (`ui/`), a NestJS API server (`api/`), and a NestJS worker service (`zyra-worker/`). The platform uses PostgreSQL with Prisma ORM for data persistence and RabbitMQ for message queuing.
+Zyra is a Web3 automation platform built as a monorepo with three main components: a Next.js frontend (`ui/`), a NestJS API server (`api/`), and a NestJS worker service (`zzyra-worker/`). The platform uses PostgreSQL with Prisma ORM for data persistence and RabbitMQ for message queuing.
 
 ## Technology Stack
 
@@ -28,7 +28,7 @@ Zyra is a Web3 automation platform built as a monorepo with three main component
 - **Documentation**: Swagger/OpenAPI
 - **AI Integration**: OpenRouter AI SDK
 
-### Worker Service (`apps/zyra-worker/`)
+### Worker Service (`apps/zzyra-worker/`)
 
 - **Framework**: NestJS 10.0.0
 - **Language**: TypeScript 5.1.3
@@ -44,13 +44,13 @@ Zyra is a Web3 automation platform built as a monorepo with three main component
 - **ORM**: Prisma 5.22.0
 - **Schema Location**: `packages/database/prisma/schema.prisma`
 - **Migrations**: Prisma migrations
-- **Client**: Shared Prisma client in `@zyra/database` package
+- **Client**: Shared Prisma client in `@zzyra/database` package
 
 ### Shared Packages
 
-- **`@zyra/database`**: Prisma client, repositories, authentication services
-- **`@zyra/types`**: Shared TypeScript types and schemas
-- **`@zyra/blocks`**: Block library and utilities
+- **`@zzyra/database`**: Prisma client, repositories, authentication services
+- **`@zzyra/types`**: Shared TypeScript types and schemas
+- **`@zzyra/blocks`**: Block library and utilities
 
 ### Infrastructure
 
@@ -162,7 +162,7 @@ apps/api/src/
 └── main.ts              # Application entry point
 ```
 
-### 3. Worker Service (`apps/zyra-worker/`)
+### 3. Worker Service (`apps/zzyra-worker/`)
 
 **Responsibilities:**
 
@@ -186,7 +186,7 @@ apps/api/src/
 **Directory Structure:**
 
 ```
-apps/zyra-worker/src/
+apps/zzyra-worker/src/
 ├── workers/              # Worker implementations
 │   ├── execution-worker.ts
 │   ├── workflow-executor.ts
@@ -264,7 +264,7 @@ apps/zyra-worker/src/
 
    ```bash
    git clone <repository-url>
-   cd zyra
+   cd zzyra
    ```
 
 2. **Install Dependencies**:
@@ -296,7 +296,7 @@ apps/zyra-worker/src/
 
    ```env
    # Database
-   DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zyra?schema=public"
+   DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zzyra?schema=public"
 
    # JWT
    JWT_SECRET="your-jwt-secret-key"

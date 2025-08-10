@@ -3,7 +3,7 @@ import {
   BlockExecutionContext,
   BlockHandler,
   CustomBlockDefinition,
-} from '@zyra/types';
+} from '@zzyra/types';
 import { DatabaseService } from '../../services/database.service';
 import { AbstractBlockHandler } from './AbstractBlockHandler';
 import { executeCustomBlockLogic } from '../../types/custom-block';

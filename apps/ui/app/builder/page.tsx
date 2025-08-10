@@ -36,13 +36,13 @@ import { useWorkflowExecutionValidation } from "@/lib/hooks/use-workflow-executi
 import { WorkflowValidationProvider } from "@/lib/contexts/workflow-validation-context";
 import { workflowService } from "@/lib/services/workflow-service";
 import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
-import { BlockType, CustomBlockDefinition } from "@zyra/types";
-import type { UnifiedWorkflowNode } from "@zyra/types";
+import { BlockType, CustomBlockDefinition } from "@zzyra/types";
+import type { UnifiedWorkflowNode } from "@zzyra/types";
 import {
   ensureValidWorkflowNode,
   prepareNodesForApi,
   prepareEdgesForApi,
-} from "@zyra/types";
+} from "@zzyra/types";
 import { ArrowLeft, Loader2, Play, Save, AlertCircle } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, useRef } from "react";
@@ -55,7 +55,7 @@ import {
   EnhancedBlockchainAuthorizationModal,
   useBlockchainDetection,
 } from "@/components/enhanced-blockchain-authorization-modal";
-import type { SecureBlockchainAuthConfig } from "@zyra/types";
+import type { SecureBlockchainAuthConfig } from "@zzyra/types";
 import {
   Tooltip,
   TooltipContent,

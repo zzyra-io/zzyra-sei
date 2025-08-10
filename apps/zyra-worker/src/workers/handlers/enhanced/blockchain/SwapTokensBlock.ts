@@ -8,7 +8,7 @@ import {
   PropertyType,
   ConnectionType,
   ValidationResult,
-} from '@zyra/types';
+} from '@zzyra/types';
 
 /**
  * Enhanced block for swapping tokens on decentralized exchanges

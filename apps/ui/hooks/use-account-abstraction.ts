@@ -882,7 +882,7 @@ export function useAccountAbstraction() {
 
       // Create delegation message that matches backend expectations
       // Create delegation message for automated workflow execution
-      // This allows zyra-worker to execute transactions on behalf of the user
+      // This allows zzyra-worker to execute transactions on behalf of the user
       const delegationMessage = {
         owner: signerAddress, // EOA signer address (for verification)
         smartWallet: smartWalletAddress, // Smart wallet address (for execution)
@@ -895,7 +895,7 @@ export function useAccountAbstraction() {
         nonce: Date.now(),
         // Workflow automation specific fields
         purpose: "workflow_automation",
-        platform: "zyra",
+        platform: "zzyra",
         automatedExecution: true,
       };
 
@@ -1091,7 +1091,7 @@ export function useAccountAbstraction() {
 
   /**
    * Get delegation info for automated workflow execution
-   * This explains how the delegation enables background execution by zyra-worker
+   * This explains how the delegation enables background execution by zzyra-worker
    */
   const getDelegationInfo = useCallback((delegation: SmartWalletDelegation) => {
     return {
@@ -1113,7 +1113,7 @@ export function useAccountAbstraction() {
       executionFlow: {
         immediate: "Frontend kernel client executes transactions directly",
         automated:
-          "Backend zyra-worker executes transactions using this delegation when workflows run",
+          "Backend zzyra-worker executes transactions using this delegation when workflows run",
         gasSponsorship: "ZeroDev paymaster sponsors gas costs",
         security: "Spending limits and operation restrictions enforced",
       },

@@ -8,7 +8,7 @@ import {
   ZyraNodeData,
   BlockType,
   HttpRequestOptions,
-} from '@zyra/types';
+} from '@zzyra/types';
 import { ZyraTemplateProcessor } from '../../../utils/template-processor';
 import { DatabaseService } from '../../../services/database.service';
 import { ExecutionLogger } from '../../execution-logger';

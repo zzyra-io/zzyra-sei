@@ -14,7 +14,7 @@ Transform your comprehensive documentation into a world-class Docusaurus site th
 ### **Multi-Audience URL Structure**
 
 ```
-docs.zyra.com/
+docs.zzyra.com/
 ├── /                           # Smart landing with audience routing
 ├── /get-started               # Universal quick start guide
 ├── /business/                 # For investors, clients, enterprises
@@ -263,16 +263,16 @@ docs.zyra.com/
 
 ```bash
 # Install the Zzyra SDK
-npm install @zyra/sdk
+npm install @zzyra/sdk
 # or
-yarn add @zyra/sdk
+yarn add @zzyra/sdk
 ```
 ````
 
 ## Authentication
 
 ```javascript
-import { ZyraClient } from "@zyra/sdk";
+import { ZyraClient } from "@zzyra/sdk";
 
 const client = new ZyraClient({
   apiKey: process.env.ZYRA_API_KEY,
@@ -520,7 +520,7 @@ export async function executeWebhook(
 #### **Workflow Builder Demo**
 
 ```jsx
-import { WorkflowBuilder } from "@zyra/components";
+import { WorkflowBuilder } from "@zzyra/components";
 
 export function InteractiveWorkflowDemo() {
   const [workflow, setWorkflow] = useState(demoWorkflow);
@@ -602,13 +602,13 @@ export function BlockCatalogBrowser() {
 const config = {
   title: "Zzyra Documentation",
   tagline: "AI-Powered Web3 Automation for Everyone",
-  url: "https://docs.zyra.com",
+  url: "https://docs.zzyra.com",
   baseUrl: "/",
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
   favicon: "img/favicon.ico",
 
-  organizationName: "zyra",
+  organizationName: "zzyra",
   projectName: "docs",
 
   i18n: {
@@ -623,7 +623,7 @@ const config = {
         docs: {
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
-          editUrl: "https://github.com/zyra/docs/tree/main/",
+          editUrl: "https://github.com/zzyra/docs/tree/main/",
           showLastUpdateAuthor: true,
           showLastUpdateTime: true,
         },
@@ -640,7 +640,7 @@ const config = {
   ],
 
   themeConfig: {
-    image: "img/zyra-social-card.jpg",
+    image: "img/zzyra-social-card.jpg",
 
     navbar: {
       title: "Zzyra",
@@ -685,13 +685,13 @@ const config = {
           label: "Developers",
         },
         {
-          href: "https://app.zyra.com",
+          href: "https://app.zzyra.com",
           label: "Launch App",
           position: "right",
           className: "launch-app-button",
         },
         {
-          href: "https://github.com/zyra",
+          href: "https://github.com/zzyra",
           label: "GitHub",
           position: "right",
         },
@@ -704,10 +704,10 @@ const config = {
         {
           title: "Product",
           items: [
-            { label: "Platform", href: "https://app.zyra.com" },
+            { label: "Platform", href: "https://app.zzyra.com" },
             { label: "Pricing", to: "/business/pricing" },
             { label: "Security", to: "/business/security" },
-            { label: "Status", href: "https://status.zyra.com" },
+            { label: "Status", href: "https://status.zzyra.com" },
           ],
         },
         {
@@ -716,23 +716,23 @@ const config = {
             { label: "Getting Started", to: "/developers/getting-started" },
             { label: "API Reference", to: "/developers/api-reference" },
             { label: "Block Development", to: "/developers/block-development" },
-            { label: "GitHub", href: "https://github.com/zyra" },
+            { label: "GitHub", href: "https://github.com/zzyra" },
           ],
         },
         {
           title: "Community",
           items: [
-            { label: "Discord", href: "https://discord.gg/zyra" },
+            { label: "Discord", href: "https://discord.gg/zzyra" },
             { label: "Twitter", href: "https://twitter.com/zyraplatform" },
-            { label: "Blog", href: "https://blog.zyra.com" },
-            { label: "Newsletter", href: "https://newsletter.zyra.com" },
+            { label: "Blog", href: "https://blog.zzyra.com" },
+            { label: "Newsletter", href: "https://newsletter.zzyra.com" },
           ],
         },
         {
           title: "Company",
           items: [
             { label: "About", to: "/about" },
-            { label: "Careers", href: "https://careers.zyra.com" },
+            { label: "Careers", href: "https://careers.zzyra.com" },
             { label: "Privacy", to: "/privacy" },
             { label: "Terms", to: "/terms" },
           ],
@@ -750,7 +750,7 @@ const config = {
     algolia: {
       appId: "YOUR_APP_ID",
       apiKey: "YOUR_SEARCH_API_KEY",
-      indexName: "zyra-docs",
+      indexName: "zzyra-docs",
       contextualSearch: true,
       searchParameters: {},
       searchPagePath: "search",
@@ -872,7 +872,7 @@ export default function ROICalculator() {
 
       <div className="cta-section">
         <p>Ready to see these results for yourself?</p>
-        <a href="https://app.zyra.com" className="cta-button">
+        <a href="https://app.zzyra.com" className="cta-button">
           Start Free Trial
         </a>
       </div>
@@ -894,7 +894,7 @@ const seoTemplates = {
       "Automate your Web3 workflows with AI-generated building blocks. DeFi, NFT, DAO automation made simple for everyone.",
     keywords:
       "Web3 automation, DeFi automation, NFT automation, DAO tools, blockchain automation, AI workflow builder",
-    canonical: "https://docs.zyra.com/",
+    canonical: "https://docs.zzyra.com/",
   },
 
   business: {

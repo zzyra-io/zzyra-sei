@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * This script cleans up duplicate imports by removing local imports
- * in favor of the shared @zyra/types package
+ * in favor of the shared @zzyra/types package
  */
 
 const fs = require('fs');
@@ -9,7 +9,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // Config
-const WORKER_DIR = path.resolve(__dirname, '../apps/zyra-worker');
+const WORKER_DIR = path.resolve(__dirname, '../apps/zzyra-worker');
 
 // Types to replace
 const TYPES_TO_REPLACE = [
@@ -54,7 +54,7 @@ function processFile(filePath) {
         // Parse the import items, trim whitespace
         const items = importItems.split(',').map(item => item.trim());
         
-        // Filter out items that are now imported from @zyra/types
+        // Filter out items that are now imported from @zzyra/types
         const remainingItems = items.filter(item => !TYPES_TO_REPLACE.includes(item));
         
         // If all items were removed, remove the entire import
@@ -70,13 +70,13 @@ function processFile(filePath) {
       return match;
     });
     
-    // 3. Make sure we have the @zyra/types import
-    if (!content.includes('@zyra/types') && TYPES_TO_REPLACE.some(type => content.includes(type))) {
+    // 3. Make sure we have the @zzyra/types import
+    if (!content.includes('@zzyra/types') && TYPES_TO_REPLACE.some(type => content.includes(type))) {
       // Find what types are used in the file
       const typesUsed = TYPES_TO_REPLACE.filter(type => content.includes(type));
       
       // Add the import at the top
-      content = `import { ${typesUsed.join(', ')} } from '@zyra/types';\n${content}`;
+      content = `import { ${typesUsed.join(', ')} } from '@zzyra/types';\n${content}`;
     }
     
     // If changed, write back to file

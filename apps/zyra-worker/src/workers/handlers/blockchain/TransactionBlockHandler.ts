@@ -23,7 +23,7 @@ import {
 } from 'viem';
 import * as chains from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import { BlockExecutionContext, BlockHandler } from '@zyra/types';
+import { BlockExecutionContext, BlockHandler } from '@zzyra/types';
 
 interface ChainConfig {
   name: string;

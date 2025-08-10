@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BlockExecutionContext, BlockHandler } from '@zyra/types';
+import { BlockExecutionContext, BlockHandler } from '@zzyra/types';
 import { DatabaseService } from '../../services/database.service';
 import * as nodemailer from 'nodemailer';
 import { ZyraTemplateProcessor } from '../../utils/template-processor';

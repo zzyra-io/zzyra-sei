@@ -4,9 +4,9 @@ This guide lists the essential environment variables required to set up and run 
 
 ## Overview
 
-Environment variables are used to configure the application without hardcoding sensitive information or configuration details directly into the code. Zzyra utilizes separate environment variable files for the frontend (`ui/.env`) and the backend worker (`zyra-worker/.env`).
+Environment variables are used to configure the application without hardcoding sensitive information or configuration details directly into the code. Zzyra utilizes separate environment variable files for the frontend (`ui/.env`) and the backend worker (`zzyra-worker/.env`).
 
-Template files (`ui/.env.example`, `zyra-worker/.env.example`) are provided in the repository. Copy these to `.env` in their respective directories and fill in the values.
+Template files (`ui/.env.example`, `zzyra-worker/.env.example`) are provided in the repository. Copy these to `.env` in their respective directories and fill in the values.
 
 **NEVER commit your `.env` files to version control.**
 
@@ -45,7 +45,7 @@ These variables are primarily used by the Next.js frontend application.
   - **Source:** Your OpenRouter account dashboard.
   - **Note:** The `NEXT_PUBLIC_` prefix makes this accessible for client-side requests to your own API routes that then use the key server-side (best practice) or potentially directly if needed, though server-side usage is recommended for better security and control.
 
-### `zyra-worker/.env` (Backend - NestJS)
+### `zzyra-worker/.env` (Backend - NestJS)
 
 These variables are used by the NestJS worker service.
 
@@ -62,7 +62,7 @@ These variables are used by the NestJS worker service.
   - **Source:** Supabase Project Dashboard > Project Settings > API > Project API Keys > `service_role` `secret`.
 
 - **(Optional) Other Worker-Specific Variables:**
-  - The worker might require additional variables for specific integrations (e.g., API keys for third-party services used in blocks, notification service keys). Refer to `zyra-worker/.env.example` for any other specific needs.
+  - The worker might require additional variables for specific integrations (e.g., API keys for third-party services used in blocks, notification service keys). Refer to `zzyra-worker/.env.example` for any other specific needs.
   - `PORT`: Often used to configure the port the NestJS service listens on if it exposes an HTTP interface (though this worker primarily polls the DB). Default is usually 3000 or defined in `main.ts`.
 
 ## Security Best Practices

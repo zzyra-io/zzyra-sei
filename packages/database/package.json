@@ -1,5 +1,5 @@
 {
-  "name": "@zyra/database",
+  "name": "@zzyra/database",
   "version": "0.1.0",
   "description": "Database package for Zzyra platform",
   "main": "dist/index.js",
@@ -20,7 +20,7 @@
   "dependencies": {
     "@prisma/client": "^5.0.0",
     "@supabase/supabase-js": "^2.38.0",
-    "@zyra/types": "workspace:*",
+    "@zzyra/types": "workspace:*",
     "jsonwebtoken": "^9.0.2",
     "uuid": "^9.0.1",
     "zod": "3.24.2"

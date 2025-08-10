@@ -45,10 +45,10 @@ Invoking executeWorkflow
 [Nest] 13731  - 04/22/2025, 11:43:21 PM VERBOSE [ExecutionWorker] Terminals validated
 [Nest] 13731  - 04/22/2025, 11:43:21 PM   ERROR [ExecutionWorker] [Worker] Job e293010a-4f3c-4248-ab0c-2519168dc263 failed: Cycle detected or orphan nodes exist
 Error: Cycle detected or orphan nodes exist
-    at topologicalSort (/Users/argahv/Documents/projects/personal/ai/zyra/zyra-worker/src/utils/graph.ts:48:45)
-    at ExecutionWorker.executeWorkflow (/Users/argahv/Documents/projects/personal/ai/zyra/zyra-worker/src/workers/execution.ts:158:35)
-    at ExecutionWorker.processItem (/Users/argahv/Documents/projects/personal/ai/zyra/zyra-worker/src/workers/execution.ts:92:36)
+    at topologicalSort (/Users/argahv/Documents/projects/personal/ai/zzyra/zzyra-worker/src/utils/graph.ts:48:45)
+    at ExecutionWorker.executeWorkflow (/Users/argahv/Documents/projects/personal/ai/zzyra/zzyra-worker/src/workers/execution.ts:158:35)
+    at ExecutionWorker.processItem (/Users/argahv/Documents/projects/personal/ai/zzyra/zzyra-worker/src/workers/execution.ts:92:36)
     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at ExecutionWorker.processBatch (/Users/argahv/Documents/projects/personal/ai/zyra/zyra-worker/node_modules/.pnpm/@argahvk+rabbitmq@0.0.1_reflect-metadata@0.2.2_rxjs@7.8.2/libs/rabbitmq/src/worker.base.ts:235:11)
-    at Timeout._onTimeout (/Users/argahv/Documents/projects/personal/ai/zyra/zyra-worker/node_modules/.pnpm/@argahvk+rabbitmq@0.0.1_reflect-metadata@0.2.2_rxjs@7.8.2/libs/rabbitmq/src/worker.base.ts:147:13)
+    at ExecutionWorker.processBatch (/Users/argahv/Documents/projects/personal/ai/zzyra/zzyra-worker/node_modules/.pnpm/@argahvk+rabbitmq@0.0.1_reflect-metadata@0.2.2_rxjs@7.8.2/libs/rabbitmq/src/worker.base.ts:235:11)
+    at Timeout._onTimeout (/Users/argahv/Documents/projects/personal/ai/zzyra/zzyra-worker/node_modules/.pnpm/@argahvk+rabbitmq@0.0.1_reflect-metadata@0.2.2_rxjs@7.8.2/libs/rabbitmq/src/worker.base.ts:147:13)
 [Nest] 13731  - 04/22/2025, 11:43:22 PM     LOG [ExecutionWorker] ZYRA.EXECUTION_QUEUE - Worker ID: 1 - Message processed and acknowledged.

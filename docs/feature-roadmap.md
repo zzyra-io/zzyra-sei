@@ -7,7 +7,7 @@ This document outlines the planned features and development phases for Zzyra.
 - **Core Platform:**
   - Visual Drag-and-Drop Workflow Builder (React Flow)
   - User Authentication & Workflow Persistence (Supabase)
-  - Monorepo Structure (`ui` + `zyra-worker`)
+  - Monorepo Structure (`ui` + `zzyra-worker`)
   - Resilient Asynchronous Workflow Execution Engine (NestJS Worker, Supabase Queue, Retry/Locking Logic)
   - Basic Execution Logging (`workflow_executions`, `node_logs`)
   - pnpm Workspace Setup

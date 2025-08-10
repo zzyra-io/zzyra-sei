@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BlockHandler, BlockExecutionContext } from '@zyra/types';
+import { BlockHandler, BlockExecutionContext } from '@zzyra/types';
 
 @Injectable()
 export class EdgeTransformHandler implements BlockHandler {

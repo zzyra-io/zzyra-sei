@@ -2,7 +2,7 @@ import {
   BlockExecutionContext,
   BlockHandler,
   enhancedDataTransformSchema,
-} from '@zyra/types';
+} from '@zzyra/types';
 import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 
@@ -11,7 +11,7 @@ import { z } from 'zod';
  * Transforms and manipulates data between blocks
  */
 export class DataTransformHandler implements BlockHandler {
-  // Use the enhanced schema from @zyra/types
+  // Use the enhanced schema from @zzyra/types
   static readonly inputSchema = enhancedDataTransformSchema.inputSchema;
   static readonly outputSchema = enhancedDataTransformSchema.outputSchema;
   static readonly configSchema = enhancedDataTransformSchema.configSchema;

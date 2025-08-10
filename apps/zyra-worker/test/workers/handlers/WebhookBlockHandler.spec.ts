@@ -4,7 +4,7 @@ import { Test } from '@nestjs/testing';
 import { WebhookBlockHandler } from '../../../src/workers/handlers/WebhookBlockHandler';
 
 import { Logger } from '@nestjs/common';
-import { BlockHandler } from '@zyra/types';
+import { BlockHandler } from '@zzyra/types';
 
 // Mock axios
 jest.mock('axios', () => ({

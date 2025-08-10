@@ -38,7 +38,7 @@ Before installing Zzyra, ensure you have the following installed:
 
    ```bash
    git clone <your-repository-url>
-   cd zyra
+   cd zzyra
    ```
 
 2. **Run the automated setup script:**
@@ -68,7 +68,7 @@ Before installing Zzyra, ensure you have the following installed:
 
    ```bash
    git clone <your-repository-url>
-   cd zyra
+   cd zzyra
    pnpm install
    ```
 
@@ -80,13 +80,13 @@ Before installing Zzyra, ensure you have the following installed:
 
 3. **Set up environment variables:**
 
-   Create `.env` files in both `apps/ui/` and `apps/zyra-worker/` directories:
+   Create `.env` files in both `apps/ui/` and `apps/zzyra-worker/` directories:
 
    **`apps/ui/.env`:**
 
    ```env
    # Database
-   DATABASE_URL=postgresql://zzyra:zzyra@localhost:5432/zyra?schema=public
+   DATABASE_URL=postgresql://zzyra:zzyra@localhost:5432/zzyra?schema=public
 
    # Authentication
    JWT_SECRET=your-jwt-secret-key-change-in-production
@@ -101,11 +101,11 @@ Before installing Zzyra, ensure you have the following installed:
    OLLAMA_URL=http://localhost:11434
    ```
 
-   **`apps/zyra-worker/.env`:**
+   **`apps/zzyra-worker/.env`:**
 
    ```env
    # Database
-   DATABASE_URL=postgresql://zzyra:zzyra@localhost:5432/zyra?schema=public
+   DATABASE_URL=postgresql://zzyra:zzyra@localhost:5432/zzyra?schema=public
 
    # Authentication
    JWT_SECRET=your-jwt-secret-key-change-in-production
@@ -144,14 +144,14 @@ Before installing Zzyra, ensure you have the following installed:
 ## 🏗 Project Structure
 
 ```
-zyra/
+zzyra/
 ├── apps/
 │   ├── ui/                 # Next.js Frontend (App Router)
 │   │   ├── app/           # Pages and API routes
 │   │   ├── components/    # React components
 │   │   ├── lib/          # Core logic, AI providers, utilities
 │   │   └── migrations/   # Database migrations
-│   └── zyra-worker/       # NestJS Backend Worker
+│   └── zzyra-worker/       # NestJS Backend Worker
 │       ├── src/          # Worker services and controllers
 │       └── test/         # Unit and integration tests
 ├── packages/
@@ -213,7 +213,7 @@ The project uses PostgreSQL with Prisma ORM. The Docker Compose setup provides a
 
    - PostgreSQL database on port 5432
    - pgAdmin web interface on port 8080 (admin: zzyra/zzyra)
-   - Database URL: `postgresql://zzyra:zzyra@localhost:5432/zyra?schema=public`
+   - Database URL: `postgresql://zzyra:zzyra@localhost:5432/zzyra?schema=public`
 
 2. **Production Setup**: For production, use a hosted PostgreSQL service:
    - Update `DATABASE_URL` in environment variables
@@ -242,15 +242,15 @@ For AI-powered block generation:
 
 ```bash
 # Build Docker image
-cd apps/zyra-worker
-docker build -t zyra-worker .
+cd apps/zzyra-worker
+docker build -t zzyra-worker .
 
 # Run with environment variables
 docker run -d \
-  --name zyra-worker \
+  --name zzyra-worker \
   -e DATABASE_URL=your_database_url \
   -e JWT_SECRET=your_jwt_secret \
-  zyra-worker
+  zzyra-worker
 ```
 
 ## 🔍 Troubleshooting
@@ -300,4 +300,4 @@ We welcome contributions! Please see our [Contributing Guidelines](docs/CONTRIBU
 - [API Documentation](docs/api.md)
 - [Environment Variables Guide](docs/environment-variables-guide.md)
 - [User Stories & Market Analysis](docs/user-stories.md)
-- [Development Cost Analysis](docs/zyra-development-costs-nepal.md)
+- [Development Cost Analysis](docs/zzyra-development-costs-nepal.md)

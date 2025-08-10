@@ -24,7 +24,7 @@ This script demonstrates real AI Agent execution using the implemented AI Agent 
 
 ### List Available Demos
 ```bash
-cd apps/zyra-worker
+cd apps/zzyra-worker
 ts-node src/scripts/ai-agent-demo.ts
 ```
 

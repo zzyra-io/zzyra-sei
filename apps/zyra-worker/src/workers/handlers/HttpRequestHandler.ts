@@ -3,7 +3,7 @@ import {
   BlockExecutionContext,
   BlockHandler,
   enhancedHttpRequestSchema,
-} from '@zyra/types';
+} from '@zzyra/types';
 import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { ZyraTemplateProcessor } from '../../utils/template-processor';
@@ -14,7 +14,7 @@ import { ZyraTemplateProcessor } from '../../utils/template-processor';
  * Maintains backward compatibility with price monitoring configurations
  */
 export class HttpRequestHandler implements BlockHandler {
-  // Use the enhanced schema from @zyra/types
+  // Use the enhanced schema from @zzyra/types
   static readonly inputSchema = enhancedHttpRequestSchema.inputSchema;
   static readonly outputSchema = enhancedHttpRequestSchema.outputSchema;
   static readonly configSchema = enhancedHttpRequestSchema.configSchema;

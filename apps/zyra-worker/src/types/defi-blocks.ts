@@ -1,4 +1,4 @@
-import { BlockType } from '@zyra/types';
+import { BlockType } from '@zzyra/types';
 /**
  * Types for DeFi block configurations and operations
  */

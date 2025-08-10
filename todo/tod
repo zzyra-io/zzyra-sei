@@ -118,7 +118,7 @@ Collaborative Editing (Future)
 Performance & UX
 – Virtualize the canvas rendering for very large graphs (>200 nodes).
 – Debounce expensive operations (e.g. JSON stringification) when updating search params or saving.
-2. Execution Worker (zyra‑worker/src/workers/execution.ts)
+2. Execution Worker (zzyra‑worker/src/workers/execution.ts)
 Key Flow
 Batch Consumption
 • processItem(batch: any[]) picks up messages from RabbitMQ.

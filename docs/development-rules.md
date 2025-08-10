@@ -12,24 +12,24 @@ Zzyra is an AI-driven, blockchain-focused workflow automation platform. It enabl
 
 ## 3. Shared Packages Usage
 
-- All shared types must be defined in `packages/types` and imported via `@zyra/types`.
-- Do not define new types in `apps/ui` or `apps/zyra-worker` unless strictly local and not shared.
+- All shared types must be defined in `packages/types` and imported via `@zzyra/types`.
+- Do not define new types in `apps/ui` or `apps/zzyra-worker` unless strictly local and not shared.
 - Confirm type existence before adding new ones.
-- All database access, repositories, authentication, and policy logic must be used from `@zyra/database`.
+- All database access, repositories, authentication, and policy logic must be used from `@zzyra/database`.
 - Do not access the database directly or define new repositories outside this package.
 - Confirm DB logic existence before adding new ones.
 - Any new type or DB logic required by UI or worker must be proposed and added to the relevant shared package before use.
 
 ## 4. Worker (Execution Engine) Guidelines
 
-- The worker (`apps/zyra-worker`) acts solely as the execution engine for workflows and blocks.
-- It must use types from `@zyra/types` and DB logic from `@zyra/database`.
+- The worker (`apps/zzyra-worker`) acts solely as the execution engine for workflows and blocks.
+- It must use types from `@zzyra/types` and DB logic from `@zzyra/database`.
 - Do not add business logic, type definitions, or DB access outside of the shared packages.
 - All execution, logging, and workflow logic must be modular, self-contained, and use shared types.
 
 ## 5. UI Guidelines
 
-- The UI (`apps/ui`) must use types from `@zyra/types` and DB logic from `@zyra/database`.
+- The UI (`apps/ui`) must use types from `@zzyra/types` and DB logic from `@zzyra/database`.
 - Do not duplicate or redefine types or DB logic in the UI.
 - All API routes and server-side logic must use the shared packages for type safety and consistency.
 
@@ -194,13 +194,13 @@ Zzyra is an AI-driven, blockchain-focused workflow automation platform. It enabl
 
 - Run DB migrations: `pnpm run db:push` from the `ui` folder (for Prisma).
 - Start frontend: `pnpm run dev` in `apps/ui`.
-- Start worker: `pnpm run start:dev` in `apps/zyra-worker`.
+- Start worker: `pnpm run start:dev` in `apps/zzyra-worker`.
 - Deploy: Use Netlify or your configured deployment pipeline.
 
 ## 18. General Guidelines
 
 - Always check both UI and worker for integration and sync when adding or updating features.
-- If unsure, check the `docs/`, `apps/ui/`, or `apps/zyra-worker/` folders for reference.
+- If unsure, check the `docs/`, `apps/ui/`, or `apps/zzyra-worker/` folders for reference.
 - Do not create unnecessary files; keep the codebase clean and maintainable.
 - Each file should be self-contained, easy to maintain, and understand.
 - All new files must be under 300 lines; split larger features into multiple, self-contained, loosely coupled files.

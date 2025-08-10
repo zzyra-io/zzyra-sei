@@ -5,7 +5,7 @@ import {
   WorkflowRepository,
   UserRepository,
   NotificationRepository,
-} from '@zyra/database';
+} from '@zzyra/database';
 import {
   prisma as defaultPrisma,
   createDevelopmentExtensionManager,
@@ -14,7 +14,7 @@ import {
   DatabaseCacheProvider,
   DatabaseRateLimitStore,
   WorkflowStatus,
-} from '@zyra/database';
+} from '@zzyra/database';
 
 interface WorkerMetrics {
   totalOperations: number;
@@ -41,7 +41,7 @@ export class DatabaseService {
     averageResponseTime: 0,
   };
 
-  // Repository instances from @zyra/database
+  // Repository instances from @zzyra/database
   public readonly executions = new ExecutionRepository();
   public readonly workflows = new WorkflowRepository();
   public readonly users = new UserRepository();

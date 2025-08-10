@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { NotificationRepository } from "@zyra/database";
-import { Notification, PaginatedResult } from "@zyra/database";
+import { NotificationRepository } from "@zzyra/database";
+import { Notification, PaginatedResult } from "@zzyra/database";
 
 @Injectable()
 export class NotificationsService {

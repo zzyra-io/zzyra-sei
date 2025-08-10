@@ -17,7 +17,7 @@ import {
   Connection,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { BlockType, NodeCategory } from "@zyra/types";
+import { BlockType, NodeCategory } from "@zzyra/types";
 // Removed debounce import since we're using direct node updates
 import { useNodeConfigurations } from "@/app/builder/node-configurations";
 import { useWorkflowStore } from "@/lib/store/workflow-store";

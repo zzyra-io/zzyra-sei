@@ -29,7 +29,7 @@ import {
   CustomBlockInput,
   CustomBlockOutput,
   CustomBlockDefinition,
-} from "@zyra/types";
+} from "@zzyra/types";
 import api from "@/lib/services/api";
 
 const CustomBlocksModal = ({

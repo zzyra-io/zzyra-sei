@@ -29,7 +29,7 @@ echo "Installing PM2..."
 npm install -g pm2
 
 # Create app directory if it doesn't exist
-APP_DIR="/opt/zyra-worker"
+APP_DIR="/opt/zzyra-worker"
 echo "Creating application directory at $APP_DIR..."
 sudo mkdir -p $APP_DIR
 sudo chown -R $USER:$USER $APP_DIR
@@ -59,7 +59,7 @@ echo "Creating PM2 ecosystem file..."
 cat > $APP_DIR/ecosystem.config.js << EOL
 module.exports = {
   apps: [{
-    name: 'zyra-worker',
+    name: 'zzyra-worker',
     script: 'dist/main.js',
     instances: 1,
     autorestart: true,
@@ -116,7 +116,7 @@ echo "=== Zzyra Worker Setup Complete ==="
 echo "The worker is now running and configured to start automatically on boot."
 echo "You can manage the worker using PM2 commands:"
 echo "  - Check status: pm2 status"
-echo "  - View logs: pm2 logs zyra-worker"
-echo "  - Restart: pm2 restart zyra-worker"
+echo "  - View logs: pm2 logs zzyra-worker"
+echo "  - Restart: pm2 restart zzyra-worker"
 echo ""
 echo "Remember to update the .env file with your production configuration."

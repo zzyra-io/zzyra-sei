@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { BlockType, DataType } from "@zyra/types";
+import { BlockType, DataType } from "@zzyra/types";
 
 interface PromptTemplate {
   id: string;

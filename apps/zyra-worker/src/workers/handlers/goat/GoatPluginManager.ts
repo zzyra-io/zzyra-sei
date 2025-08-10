@@ -681,7 +681,7 @@ export class GoatPluginManager {
               handler: tool.handler,
               metadata: {
                 version: '1.0.0',
-                author: 'zyra-system',
+                author: 'zzyra-system',
                 tags: [pluginConfig.category, networkName],
               },
             };

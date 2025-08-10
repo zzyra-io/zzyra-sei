@@ -3,7 +3,7 @@ import {
   ConflictException,
   NotFoundException,
 } from "@nestjs/common";
-import { WalletRepository } from "@zyra/database";
+import { WalletRepository } from "@zzyra/database";
 import {
   CreateWalletDto,
   WalletResponseDto,

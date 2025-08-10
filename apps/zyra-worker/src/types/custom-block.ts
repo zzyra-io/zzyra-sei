@@ -1,4 +1,4 @@
-// Import shared types from @zyra/types
+// Import shared types from @zzyra/types
 import {
   NodeCategory,
   DataType,
@@ -9,7 +9,7 @@ import {
   CustomBlockExecutionResult as SharedExecutionResult,
   createParameter as sharedCreateParameter,
   createCustomBlockDefinition as sharedCreateCustomBlockDefinition,
-} from '@zyra/types';
+} from '@zzyra/types';
 
 // Re-export the shared types
 export { DataType };

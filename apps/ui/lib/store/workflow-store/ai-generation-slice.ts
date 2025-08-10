@@ -68,7 +68,7 @@ export const createAIGenerationSlice: StateCreator<
       // Store recent prompts in localStorage for persistence
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem('zyra-recent-prompts', JSON.stringify(prompts));
+          localStorage.setItem('zzyra-recent-prompts', JSON.stringify(prompts));
         } catch (e) {
           console.error('Failed to store recent prompts in localStorage:', e);
         }

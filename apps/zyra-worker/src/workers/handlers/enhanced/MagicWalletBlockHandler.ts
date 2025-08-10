@@ -8,7 +8,7 @@ import {
   ConnectionType,
   PropertyType,
   ValidationResult,
-} from '@zyra/types';
+} from '@zzyra/types';
 import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()

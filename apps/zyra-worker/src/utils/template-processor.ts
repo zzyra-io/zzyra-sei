@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { TemplateProcessor } from '@zyra/types';
+import { TemplateProcessor } from '@zzyra/types';
 
 @Injectable()
 export class ZyraTemplateProcessor implements TemplateProcessor {

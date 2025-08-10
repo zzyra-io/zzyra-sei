@@ -2,10 +2,10 @@
 
 ## Type Definitions
 
-### Shared Types (`@zyra/types`)
+### Shared Types (`@zzyra/types`)
 
 - All shared types must be defined in `packages/types`
-- Use explicit types from `@zyra/types` instead of creating new ones
+- Use explicit types from `@zzyra/types` instead of creating new ones
 - Follow the type hierarchy:
 
   ```typescript
@@ -71,11 +71,11 @@ function createRepository<T extends BaseEntity>(entity: T): Repository<T> {
 
 ```typescript
 // Good
-import { User, UserDTO } from "@zyra/types";
-import type { Workflow } from "@zyra/types";
+import { User, UserDTO } from "@zzyra/types";
+import type { Workflow } from "@zzyra/types";
 
 // Bad
-import { User as LocalUser } from "@zyra/types"; // Don't rename types
+import { User as LocalUser } from "@zzyra/types"; // Don't rename types
 ```
 
 ### Type-Only Imports
@@ -84,8 +84,8 @@ import { User as LocalUser } from "@zyra/types"; // Don't rename types
 - Use regular imports for values
 
 ```typescript
-import type { User } from "@zyra/types";
-import { createUser } from "@zyra/database";
+import type { User } from "@zzyra/types";
+import { createUser } from "@zzyra/database";
 ```
 
 ## Type Exports

@@ -35,18 +35,18 @@ This package contains everything needed to deploy the Zzyra worker to Oracle Clo
 ## Quick Start
 
 1. Upload this package to your Oracle Cloud instance
-2. Extract the package: \`tar -xzf zyra-worker-deployment.tar.gz\`
+2. Extract the package: \`tar -xzf zzyra-worker-deployment.tar.gz\`
 3. Navigate to the extracted directory: \`cd deployment-package\`
 4. Make the setup script executable: \`chmod +x deploy-scripts/setup.sh\`
 5. Run the setup script: \`./deploy-scripts/setup.sh\`
-6. Configure your environment variables in \`/opt/zyra-worker/.env\`
+6. Configure your environment variables in \`/opt/zzyra-worker/.env\`
 
 For detailed instructions, see \`deploy-scripts/ORACLE_CLOUD_DEPLOYMENT.md\`.
 EOL
 
 # Create a tar.gz archive
 echo "Creating deployment archive..."
-tar -czf ./zyra-worker-deployment.tar.gz -C $DEPLOY_DIR .
+tar -czf ./zzyra-worker-deployment.tar.gz -C $DEPLOY_DIR .
 
-echo "=== Deployment Package Created: zyra-worker-deployment.tar.gz ==="
+echo "=== Deployment Package Created: zzyra-worker-deployment.tar.gz ==="
 echo "Upload this file to your Oracle Cloud instance and follow the instructions in deploy-scripts/ORACLE_CLOUD_DEPLOYMENT.md"

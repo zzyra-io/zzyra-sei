@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Config
-const WORKER_DIR = path.resolve(__dirname, '../apps/zyra-worker');
+const WORKER_DIR = path.resolve(__dirname, '../apps/zzyra-worker');
 
 // Handler files with type definition conflicts
 const HANDLER_FILES = [
@@ -41,16 +41,16 @@ function fixTypeDefinitions(filePath, fileName) {
     const schemaRegex = /(export\s+const\s+\w+ConfigSchema\s*=[\s\S]*?\)\s*;)/g;
     
     // Comment out type definitions
-    content = content.replace(typeRegex, '// @zyra/types: Local type definition removed\n// $1');
+    content = content.replace(typeRegex, '// @zzyra/types: Local type definition removed\n// $1');
     
     // Comment out schema definitions
-    content = content.replace(schemaRegex, '// @zyra/types: Local schema definition removed\n// $1');
+    content = content.replace(schemaRegex, '// @zzyra/types: Local schema definition removed\n// $1');
     
     // Fix imports
-    if (content.includes('import {') && content.includes('from \'@zyra/types\'')) {
+    if (content.includes('import {') && content.includes('from \'@zzyra/types\'')) {
       // Remove conflicting imports
       content = content.replace(
-        /import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]@zyra\/types['"]\s*;/g,
+        /import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]@zzyra\/types['"]\s*;/g,
         (match, imports) => {
           const importParts = imports.split(',').map(part => part.trim());
           const filteredParts = importParts.filter(part => 
@@ -58,20 +58,20 @@ function fixTypeDefinitions(filePath, fileName) {
           );
           
           if (filteredParts.length === 0) {
-            return '// Import removed - conflicts resolved with @zyra/types';
+            return '// Import removed - conflicts resolved with @zzyra/types';
           }
           
-          return `import { ${filteredParts.join(', ')} } from '@zyra/types';`;
+          return `import { ${filteredParts.join(', ')} } from '@zzyra/types';`;
         }
       );
       
       // Add back BlockType and BlockExecutionContext
       if (!content.includes('BlockType') && !content.includes('BlockExecutionContext')) {
-        content = `import { BlockType, BlockExecutionContext } from '@zyra/types';\n${content}`;
+        content = `import { BlockType, BlockExecutionContext } from '@zzyra/types';\n${content}`;
       } else if (!content.includes('BlockType')) {
-        content = `import { BlockType } from '@zyra/types';\n${content}`;
+        content = `import { BlockType } from '@zzyra/types';\n${content}`;
       } else if (!content.includes('BlockExecutionContext')) {
-        content = `import { BlockExecutionContext } from '@zyra/types';\n${content}`;
+        content = `import { BlockExecutionContext } from '@zzyra/types';\n${content}`;
       }
     }
     
@@ -99,20 +99,20 @@ function fixMissingContext(filePath, fileName) {
     
     // Add import for BlockExecutionContext if not present
     if (content.includes('ctx: BlockExecutionContext') && !content.includes('import { BlockExecutionContext }')) {
-      if (content.includes('from \'@zyra/types\'')) {
+      if (content.includes('from \'@zzyra/types\'')) {
         // Add to existing import
         content = content.replace(
-          /import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]@zyra\/types['"]\s*;/g,
+          /import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]@zzyra\/types['"]\s*;/g,
           (match, imports) => {
             if (!imports.includes('BlockExecutionContext')) {
-              return `import { BlockExecutionContext, ${imports} } from '@zyra/types';`;
+              return `import { BlockExecutionContext, ${imports} } from '@zzyra/types';`;
             }
             return match;
           }
         );
       } else {
         // Add new import
-        content = `import { BlockExecutionContext } from '@zyra/types';\n${content}`;
+        content = `import { BlockExecutionContext } from '@zzyra/types';\n${content}`;
       }
     }
     

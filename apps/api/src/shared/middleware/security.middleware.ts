@@ -1,7 +1,7 @@
 import { Injectable, NestMiddleware, Logger } from "@nestjs/common";
 import { Request, Response, NextFunction } from "express";
 import { PrismaService } from "../../database/prisma.service";
-import { SessionEventType } from "@zyra/types";
+import { SessionEventType } from "@zzyra/types";
 import { createHmac, createHash } from "crypto";
 
 /**

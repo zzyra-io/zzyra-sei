@@ -11,8 +11,8 @@ import {
   authMiddleware,
   getUserId,
   getPolicyContext,
-} from "@zyra/database";
-import { BlockType } from "@zyra/types";
+} from "@zzyra/database";
+import { BlockType } from "@zzyra/types";
 
 // Initialize services
 const authService = new AuthService();

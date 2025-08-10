@@ -8,7 +8,7 @@ import {
   PropertyType,
   ConnectionType,
   ZyraNodeData,
-} from '@zyra/types';
+} from '@zzyra/types';
 
 /**
  * SEI Network DCA (Dollar Cost Averaging) Trading Bot

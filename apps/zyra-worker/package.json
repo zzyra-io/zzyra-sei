@@ -1,5 +1,5 @@
 {
-  "name": "zyra-worker",
+  "name": "zzyra-worker",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -66,8 +66,8 @@
     "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/multi-chain-ecdsa-validator": "^5.4.5",
     "@zerodev/sdk": "^5.4.41",
-    "@zyra/database": "workspace:*",
-    "@zyra/types": "workspace:*",
+    "@zzyra/database": "workspace:*",
+    "@zzyra/types": "workspace:*",
     "ai": "^4.3.16",
     "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.3",

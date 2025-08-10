@@ -225,7 +225,7 @@ async validateERC20Transfer(sessionKeyId: string, tokenAddress: string, recipien
 
 **P1.1: Enhanced ERC-20 Support**
 ```typescript
-// apps/zyra-worker/src/services/erc20.service.ts
+// apps/zzyra-worker/src/services/erc20.service.ts
 @Injectable()
 export class ERC20Service {
   async executeTransfer(params: {
@@ -271,7 +271,7 @@ export class ERC20Service {
 
 **P1.2: Comprehensive Error Handling**
 ```typescript
-// apps/zyra-worker/src/services/error-handler.service.ts
+// apps/zzyra-worker/src/services/error-handler.service.ts
 export enum TransactionErrorType {
   INSUFFICIENT_BALANCE = 'INSUFFICIENT_BALANCE',
   TOKEN_NOT_ALLOWED = 'TOKEN_NOT_ALLOWED',

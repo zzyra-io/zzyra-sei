@@ -7,7 +7,7 @@ The Zyra API is built with NestJS and provides RESTful endpoints for workflow au
 ## Base URL
 
 - **Development**: `http://localhost:3002/api`
-- **Production**: `https://api.zyra.com/api`
+- **Production**: `https://api.zzyra.com/api`
 
 ## Authentication
 
@@ -645,7 +645,7 @@ Authorization: Bearer <jwt-token>
 ### JavaScript/TypeScript
 
 ```typescript
-import { ZyraClient } from '@zyra/sdk';
+import { ZyraClient } from '@zzyra/sdk';
 
 const client = new ZyraClient({
   baseUrl: 'http://localhost:3002/api',
@@ -672,7 +672,7 @@ const execution = await client.workflows.execute(workflow.id, {
 The API includes interactive documentation via Swagger UI:
 
 - **Development**: `http://localhost:3002/api/docs`
-- **Production**: `https://api.zyra.com/api/docs`
+- **Production**: `https://api.zzyra.com/api/docs`
 
 ### Example cURL Requests
 

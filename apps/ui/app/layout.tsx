@@ -25,14 +25,14 @@ export const metadata = {
   title: "Zzyra - AI-Powered Workflow Automation with Blockchain",
   description:
     "Build powerful AI-native workflows that seamlessly integrate with blockchain technology",
-  metadataBase: new URL("https://zyra.vercel.app"),
+  metadataBase: new URL("https://zzyra.vercel.app"),
   generator: "v0.dev",
   icons: {
     icon: [
-      { url: "/zyra-icon.svg", type: "image/svg+xml" },
+      { url: "/zzyra-icon.svg", type: "image/svg+xml" },
       { url: "/favicon.ico", type: "image/x-icon" },
     ],
-    apple: "/zyra-icon.svg",
+    apple: "/zzyra-icon.svg",
   },
 };
 

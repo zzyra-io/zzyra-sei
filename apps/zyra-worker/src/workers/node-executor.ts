@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { trace } from '@opentelemetry/api';
-import { BlockHandler, BlockExecutionContext, BlockType } from '@zyra/types';
+import { BlockHandler, BlockExecutionContext, BlockType } from '@zzyra/types';
 import { DatabaseService } from '../services/database.service';
 import { ExecutionLogger } from './execution-logger';
 import { MagicAdminService } from '../services/magic-admin.service';
 import { CircuitBreakerDbService } from '../lib/blockchain/CircuitBreakerDbService';
 import { BlockHandlerRegistry } from './handlers/BlockHandlerRegistry';
 import { EnhancedBlockRegistry } from './handlers/enhanced/EnhancedBlockRegistry';
-import { getEnhancedBlockSchema } from '@zyra/types';
+import { getEnhancedBlockSchema } from '@zzyra/types';
 import { ZyraTemplateProcessor } from '../utils/template-processor';
 
 @Injectable()

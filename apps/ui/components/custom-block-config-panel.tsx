@@ -15,7 +15,7 @@ import {
   type BlockParameter,
   DataType,
   NodeCategory,
-} from "@zyra/types";
+} from "@zzyra/types";
 import { customBlockService } from "@/lib/services/custom-block-service";
 import { useToast } from "@/components/ui/use-toast";
 

@@ -626,7 +626,7 @@ const config = {
     },
     output: {
       value:
-        "/Users/argahv/Documents/projects/personal/ai/zyra/packages/database/src/generated/client",
+        "/Users/argahv/Documents/projects/personal/ai/zzyra/packages/database/src/generated/client",
       fromEnvVar: null,
     },
     config: {
@@ -641,7 +641,7 @@ const config = {
     ],
     previewFeatures: [],
     sourceFilePath:
-      "/Users/argahv/Documents/projects/personal/ai/zyra/packages/database/prisma/schema.prisma",
+      "/Users/argahv/Documents/projects/personal/ai/zzyra/packages/database/prisma/schema.prisma",
     isCustomOutput: true,
   },
   relativeEnvPaths: {

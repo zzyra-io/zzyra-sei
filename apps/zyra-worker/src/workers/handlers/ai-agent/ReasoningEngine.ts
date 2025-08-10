@@ -2745,7 +2745,7 @@ Respond with: "VALID - [brief reason]" or "INVALID - [brief reason]"`;
 
       this.sequentialThinkingClient = new Client(
         {
-          name: 'zyra-reasoning-engine',
+          name: 'zzyra-reasoning-engine',
           version: '1.0.0',
         },
         {

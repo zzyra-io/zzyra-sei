@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { z } from "zod";
-import { getEnhancedBlockSchema, BlockType } from "@zyra/types";
+import { getEnhancedBlockSchema, BlockType } from "@zzyra/types";
 
 interface ValidationError {
   path: string[];

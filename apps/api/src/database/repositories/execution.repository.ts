@@ -5,7 +5,7 @@ import {
   NodeLog,
   WorkflowExecution,
   WorkflowStatus,
-} from "@zyra/database";
+} from "@zzyra/database";
 
 @Injectable()
 export class ExecutionRepository {

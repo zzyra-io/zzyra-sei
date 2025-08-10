@@ -7,7 +7,7 @@ import {
   ConnectionType,
   PropertyType,
   ValidationResult,
-} from '@zyra/types';
+} from '@zzyra/types';
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../services/database.service';
 import * as nodemailer from 'nodemailer';

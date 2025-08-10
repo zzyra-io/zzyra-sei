@@ -107,7 +107,7 @@ Execution-Worker Engine: Implementation Plan
 
 1. Job Intake & Scheduling
    Queue Choice: Use BullMQ (with Redis) for Node.js/NestJS. It’s robust, battle-tested, and integrates well with horizontal scaling.
-   Integration: Place queue initialization and worker logic in zyra-worker/services/queue.service.ts.
+   Integration: Place queue initialization and worker logic in zzyra-worker/services/queue.service.ts.
    Idempotency: Use job IDs in the format executionId:nodeId:attempt to prevent duplicate processing.
 2. Run-Scope Record
    On Job Start: Insert a row in workflow_executions with started_at, status='running'.

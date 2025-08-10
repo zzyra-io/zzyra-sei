@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../services/database.service';
-import type { WorkflowStatus } from '@zyra/database';
+import type { WorkflowStatus } from '@zzyra/database';
 
 export interface Workflow {
   id: string;

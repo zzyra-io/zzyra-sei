@@ -4,7 +4,7 @@ import { Test } from '@nestjs/testing';
 import { BlockHandlerRegistry } from '../../../src/workers/handlers/BlockHandlerRegistry';
 
 import { Logger } from '@nestjs/common';
-import { BlockType, BlockHandler } from '@zyra/types';
+import { BlockType, BlockHandler } from '@zzyra/types';
 
 describe('BlockHandlerRegistry', () => {
   let blockHandlerRegistry: BlockHandlerRegistry;

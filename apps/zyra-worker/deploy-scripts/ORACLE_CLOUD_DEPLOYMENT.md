@@ -68,7 +68,7 @@ This guide provides step-by-step instructions for deploying the Zzyra worker to 
 1. Clone your repository (or upload the code to the instance):
    ```bash
    git clone <your-repo-url>
-   cd zyra/zyra-worker
+   cd zzyra/zzyra-worker
    ```
 2. Make the setup script executable:
    ```bash
@@ -81,7 +81,7 @@ This guide provides step-by-step instructions for deploying the Zzyra worker to 
 4. The script will:
    - Install Node.js 20.x
    - Install pnpm and PM2
-   - Set up the application in /opt/zyra-worker
+   - Set up the application in /opt/zzyra-worker
    - Configure the worker to start automatically on boot
    - Open the necessary firewall ports
 
@@ -89,7 +89,7 @@ This guide provides step-by-step instructions for deploying the Zzyra worker to 
 
 1. Update the environment variables in the .env file:
    ```bash
-   sudo nano /opt/zyra-worker/.env
+   sudo nano /opt/zzyra-worker/.env
    ```
 2. Modify the variables as needed for your production environment
 3. Save the file and exit
@@ -102,7 +102,7 @@ This guide provides step-by-step instructions for deploying the Zzyra worker to 
    ```
 2. View the logs:
    ```bash
-   pm2 logs zyra-worker
+   pm2 logs zzyra-worker
    ```
 3. Test the health endpoint:
    ```bash
@@ -128,27 +128,27 @@ This guide provides step-by-step instructions for deploying the Zzyra worker to 
 
 ## Troubleshooting
 
-- **Worker not starting**: Check the PM2 logs with `pm2 logs zyra-worker`
+- **Worker not starting**: Check the PM2 logs with `pm2 logs zzyra-worker`
 - **Cannot connect to the worker**: Verify the security list rules and firewall settings
-- **Environment variables issues**: Check the .env file in /opt/zyra-worker
+- **Environment variables issues**: Check the .env file in /opt/zzyra-worker
 
 ## Maintenance
 
 - **Updating the worker**:
   ```bash
-  cd /opt/zyra-worker
+  cd /opt/zzyra-worker
   git pull
   pnpm install
   pnpm run build
-  pm2 restart zyra-worker
+  pm2 restart zzyra-worker
   ```
 - **Viewing logs**:
   ```bash
-  pm2 logs zyra-worker
+  pm2 logs zzyra-worker
   ```
 - **Restarting the worker**:
   ```bash
-  pm2 restart zyra-worker
+  pm2 restart zzyra-worker
   ```
 
 ## Best Practices

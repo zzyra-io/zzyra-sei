@@ -1,7 +1,7 @@
 import { Injectable, Inject, Logger } from "@nestjs/common";
 import { NodeLogDto } from "./dto/execution.dto";
 import { ExecutionRepository } from "../database/repositories/execution.repository";
-import { NodeLog } from "@zyra/database";
+import { NodeLog } from "@zzyra/database";
 
 @Injectable()
 export class NodeLogsService {

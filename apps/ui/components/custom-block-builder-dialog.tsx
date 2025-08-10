@@ -25,7 +25,7 @@ import {
   DataType,
   LogicType,
   NodeCategory,
-} from "@zyra/types";
+} from "@zzyra/types";
 import {
   AlertCircle,
   Loader2,

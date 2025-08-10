@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * This script fixes type conflicts between local types and imported types
- * from @zyra/types package
+ * from @zzyra/types package
  */
 
 const fs = require('fs');
 const path = require('path');
 
 // Config
-const WORKER_DIR = path.resolve(__dirname, '../apps/zyra-worker');
+const WORKER_DIR = path.resolve(__dirname, '../apps/zzyra-worker');
 
 // Type conflicts to resolve
 const CONFLICTING_TYPES = [
@@ -27,9 +27,9 @@ const TYPE_DEFINITION_REGEX = (type) => new RegExp(
   `(export\\s+(type|interface)\\s+${type}|export\\s+const\\s+${type}Schema)([^;]*?[{\\[])`
 );
 
-// Regex to find import of the type from @zyra/types
+// Regex to find import of the type from @zzyra/types
 const TYPE_IMPORT_REGEX = (type) => new RegExp(
-  `import\\s+\\{[^}]*?\\b${type}\\b.*?\\}\\s+from\\s+['"]@zyra\\/types['"]`
+  `import\\s+\\{[^}]*?\\b${type}\\b.*?\\}\\s+from\\s+['"]@zzyra\\/types['"]`
 );
 
 /**
@@ -51,7 +51,7 @@ function processFile(filePath) {
         // Comment out local definition to resolve conflict
         content = content.replace(
           TYPE_DEFINITION_REGEX(type),
-          `// COMMENTED OUT FOR @zyra/types COMPATIBILITY\n// $1$3`
+          `// COMMENTED OUT FOR @zzyra/types COMPATIBILITY\n// $1$3`
         );
         
         modified = true;

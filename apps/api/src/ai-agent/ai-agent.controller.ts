@@ -8,7 +8,7 @@ import {
   MessageEvent,
 } from "@nestjs/common";
 import { AIAgentService } from "./ai-agent.service";
-import { AIAgentConfig } from "@zyra/types";
+import { AIAgentConfig } from "@zzyra/types";
 import { Observable, interval, map } from "rxjs";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Public } from "src/auth/decorators/public.decorator";

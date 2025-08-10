@@ -28,7 +28,7 @@ import {
   getEnhancedBlockSchema,
   BlockchainNode,
   SUPPORTED_CHAINS,
-} from '@zyra/types';
+} from '@zzyra/types';
 import { z } from 'zod';
 
 @Injectable()

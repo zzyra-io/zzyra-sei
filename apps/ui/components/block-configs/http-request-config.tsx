@@ -36,7 +36,7 @@ import {
   Settings,
   Activity,
 } from "lucide-react";
-import { enhancedHttpRequestSchema } from "@zyra/types";
+import { enhancedHttpRequestSchema } from "@zzyra/types";
 
 interface HttpRequestConfigProps {
   config: Record<string, unknown>;
@@ -83,7 +83,7 @@ export function HttpRequestConfig({
   const [activeTab, setActiveTab] = useState("config");
   const [advancedCollapsed, setAdvancedCollapsed] = useState(true);
 
-  // Use the enhanced schema from @zyra/types
+  // Use the enhanced schema from @zzyra/types
   const schema = enhancedHttpRequestSchema;
 
   // Validation function

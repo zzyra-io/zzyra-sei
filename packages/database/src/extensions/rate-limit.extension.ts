@@ -301,7 +301,7 @@ function generateRateLimitKey(
       throw new Error(`Invalid time window: ${timeWindow}`);
   }
 
-  return `zyra:ratelimit:${userId}:${operation}:${timeWindow}:${windowStart}`;
+  return `zzyra:ratelimit:${userId}:${operation}:${timeWindow}:${windowStart}`;
 }
 
 // Check if user is in burst allowance period

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { UserRepository } from "@zyra/database";
+import { UserRepository } from "@zzyra/database";
 
 interface JwtPayload {
   sub: string;

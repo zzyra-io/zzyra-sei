@@ -19,7 +19,7 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
+if ! command -v docker compose &> /dev/null; then
     echo -e "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
     exit 1
 fi
@@ -31,7 +31,7 @@ echo -e "${GREEN}Docker network created or already exists.${NC}"
 
 # Start Docker containers
 echo -e "${YELLOW}Starting Docker containers...${NC}"
-docker-compose -f setup-compose.yml up -d
+docker compose -f setup-compose.yml up -d
 echo -e "${GREEN}Docker containers started.${NC}"
 
 # Install dependencies
@@ -45,7 +45,7 @@ if [ ! -f ".env" ]; then
     echo -e "${YELLOW}Creating .env file...${NC}"
     cat > .env << EOL
 # Database
-DATABASE_URL="postgresql://zzyra:zzyra@localhost:5432/zyra?schema=public"
+DATABASE_URL="postgresql://zzyra:zzyra@localhost:5432/zzyra?schema=public"
 
 # JWT
 JWT_SECRET="your-jwt-secret-key-change-in-production"

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Zzyra is built using a monorepo structure housing two main components: a Next.js frontend (`ui/`) and a Node.js/NestJS backend worker (`zyra-worker/`). These components interact primarily through a Supabase (PostgreSQL) database, which acts as both a data store and a message queue for workflow execution.
+Zzyra is built using a monorepo structure housing two main components: a Next.js frontend (`ui/`) and a Node.js/NestJS backend worker (`zzyra-worker/`). These components interact primarily through a Supabase (PostgreSQL) database, which acts as both a data store and a message queue for workflow execution.
 
 ```mermaid
 graph TD
@@ -24,7 +24,7 @@ graph TD
   - State Management: Zustand (or relevant library)
   - API: Next.js API Routes
   - Deployment: Netlify
-- **Backend (`zyra-worker/`):**
+- **Backend (`zzyra-worker/`):**
   - Framework: NestJS
   - Language: TypeScript
   - Runtime: Node.js v20.3.0+
@@ -49,7 +49,7 @@ graph TD
     - **Key Features:** Visual drag-and-drop interface, AI Copilot integration for workflow/block generation, real-time updates via Supabase subscriptions (optional), user management.
     - **API Routes:** Handles server-side logic tightly coupled with the UI, such as user-specific data fetching, AI generation requests, and basic workflow operations.
 
-2.  **Worker (`zyra-worker/`) - NestJS Service:**
+2.  **Worker (`zzyra-worker/`) - NestJS Service:**
 
     - **Responsibilities:** Asynchronously executing workflow steps dequeued from Supabase, interacting with external APIs (Web3, AI models, other integrations), calculating costs, sending notifications (future), updating execution status and logs in the database.
     - **Decoupling:** Runs independently from the UI, ensuring workflow execution doesn't block user interactions. Communicates via the database.
@@ -72,7 +72,7 @@ graph TD
 
 1.  User triggers workflow execution via the UI.
 2.  UI API route inserts/updates an entry in the `workflow_executions` table in Supabase, marking it as 'queued'.
-3.  The `zyra-worker` polls the database for 'queued' executions.
+3.  The `zzyra-worker` polls the database for 'queued' executions.
 4.  Worker picks up a job, updates its status to 'running', and sets `locked_by`.
 5.  Worker executes nodes sequentially based on workflow definition.
     - Fetches node logic (built-in or custom block code).

@@ -5,7 +5,7 @@ import {
   CreateSessionKeyRequest,
   SessionUsageStats,
   SessionKeyValidationResult,
-} from "@zyra/types";
+} from "@zzyra/types";
 import api from "@/lib/services/api";
 import { toast } from "@/hooks/use-toast";
 import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";

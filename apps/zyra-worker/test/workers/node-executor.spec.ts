@@ -8,7 +8,7 @@ import {
   createMockNodeExecution,
 } from '../utils/mocks';
 import * as serviceClient from '../../src/lib/supabase/serviceClient';
-import { BlockType, BlockHandler } from '@zyra/types';
+import { BlockType, BlockHandler } from '@zzyra/types';
 
 // Mock the createServiceClient function
 jest.mock('../../src/lib/supabase/serviceClient', () => ({

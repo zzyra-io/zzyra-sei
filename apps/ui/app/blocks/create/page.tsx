@@ -32,7 +32,7 @@ import {
   BlockType,
   NodeCategory,
   getBlockMetadata,
-} from "@zyra/types";
+} from "@zzyra/types";
 import {
   ArrowLeft,
   Code,

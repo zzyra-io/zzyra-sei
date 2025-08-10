@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="x-ua-compatible" content="ie=edge">
-        <title>@zyra/api documentation</title>
+        <title>@zzyra/api documentation</title>
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -64,7 +64,7 @@
 
         <div class="navbar navbar-default navbar-fixed-top d-md-none p-0">
                <div class="d-flex">
-                    <a href="../" class="navbar-brand">@zyra/api documentation</a>
+                    <a href="../" class="navbar-brand">@zzyra/api documentation</a>
                     <button type="button" class="btn btn-default btn-menu ion-ios-menu" id="btn-menu"></button>
                </div>
         </div>
@@ -412,7 +412,7 @@ import {
   BlockType as ZyraBlockType,
   BlockMetadata,
   BLOCK_CATALOG,
-} from &quot;@zyra/types&quot;;
+} from &quot;@zzyra/types&quot;;
 
 export interface BlockType {
   id: string;
@@ -452,7 +452,7 @@ export class BlocksService {
 
   async getBlockTypes(): Promise&lt;BlockMetadata[]&gt; {
     try {
-      // Get all block types from the zyra types catalog
+      // Get all block types from the zzyra types catalog
       const blockTypes: BlockMetadata[] &#x3D; Object.values(ZyraBlockType).map(
         (blockTypeKey) &#x3D;&gt; {
           const metadata &#x3D; BLOCK_CATALOG[blockTypeKey];

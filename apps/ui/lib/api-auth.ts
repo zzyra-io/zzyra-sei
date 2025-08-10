@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AuthService } from "@zyra/database";
+import { AuthService } from "@zzyra/database";
 
 // Initialize the auth service
 const authService = new AuthService();

@@ -9,7 +9,7 @@ import {
   ValidationResult,
   HttpRequestOptions,
   BlockType,
-} from '@zyra/types';
+} from '@zzyra/types';
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 

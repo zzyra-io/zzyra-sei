@@ -1,5 +1,5 @@
 import { ExceptionFilter, Catch, ArgumentsHost, Logger } from '@nestjs/common';
-import { Prisma } from '@zyra/database';
+import { Prisma } from '@zzyra/database';
 
 @Catch(
   Prisma.PrismaClientKnownRequestError,

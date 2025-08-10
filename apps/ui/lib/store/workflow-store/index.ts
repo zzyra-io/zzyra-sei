@@ -47,11 +47,11 @@ export const useWorkflowStore = create<WorkflowStore>()(
             ...createAIGenerationSlice(...a),
             ...createResetSlice(...a),
           }),
-          { name: "zyra-workflow-store" }
+          { name: "zzyra-workflow-store" }
         )
       ),
       {
-        name: "zyra-workflow-storage",
+        name: "zzyra-workflow-storage",
         storage:
           typeof window !== "undefined"
             ? createJSONStorage(() => localStorage)

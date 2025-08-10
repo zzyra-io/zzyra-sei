@@ -64,7 +64,7 @@ CIRCUIT_BREAKER_RESET_TIMEOUT=60000
 Run the test script to verify your circuit breaker configuration:
 
 ```bash
-cd apps/zyra-worker
+cd apps/zzyra-worker
 npx ts-node src/scripts/test-circuit-breaker-config.ts
 ```
 

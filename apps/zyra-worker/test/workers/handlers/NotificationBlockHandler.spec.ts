@@ -7,7 +7,7 @@ import { Logger } from '@nestjs/common';
 import { NotificationService } from '../../../src/services/notification.service';
 import { createMockSupabaseClient } from '../../utils/mocks';
 import * as serviceClient from '../../../src/lib/supabase/serviceClient';
-import { BlockHandler } from '@zyra/types';
+import { BlockHandler } from '@zzyra/types';
 
 // Mock the createServiceClient function
 jest.mock('../../../src/lib/supabase/serviceClient', () => ({

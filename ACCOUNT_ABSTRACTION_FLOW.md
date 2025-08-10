@@ -17,7 +17,7 @@ Zyra implements Account Abstraction (AA) using Dynamic Labs + ZeroDev to enable 
 #### 2. **Automated Execution** (Workflow Background)
 
 - User creates a delegation allowing Zyra to execute transactions
-- zyra-worker executes transactions using the delegation when workflows run
+- zzyra-worker executes transactions using the delegation when workflows run
 - User doesn't need to be present
 
 ## Flow Diagram
@@ -26,7 +26,7 @@ Zyra implements Account Abstraction (AA) using Dynamic Labs + ZeroDev to enable 
 User Authorization → Workflow Runs → Backend Execution
      ↓                    ↓                ↓
 1. Create Delegation → 2. Trigger → 3. Execute UserOp
-   (Frontend)           (Queue)      (zyra-worker)
+   (Frontend)           (Queue)      (zzyra-worker)
 ```
 
 ## Implementation Details
@@ -63,7 +63,7 @@ ZeroDevSmartWalletConnectorsWithConfig({
 }
 ```
 
-### Backend (`apps/zyra-worker/`)
+### Backend (`apps/zzyra-worker/`)
 
 **SendTransactionBlock Handler**:
 
@@ -141,7 +141,7 @@ AA_ENTRY_POINT_ADDRESS=0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
 
 1. Create delegation in frontend
 2. Trigger workflow with blockchain operations
-3. Verify zyra-worker executes transaction
+3. Verify zzyra-worker executes transaction
 4. Check transaction appears in explorer
 
 ## Benefits

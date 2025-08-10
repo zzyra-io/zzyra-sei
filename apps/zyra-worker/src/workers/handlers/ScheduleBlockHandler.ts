@@ -1,4 +1,4 @@
-import { BlockExecutionContext, BlockHandler } from '@zyra/types';
+import { BlockExecutionContext, BlockHandler } from '@zzyra/types';
 
 export class ScheduleBlockHandler implements BlockHandler {
   async execute(node: any, ctx: BlockExecutionContext): Promise<any> {

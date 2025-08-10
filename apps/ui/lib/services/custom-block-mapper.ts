@@ -1,6 +1,6 @@
 import { LogicType, type CustomBlockDefinition } from "@/types/custom-block";
 import { NodeCategory } from "@/types/workflow";
-import { BlockType } from '@zyra/types';
+import { BlockType } from '@zzyra/types';
 
 
 /**

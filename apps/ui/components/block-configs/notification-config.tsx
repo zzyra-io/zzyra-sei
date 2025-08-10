@@ -39,7 +39,7 @@ import {
   Shield,
   Zap,
 } from "lucide-react";
-import { BlockType, getEnhancedBlockSchema } from "@zyra/types";
+import { BlockType, getEnhancedBlockSchema } from "@zzyra/types";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,

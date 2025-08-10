@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BlockHandler, BlockExecutionContext } from '@zyra/types';
+import { BlockHandler, BlockExecutionContext } from '@zzyra/types';
 import { DatabaseService } from '../../services/database.service';
 import { ExecutionLogger } from '../execution-logger';
 import { LLMProviderManager } from './ai-agent/LLMProviderManager';
@@ -694,7 +694,7 @@ export class AIAgentHandler implements BlockHandler {
       baseEnv.BRAVE_API_KEY = 'demo-key';
     }
     if (!baseEnv.DATABASE_URL) {
-      baseEnv.DATABASE_URL = 'postgresql://localhost/zyra';
+      baseEnv.DATABASE_URL = 'postgresql://localhost/zzyra';
     }
 
     this.logger.log(

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../services/database.service';
-import { BlockExecutionContext } from '@zyra/types';
+import { BlockExecutionContext } from '@zzyra/types';
 
 // Extended logger interface with the 'log' method for compatibility
 interface ExtendedLogger {

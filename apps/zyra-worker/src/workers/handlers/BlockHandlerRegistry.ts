@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BlockType } from '@zyra/types';
+import { BlockType } from '@zzyra/types';
 import { DatabaseService } from '../../services/database.service';
 import { ExecutionLogger } from '../execution-logger';
-import { BlockExecutionContext, BlockHandler } from '@zyra/types';
+import { BlockExecutionContext, BlockHandler } from '@zzyra/types';
 import { EnhancedBlockRegistry } from './enhanced/EnhancedBlockRegistry';
 import { MetricsBlockHandler } from './MetricsBlockHandler';
 import { DataTransformHandler } from './DataTransformHandler';

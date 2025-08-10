@@ -10,10 +10,10 @@
 - Use `scripts/` for build scripts
 
 ```
-zyra/
+zzyra/
 ├── apps/
 │   ├── ui/                 # Next.js frontend
-│   └── zyra-worker/        # NestJS worker
+│   └── zzyra-worker/        # NestJS worker
 ├── packages/
 │   ├── database/          # Prisma and DB access
 │   └── types/             # Shared TypeScript types
@@ -30,7 +30,7 @@ zyra/
 
 ```json
 {
-  "name": "@zyra/types",
+  "name": "@zzyra/types",
   "version": "0.0.0",
   "private": true,
   "main": "./dist/index.js",
@@ -56,11 +56,11 @@ zyra/
 ```json
 {
   "dependencies": {
-    "@zyra/types": "workspace:*",
-    "@zyra/database": "workspace:*"
+    "@zzyra/types": "workspace:*",
+    "@zzyra/database": "workspace:*"
   },
   "devDependencies": {
-    "@zyra/types": "workspace:*",
+    "@zzyra/types": "workspace:*",
     "typescript": "^5.0.0"
   }
 }
@@ -147,8 +147,8 @@ pnpm build
 
 ```typescript
 // Import from workspace package
-import { User } from "@zyra/types";
-import { createUser } from "@zyra/database";
+import { User } from "@zzyra/types";
+import { createUser } from "@zzyra/database";
 
 // Export from package
 export * from "./types";
@@ -211,21 +211,21 @@ describe("User", () => {
 - Use proper changelog
 
 ````markdown
-# @zyra/types
+# @zzyra/types
 
 Shared TypeScript types for Zzyra.
 
 ## Installation
 
 ```bash
-pnpm add @zyra/types
+pnpm add @zzyra/types
 ```
 ````
 
 ## Usage
 
 ```typescript
-import { User } from "@zyra/types";
+import { User } from "@zzyra/types";
 
 const user: User = {
   id: "1",
@@ -260,7 +260,7 @@ AI-driven, blockchain-focused workflow automation platform.
 ## Architecture
 
 - `apps/ui`: Next.js frontend
-- `apps/zyra-worker`: NestJS worker
+- `apps/zzyra-worker`: NestJS worker
 - `packages/database`: Prisma and DB access
 - `packages/types`: Shared TypeScript types
 

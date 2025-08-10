@@ -1,4 +1,4 @@
-import { BlockExecutionContext, BlockHandler } from '@zyra/types';
+import { BlockExecutionContext, BlockHandler } from '@zzyra/types';
 
 /**
  * Extended BlockExecutionContext for testing purposes

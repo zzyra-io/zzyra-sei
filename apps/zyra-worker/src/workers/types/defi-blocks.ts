@@ -1,4 +1,4 @@
-import { BlockType } from '@zyra/types';
+import { BlockType } from '@zzyra/types';
 export enum DefiBlockType {
   SCHEDULE = 'schedule',
   PRICE_MONITOR = 'price-monitor',
