@@ -1,0 +1,38 @@
+{
+  "name": "zzyra",
+  "private": true,
+  "packageManager": "pnpm@9.15.2",
+  "prisma": {
+    "schema": "packages/database/prisma/schema.prisma"
+  },
+  "pnpm": {
+    "overrides": {
+      "jose": ">=4.15.5",
+      "multer": ">=2.0.1",
+      "tar-fs": ">=3.0.9",
+      "fastify": ">=4.29.1"
+    }
+  },
+  "devDependencies": {
+    "turbo": "^2.5.3",
+    "zod": "^3.24.2"
+  },
+  "workspaces": [
+    "./apps/*",
+    "./packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "dev:ui": "turbo run dev --filter zzyra-web3-automation",
+    "dev:worker": "turbo run dev --filter zzyra-worker",
+    "dev:api": "turbo run dev --filter @zzyra/api",
+    "docs:generate": "turbo run docs:generate --filter @zzyra/api",
+    "dev:all": "pnpm run dev:ui & pnpm run dev:worker & pnpm run dev:api",
+    "docs:build": "turbo run docs:build --filter @zzyra/api",
+    "docs:serve": "turbo run docs:serve --filter @zzyra/api",
+    "clean": "find . -name 'node_modules' -type d -prune -exec rm -rf '{}' + && find . -name 'dist' -exec rm -rf '{}' + && find . -name '.next' -exec rm -rf '{}' + && find . -name '.turbo' -exec rm -rf '{}' +"
+  }
+}
