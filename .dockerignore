@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+Dockerfile*
+*.md
+.claude
+.cursor
+.vscode
+*.log
+.windsurf
+scripts
+todo
+sei-mcp-secrets
+.env
+.env.*
