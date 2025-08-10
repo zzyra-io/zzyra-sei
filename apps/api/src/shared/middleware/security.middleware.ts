@@ -2,6 +2,7 @@ import { Injectable, NestMiddleware, Logger } from "@nestjs/common";
 import { Request, Response, NextFunction } from "express";
 import { PrismaService } from "../../database/prisma.service";
 import { SessionEventType } from "@zyra/types";
+import { createHmac, createHash } from "crypto";
 
 /**
  * Security middleware for rate limiting and transaction validation
@@ -16,6 +17,22 @@ export class SecurityMiddleware implements NestMiddleware {
     string,
     { count: number; resetTime: number }
   >();
+
+  // In-memory nonce store for replay protection (in production, use Redis)
+  private readonly nonceStore = new Map<string, number>();
+
+  // Service auth configuration loaded from environment
+  private readonly serviceAuth = {
+    worker: {
+      id: process.env.SERVICE_AUTH_WORKER_ID || "",
+      secret: process.env.SERVICE_AUTH_WORKER_SECRET || "",
+    },
+    internal: {
+      id: process.env.SERVICE_AUTH_INTERNAL_ID || "",
+      secret: process.env.SERVICE_AUTH_INTERNAL_SECRET || "",
+    },
+    skewMs: Number(process.env.SERVICE_AUTH_SKEW_MS || 5 * 60 * 1000),
+  } as const;
 
   // Rate limiting configuration
   private readonly rateLimits = {
@@ -52,6 +69,32 @@ export class SecurityMiddleware implements NestMiddleware {
         return;
       }
 
+      // Verify service-to-service HMAC auth when required
+      const authCheck = this.verifyServiceAuth(req);
+
+      // Enforce service auth for privileged session-keys endpoints
+      const isSessionKeys = req.originalUrl.includes("/session-keys");
+      const isValidate = isSessionKeys && req.originalUrl.includes("/validate");
+      const isUsage = isSessionKeys && req.originalUrl.includes("/usage");
+
+      if (isValidate || isUsage) {
+        if (!authCheck.ok || authCheck.role !== "internal") {
+          this.logger.warn("Unauthorized service call to privileged endpoint", {
+            endpoint: req.originalUrl,
+            serviceId: authCheck.serviceId || "unknown",
+          });
+          res.status(401).json({ success: false, error: "Unauthorized" });
+          return;
+        }
+      }
+
+      if (authCheck.ok) {
+        (req as any).service = {
+          id: authCheck.serviceId,
+          role: authCheck.role,
+        };
+      }
+
       // Apply security headers
       this.applySecurityHeaders(res);
 
@@ -78,6 +121,92 @@ export class SecurityMiddleware implements NestMiddleware {
     } catch (error) {
       this.logger.error("Security middleware error", error);
       next(); // Continue even if security middleware fails
+    }
+  }
+
+  /**
+   * Verify HMAC service-to-service authentication headers
+   */
+  private verifyServiceAuth(req: Request): {
+    ok: boolean;
+    serviceId?: string;
+    role?: "worker" | "internal";
+  } {
+    try {
+      const serviceId = (req.headers["x-service-id"] as string) || "";
+      const timestampHeader = (req.headers["x-timestamp"] as string) || "";
+      const nonce = (req.headers["x-nonce"] as string) || "";
+      const signature = (req.headers["x-signature"] as string) || "";
+
+      if (!serviceId || !timestampHeader || !nonce || !signature) {
+        return { ok: false };
+      }
+
+      const timestamp = Number(timestampHeader);
+      if (!Number.isFinite(timestamp)) {
+        return { ok: false };
+      }
+
+      const now = Date.now();
+      if (Math.abs(now - timestamp) > this.serviceAuth.skewMs) {
+        return { ok: false };
+      }
+
+      // Replay protection
+      const existing = this.nonceStore.get(nonce);
+      if (existing && existing > now) {
+        return { ok: false };
+      }
+
+      // Resolve secret and role
+      let secret = "";
+      let role: "worker" | "internal" | undefined;
+      if (
+        serviceId === this.serviceAuth.worker.id &&
+        this.serviceAuth.worker.secret
+      ) {
+        secret = this.serviceAuth.worker.secret;
+        role = "worker";
+      } else if (
+        serviceId === this.serviceAuth.internal.id &&
+        this.serviceAuth.internal.secret
+      ) {
+        secret = this.serviceAuth.internal.secret;
+        role = "internal";
+      } else {
+        return { ok: false };
+      }
+
+      const bodyString =
+        req.body && Object.keys(req.body).length > 0
+          ? JSON.stringify(req.body)
+          : "";
+      const bodyHash = createHash("sha256").update(bodyString).digest("hex");
+      const canonical = `${req.method.toUpperCase()}\n${req.originalUrl}\n${bodyHash}\n${timestamp}\n${nonce}`;
+      const expected = createHmac("sha256", secret)
+        .update(canonical)
+        .digest("base64");
+
+      if (signature !== expected) {
+        return { ok: false };
+      }
+
+      // Store nonce expiry
+      this.nonceStore.set(nonce, now + this.serviceAuth.skewMs);
+      this.cleanupNonceStore();
+
+      return { ok: true, serviceId, role };
+    } catch {
+      return { ok: false };
+    }
+  }
+
+  private cleanupNonceStore(): void {
+    const now = Date.now();
+    for (const [n, exp] of this.nonceStore.entries()) {
+      if (exp <= now) {
+        this.nonceStore.delete(n);
+      }
     }
   }
 

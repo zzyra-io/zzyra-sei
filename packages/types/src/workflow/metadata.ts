@@ -209,7 +209,7 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
     category: NodeCategory.ACTION,
     icon: "send",
     defaultConfig: {
-      chainId: "sei-testnet",
+      chainId: "1328",
       recipientAddress: "",
       amount: "",
       tokenAddress: "",
@@ -224,7 +224,7 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
     category: NodeCategory.ACTION,
     icon: "wallet",
     defaultConfig: {
-      chainId: "sei-testnet",
+      chainId: "1328",
       walletAddress: "",
       tokenAddresses: "",
       includeUsdValue: false,
@@ -239,7 +239,7 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
     category: NodeCategory.ACTION,
     icon: "refresh",
     defaultConfig: {
-      chainId: "sei-testnet",
+      chainId: "1328",
       fromToken: "",
       toToken: "",
       amountIn: "",
@@ -257,7 +257,7 @@ export const BLOCK_CATALOG: Record<string, BlockMetadata> = {
     category: NodeCategory.ACTION,
     icon: "plus",
     defaultConfig: {
-      chainId: "sei-testnet",
+      chainId: "1328",
       walletType: "eoa",
       autoFund: true,
       fundingAmount: "1.0",

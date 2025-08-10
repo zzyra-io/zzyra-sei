@@ -40,7 +40,7 @@ function registerReadOnlyTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
         ),
     },
     async ({ network = DEFAULT_NETWORK }) => {
@@ -219,7 +219,7 @@ function registerReadOnlyTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei testnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei testnet.",
         ),
     },
     async ({ address, network = DEFAULT_NETWORK }) => {
@@ -331,7 +331,7 @@ function registerReadOnlyTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
         ),
     },
     async ({ tokenAddress, ownerAddress, network = DEFAULT_NETWORK }) => {
@@ -390,7 +390,7 @@ function registerReadOnlyTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet', etc.) or chain ID. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet', etc.) or chain ID. Defaults to Sei mainnet.",
         ),
     },
     async ({ txHash, network = DEFAULT_NETWORK }) => {
@@ -545,7 +545,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
         ),
     },
     async ({ to, amount, network = DEFAULT_NETWORK }) => {
@@ -602,7 +602,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
         ),
     },
     async ({ tokenAddress, toAddress, amount, network = DEFAULT_NETWORK }) => {
@@ -672,7 +672,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
         ),
     },
     async ({
@@ -743,7 +743,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. Most NFTs are on Sei mainnet, which is the default.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. Most NFTs are on Sei mainnet, which is the default.",
         ),
     },
     async ({ tokenAddress, tokenId, toAddress, network = DEFAULT_NETWORK }) => {
@@ -815,7 +815,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. ERC1155 tokens exist across many networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. ERC1155 tokens exist across many networks. Defaults to Sei mainnet.",
         ),
     },
     async ({
@@ -892,7 +892,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
         ),
     },
     async ({ tokenAddress, toAddress, amount, network = DEFAULT_NETWORK }) => {
@@ -968,7 +968,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
         ),
     },
     async ({
@@ -1040,7 +1040,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
         ),
     },
     async ({
@@ -1118,7 +1118,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
         ),
     },
     async ({ bytecode, abi, args = [], network = DEFAULT_NETWORK }) => {
@@ -1184,7 +1184,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
         ),
     },
     async ({ address, network = DEFAULT_NETWORK }) => {
@@ -1238,7 +1238,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. Defaults to Sei mainnet.",
         ),
     },
     async ({ tokenAddress, network = DEFAULT_NETWORK }) => {
@@ -1435,7 +1435,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet' etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet' etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
         ),
     },
     async ({
@@ -1506,7 +1506,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. ERC1155 tokens exist across many networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. ERC1155 tokens exist across many networks. Defaults to Sei mainnet.",
         ),
     },
     async ({ tokenAddress, tokenId, network = DEFAULT_NETWORK }) => {
@@ -1567,7 +1567,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. Most NFTs are on Sei mainnet, which is the default.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. Most NFTs are on Sei mainnet, which is the default.",
         ),
     },
     async ({ tokenAddress, ownerAddress, network = DEFAULT_NETWORK }) => {
@@ -1633,7 +1633,7 @@ function registerWalletTools(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet') or chain ID. ERC1155 tokens exist across many networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet') or chain ID. ERC1155 tokens exist across many networks. Defaults to Sei mainnet.",
         ),
     },
     async ({

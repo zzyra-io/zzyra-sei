@@ -58,7 +58,7 @@ export default function SeiSmartContractCallConfig({
 
   // Cast config to expected type with defaults
   const typedConfig: SeiSmartContractCallConfig = {
-    network: "sei-testnet",
+    network: "1328",
     contractAddress: "",
     functionName: "",
     walletConfig: { type: "magic_wallet" },
@@ -173,7 +173,7 @@ export default function SeiSmartContractCallConfig({
                       <SelectValue placeholder='Select network' />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value='sei-testnet'>Sei Testnet</SelectItem>
+                      <SelectItem value='1328'>Sei Testnet</SelectItem>
                       <SelectItem value='sei-mainnet'>Sei Mainnet</SelectItem>
                     </SelectContent>
                   </Select>

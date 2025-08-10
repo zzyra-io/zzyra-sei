@@ -868,48 +868,48 @@ Edges: ${JSON.stringify(edges, null, 2)}
     return [
       // Sei Network Tools
       {
-        id: "enhanced-transaction-history-get_transaction_history_sei-testnet",
+        id: "enhanced-transaction-history-get_transaction_history_1328",
         name: "get_transaction_history_sei_testnet",
         description:
           "Get transaction history for Sei testnet addresses with enhanced filtering",
         category: "analytics",
         capabilities: ["transaction-history", "filtering", "pagination"],
-        network: "sei-testnet",
+        network: "1328",
       },
       {
-        id: "enhanced-transaction-history-get_wallet_balance_detailed_sei-testnet",
+        id: "enhanced-transaction-history-get_wallet_balance_detailed_1328",
         name: "get_wallet_balance_detailed_sei_testnet",
         description:
           "Get detailed wallet balance including native tokens and ERC-20 tokens on Sei",
         category: "blockchain",
         capabilities: ["balance-check", "token-info", "multi-token"],
-        network: "sei-testnet",
+        network: "1328",
       },
       {
-        id: "enhanced-transaction-history-estimate_gas_price_sei-testnet",
+        id: "enhanced-transaction-history-estimate_gas_price_1328",
         name: "estimate_gas_price_sei_testnet",
         description: "Estimate current gas prices for Sei network transactions",
         category: "blockchain",
         capabilities: ["gas-estimation", "network-fees"],
-        network: "sei-testnet",
+        network: "1328",
       },
 
       // DeFi Analytics Tools
       {
-        id: "defi-analytics-analyze_portfolio_sei-testnet",
+        id: "defi-analytics-analyze_portfolio_1328",
         name: "analyze_portfolio_sei_testnet",
         description: "Analyze DeFi portfolio performance and positions",
         category: "defi",
         capabilities: ["portfolio-analysis", "yield-tracking", "performance"],
-        network: "sei-testnet",
+        network: "1328",
       },
       {
-        id: "defi-analytics-find_arbitrage_opportunities_sei-testnet",
+        id: "defi-analytics-find_arbitrage_opportunities_1328",
         name: "find_arbitrage_opportunities_sei_testnet",
         description: "Find arbitrage opportunities across different DEXs",
         category: "defi",
         capabilities: ["arbitrage", "dex-analysis", "profit-detection"],
-        network: "sei-testnet",
+        network: "1328",
       },
 
       // Base Sepolia Tools
@@ -1387,7 +1387,7 @@ Edges: ${JSON.stringify(edges, null, 2)}
 
     // Network detection
     if (prompt.toLowerCase().includes("sei")) {
-      config.network = "sei-testnet";
+      config.network = "1328";
     } else if (prompt.toLowerCase().includes("base")) {
       config.network = "base-sepolia";
     } else if (prompt.toLowerCase().includes("ethereum")) {
@@ -1650,7 +1650,7 @@ Edges: ${JSON.stringify(edges, null, 2)}
 
       case "SEI_PAYMENT":
         return {
-          network: "sei-testnet",
+          network: "1328",
           gasLimit: "200000",
           gasPrice: "auto",
           confirmations: 1,

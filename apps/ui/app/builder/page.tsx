@@ -38,7 +38,11 @@ import { workflowService } from "@/lib/services/workflow-service";
 import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
 import { BlockType, CustomBlockDefinition } from "@zyra/types";
 import type { UnifiedWorkflowNode } from "@zyra/types";
-import { ensureValidWorkflowNode, prepareNodesForApi } from "@zyra/types";
+import {
+  ensureValidWorkflowNode,
+  prepareNodesForApi,
+  prepareEdgesForApi,
+} from "@zyra/types";
 import { ArrowLeft, Loader2, Play, Save, AlertCircle } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, useRef } from "react";
@@ -51,12 +55,18 @@ import {
   EnhancedBlockchainAuthorizationModal,
   useBlockchainDetection,
 } from "@/components/enhanced-blockchain-authorization-modal";
+import type { SecureBlockchainAuthConfig } from "@zyra/types";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DynamicEmbeddedWidget,
+  DynamicWidget,
+} from "@dynamic-labs/sdk-react-core";
+import { DynamicWagmiConnector } from "@dynamic-labs/wagmi-connector";
 
 // Simplified save state interface
 interface SaveState {
@@ -378,14 +388,16 @@ export default function BuilderPage() {
         try {
           // Get the current nodes directly from the store to ensure we have the latest state
           const currentNodes = useWorkflowStore.getState().nodes;
+          const currentEdges = useWorkflowStore.getState().edges;
           console.log("Auto-saving workflow with nodes:", currentNodes);
           const apiNodes = prepareWorkflowNodesForApi(currentNodes);
+          const apiEdges = prepareEdgesForApi(currentEdges as any);
           console.log("Prepared nodes for API:", apiNodes);
           await workflowService.updateWorkflow(workflowId, {
             name: workflowName,
             description: workflowDescription,
             nodes: apiNodes,
-            edges: edges, // Use edges directly as they are already prepared
+            edges: apiEdges,
             is_public: false,
           });
           setHasUnsavedChanges(false);
@@ -568,12 +580,14 @@ export default function BuilderPage() {
         setLoading(true);
         // Get the current nodes directly from the store to ensure we have the latest state
         const currentNodes = useWorkflowStore.getState().nodes;
+        const currentEdges = useWorkflowStore.getState().edges;
         const apiNodes = prepareWorkflowNodesForApi(currentNodes);
+        const apiEdges = prepareEdgesForApi(currentEdges as any);
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
           nodes: apiNodes,
-          edges,
+          edges: apiEdges,
           is_public: false,
           tags,
         });
@@ -617,13 +631,13 @@ export default function BuilderPage() {
       }
     },
     [
-      edges,
       router,
       toast,
       setWorkflowId,
       setHasUnsavedChanges,
       setLoading,
       prepareWorkflowNodesForApi,
+      // prepareEdgesForApi intentionally omitted from deps because it's stable import
     ]
   );
 
@@ -633,13 +647,15 @@ export default function BuilderPage() {
         setLoading(true);
         // Get the current nodes directly from the store to ensure we have the latest state
         const currentNodes = useWorkflowStore.getState().nodes;
+        const currentEdges = useWorkflowStore.getState().edges;
         const apiNodes = prepareWorkflowNodesForApi(currentNodes);
+        const apiEdges = prepareEdgesForApi(currentEdges as any);
         if (workflowId && initialId) {
           await workflowService.updateWorkflow(workflowId, {
             name,
             description,
             nodes: apiNodes,
-            edges: edges, // Use edges directly as they are already prepared
+            edges: apiEdges,
             is_public: false,
             tags,
           });
@@ -670,11 +686,11 @@ export default function BuilderPage() {
     [
       workflowId,
       initialId,
-      edges,
       toast,
       setHasUnsavedChanges,
       setLoading,
       prepareWorkflowNodesForApi,
+      // prepareEdgesForApi intentionally omitted from deps because it's stable import
     ]
   );
 
@@ -682,12 +698,16 @@ export default function BuilderPage() {
     async (name: string, description: string, tags: string[] = []) => {
       try {
         setLoading(true);
-        const apiNodes = prepareWorkflowNodesForApi(nodes);
+        // Always use latest from store to avoid stale state
+        const currentNodes = useWorkflowStore.getState().nodes;
+        const currentEdges = useWorkflowStore.getState().edges;
+        const apiNodes = prepareWorkflowNodesForApi(currentNodes);
+        const apiEdges = prepareEdgesForApi(currentEdges as any);
         const savedWorkflow = await workflowService.createWorkflow({
           name,
           description,
           nodes: apiNodes,
-          edges,
+          edges: apiEdges,
           is_public: false,
           tags,
         });
@@ -821,7 +841,7 @@ export default function BuilderPage() {
   ]);
 
   const handleBlockchainAuthorization = useCallback(
-    async (authConfig: Record<string, unknown>) => {
+    async (authConfig: SecureBlockchainAuthConfig) => {
       try {
         // Store authorization config for execution
         console.log("Blockchain authorization received:", authConfig);
@@ -1125,6 +1145,7 @@ export default function BuilderPage() {
             </div>
           </div>
           <div className='flex items-center gap-2'>
+            <DynamicWidget variant='dropdown' />
             <Button
               variant='outline'
               size='sm'
@@ -1514,13 +1535,12 @@ export default function BuilderPage() {
         />
 
         {/* Enhanced Blockchain Authorization Modal */}
-        {showBlockchainAuth && (
-          <EnhancedBlockchainAuthorizationModal
-            nodes={nodes}
-            onAuthorize={handleBlockchainAuthorization}
-            onCancel={handleBlockchainCancel}
-          />
-        )}
+        <EnhancedBlockchainAuthorizationModal
+          nodes={nodes}
+          open={showBlockchainAuth}
+          onAuthorize={handleBlockchainAuthorization}
+          onCancel={handleBlockchainCancel}
+        />
 
         {/* Exit Confirmation Dialog */}
         <AlertDialog open={isExitDialogOpen} onOpenChange={setIsExitDialogOpen}>

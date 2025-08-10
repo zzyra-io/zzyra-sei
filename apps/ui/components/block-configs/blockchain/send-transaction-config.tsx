@@ -162,7 +162,7 @@ export function SendTransactionConfig({
           <div className='space-y-2'>
             <Label htmlFor='chainId'>Chain</Label>
             <Select
-              value={(config.chainId as string) || "sei-testnet"}
+              value={(config.chainId as string) || "1328"}
               onValueChange={(value) =>
                 handleChangeWithValidation("chainId", value)
               }>

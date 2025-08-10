@@ -22,6 +22,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:zerodev": "ts-node test-zerodev-flow.ts",
+    "test:zerodev:simple": "ts-node test-zerodev-simple.ts",
     "db:generate-types": "supabase gen types typescript --project-id uyeialofjqobqbgaftfc --schema public > src/types/supabase.ts"
   },
   "dependencies": {
@@ -61,6 +63,7 @@
     "@types/nodemailer": "^6.4.17",
     "@types/sanitize-html": "^2.15.0",
     "@willsoto/nestjs-prometheus": "^6.0.2",
+    "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/multi-chain-ecdsa-validator": "^5.4.5",
     "@zerodev/sdk": "^5.4.41",
     "@zyra/database": "workspace:*",

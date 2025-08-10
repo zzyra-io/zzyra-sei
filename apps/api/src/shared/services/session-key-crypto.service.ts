@@ -110,22 +110,31 @@ export class SessionKeyCryptoService {
   }
 
   /**
-   * Generate session key pair using Web Crypto API compatible format
+   * Generate session key pair with proper wallet address derivation
+   * FIXED: Generate actual wallet address from private key
    */
   async generateSessionKeyPair(): Promise<{
-    publicKey: string;
+    address: string;
     privateKey: string;
   }> {
     try {
-      // For server-side, we'll use a simple approach with crypto
-      // In production, you might want to use actual ECDSA key generation
-      const privateKey = randomBytes(32).toString("hex");
-
-      // Generate a mock public key (in real implementation, derive from private key)
-      const publicKey = randomBytes(33).toString("hex");
-
-      this.logger.debug("Session key pair generated successfully");
-      return { publicKey, privateKey };
+      // Generate a proper 32-byte private key
+      const privateKeyBytes = randomBytes(32);
+      const privateKey = `0x${privateKeyBytes.toString('hex')}`;
+      
+      // Use ethers for address derivation (available in this package)
+      const { ethers } = await import('ethers');
+      const wallet = new ethers.Wallet(privateKey);
+      const address = wallet.address;
+      
+      this.logger.debug("Session key pair generated successfully", {
+        address,
+      });
+      
+      return { 
+        address, 
+        privateKey 
+      };
     } catch (error) {
       this.logger.error("Failed to generate session key pair", error);
       throw new Error("Key generation failed");

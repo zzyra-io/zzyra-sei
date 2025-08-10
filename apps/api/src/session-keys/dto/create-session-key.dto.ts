@@ -36,6 +36,10 @@ export class CreateSessionKeyDto {
   @IsString()
   walletAddress: string;
 
+  @IsOptional()
+  @IsString()
+  smartWalletOwner?: string;
+
   @IsString()
   chainId: string;
 

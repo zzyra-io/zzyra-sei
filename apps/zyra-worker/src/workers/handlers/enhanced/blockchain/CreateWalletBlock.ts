@@ -33,9 +33,9 @@ export class CreateWalletBlock implements EnhancedBlockHandler {
         name: 'chainId',
         type: PropertyType.OPTIONS,
         required: true,
-        default: 'sei-testnet',
+        default: '1328',
         options: [
-          { name: 'SEI Testnet', value: 'sei-testnet' },
+          { name: 'SEI Testnet', value: '1328' },
           { name: 'Ethereum Sepolia', value: 'ethereum-sepolia' },
           { name: 'Base Sepolia', value: 'base-sepolia' },
         ],

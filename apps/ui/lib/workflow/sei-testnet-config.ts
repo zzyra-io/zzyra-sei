@@ -2,7 +2,7 @@
  * Sei Testnet (Atlantic-2) network configuration for DeFi operations
  */
 export const SEI_TESTNET_CONFIG = {
-  networkId: "sei-testnet",
+  networkId: "1328",
   chainId: 1328,
   rpcUrl:
     "https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32",

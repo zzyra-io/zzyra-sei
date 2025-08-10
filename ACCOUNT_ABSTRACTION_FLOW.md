@@ -166,3 +166,38 @@ AA_ENTRY_POINT_ADDRESS=0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
 - User wouldn't be present when automated workflows execute
 - Cannot rely on browser/wallet availability for scheduled tasks
 - Background job processing requires server-side execution
+
+sequenceDiagram
+participant UI as UI (Next.js)
+participant API as API (NestJS)
+participant Queue as RabbitMQ
+participant Worker as Worker (NestJS)
+participant ZeroDv as ZeroDv Service
+participant Blockchain as SEI Network
+
+    Note over UI: User clicks "Execute Workflow"
+    UI->>UI: EnhancedBlockchainAuthorizationModal
+    UI->>UI: Dynamic Labs Wallet Authorization
+    UI->>UI: Create AA delegation signature
+
+    UI->>API: POST /workflows/{id}/execute<br/>{blockchainAuthorization}
+    API->>API: WorkflowsService.execute()
+    API->>Queue: addExecutionJob(executionId, blockchainAuthorization)
+
+    Queue->>Worker: Job: {executionId, userId, blockchainAuthorization}
+    Worker->>Worker: ExecutionWorker.processMessage()
+    Worker->>Worker: WorkflowExecutor.executeWorkflow()
+    Worker->>Worker: NodeExecutor.executeNode()
+    Worker->>Worker: SendTransactionBlock.execute()
+
+    Note over Worker: ❌ Current Wrong Pattern
+    Worker->>ZeroDv: Manual kernel client creation
+    ZeroDv->>ZeroDv: Proxy owner with manual factory args
+    ZeroDv->>Blockchain: User operation with 0 gas limits
+    Blockchain->>ZeroDv: ❌ AA20 account not deployed
+
+    Note over Worker: ✅ Required Fix
+    Worker->>ZeroDv: Use ZeroDv v5+ validator pattern
+    ZeroDv->>ZeroDv: signerToEcdsaValidator + createKernelAccount
+    ZeroDv->>Blockchain: Proper user operation with deployment
+    Blockchain->>ZeroDv: ✅ Smart account deployed & transaction success

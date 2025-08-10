@@ -33,9 +33,9 @@ export class CheckBalanceBlock implements EnhancedBlockHandler {
         name: 'chainId',
         type: PropertyType.OPTIONS,
         required: true,
-        default: 'sei-testnet',
+        default: '1328',
         options: [
-          { name: 'SEI Testnet', value: 'sei-testnet' },
+          { name: 'SEI Testnet', value: '1328' },
           { name: 'Ethereum Sepolia', value: 'ethereum-sepolia' },
           { name: 'Base Sepolia', value: 'base-sepolia' },
         ],
@@ -299,7 +299,7 @@ export class CheckBalanceBlock implements EnhancedBlockHandler {
    */
   private getChainInfo(chainId: string): { symbol: string; decimals: number } {
     const chainMap = {
-      'sei-testnet': { symbol: 'SEI', decimals: 18 },
+      '1328': { symbol: 'SEI', decimals: 18 },
       'ethereum-sepolia': { symbol: 'ETH', decimals: 18 },
       'base-sepolia': { symbol: 'ETH', decimals: 18 },
     };

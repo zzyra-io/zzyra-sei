@@ -48,11 +48,13 @@ export interface SessionKeyPermission {
 export interface SessionKeyData {
   id: string;
   userId: string;
-  walletAddress: string;
+  walletAddress: string; // Session key's own address
+  smartWalletOwner?: string; // Smart wallet that owns this session key  
+  parentWalletAddress?: string; // Original EOA address
   chainId: string;
   sessionPublicKey: string;
   encryptedPrivateKey: string;
-  nonce: bigint;
+  nonce: string;
   securityLevel: SecurityLevel;
   status: SessionKeyStatus;
   validUntil: Date;
@@ -63,6 +65,7 @@ export interface SessionKeyData {
   dailyUsedAmount: string;
   lastUsedAt?: Date;
   dailyResetAt: Date;
+  parentDelegationSignature?: string; // Original Dynamic delegation
   permissions: SessionKeyPermission[];
 }
 
@@ -102,7 +105,8 @@ export interface SessionEvent {
 // ================ Request/Response DTOs ================
 
 export interface CreateSessionKeyRequest {
-  walletAddress: string;
+  walletAddress: string; // EOA address that initially authorized
+  smartWalletOwner?: string; // Smart wallet address that owns the session key
   chainId: string;
   securityLevel: SecurityLevel;
   validUntil: Date;
@@ -260,7 +264,6 @@ export interface SessionKeyRepository {
       userId: string;
       encryptedPrivateKey: string;
       sessionPublicKey: string;
-      nonce: bigint;
     }
   ): Promise<SessionKeyData>;
   findById(id: string): Promise<SessionKeyData | null>;

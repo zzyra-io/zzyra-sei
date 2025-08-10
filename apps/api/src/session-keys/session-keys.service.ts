@@ -32,6 +32,7 @@ export class SessionKeysService {
 
   /**
    * Create a new session key with encrypted private key
+   * FIXED: Proper delegation hierarchy for smart wallet integration
    */
   async createSessionKey(
     userId: string,
@@ -39,16 +40,17 @@ export class SessionKeysService {
     userSignature: string
   ): Promise<{ sessionKey: SessionKeyData; delegationMessage: string }> {
     try {
-      this.logger.log("Creating new session key", {
+      this.logger.log("Creating new session key for smart wallet delegation", {
         userId,
         chainId: request.chainId,
+        smartWalletOwner: request.smartWalletOwner,
       });
 
       // Generate session key pair
-      const { publicKey, privateKey } =
+      const { address: sessionKeyAddress, privateKey } =
         await this.cryptoService.generateSessionKeyPair();
 
-      // Encrypt private key with user signature
+      // Encrypt private key with user signature (Dynamic delegation message)
       const encryptedPrivateKey = await this.cryptoService.encryptSessionKey(
         privateKey,
         userSignature
@@ -57,16 +59,19 @@ export class SessionKeysService {
       // Generate nonce
       const nonce = this.cryptoService.generateNonce();
 
-      // Create delegation message
+      // Create delegation message for smart wallet → session key delegation
       const delegationMessage = {
-        userAddress: request.walletAddress,
-        sessionPublicKey: publicKey,
+        smartWalletAddress: request.smartWalletOwner, // Smart wallet that owns this session key
+        sessionKeyAddress, // Generated session key address
+        delegatedBy: request.walletAddress, // Original EOA that authorized the smart wallet
         chainId: request.chainId,
         securityLevel: request.securityLevel,
         validUntil: request.validUntil.toISOString(),
         nonce: nonce.toString(),
         permissions: request.permissions,
         timestamp: new Date().toISOString(),
+        purpose: "workflow_automation_delegation",
+        parentSignature: userSignature, // Original Dynamic signature
       };
 
       // Create session key in database with transaction
@@ -75,14 +80,17 @@ export class SessionKeysService {
         const newSessionKey = await tx.sessionKey.create({
           data: {
             userId,
-            walletAddress: request.walletAddress,
+            walletAddress: sessionKeyAddress, // Session key's own address
+            smartWalletOwner: request.smartWalletOwner, // Smart wallet that owns this session key
+            parentWalletAddress: request.walletAddress, // Original EOA address
             chainId: request.chainId,
-            sessionPublicKey: publicKey,
+            sessionPublicKey: sessionKeyAddress,
             encryptedPrivateKey,
-            nonce,
+            // Let DB autogenerate nonce via default(autoincrement()) to avoid BigInt transport issues
             securityLevel: request.securityLevel,
             validUntil: request.validUntil,
             dailyResetAt: new Date(),
+            parentDelegationSignature: userSignature,
           },
           include: {
             permissions: true,
@@ -545,7 +553,7 @@ export class SessionKeysService {
       chainId: sessionKey.chainId,
       sessionPublicKey: sessionKey.sessionPublicKey,
       encryptedPrivateKey: sessionKey.encryptedPrivateKey,
-      nonce: sessionKey.nonce,
+      nonce: sessionKey.nonce.toString(),
       securityLevel: sessionKey.securityLevel as SecurityLevel,
       status: sessionKey.status as SessionKeyStatus,
       validUntil: sessionKey.validUntil,

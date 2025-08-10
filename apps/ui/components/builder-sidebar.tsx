@@ -57,7 +57,6 @@ import * as z from "zod";
 
 // import { AIBlockForm } from "./builders/ai-block-form";
 import api from "@/lib/services/api";
-import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
 import CustomBlocksModal from "./custom-blocks-modal";
 
 interface BuilderSidebarProps {
@@ -414,7 +413,6 @@ export function BuilderSidebar({
 
           {mainTab === "settings" && (
             <div className='h-full'>
-              <DynamicWidget variant='modal' />
               <div className='px-4 py-4 border-b bg-muted/10'>
                 <div className='flex items-center gap-2 mb-2'>
                   <LayoutDashboard className='h-4 w-4 text-primary' />

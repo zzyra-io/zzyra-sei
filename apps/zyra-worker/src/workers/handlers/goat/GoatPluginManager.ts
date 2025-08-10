@@ -13,7 +13,7 @@ import { z } from 'zod';
 const seiTestnet = {
   id: 1328,
   name: 'Sei Testnet',
-  network: 'sei-testnet',
+  network: '1328',
   nativeCurrency: {
     decimals: 18,
     name: 'SEI',
@@ -434,7 +434,7 @@ class EnhancedTransactionHistoryPlugin extends PluginBase<any> {
           decimals: 6,
         },
       ],
-      'sei-testnet': [], // SEI doesn't use ERC-20, uses native cosmos tokens
+      '1328': [], // SEI doesn't use ERC-20, uses native cosmos tokens
     };
 
     return tokensByChain[chain] || [];
@@ -569,7 +569,7 @@ export class GoatPluginManager {
     const networks: NetworkConfig[] = [
       {
         chainId: 1328,
-        name: 'sei-testnet',
+        name: '1328',
         rpcUrl:
           process.env.SEI_TESTNET_RPC_URL ||
           'https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32',
@@ -719,7 +719,7 @@ export class GoatPluginManager {
   private async loadERC20Plugin(): Promise<void> {
     try {
       for (const [networkName, walletClient] of this.walletClients.entries()) {
-        if (networkName === 'sei-testnet') continue; // Skip for Sei testnet for now
+        if (networkName === '1328') continue; // Skip for Sei testnet for now
 
         const erc20Plugin = erc20({ tokens: [] });
         // const { listOfTools } = await getOnChainTools({
@@ -893,7 +893,7 @@ export class GoatPluginManager {
           decimals: 6,
         },
       ],
-      'sei-testnet': [], // SEI doesn't use ERC-20, uses native cosmos tokens
+      '1328': [], // SEI doesn't use ERC-20, uses native cosmos tokens
     };
 
     return tokensByChain[chain] || [];

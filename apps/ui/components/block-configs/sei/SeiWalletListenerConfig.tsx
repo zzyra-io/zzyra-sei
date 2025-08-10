@@ -56,7 +56,7 @@ export default function SeiWalletListenerConfig({
 
   // Cast config to expected type with defaults
   const typedConfig = {
-    network: "sei-testnet",
+    network: "1328",
     walletAddresses: [] as string[],
     eventTypes: [] as string[],
     pollingInterval: 30000,
@@ -171,7 +171,7 @@ export default function SeiWalletListenerConfig({
                     <SelectValue placeholder='Select network' />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value='sei-testnet'>Sei Testnet</SelectItem>
+                    <SelectItem value='1328'>Sei Testnet</SelectItem>
                     <SelectItem value='sei-mainnet'>Sei Mainnet</SelectItem>
                   </SelectContent>
                 </Select>
@@ -407,7 +407,7 @@ export default function SeiWalletListenerConfig({
     "tokenDenom": "usei"
   }],
   "totalEvents": 1,
-  "network": "sei-testnet",
+  "network": "1328",
   "timestamp": "2024-01-01T00:00:00Z"
 }`}
               </pre>

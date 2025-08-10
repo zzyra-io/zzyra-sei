@@ -13,7 +13,7 @@ import { baseSepolia } from 'viem/chains';
 const seiTestnet = {
   id: 1328,
   name: 'Sei Testnet',
-  network: 'sei-testnet',
+  network: '1328',
   nativeCurrency: {
     decimals: 18,
     name: 'SEI',

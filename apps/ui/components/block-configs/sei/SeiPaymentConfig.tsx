@@ -47,7 +47,7 @@ export default function SeiPaymentConfig({
   const [activeTab, setActiveTab] = useState("config");
 
   const typedConfig = {
-    network: "sei-testnet",
+    network: "1328",
     paymentType: "single",
     singlePayment: { recipient: "", amount: 0, tokenDenom: "usei" },
     walletConfig: { type: "magic_wallet" },
@@ -113,7 +113,7 @@ export default function SeiPaymentConfig({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value='sei-testnet'>Sei Testnet</SelectItem>
+                      <SelectItem value='1328'>Sei Testnet</SelectItem>
                       <SelectItem value='sei-mainnet'>Sei Mainnet</SelectItem>
                     </SelectContent>
                   </Select>

@@ -13,10 +13,10 @@ import { ReactNode } from "react";
 import { http } from "viem";
 import { WagmiProvider, createConfig } from "wagmi";
 
-// SEI Network Configuration (EVM-compatible Layer 1)
+// SEI Testnet Configuration (EVM-compatible) - Updated to match ZeroDev
 const seiNetwork = {
-  id: 1328, // SEI Pacific-1 mainnet chain ID
-  name: "Sei Network",
+  id: 1328, // SEI Testnet chain ID (matches ZeroDev dashboard)
+  name: "SEI Testnet",
   nativeCurrency: {
     decimals: 18,
     name: "SEI",

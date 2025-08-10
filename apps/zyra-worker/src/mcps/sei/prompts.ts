@@ -41,7 +41,7 @@ function registerReadOnlyPrompts(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet' etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet' etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
         ),
     },
     ({ blockNumber, network = DEFAULT_NETWORK }) => ({
@@ -69,7 +69,7 @@ function registerReadOnlyPrompts(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet' etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet' etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
         ),
     },
     ({ txHash, network = DEFAULT_NETWORK }) => ({
@@ -95,7 +95,7 @@ function registerReadOnlyPrompts(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet' etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet' etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
         ),
     },
     ({ address, network = DEFAULT_NETWORK }) => ({
@@ -171,7 +171,7 @@ function registerReadOnlyPrompts(server: McpServer) {
       networkList: z
         .string()
         .describe(
-          "Comma-separated list of networks to compare (e.g., 'sei,sei-testnet,sei-devnet')",
+          "Comma-separated list of networks to compare (e.g., 'sei,1328,sei-devnet')",
         ),
     },
     ({ networkList }) => {
@@ -210,7 +210,7 @@ function registerReadOnlyPrompts(server: McpServer) {
         .string()
         .optional()
         .describe(
-          "Network name (e.g., 'sei', 'sei-testnet', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
+          "Network name (e.g., 'sei', '1328', 'sei-devnet', etc.) or chain ID. Supports all Sei networks. Defaults to Sei mainnet.",
         ),
     },
     ({

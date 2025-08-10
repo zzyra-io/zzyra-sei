@@ -72,7 +72,11 @@ export class SessionKeysController {
       return {
         success: true,
         data: {
-          sessionKey: result.sessionKey,
+          sessionKey: {
+            ...result.sessionKey,
+            // Ensure BigInt-like fields are serializable
+            nonce: result.sessionKey.nonce,
+          },
           delegationMessage: result.delegationMessage,
         },
       };
@@ -114,7 +118,7 @@ export class SessionKeysController {
         return { success: true, data: sessionKey };
       }
 
-      // System request (worker) - allow access to any session key
+      // System request (worker) - allow access to any session key when service auth is present
       const sessionKey = await this.sessionKeysService.getSessionKeyById(id);
 
       if (!sessionKey) {
@@ -134,6 +138,64 @@ export class SessionKeysController {
         "Internal server error",
         HttpStatus.INTERNAL_SERVER_ERROR
       );
+    }
+  }
+
+  /**
+   * Get session key status and deployment info
+   * GET /api/session-keys/status
+   */
+  @Get("status")
+  async getSessionKeyStatus(@Request() req: any) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return {
+          hasActiveSession: false,
+          error: "User not authenticated",
+        };
+      }
+
+      const activeSessionKeys =
+        await this.sessionKeysService.getSessionKeysByUserId(
+          userId,
+          SessionKeyStatus.ACTIVE
+        );
+
+      if (!activeSessionKeys || activeSessionKeys.length === 0) {
+        return {
+          hasActiveSession: false,
+          message: "No active session keys found",
+        };
+      }
+
+      // Get the most recent active session key
+      const mostRecentSession = activeSessionKeys[0];
+
+      // Check if this is a recently created session (likely means deployment completed)
+      const isRecentlyCreated =
+        new Date().getTime() - new Date(mostRecentSession.createdAt).getTime() <
+        10 * 60 * 1000; // 10 minutes
+
+      return {
+        hasActiveSession: true,
+        sessionKeyId: mostRecentSession.id,
+        walletAddress: mostRecentSession.walletAddress,
+        smartWalletAddress: mostRecentSession.smartWalletOwner,
+        status: mostRecentSession.status,
+        createdAt: mostRecentSession.createdAt,
+        isRecentlyCreated,
+        deploymentLikely: isRecentlyCreated,
+        message: isRecentlyCreated
+          ? "Recent session key found - smart wallet likely deployed"
+          : "Active session key found",
+      };
+    } catch (error) {
+      this.logger.error("Error checking session key status:", error);
+      return {
+        hasActiveSession: false,
+        error: "Failed to check session status",
+      };
     }
   }
 

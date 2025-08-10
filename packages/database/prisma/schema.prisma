@@ -1211,13 +1211,16 @@ model McpToolCall {
 model SessionKey {
   id                   String            @id @default(uuid())
   userId               String            @map("user_id")
-  walletAddress        String            @map("wallet_address")
+  walletAddress        String            @map("wallet_address") // Session key's own address
+  smartWalletOwner     String?           @map("smart_wallet_owner") // Smart wallet that owns this session key
+  parentWalletAddress  String?           @map("parent_wallet_address") // Original EOA address
   chainId              String            @map("chain_id")
   
   // Session key data
   sessionPublicKey     String            @map("session_public_key")
   encryptedPrivateKey  String            @map("encrypted_private_key")
   nonce                BigInt            @default(autoincrement())
+  parentDelegationSignature String?      @map("parent_delegation_signature") // Original Dynamic delegation
   
   // Security and permissions
   securityLevel        SecurityLevel     @default(basic) @map("security_level")

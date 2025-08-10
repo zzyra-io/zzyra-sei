@@ -63,12 +63,12 @@ export interface BlockchainNode {
 }
 
 export const SUPPORTED_CHAINS = {
-  "sei-testnet": {
+  "1328": {
     name: "SEI Testnet",
     symbol: "SEI",
     rpcUrl: "https://rpc-testnet.sei-labs.org",
     explorer: "https://testnet.seitrace.com",
-    faucet: "https://faucet.sei-testnet.org",
+    faucet: "https://faucet.1328.org",
   },
   "base-sepolia": {
     name: "Base Sepolia",

@@ -21,14 +21,15 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { ConfigService } from '@nestjs/config';
 import { ZeroDevService } from '../../../../services/zerodev.service';
+import { DatabaseService } from '../../../../services/database.service';
 
 /**
  * SEI Network Configuration
  */
 const SEI_TESTNET_CONFIG = {
-  id: 713715,
+  id: 1328,
   name: 'SEI Testnet',
-  network: 'sei-testnet',
+  network: '1328',
   nativeCurrency: {
     name: 'SEI',
     symbol: 'SEI',
@@ -98,6 +99,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   constructor(
     private readonly configService: ConfigService,
     private readonly zeroDevService: ZeroDevService,
+    private readonly databaseService: DatabaseService,
   ) {}
 
   definition: EnhancedBlockDefinition = {
@@ -115,9 +117,9 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         name: 'chainId',
         type: PropertyType.OPTIONS,
         required: true,
-        default: 'sei-testnet',
+        default: '1328',
         options: [
-          { name: 'SEI Testnet', value: 'sei-testnet' },
+          { name: 'SEI Testnet', value: '1328' },
           { name: 'Ethereum Sepolia', value: 'ethereum-sepolia' },
           { name: 'Base Sepolia', value: 'base-sepolia' },
         ],
@@ -370,6 +372,71 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   }
 
   /**
+   * Deploy smart wallet if needed using the EOA owner
+   */
+  private async deploySmartWalletIfNeeded(
+    eoaAddress: string,
+    smartWalletAddress: string,
+    chainId: number,
+    context: EnhancedBlockExecutionContext,
+  ): Promise<void> {
+    context.logger.log(
+      `Attempting to deploy smart wallet ${smartWalletAddress} using EOA ${eoaAddress}`,
+    );
+
+    // Smart wallet deployment requires manual intervention for security reasons
+    // The backend cannot access EOA private keys (which is correct for security)
+    context.logger.error(
+      `Smart wallet ${smartWalletAddress} is not deployed. ` +
+      `This workflow cannot proceed until the smart wallet is deployed.`
+    );
+    
+    // Check if this is a recent session key (user might still be in deployment process)
+    let guidanceMessage = `Please use the Zyra frontend to create a new blockchain authorization with your current smart wallet. This will ensure the session key matches your deployed smart wallet address.`;
+    
+    try {
+      const sessionKeys = await this.databaseService.prisma.sessionKey.findMany({
+        where: {
+          userId: context.userId,
+          status: 'active',
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 1,
+      });
+
+      const recentSessionKey = sessionKeys.find(sk => 
+        new Date().getTime() - new Date(sk.createdAt).getTime() < 5 * 60 * 1000 // Created within 5 minutes
+      );
+      
+      const isRecentDelegation = !!recentSessionKey;
+      guidanceMessage = isRecentDelegation 
+        ? `It looks like you just created this delegation. The smart wallet deployment might still be in progress. Please wait 1-2 minutes and try running the workflow again.`
+        : `Please use the Zyra frontend to create a new blockchain authorization with your current smart wallet (${smartWalletAddress}). This will ensure the session key matches your deployed smart wallet address.`;
+        
+      context.logger.log('Smart wallet deployment guidance:', {
+        hasRecentSession: isRecentDelegation,
+        recentSessionKeyId: recentSessionKey?.id,
+        smartWalletAddress,
+        eoaAddress,
+      });
+      
+    } catch (dbError) {
+      context.logger.error('Failed to check recent session keys:', dbError);
+      // Keep the default guidance message
+    }
+    
+    throw new Error(
+      `⚠️ Smart Wallet Not Deployed\n\n` +
+      `Smart wallet: ${smartWalletAddress}\n` +
+      `Owner EOA: ${eoaAddress}\n\n` +
+      `${guidanceMessage}\n\n` +
+      `This is a one-time setup step for Account Abstraction workflows.`
+    );
+  }
+
+  /**
    * Check if amount is within authorized spending limits
    */
   private checkSpendingLimits(
@@ -398,7 +465,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   }
 
   /**
-   * Execute the actual blockchain transaction with pre-determined auth method
+   * Execute the actual blockchain transaction with proper delegation hierarchy support
    */
   private async executeTransactionWithAuth(params: {
     chainId: string;
@@ -407,18 +474,46 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     tokenAddress?: string;
     gasLimit: number;
     context: EnhancedBlockExecutionContext;
-    authMethod: { useAA: boolean; aaData?: any; sessionKeyId?: string };
+    authMethod: {
+      useAA: boolean;
+      aaData?: any;
+      sessionKeyId?: string;
+      delegationMode: 'immediate' | 'delegated' | 'hybrid';
+    };
   }): Promise<TransactionResult> {
     const { context, authMethod } = params;
 
     context.logger.info('Executing blockchain transaction', params);
 
-    if (authMethod.useAA && authMethod.aaData) {
+    // If we have a sessionKeyId, we should use AA execution with ZeroDev
+    if (authMethod.sessionKeyId || (authMethod.useAA && authMethod.aaData)) {
       // Execute via Account Abstraction
-      context.logger.info('Using Account Abstraction execution path');
-      return this.executeAATransaction(authMethod.aaData, params);
+      context.logger.info('Using Account Abstraction execution path', {
+        sessionKeyId: authMethod.sessionKeyId,
+        hasAAData: !!authMethod.aaData,
+      });
+
+      // If we have sessionKeyId but no aaData, create minimal aaData for ZeroDev
+      if (authMethod.sessionKeyId && !authMethod.aaData) {
+        const sessionWallet = await this.getSessionKeyWallet(
+          context,
+          params.chainId,
+        );
+        authMethod.aaData = {
+          smartWalletAddress: sessionWallet.address,
+          ownerAddress: sessionWallet.address, // For session keys, owner is the session key itself
+          sessionKeyId: authMethod.sessionKeyId,
+          // Note: kernelClient will be created on-demand using ZeroDev service
+        };
+      }
+
+      return this.executeAATransactionWithDelegation(
+        authMethod.aaData,
+        params,
+        authMethod.delegationMode,
+      );
     } else {
-      // Execute via Session Key (legacy path)
+      // Execute via Session Key (legacy path - only for non-AA chains)
       context.logger.info('Using Session Key execution path');
       return this.executeSessionKeyTransaction(params);
     }
@@ -439,7 +534,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
     // Route to appropriate blockchain handler
     switch (chainId) {
-      case 'sei-testnet':
+      case '1328':
         return this.executeSeiTransaction(params);
       case 'ethereum-sepolia':
       case 'base-sepolia':
@@ -450,11 +545,17 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   }
 
   /**
-   * Parse blockchain authorization to determine execution method (AA vs Session Key)
+   * Parse blockchain authorization to determine execution method
+   * Supports the new delegation hierarchy: EOA → Smart Wallet → Session Key
    */
   private async parseBlockchainAuthorization(
     context: EnhancedBlockExecutionContext,
-  ): Promise<{ useAA: boolean; aaData?: any; sessionKeyId?: string }> {
+  ): Promise<{
+    useAA: boolean;
+    aaData?: any;
+    sessionKeyId?: string;
+    delegationMode: 'immediate' | 'delegated' | 'hybrid';
+  }> {
     const authConfig = context.blockchainAuthorization;
     if (!authConfig?.delegationSignature) {
       throw new Error('No blockchain authorization provided');
@@ -474,6 +575,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
         return {
           useAA: true,
+          delegationMode: 'immediate', // EOA directly controls smart wallet
           aaData: {
             smartWalletAddress: parsedData.smartWallet,
             ownerAddress: parsedData.owner,
@@ -489,7 +591,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
       // Fallback: Check for legacy useAA format
       if (parsedData.useAA === true) {
-        return { useAA: true, aaData: parsedData };
+        return {
+          useAA: true,
+          delegationMode: 'hybrid',
+          aaData: parsedData,
+        };
       }
     } catch (error) {
       context.logger.debug(
@@ -502,7 +608,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
     // Fallback to session key
     if (authConfig.sessionKeyId) {
-      return { useAA: false, sessionKeyId: authConfig.sessionKeyId };
+      return {
+        useAA: false,
+        delegationMode: 'immediate',
+        sessionKeyId: authConfig.sessionKeyId,
+      };
     }
 
     throw new Error(
@@ -555,7 +665,283 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   }
 
   /**
-   * Execute transaction using Account Abstraction for automated workflow execution
+   * Execute transaction using Account Abstraction with proper delegation hierarchy
+   * Supports: immediate (EOA → Smart Wallet), delegated (Session Key → Smart Wallet), hybrid
+   */
+  private async executeAATransactionWithDelegation(
+    aaData: any,
+    params: {
+      chainId: string;
+      recipientAddress: string;
+      amount: string;
+      tokenAddress?: string;
+      gasLimit: number;
+      context: EnhancedBlockExecutionContext;
+    },
+    delegationMode: 'immediate' | 'delegated' | 'hybrid',
+  ): Promise<TransactionResult> {
+    const { chainId, recipientAddress, amount, context } = params;
+
+    try {
+      context.logger.info(
+        'Executing AA transaction with delegation hierarchy',
+        {
+          chainId,
+          delegationMode,
+          smartWalletAddress: aaData.smartWalletAddress,
+          ownerAddress: aaData.ownerAddress,
+          sessionKeyId: aaData.sessionKeyId,
+          recipientAddress,
+          amount,
+          operations: aaData.operations,
+          executionId: context.executionId,
+        },
+      );
+
+      // Validate delegation hasn't expired
+      if (aaData.expiresAt) {
+        const expiryTime = new Date(aaData.expiresAt).getTime();
+        if (Date.now() > expiryTime) {
+          throw new Error('AA delegation has expired');
+        }
+      }
+
+      // Validate spending limits
+      const requestedAmount = parseFloat(amount);
+      const maxAmount = parseFloat(aaData.maxAmountPerTx || '1000000');
+
+      if (requestedAmount > maxAmount) {
+        throw new Error(
+          `Transaction amount ${amount} exceeds maximum allowed ${aaData.maxAmountPerTx}`,
+        );
+      }
+
+      // Validate operation is allowed
+      const operation = params.tokenAddress ? 'erc20_transfer' : 'eth_transfer';
+      if (aaData.operations && !aaData.operations.includes(operation)) {
+        throw new Error(`Operation ${operation} not permitted in delegation`);
+      }
+
+      context.logger.info('AA delegation validation passed', {
+        delegationMode,
+        smartWallet: aaData.smartWalletAddress,
+        owner: aaData.ownerAddress,
+        sessionKeyId: aaData.sessionKeyId,
+        operation,
+        amount,
+        maxAllowed: aaData.maxAmountPerTx,
+      });
+
+      const chainIdNumber = this.getChainIdNumber(chainId);
+
+      // Create kernel client based on delegation mode
+      if (!aaData.kernelClient) {
+        context.logger.info('Creating kernel client based on delegation mode', {
+          delegationMode,
+          smartWallet: aaData.smartWalletAddress,
+          chainId,
+        });
+
+        try {
+          let kernelClient;
+
+          switch (delegationMode) {
+            case 'immediate':
+              // EOA directly controls smart wallet (Dynamic Labs pattern)
+              // This would require the EOA private key, which we don't have in automated execution
+              // For now, fall back to session key method
+              context.logger.warn(
+                'Immediate delegation mode requested but not supported in automated execution, falling back to delegated mode',
+              );
+            // Fall through to delegated case
+
+            case 'delegated':
+              // Session key operates on behalf of smart wallet
+              const sessionWallet = await this.getSessionKeyWallet(
+                context,
+                chainId,
+              );
+              const formattedPk = this.formatPrivateKey(
+                sessionWallet.privateKey,
+              );
+
+              context.logger.info('Creating delegated kernel client', {
+                sessionKeyAddress: sessionWallet.address,
+                smartWalletAddress: aaData.smartWalletAddress,
+              });
+
+              try {
+                // Create kernel client in delegated mode
+                kernelClient = await this.zeroDevService.createKernelAccount(
+                  formattedPk,
+                  chainIdNumber,
+                  'delegated',
+                  aaData.smartWalletAddress, // Smart wallet that owns the session key
+                );
+              } catch (error) {
+                const errorMessage =
+                  error instanceof Error ? error.message : String(error);
+
+                // If smart wallet doesn't exist, we need to deploy it using the EOA, not the session key
+                if (errorMessage.includes('not deployed')) {
+                  context.logger.error(
+                    'Smart wallet not deployed - this indicates a problem with the authorization flow',
+                    {
+                      smartWalletAddress: aaData.smartWalletAddress,
+                      sessionKeyAddress: sessionWallet.address,
+                      ownerAddress: aaData.ownerAddress,
+                    },
+                  );
+
+                  // CRITICAL FIX: Deploy the smart wallet if it's not deployed
+                  context.logger.warn(
+                    `Smart wallet ${aaData.smartWalletAddress} is not deployed. Attempting to deploy it now.`,
+                  );
+
+                  try {
+                    // Deploy the smart wallet using the EOA (owner)
+                    await this.deploySmartWalletIfNeeded(
+                      aaData.ownerAddress,
+                      aaData.smartWalletAddress,
+                      chainIdNumber,
+                      context,
+                    );
+                    context.logger.log(
+                      `Successfully deployed smart wallet ${aaData.smartWalletAddress}`,
+                    );
+
+                    // Retry the session key transaction now that the smart wallet is deployed
+                    kernelClient =
+                      await this.zeroDevService.createKernelAccount(
+                        formattedPk,
+                        chainIdNumber,
+                        'delegated',
+                        aaData.smartWalletAddress,
+                      );
+                  } catch (deployError) {
+                    context.logger.error(
+                      `Failed to deploy smart wallet: ${deployError}`,
+                    );
+                    throw new Error(
+                      `Smart wallet ${aaData.smartWalletAddress} is not deployed and deployment failed: ${deployError instanceof Error ? deployError.message : 'Unknown error'}. ` +
+                        `This indicates an issue with the delegation hierarchy setup. ` +
+                        `The smart wallet should be deployed by the EOA (${aaData.ownerAddress}) ` +
+                        `before session keys can operate on its behalf.`,
+                    );
+                  }
+                } else {
+                  throw error;
+                }
+              }
+              break;
+
+            case 'hybrid':
+              // Support both patterns - start with session key for automated execution
+              const hybridSessionWallet = await this.getSessionKeyWallet(
+                context,
+                chainId,
+              );
+              const hybridFormattedPk = this.formatPrivateKey(
+                hybridSessionWallet.privateKey,
+              );
+
+              kernelClient = await this.zeroDevService.createKernelAccount(
+                hybridFormattedPk,
+                chainIdNumber,
+                'hybrid',
+                aaData.smartWalletAddress,
+              );
+              break;
+
+            default:
+              throw new Error(`Unsupported delegation mode: ${delegationMode}`);
+          }
+
+          aaData.kernelClient = kernelClient;
+
+          context.logger.info('Kernel client created successfully', {
+            delegationMode,
+            smartWallet: aaData.smartWalletAddress,
+            sessionKeyId: aaData.sessionKeyId,
+            kernelClientAddress: kernelClient.account?.address,
+          });
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          context.logger.error('Failed to create kernel client', {
+            error: errorMessage,
+            delegationMode,
+            smartWallet: aaData.smartWalletAddress,
+          });
+          throw new Error(`Failed to create kernel client: ${errorMessage}`);
+        }
+      }
+
+      let result: TransactionResult;
+
+      // Execute the transaction using ZeroDev service
+      context.logger.info('Executing transaction with kernel client', {
+        delegationMode,
+        operation,
+        amount,
+        recipient: recipientAddress,
+      });
+
+      if (params.tokenAddress) {
+        // ERC20 transfer using contract interaction
+        const erc20Data = this.encodeERC20Transfer(
+          recipientAddress,
+          amount,
+          params.tokenAddress,
+        );
+
+        result = await this.zeroDevService.executeContractInteraction(
+          aaData.kernelClient,
+          params.tokenAddress,
+          erc20Data,
+          BigInt(0),
+          chainIdNumber,
+        );
+      } else {
+        // Native token transfer
+        result = await this.zeroDevService.executeSimpleTransaction(
+          aaData.kernelClient,
+          recipientAddress,
+          amount,
+          chainIdNumber,
+        );
+      }
+
+      context.logger.info(
+        'AA transaction with delegation executed successfully',
+        {
+          delegationMode,
+          transactionHash: result.transactionHash,
+          smartWallet: aaData.smartWalletAddress,
+          sessionKeyId: aaData.sessionKeyId,
+          amount,
+          recipient: recipientAddress,
+          gasUsed: result.gasUsed,
+          blockNumber: result.blockNumber,
+        },
+      );
+
+      return result;
+    } catch (error) {
+      context.logger.error('Failed to execute AA transaction with delegation', {
+        error: error instanceof Error ? error.message : String(error),
+        delegationMode,
+        chainId,
+        smartWalletAddress: aaData.smartWalletAddress,
+        sessionKeyId: aaData.sessionKeyId,
+        executionId: context.executionId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Execute transaction using Account Abstraction for automated workflow execution (LEGACY)
    * This executes transactions on behalf of users using their delegated session keys
    */
   private async executeAATransaction(
@@ -636,28 +1022,23 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         });
 
         try {
-          // Create a kernel account first using the ZeroDev service
-          // We need to create a new account since we only have the address
-          // The owner private key should come from the delegation data
-          if (!aaData.ownerPrivateKey) {
-            throw new Error(
-              'Owner private key not provided in delegation data',
-            );
-          }
-
-          const kernelAccount = await this.zeroDevService.createKernelAccount(
-            aaData.ownerPrivateKey,
-            chainIdNumber,
+          // Prefer session key-based kernel client for automated AA execution
+          const sessionWallet = await this.getSessionKeyWallet(
+            context,
+            chainId,
           );
 
-          // Create the kernel client using the ZeroDev service
-          aaData.kernelClient = await this.zeroDevService.createKernelClient(
-            kernelAccount,
+          const formattedPk = this.formatPrivateKey(sessionWallet.privateKey);
+
+          // createKernelAccount now returns the kernel client directly
+          aaData.kernelClient = await this.zeroDevService.createKernelAccount(
+            formattedPk,
             chainIdNumber,
           );
 
           context.logger.info('Kernel client created successfully', {
             smartWallet: aaData.smartWalletAddress,
+            sessionKeyId: context.blockchainAuthorization?.sessionKeyId,
           });
         } catch (error) {
           const errorMessage =
@@ -784,11 +1165,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       const { createPublicClient, http } = require('viem');
       const publicClient = createPublicClient({
         chain: {
-          id: chainId === 'sei-testnet' ? 1328 : 11155111,
+          id: chainId === '1328' ? 1328 : 11155111,
           rpcUrls: {
             default: {
               http: [
-                chainId === 'sei-testnet'
+                chainId === '1328'
                   ? 'https://evm-rpc-testnet.sei-apis.com'
                   : 'https://rpc.sepolia.org',
               ],
@@ -989,11 +1370,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       const { createPublicClient, http } = require('viem');
       const publicClient = createPublicClient({
         chain: {
-          id: chainId === 'sei-testnet' ? 1328 : 11155111,
+          id: chainId === '1328' ? 1328 : 11155111,
           rpcUrls: {
             default: {
               http: [
-                chainId === 'sei-testnet'
+                chainId === '1328'
                   ? 'https://evm-rpc-testnet.sei-apis.com'
                   : 'https://rpc.sepolia.org',
               ],
@@ -1229,17 +1610,32 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     }
 
     try {
-      // Fetch session key from API
-      const response = await fetch(
-        `${process.env.API_BASE_URL}/api/session-keys/${sessionKeyId}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.WORKER_API_TOKEN}`,
-          },
+      // Fetch session key from API with HMAC service auth
+      const crypto = require('crypto');
+      const getTimestamp = Date.now().toString();
+      const getNonce = `${getTimestamp}-${Math.random().toString(36).slice(2)}`;
+      const getBody = '';
+      const getBodyHash = crypto
+        .createHash('sha256')
+        .update(getBody)
+        .digest('hex');
+      const getPath = `/api/session-keys/${sessionKeyId}`;
+      const getCanonical = `GET\n${getPath}\n${getBodyHash}\n${getTimestamp}\n${getNonce}`;
+      const getSignature = crypto
+        .createHmac('sha256', process.env.SERVICE_AUTH_WORKER_SECRET as string)
+        .update(getCanonical)
+        .digest('base64');
+
+      const response = await fetch(`${process.env.API_BASE_URL}${getPath}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Service-Id': process.env.SERVICE_AUTH_WORKER_ID || '',
+          'X-Timestamp': getTimestamp,
+          'X-Nonce': getNonce,
+          'X-Signature': getSignature,
         },
-      );
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch session key: ${response.statusText}`);
@@ -1247,10 +1643,22 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
       const { data: sessionKey } = await response.json();
 
-      // Decrypt the session private key using the delegation signature
+      // Determine the decryption message: support wrapped JSON or raw string
+      const rawDelegation = context.blockchainAuthorization.delegationSignature;
+      let decryptionMessage = rawDelegation;
+      try {
+        const parsed = JSON.parse(rawDelegation);
+        if (parsed && typeof parsed.encryptionMessage === 'string') {
+          decryptionMessage = parsed.encryptionMessage;
+        }
+      } catch {
+        // keep raw string
+      }
+
+      // Decrypt the session private key using the delegation message
       const privateKey = await this.decryptSessionKey(
         sessionKey.encryptedPrivateKey,
-        context.blockchainAuthorization.delegationSignature,
+        decryptionMessage,
       );
 
       return {
@@ -1270,6 +1678,17 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         `Session key wallet initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
+  }
+
+  /**
+   * Normalize a hex private key to 0x-prefixed 32-byte format
+   */
+  private formatPrivateKey(privateKey: string): `0x${string}` {
+    const hex = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
+    if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+      throw new Error('Invalid session key format: expected 32-byte hex');
+    }
+    return `0x${hex}`;
   }
 
   /**
@@ -1343,9 +1762,8 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       const sessionWallet = await this.getSessionKeyWallet(context, chainId);
 
       // Create account from session key private key
-      const account = privateKeyToAccount(
-        sessionWallet.privateKey as `0x${string}`,
-      );
+      const formattedPk = this.formatPrivateKey(sessionWallet.privateKey);
+      const account = privateKeyToAccount(formattedPk);
 
       context.logger.info('Connecting to SEI testnet EVM', {
         rpcUrl: SEI_TESTNET_CONFIG.rpcUrls.default.http[0],
@@ -1526,7 +1944,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     const rpcUrls = {
       'ethereum-sepolia': 'https://rpc.sepolia.org',
       'base-sepolia': 'https://sepolia.base.org',
-      'sei-testnet': 'https://rpc-testnet.sei-labs.io',
+      '1328': 'https://rpc-testnet.sei-labs.io',
     };
 
     return rpcUrls[chainId as keyof typeof rpcUrls] || '';
@@ -1539,7 +1957,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     const explorerUrls = {
       'ethereum-sepolia': 'https://sepolia.etherscan.io',
       'base-sepolia': 'https://sepolia.basescan.org',
-      'sei-testnet': 'https://seitrace.com',
+      '1328': 'https://seitrace.com',
     };
 
     const baseUrl =
@@ -1553,7 +1971,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
    */
   private getChainIdNumber(chainId: string): number {
     const chainIds = {
-      'sei-testnet': 713715,
+      '1328': 1328,
       'ethereum-sepolia': 11155111,
       'base-sepolia': 84532,
     };
@@ -1591,22 +2009,37 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         };
       }
 
-      // Call session key service for validation
-      const response = await fetch(
-        `${process.env.API_BASE_URL}/api/session-keys/${sessionKeyId}/validate`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.INTERNAL_API_TOKEN}`, // Internal service token
-          },
-          body: JSON.stringify({
-            operation: transaction.operation,
-            amount: transaction.amount,
-            toAddress: transaction.toAddress,
-          }),
+      // Call session key service for validation with HMAC service auth
+      const crypto = require('crypto');
+      const vTimestamp = Date.now().toString();
+      const vNonce = `${vTimestamp}-${Math.random().toString(36).slice(2)}`;
+      const vBodyObj = {
+        operation: transaction.operation,
+        amount: transaction.amount,
+        toAddress: transaction.toAddress,
+      };
+      const vBody = JSON.stringify(vBodyObj);
+      const vBodyHash = crypto.createHash('sha256').update(vBody).digest('hex');
+      const vPath = `/api/session-keys/${sessionKeyId}/validate`;
+      const vCanonical = `POST\n${vPath}\n${vBodyHash}\n${vTimestamp}\n${vNonce}`;
+      const vSignature = crypto
+        .createHmac(
+          'sha256',
+          process.env.SERVICE_AUTH_INTERNAL_SECRET as string,
+        )
+        .update(vCanonical)
+        .digest('base64');
+      const response = await fetch(`${process.env.API_BASE_URL}${vPath}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Service-Id': process.env.SERVICE_AUTH_INTERNAL_ID || '',
+          'X-Timestamp': vTimestamp,
+          'X-Nonce': vNonce,
+          'X-Signature': vSignature,
         },
-      );
+        body: vBody,
+      });
 
       if (!response.ok) {
         throw new Error(`Session validation failed: ${response.statusText}`);
@@ -1632,20 +2065,32 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     transactionHash?: string,
   ): Promise<void> {
     try {
-      const response = await fetch(
-        `${process.env.API_BASE_URL}/api/session-keys/${sessionKeyId}/usage`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.INTERNAL_API_TOKEN}`,
-          },
-          body: JSON.stringify({
-            amount,
-            transactionHash,
-          }),
+      const crypto = require('crypto');
+      const uTimestamp = Date.now().toString();
+      const uNonce = `${uTimestamp}-${Math.random().toString(36).slice(2)}`;
+      const uBodyObj = { amount, transactionHash };
+      const uBody = JSON.stringify(uBodyObj);
+      const uBodyHash = crypto.createHash('sha256').update(uBody).digest('hex');
+      const uPath = `/api/session-keys/${sessionKeyId}/usage`;
+      const uCanonical = `PUT\n${uPath}\n${uBodyHash}\n${uTimestamp}\n${uNonce}`;
+      const uSignature = crypto
+        .createHmac(
+          'sha256',
+          process.env.SERVICE_AUTH_INTERNAL_SECRET as string,
+        )
+        .update(uCanonical)
+        .digest('base64');
+      const response = await fetch(`${process.env.API_BASE_URL}${uPath}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Service-Id': process.env.SERVICE_AUTH_INTERNAL_ID || '',
+          'X-Timestamp': uTimestamp,
+          'X-Nonce': uNonce,
+          'X-Signature': uSignature,
         },
-      );
+        body: uBody,
+      });
 
       if (!response.ok) {
         this.logger.error('Failed to update session key usage', {

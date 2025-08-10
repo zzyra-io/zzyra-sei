@@ -16,7 +16,7 @@ export const chainMap: Record<number, Chain> = {
 // Map network names to chain IDs for easier reference
 export const networkNameMap: Record<string, number> = {
   sei: 1329,
-  "sei-testnet": 1328,
+  "1328": 1328,
   "sei-devnet": 713_715,
 };
 

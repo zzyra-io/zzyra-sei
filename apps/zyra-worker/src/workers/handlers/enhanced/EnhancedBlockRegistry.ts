@@ -65,7 +65,7 @@ export class EnhancedBlockRegistry {
     // Register blockchain blocks
     const zeroDevService = new ZeroDevService(this.configService);
     this.registerEnhancedBlock(
-      new SendTransactionBlock(this.configService, zeroDevService),
+      new SendTransactionBlock(this.configService, zeroDevService, this.databaseService),
     );
     this.registerEnhancedBlock(new SeiDcaTradingBlock(this.configService));
     this.registerEnhancedBlock(new CheckBalanceBlock());

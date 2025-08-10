@@ -644,7 +644,7 @@ export class AIDecisionEngine {
       // Blockchain-specific constraints
       blockchain: {
         maxTransactionValue: "1000000", // in wei/smallest unit
-        allowedNetworks: ["sei-testnet", "sei-mainnet"],
+        allowedNetworks: ["1328", "sei-mainnet"],
         requireConfirmation: true,
       },
     };

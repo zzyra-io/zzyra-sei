@@ -89,7 +89,7 @@ export class WorkflowExecutor {
 
       // Direct blockchain blocks
       if (node.data?.blockType === 'AI_BLOCKCHAIN') {
-        const chain = node.data?.blockchain || 'sei-testnet'; // Default to SEI
+        const chain = node.data?.blockchain || '1328'; // Default to SEI
         supportedChains.add(chain);
 
         blockchainNodes.push({
@@ -120,7 +120,7 @@ export class WorkflowExecutor {
       // Check tool config for chain info
       if (tool.config?.RPC_PROVIDER_URL) {
         if (tool.config.RPC_PROVIDER_URL.includes('sei')) {
-          chains.add('sei-testnet');
+          chains.add('1328');
         } else if (tool.config.RPC_PROVIDER_URL.includes('base')) {
           chains.add('base-sepolia');
         } else if (tool.config.RPC_PROVIDER_URL.includes('ethereum')) {
@@ -133,13 +133,13 @@ export class WorkflowExecutor {
         tool.name?.toLowerCase().includes('sei') ||
         tool.description?.toLowerCase().includes('sei')
       ) {
-        chains.add('sei-testnet');
+        chains.add('1328');
       }
     });
 
     // Default to SEI if no specific chain detected (our focus)
     if (chains.size === 0) {
-      chains.add('sei-testnet');
+      chains.add('1328');
     }
 
     return Array.from(chains);
@@ -165,7 +165,7 @@ export class WorkflowExecutor {
         } else {
           // Default estimates by chain (focusing on SEI)
           const defaults = {
-            'sei-testnet': '1.0',
+            '1328': '1.0',
             'base-sepolia': '0.01',
             'ethereum-sepolia': '0.001',
           };

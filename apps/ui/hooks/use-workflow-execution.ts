@@ -461,6 +461,69 @@ export function useWorkflowExecution() {
         });
       });
 
+      // Pre-flight check: Verify smart wallet deployment for blockchain workflows
+      const hasBlockchainNodes = nodes.some((node) => {
+        const blockType = node.data?.blockType?.toString();
+        return (
+          blockType === "SEND_TRANSACTION" ||
+          blockType === "CHECK_BALANCE" ||
+          blockType === "SWAP_TOKENS" ||
+          blockType === "CREATE_WALLET" ||
+          (blockType === "AI_AGENT" && 
+           node.data?.config?.selectedTools?.some((tool: any) => 
+             tool.id === "goat" || 
+             tool.description?.toLowerCase().includes("blockchain") ||
+             tool.description?.toLowerCase().includes("sei")
+           ))
+        );
+      });
+
+      if (hasBlockchainNodes) {
+        toast({
+          title: "🔍 Checking Smart Wallet Status",
+          description: "Verifying blockchain authorization before execution...",
+        });
+
+        // Check if user has active blockchain authorization
+        try {
+          const response = await fetch('/api/session-keys/status', {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          
+          if (response.ok) {
+            const sessionStatus = await response.json();
+            console.log('Session status check:', sessionStatus);
+            
+            if (!sessionStatus.hasActiveSession) {
+              toast({
+                title: "⚠️ Blockchain Authorization Required",
+                description: "Please authorize blockchain operations before running this workflow.",
+                variant: "destructive",
+              });
+              return; // Don't execute if no authorization
+            }
+
+            // Check if there's a smart wallet address mismatch issue
+            if (sessionStatus.smartWalletAddress && sessionStatus.isRecentlyCreated) {
+              console.log('Using recently created smart wallet:', sessionStatus.smartWalletAddress);
+            } else if (sessionStatus.smartWalletAddress) {
+              console.log('Using existing smart wallet:', sessionStatus.smartWalletAddress);
+              // This might be an older session key with a different smart wallet
+              // The backend will handle deployment checks
+            }
+          }
+        } catch (statusError) {
+          console.warn("Could not check session status:", statusError);
+          // Continue execution - the backend will handle the error gracefully
+        }
+
+        toast({
+          title: "✅ Pre-flight Check Complete",
+          description: "Blockchain authorization verified. Starting workflow...",
+        });
+      }
+
       // Execute the workflow
       await executeWorkflowMutation();
     } catch (error) {

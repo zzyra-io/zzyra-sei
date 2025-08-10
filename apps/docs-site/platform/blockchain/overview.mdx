@@ -5,8 +5,10 @@ description: "Current blockchain capabilities and roadmap for Zzyra - Sei Networ
 
 ## Blockchain Overview
 
-<Alert type="info">
-  **Development Status**: Zzyra currently supports Sei Network operations with GOAT SDK integration. Multi-chain support and advanced DeFi features are in active development.
+<Alert type='info'>
+  **Development Status**: Zzyra currently supports Sei Network operations with
+  GOAT SDK integration. Multi-chain support and advanced DeFi features are in
+  active development.
 </Alert>
 
 Zzyra is building comprehensive blockchain integration capabilities, starting with strong Sei Network support and expanding toward multi-chain automation with advanced security features.
@@ -16,36 +18,21 @@ Zzyra is building comprehensive blockchain integration capabilities, starting wi
 ### **Current & Planned Blockchain Support**
 
 <CardGroup cols={3}>
-  <Card title="Current Networks" icon="link">
-    **✅ Implemented**
-    - SEI Testnet (Chain ID 1328)
-    - Native Sei operations
-    - GOAT SDK integration
-    
-    **🚧 In Development**  
-    - Enhanced Sei MCP server
-    - Address format validation
-    - Gas optimization
+  <Card title='Current Networks' icon='link'>
+    **✅ Implemented** - SEI Testnet (Chain ID 1328) - Native Sei operations -
+    GOAT SDK integration **🚧 In Development** - Enhanced Sei MCP server -
+    Address format validation - Gas optimization
   </Card>
-  
-  <Card title="Planned Networks" icon="cog">
-    **📋 Multi-Chain Roadmap**
-    - Ethereum (Mainnet & Sepolia)
-    - Base (Mainnet & Sepolia)
-    - Optimism
-    - Polygon
-    - Arbitrum
-    - Additional EVM chains
+
+  <Card title='Planned Networks' icon='cog'>
+    **📋 Multi-Chain Roadmap** - Ethereum (Mainnet & Sepolia) - Base (Mainnet &
+    Sepolia) - Optimism - Polygon - Arbitrum - Additional EVM chains
   </Card>
-  
-  <Card title="DeFi Roadmap" icon="chart-line">
-    **📋 Planned DeFi Features**
-    - DEX token swapping
-    - Liquidity provision
-    - Yield farming automation
-    - Portfolio management
-    - Cross-chain operations
-    - Arbitrage detection
+
+  <Card title='DeFi Roadmap' icon='chart-line'>
+    **📋 Planned DeFi Features** - DEX token swapping - Liquidity provision -
+    Yield farming automation - Portfolio management - Cross-chain operations -
+    Arbitrage detection
   </Card>
 </CardGroup>
 
@@ -64,7 +51,7 @@ Zyra includes production-ready blockchain automation blocks:
     
     ```typescript
     interface CreateWalletConfig {
-      chainId: "sei-testnet" | "ethereum-sepolia" | "base-sepolia";
+      chainId: "1328" | "ethereum-sepolia" | "base-sepolia";
       walletType: "eoa" | "smart" | "multisig";
       autoFund: boolean;
       fundingAmount: string;
@@ -142,41 +129,25 @@ Zyra includes production-ready blockchain automation blocks:
 Zyra implements a comprehensive Account Abstraction solution using session keys:
 
 <Tabs>
-  <Tab title="Session Key Benefits">
-    **Automated Transaction Signing**
-    - Execute transactions without manual approval
-    - Time-bounded authorization (1 hour to 7 days)
-    - Spending limits and security controls
-    - Multi-chain session support
-    
-    **Security Features**
-    - AES-256-GCM encryption
-    - User signature-based key derivation
-    - Hardware-level protection ready
-    - Comprehensive audit trails
+  <Tab title='Session Key Benefits'>
+    **Automated Transaction Signing** - Execute transactions without manual
+    approval - Time-bounded authorization (1 hour to 7 days) - Spending limits
+    and security controls - Multi-chain session support **Security Features** -
+    AES-256-GCM encryption - User signature-based key derivation -
+    Hardware-level protection ready - Comprehensive audit trails
   </Tab>
-  
-  <Tab title="Permission System">
-    **Granular Controls**
-    - Operation-specific permissions
-    - Per-transaction amount limits
-    - Daily spending caps
-    - Contract address whitelisting
-    - Emergency stop capabilities
-    
-    **Security Levels**
-    - BASIC: Standard protection
-    - ENHANCED: Additional monitoring
-    - MAXIMUM: Highest security
+
+  <Tab title='Permission System'>
+    **Granular Controls** - Operation-specific permissions - Per-transaction
+    amount limits - Daily spending caps - Contract address whitelisting -
+    Emergency stop capabilities **Security Levels** - BASIC: Standard protection
+    - ENHANCED: Additional monitoring - MAXIMUM: Highest security
   </Tab>
-  
-  <Tab title="Session Management">
-    **Lifecycle Management**
-    - Automated session creation
-    - Real-time usage tracking
-    - Automatic expiry handling
-    - Manual revocation capabilities
-    - Usage analytics and reporting
+
+  <Tab title='Session Management'>
+    **Lifecycle Management** - Automated session creation - Real-time usage
+    tracking - Automatic expiry handling - Manual revocation capabilities -
+    Usage analytics and reporting
   </Tab>
 </Tabs>
 
@@ -199,18 +170,18 @@ interface SessionKeyData {
 }
 
 interface SessionPermission {
-  operation: string;           // "send", "swap", "stake", etc.
-  maxAmountPerTx: string;     // Per-transaction limit
-  maxDailyAmount: string;     // Daily spending limit
+  operation: string; // "send", "swap", "stake", etc.
+  maxAmountPerTx: string; // Per-transaction limit
+  maxDailyAmount: string; // Daily spending limit
   allowedContracts: string[]; // Whitelisted addresses
   requireConfirmation: boolean; // Manual approval required
-  emergencyStop: boolean;     // Operation suspended
+  emergencyStop: boolean; // Operation suspended
 }
 
 enum SecurityLevel {
   BASIC = "basic",
-  ENHANCED = "enhanced", 
-  MAXIMUM = "maximum"
+  ENHANCED = "enhanced",
+  MAXIMUM = "maximum",
 }
 ```
 
@@ -219,19 +190,20 @@ enum SecurityLevel {
 ### **Enhanced Authorization Modal**
 
 <Steps>
-  <Step title="Workflow Analysis">
-    Automatically detects blockchain operations in workflow and calculates spending requirements
+  <Step title='Workflow Analysis'>
+    Automatically detects blockchain operations in workflow and calculates
+    spending requirements
   </Step>
-  <Step title="Chain Configuration">
+  <Step title='Chain Configuration'>
     Configure spending limits and security settings for each blockchain network
   </Step>
-  <Step title="Session Key Creation">
+  <Step title='Session Key Creation'>
     Generate encrypted session key using Magic SDK secure signing
   </Step>
-  <Step title="Permission Setup">
+  <Step title='Permission Setup'>
     Configure granular permissions for each operation type
   </Step>
-  <Step title="Execution Authorization">
+  <Step title='Execution Authorization'>
     Enable automated blockchain operations within configured limits
   </Step>
 </Steps>
@@ -246,12 +218,12 @@ interface TransactionValidation {
   validateBlockchainAuthorization(): boolean;
   validateChainPermissions(chainId: string): boolean;
   validateOperationPermissions(operation: string): boolean;
-  
-  // Session key validation  
+
+  // Session key validation
   validateSessionKey(sessionKeyId: string): Promise<ValidationResult>;
   checkSpendingLimits(amount: string): boolean;
   validateContractAddress(address: string): boolean;
-  
+
   // Security validations
   checkTransactionSafety(transaction: Transaction): Promise<SafetyResult>;
   validateGasParameters(gasLimit: number, gasPrice: string): boolean;
@@ -264,36 +236,25 @@ interface TransactionValidation {
 ### **Multi-Layer Security**
 
 <CardGroup cols={2}>
-  <Card title="Cryptographic Security" icon="lock">
-    **Advanced Encryption**
-    - AES-256-GCM for session keys
-    - Scrypt key derivation functions
-    - Nonce-based replay protection
-    - Authentication tag verification
+  <Card title='Cryptographic Security' icon='lock'>
+    **Advanced Encryption** - AES-256-GCM for session keys - Scrypt key
+    derivation functions - Nonce-based replay protection - Authentication tag
+    verification
   </Card>
-  
-  <Card title="Authorization Controls" icon="shield-check">
-    **Access Management**
-    - Role-based permissions
-    - Time-bounded sessions
-    - Spending limit enforcement
-    - Emergency revocation
+
+  <Card title='Authorization Controls' icon='shield-check'>
+    **Access Management** - Role-based permissions - Time-bounded sessions -
+    Spending limit enforcement - Emergency revocation
   </Card>
-  
-  <Card title="Transaction Safety" icon="user-shield">
-    **Safe Execution**
-    - Pre-execution validation
-    - Simulation mode (planned)
-    - Multi-signature support (planned)
-    - Automated risk assessment
+
+  <Card title='Transaction Safety' icon='user-shield'>
+    **Safe Execution** - Pre-execution validation - Simulation mode (planned) -
+    Multi-signature support (planned) - Automated risk assessment
   </Card>
-  
-  <Card title="Audit & Monitoring" icon="eye">
-    **Complete Visibility**
-    - Real-time transaction monitoring
-    - Comprehensive audit logs
-    - Usage analytics
-    - Security event tracking
+
+  <Card title='Audit & Monitoring' icon='eye'>
+    **Complete Visibility** - Real-time transaction monitoring - Comprehensive
+    audit logs - Usage analytics - Security event tracking
   </Card>
 </CardGroup>
 
@@ -302,10 +263,10 @@ interface TransactionValidation {
 ```typescript
 enum SessionEventType {
   CREATED = "created",
-  USED = "used", 
+  USED = "used",
   REVOKED = "revoked",
   EXPIRED = "expired",
-  SECURITY_ALERT = "security_alert"
+  SECURITY_ALERT = "security_alert",
 }
 
 interface SessionEvent {
@@ -334,21 +295,21 @@ const aiBlockchainWorkflow = {
       type: "AI_AGENT",
       config: {
         systemPrompt: "Analyze DeFi market conditions and recommend actions",
-        selectedTools: ["brave-search", "fetch", "goat"]
-      }
+        selectedTools: ["brave-search", "fetch", "goat"],
+      },
     },
     {
-      id: "execute-swap", 
+      id: "execute-swap",
       type: "SWAP_TOKENS",
       config: {
         chainId: "{{aiAgent.recommendedChain}}",
-        fromToken: "{{aiAgent.fromToken}}", 
+        fromToken: "{{aiAgent.fromToken}}",
         toToken: "{{aiAgent.toToken}}",
         amountIn: "{{aiAgent.swapAmount}}",
-        slippageTolerance: 1.0
-      }
-    }
-  ]
+        slippageTolerance: 1.0,
+      },
+    },
+  ],
 };
 ```
 
@@ -360,15 +321,15 @@ interface BlockDataFlow {
   // From HTTP Request block
   "{{httpRequest.data.price}}": number;
   "{{httpRequest.data.volume}}": number;
-  
-  // From Price Monitor block  
+
+  // From Price Monitor block
   "{{priceMonitor.currentPrice}}": number;
   "{{priceMonitor.triggered}}": boolean;
-  
+
   // From AI Agent block
   "{{aiAgent.recommendation}}": string;
   "{{aiAgent.confidence}}": number;
-  
+
   // From Blockchain blocks
   "{{createWallet.address}}": string;
   "{{checkBalance.nativeBalance.balance}}": string;
@@ -433,40 +394,28 @@ Integration with Model Context Protocol for AI-driven blockchain operations:
 ### **Enterprise Features**
 
 <AccordionGroup>
-  <Accordion title="Treasury Management" icon="building">
-    **Enterprise Treasury Operations**
-    - Multi-signature treasury wallets
-    - Automated treasury rebalancing
-    - Cross-chain treasury management
-    - Compliance and reporting
-    - Risk management controls
+  <Accordion title='Treasury Management' icon='building'>
+    **Enterprise Treasury Operations** - Multi-signature treasury wallets -
+    Automated treasury rebalancing - Cross-chain treasury management -
+    Compliance and reporting - Risk management controls
   </Accordion>
-  
-  <Accordion title="DeFi Automation" icon="robot">
-    **Automated DeFi Strategies**
-    - Yield farming automation
-    - Liquidity provision management
-    - Impermanent loss protection
-    - Arbitrage bot deployment
-    - Portfolio rebalancing
+
+  <Accordion title='DeFi Automation' icon='robot'>
+    **Automated DeFi Strategies** - Yield farming automation - Liquidity
+    provision management - Impermanent loss protection - Arbitrage bot
+    deployment - Portfolio rebalancing
   </Accordion>
-  
-  <Accordion title="Risk Management" icon="shield-exclamation">
-    **Advanced Risk Controls**
-    - Real-time risk assessment
-    - Position size limitations
-    - Exposure monitoring
-    - Emergency stop mechanisms
-    - Slippage protection
+
+  <Accordion title='Risk Management' icon='shield-exclamation'>
+    **Advanced Risk Controls** - Real-time risk assessment - Position size
+    limitations - Exposure monitoring - Emergency stop mechanisms - Slippage
+    protection
   </Accordion>
-  
-  <Accordion title="Compliance & Reporting" icon="clipboard-check">
-    **Regulatory Compliance**
-    - Transaction categorization
-    - Tax reporting preparation
-    - Audit trail generation
-    - Compliance rule enforcement
-    - Regulatory reporting
+
+  <Accordion title='Compliance & Reporting' icon='clipboard-check'>
+    **Regulatory Compliance** - Transaction categorization - Tax reporting
+    preparation - Audit trail generation - Compliance rule enforcement -
+    Regulatory reporting
   </Accordion>
 </AccordionGroup>
 
@@ -475,40 +424,28 @@ Integration with Model Context Protocol for AI-driven blockchain operations:
 ### **Security Best Practices**
 
 <CardGroup cols={2}>
-  <Card title="Session Key Management" icon="key">
-    **Secure Session Practices**
-    - Use minimum required permissions
-    - Set appropriate time limits
-    - Monitor usage patterns
-    - Implement spending controls
-    - Enable security alerts
+  <Card title='Session Key Management' icon='key'>
+    **Secure Session Practices** - Use minimum required permissions - Set
+    appropriate time limits - Monitor usage patterns - Implement spending
+    controls - Enable security alerts
   </Card>
-  
-  <Card title="Transaction Safety" icon="shield-check">
-    **Safe Transaction Practices**  
-    - Always validate recipient addresses
-    - Use appropriate gas limits
-    - Monitor for MEV attacks
-    - Implement slippage protection
-    - Test with small amounts first
+
+  <Card title='Transaction Safety' icon='shield-check'>
+    **Safe Transaction Practices** - Always validate recipient addresses - Use
+    appropriate gas limits - Monitor for MEV attacks - Implement slippage
+    protection - Test with small amounts first
   </Card>
-  
-  <Card title="Multi-Chain Operations" icon="link">
-    **Cross-Chain Best Practices**
-    - Understand chain-specific risks
-    - Monitor bridge security
-    - Use reputable bridge protocols  
-    - Account for different gas tokens
-    - Plan for network congestion
+
+  <Card title='Multi-Chain Operations' icon='link'>
+    **Cross-Chain Best Practices** - Understand chain-specific risks - Monitor
+    bridge security - Use reputable bridge protocols - Account for different gas
+    tokens - Plan for network congestion
   </Card>
-  
-  <Card title="Emergency Procedures" icon="exclamation-triangle">
-    **Emergency Response**
-    - Implement emergency stops
-    - Have revocation procedures
-    - Monitor for unusual activity
-    - Maintain emergency contacts
-    - Plan incident response
+
+  <Card title='Emergency Procedures' icon='exclamation-triangle'>
+    **Emergency Response** - Implement emergency stops - Have revocation
+    procedures - Monitor for unusual activity - Maintain emergency contacts -
+    Plan incident response
   </Card>
 </CardGroup>
 
@@ -528,11 +465,11 @@ const batchSwap: BatchOperation = {
   operations: [
     { type: "approve", token: "USDC", amount: "1000" },
     { type: "swap", fromToken: "USDC", toToken: "ETH", amount: "1000" },
-    { type: "stake", token: "ETH", amount: "0.5" }
+    { type: "stake", token: "ETH", amount: "0.5" },
   ],
   gasOptimization: true,
   executionOrder: "sequential",
-  failureHandling: "stop"
+  failureHandling: "stop",
 };
 ```
 
@@ -541,56 +478,50 @@ const batchSwap: BatchOperation = {
 ### **Common Issues**
 
 <AccordionGroup>
-  <Accordion title="Session Key Issues" icon="key">
-    **Symptoms**: Session key validation failures
-    
-    **Solutions**:
-    - Check session key expiration
-    - Verify spending limits not exceeded
-    - Confirm operation permissions
-    - Review emergency stop status
-    - Validate wallet authorization
+  <Accordion title='Session Key Issues' icon='key'>
+    **Symptoms**: Session key validation failures **Solutions**: - Check session
+    key expiration - Verify spending limits not exceeded - Confirm operation
+    permissions - Review emergency stop status - Validate wallet authorization
   </Accordion>
-  
-  <Accordion title="Transaction Failures" icon="x-circle">
-    **Symptoms**: Blockchain transactions failing
-    
-    **Solutions**:
-    - Verify sufficient balance for gas
-    - Check network congestion
-    - Validate contract addresses
-    - Confirm slippage tolerance
-    - Review transaction parameters
+
+  <Accordion title='Transaction Failures' icon='x-circle'>
+    **Symptoms**: Blockchain transactions failing **Solutions**: - Verify
+    sufficient balance for gas - Check network congestion - Validate contract
+    addresses - Confirm slippage tolerance - Review transaction parameters
   </Accordion>
-  
-  <Accordion title="Network Connectivity" icon="wifi-off">
-    **Symptoms**: Unable to connect to blockchain networks
-    
-    **Solutions**:
-    - Check RPC endpoint status
-    - Verify network connectivity
-    - Confirm firewall settings
-    - Test alternative RPC providers
-    - Check for network maintenance
+
+  <Accordion title='Network Connectivity' icon='wifi-off'>
+    **Symptoms**: Unable to connect to blockchain networks **Solutions**: -
+    Check RPC endpoint status - Verify network connectivity - Confirm firewall
+    settings - Test alternative RPC providers - Check for network maintenance
   </Accordion>
 </AccordionGroup>
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Session Keys Guide" icon="key" href="/platform/security/session-keys">
+  <Card
+    title='Session Keys Guide'
+    icon='key'
+    href='/platform/security/session-keys'>
     Learn about session key management and security features
   </Card>
-  
-  <Card title="AI + Blockchain" icon="brain" href="/platform/ai-agents/blockchain">
+
+  <Card
+    title='AI + Blockchain'
+    icon='brain'
+    href='/platform/ai-agents/blockchain'>
     Combine AI agents with blockchain operations
   </Card>
-  
-  <Card title="DeFi Workflows" icon="chart-line" href="/platform/use-cases/defi-automation">
+
+  <Card
+    title='DeFi Workflows'
+    icon='chart-line'
+    href='/platform/use-cases/defi-automation'>
     Build automated DeFi strategies and workflows
   </Card>
-  
-  <Card title="API Reference" icon="code" href="/api-reference/blockchain">
+
+  <Card title='API Reference' icon='code' href='/api-reference/blockchain'>
     Technical API documentation for blockchain integration
   </Card>
 </CardGroup>

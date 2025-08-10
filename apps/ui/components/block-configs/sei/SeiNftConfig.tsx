@@ -46,7 +46,7 @@ export default function SeiNftConfig({
   const [activeTab, setActiveTab] = useState("config");
 
   const typedConfig = {
-    network: "sei-testnet",
+    network: "1328",
     operation: "monitor",
     walletConfig: { type: "magic_wallet" },
     ...config,
@@ -103,7 +103,7 @@ export default function SeiNftConfig({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value='sei-testnet'>Sei Testnet</SelectItem>
+                      <SelectItem value='1328'>Sei Testnet</SelectItem>
                       <SelectItem value='sei-mainnet'>Sei Mainnet</SelectItem>
                     </SelectContent>
                   </Select>

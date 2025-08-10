@@ -37,7 +37,7 @@ describe("chains module", () => {
 
     test("networkNameMap contains expected mappings", () => {
       expect(networkNameMap.sei).toBe(1329);
-      expect(networkNameMap["sei-testnet"]).toBe(1328);
+      expect(networkNameMap["1328"]).toBe(1328);
       expect(networkNameMap["sei-devnet"]).toBe(713715);
     });
 
@@ -60,13 +60,13 @@ describe("chains module", () => {
 
     test("resolves network names to chain IDs", () => {
       expect(resolveChainId("sei")).toBe(1329);
-      expect(resolveChainId("sei-testnet")).toBe(1328);
+      expect(resolveChainId("1328")).toBe(1328);
       expect(resolveChainId("sei-devnet")).toBe(713715);
     });
 
     test("resolves case-insensitive network names", () => {
       expect(resolveChainId("SEI")).toBe(1329);
-      expect(resolveChainId("Sei-Testnet")).toBe(1328);
+      expect(resolveChainId("1328")).toBe(1328);
       expect(resolveChainId("SEI-DEVNET")).toBe(713715);
     });
 
@@ -91,7 +91,7 @@ describe("chains module", () => {
 
     test("returns chain for network name", () => {
       expect(getChain("sei")).toBe(sei);
-      expect(getChain("sei-testnet")).toBe(seiTestnet);
+      expect(getChain("1328")).toBe(seiTestnet);
       expect(getChain("sei-devnet")).toBe(seiDevnet);
     });
 
@@ -108,7 +108,7 @@ describe("chains module", () => {
         // Restore the original map
         // @ts-ignore - Restoring original state
         for (const key of Object.keys(networkNameMap)) {
-          if (key !== "sei" && key !== "sei-testnet" && key !== "sei-devnet") {
+          if (key !== "sei" && key !== "1328" && key !== "sei-devnet") {
             // @ts-ignore - Cleanup
             delete networkNameMap[key];
           }
@@ -118,7 +118,7 @@ describe("chains module", () => {
 
     test("returns chain for case-insensitive network name", () => {
       expect(getChain("SEI")).toBe(sei);
-      expect(getChain("Sei-Testnet")).toBe(seiTestnet);
+      expect(getChain("1328")).toBe(seiTestnet);
       expect(getChain("SEI-DEVNET")).toBe(seiDevnet);
     });
 
@@ -154,7 +154,7 @@ describe("chains module", () => {
 
     test("returns correct RPC URL for network name", () => {
       expect(getRpcUrl("sei")).toBe("https://evm-rpc.sei-apis.com");
-      expect(getRpcUrl("sei-testnet")).toBe(
+      expect(getRpcUrl("1328")).toBe(
         "https://yolo-sparkling-sea.sei-atlantic.quiknode.pro/aa0487f22e4ebd479a97f9736eb3c0fb8a2b8e32"
       );
       expect(getRpcUrl("sei-devnet")).toBe(
@@ -178,7 +178,7 @@ describe("chains module", () => {
 
       // Check that all expected networks are included
       expect(networks).toContain("sei");
-      expect(networks).toContain("sei-testnet");
+      expect(networks).toContain("1328");
       expect(networks).toContain("sei-devnet");
 
       // Check that the list is sorted

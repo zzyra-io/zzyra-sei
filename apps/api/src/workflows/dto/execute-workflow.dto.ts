@@ -36,7 +36,7 @@ export class ExecuteWorkflowDto {
     example: {
       selectedChains: [
         {
-          chainId: "sei-testnet",
+          chainId: "1328",
           chainName: "SEI Testnet",
           maxDailySpending: "1.0",
           allowedOperations: ["trade", "transfer"],

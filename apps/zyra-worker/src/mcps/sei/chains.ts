@@ -4,7 +4,7 @@ import { sei, seiDevnet, seiTestnet } from 'viem/chains';
 // Default configuration values - Using testnet for development
 // Can be overridden with SEI_DEFAULT_NETWORK environment variable
 const defaultNetworkFromEnv = process.env.SEI_DEFAULT_NETWORK;
-export const DEFAULT_NETWORK = defaultNetworkFromEnv || 'sei-testnet';
+export const DEFAULT_NETWORK = defaultNetworkFromEnv || '1328';
 export const DEFAULT_RPC_URL =
   defaultNetworkFromEnv === 'sei'
     ? 'https://evm-rpc.sei-apis.com'
@@ -21,7 +21,7 @@ export const chainMap: Record<number, Chain> = {
 // Map network names to chain IDs for easier reference
 export const networkNameMap: Record<string, number> = {
   sei: 1329,
-  'sei-testnet': 1328,
+  '1328': 1328,
   'sei-devnet': 713_715,
 };
 
