@@ -9,7 +9,7 @@ import {
   IsDecimal,
 } from "class-validator";
 import { Type } from "class-transformer";
-import { SecurityLevel } from "@zyra/types";
+import { SecurityLevel } from "@zzyra/types";
 
 export class SessionPermissionDto {
   @IsString()

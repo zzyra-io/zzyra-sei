@@ -55,7 +55,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { AIAgentAPI } from "@/lib/api/ai-agent";
-import type { MCPServerConfig } from "@zyra/types";
+import type { MCPServerConfig } from "@zzyra/types";
 import { useWorkflowStore } from "@/lib/store/workflow-store";
 import {
   useExecutionWebSocket,

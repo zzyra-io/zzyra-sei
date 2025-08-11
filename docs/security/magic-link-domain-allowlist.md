@@ -23,8 +23,8 @@ For Zzyra as a production-ready SAAS platform:
 4. Scroll to "Allowed Origins & Redirects"
 5. Toggle on the domain allowlist feature
 6. Add all domains that will be used with your Zzyra application:
-   - Production domain (e.g., `https://app.zyra.com`)
-   - Staging/testing domains (e.g., `https://staging.zyra.com`)
+   - Production domain (e.g., `https://app.zzyra.com`)
+   - Staging/testing domains (e.g., `https://staging.zzyra.com`)
    - Development domains (e.g., `http://localhost:3000`)
 
 ### 2. Domains to Include
@@ -40,7 +40,7 @@ For a complete implementation, ensure you add all domains where Zzyra will be ac
 
 If you're using OAuth with Magic Link, ensure you add all redirect URIs:
 
-- `/callback` endpoints (e.g., `https://app.zyra.com/callback`)
+- `/callback` endpoints (e.g., `https://app.zzyra.com/callback`)
 - Any other OAuth redirect paths used in your application
 
 ## Technical Implementation
@@ -62,7 +62,7 @@ curl --location --request POST 'https://api.magic.link/v2/api/magic_client/allow
 --data-raw '{
     "access_type": "domain",
     "target_client_id": "YOUR_CLIENT_ID",
-    "value": "https://app.zyra.com"
+    "value": "https://app.zzyra.com"
 }'
 ```
 

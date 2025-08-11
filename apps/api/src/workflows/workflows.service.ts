@@ -8,7 +8,7 @@ import {
   WorkflowStatisticsDto,
 } from "./dto/workflow.dto";
 import { QueueService } from "../queue/queue.service";
-import { WorkflowRepository, ExecutionRepository } from "@zyra/database";
+import { WorkflowRepository, ExecutionRepository } from "@zzyra/database";
 
 @Injectable()
 export class WorkflowsService {

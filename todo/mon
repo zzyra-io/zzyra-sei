@@ -1,7 +1,7 @@
-zyra/
+zzyra/
 ├── apps/
 │   ├── ui/               # Next.js frontend
-│   └── zyra-worker/      # NestJS worker service
+│   └── zzyra-worker/      # NestJS worker service
 ├── packages/
 │   ├── types/            # Shared type definitions
 │   ├── blockchain/       # Shared blockchain utils (consider adding)

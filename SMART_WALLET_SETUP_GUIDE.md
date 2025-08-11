@@ -56,7 +56,7 @@ After logging in with Email/SMS:
 ```
 Embedded Wallet (EOA) → Smart Wallet → Automated Transactions
       ↑                      ↑                   ↑
-  User Signs            Paymaster Pays      zyra-worker
+  User Signs            Paymaster Pays      zzyra-worker
   Delegation            Gas Fees            Executes
 ```
 

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma.service";
-import { Workflow } from "@zyra/database";
+import { Workflow } from "@zzyra/database";
 
 @Injectable()
 export class WorkflowRepository {

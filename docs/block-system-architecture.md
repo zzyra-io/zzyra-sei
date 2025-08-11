@@ -100,7 +100,7 @@ The Flow Canvas component in the UI app integrates with the block registry to cr
 
 ```typescript
 // apps/ui/components/flow-canvas.tsx
-import { getBlock } from "@zyra/blocks";
+import { getBlock } from "@zzyra/blocks";
 
 // When adding a new node from drag-and-drop
 const onDrop = useCallback((event) => {
@@ -139,7 +139,7 @@ The configuration panel adapts to each block type using the block's registered C
 
 ```typescript
 // apps/ui/components/block-config-panel.tsx
-import { getBlock } from '@zyra/blocks';
+import { getBlock } from '@zzyra/blocks';
 
 export const BlockConfigPanel: React.FC<{ nodeId: string }> = ({ nodeId }) => {
   const { nodes, updateNode } = useWorkflowStore();
@@ -183,7 +183,7 @@ Custom nodes can display live data using the block's LiveComponent when availabl
 
 ```typescript
 // apps/ui/components/custom-node.tsx
-import { getBlock } from '@zyra/blocks';
+import { getBlock } from '@zzyra/blocks';
 
 export const CustomNode: React.FC = ({ data, id }) => {
   const blockDef = getBlock(data.blockType);
@@ -216,8 +216,8 @@ export const CustomNode: React.FC = ({ data, id }) => {
 The worker uses a registry to manage handlers for different block types:
 
 ```typescript
-// apps/zyra-worker/src/workers/handlers/BlockHandlerRegistry.ts
-import { getAllBlocks } from "@zyra/blocks";
+// apps/zzyra-worker/src/workers/handlers/BlockHandlerRegistry.ts
+import { getAllBlocks } from "@zzyra/blocks";
 
 class BlockHandlerRegistry {
   private handlers: Map<BlockType, BlockHandler> = new Map();
@@ -244,8 +244,8 @@ class BlockHandlerRegistry {
 Each block handler validates and executes block logic using the block's schema and runtime code:
 
 ```typescript
-// apps/zyra-worker/src/workers/handlers/GenericBlockHandler.ts
-import { getBlock } from "@zyra/blocks";
+// apps/zzyra-worker/src/workers/handlers/GenericBlockHandler.ts
+import { getBlock } from "@zzyra/blocks";
 
 export class GenericBlockHandler implements BlockHandler {
   constructor(private blockType: BlockType) {}
@@ -277,7 +277,7 @@ export class GenericBlockHandler implements BlockHandler {
 ```typescript
 // packages/blocks/src/blocks/webhook/index.ts
 import { z } from "zod";
-import { BlockType, NodeCategory } from "@zyra/types";
+import { BlockType, NodeCategory } from "@zzyra/types";
 import { WebhookConfigComponent } from "./ui";
 import { defaultConfig } from "./defaults";
 import { validate } from "./validator";
@@ -310,7 +310,7 @@ registerBlock({
 
 To add a new block type to the system:
 
-1. Add the block type to the BlockType enum in `@zyra/types`
+1. Add the block type to the BlockType enum in `@zzyra/types`
 2. Create a new directory in `packages/blocks/src/blocks/` for the block
 3. Implement all required files (schema, defaults, UI, validation, runtime)
 4. Register the block in the block's index.ts file

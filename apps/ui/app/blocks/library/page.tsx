@@ -21,7 +21,7 @@ import { BlockType } from '@/types/workflow'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Search, Filter, Star, Share, Plus } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
-import { BlockType } from '@zyra/types';
+import { BlockType } from '@zzyra/types';
 
 
 // Block Card Component for displaying blocks in the library

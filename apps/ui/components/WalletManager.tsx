@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useAccount, useConnect, useDisconnect, useEnsName } from "wagmi";
-import { useWallet } from "@zyra/wallet"; // Assuming this is the correct import path for your hook
+import { useWallet } from "@zzyra/wallet"; // Assuming this is the correct import path for your hook
 
 export function WalletManager() {
   const { address, connector, isConnected, chain } = useAccount();
@@ -18,7 +18,7 @@ export function WalletManager() {
   const isConnecting = connectStatus === "pending";
   const isDisconnecting = disconnectStatus === "pending";
 
-  // From your @zyra/wallet package - adjust property names if they differ in your implementation
+  // From your @zzyra/wallet package - adjust property names if they differ in your implementation
   const {
     persistedWallet,
     isLoading: isWalletLoading, // Assuming 'isLoading' is the correct prop name

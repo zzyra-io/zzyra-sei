@@ -21,8 +21,8 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@zyra/wallet": ["../../packages/wallet/src/index.ts"],
-      "@zyra/wallet/*": ["../../packages/wallet/src/*"]
+      "@zzyra/wallet": ["../../packages/wallet/src/index.ts"],
+      "@zzyra/wallet/*": ["../../packages/wallet/src/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

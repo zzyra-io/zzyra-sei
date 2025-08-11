@@ -1,5 +1,5 @@
-import { BlockType } from "@zyra/types";
-import { AICustomBlockData } from "@zyra/types";
+import { BlockType } from "@zzyra/types";
+import { AICustomBlockData } from "@zzyra/types";
 
 /**
  * Interface for shared/saved DeFi block entry

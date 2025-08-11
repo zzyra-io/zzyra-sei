@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { ErrorCodes } from "@/lib/utils/error-handler";
-import { BlockType } from "@zyra/types";
+import { BlockType } from "@zzyra/types";
 
 /**
  * Custom hook for comprehensive workflow validation with detailed error reporting

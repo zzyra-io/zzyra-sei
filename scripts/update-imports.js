@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * This script helps migrate local type imports to the shared @zyra/types package
- * It scans source files and replaces imports of local types with imports from @zyra/types
+ * This script helps migrate local type imports to the shared @zzyra/types package
+ * It scans source files and replaces imports of local types with imports from @zzyra/types
  */
 
 const fs = require('fs');
@@ -10,28 +10,28 @@ const { execSync } = require('child_process');
 
 // Config
 const UI_DIR = path.resolve(__dirname, '../apps/ui');
-const WORKER_DIR = path.resolve(__dirname, '../apps/zyra-worker');
+const WORKER_DIR = path.resolve(__dirname, '../apps/zzyra-worker');
 
 // Type mapping - add more as needed
 const TYPE_MAPPING = {
-  'BlockType': '@zyra/types',
-  'BlockExecutionContext': '@zyra/types',
-  'LogEntry': '@zyra/types',
-  'BlockHandler': '@zyra/types',
-  'ProtocolMonitorConfig': '@zyra/types',
-  'PositionManagerConfig': '@zyra/types',
-  'YieldStrategyConfig': '@zyra/types',
-  'RebalanceCalculatorConfig': '@zyra/types',
-  'GasOptimizerConfig': '@zyra/types',
+  'BlockType': '@zzyra/types',
+  'BlockExecutionContext': '@zzyra/types',
+  'LogEntry': '@zzyra/types',
+  'BlockHandler': '@zzyra/types',
+  'ProtocolMonitorConfig': '@zzyra/types',
+  'PositionManagerConfig': '@zzyra/types',
+  'YieldStrategyConfig': '@zzyra/types',
+  'RebalanceCalculatorConfig': '@zzyra/types',
+  'GasOptimizerConfig': '@zzyra/types',
 };
 
 // Schema mapping
 const SCHEMA_MAPPING = {
-  'ProtocolMonitorConfigSchema': '@zyra/types',
-  'PositionManagerConfigSchema': '@zyra/types',
-  'YieldStrategyConfigSchema': '@zyra/types',
-  'RebalanceCalculatorConfigSchema': '@zyra/types',
-  'GasOptimizerConfigSchema': '@zyra/types',
+  'ProtocolMonitorConfigSchema': '@zzyra/types',
+  'PositionManagerConfigSchema': '@zzyra/types',
+  'YieldStrategyConfigSchema': '@zzyra/types',
+  'RebalanceCalculatorConfigSchema': '@zzyra/types',
+  'GasOptimizerConfigSchema': '@zzyra/types',
 };
 
 /**
@@ -42,16 +42,16 @@ function processFile(filePath) {
   let content = fs.readFileSync(filePath, 'utf8');
   let modified = false;
   
-  // Track what we need to import from @zyra/types
+  // Track what we need to import from @zzyra/types
   const typesToImport = new Set();
   
   // Check for type usages
   Object.keys(TYPE_MAPPING).forEach(type => {
-    // Look for type usage that's not already from @zyra/types
+    // Look for type usage that's not already from @zzyra/types
     if (content.includes(type) && 
-        !content.includes(`import { ${type} } from '@zyra/types'`) && 
+        !content.includes(`import { ${type} } from '@zzyra/types'`) && 
         !content.includes(`import { ${type},`) && 
-        !content.includes(`, ${type} } from '@zyra/types'`) &&
+        !content.includes(`, ${type} } from '@zzyra/types'`) &&
         !content.includes(`, ${type},`)) {
       typesToImport.add(type);
     }
@@ -60,9 +60,9 @@ function processFile(filePath) {
   // Check for schema usages
   Object.keys(SCHEMA_MAPPING).forEach(schema => {
     if (content.includes(schema) && 
-        !content.includes(`import { ${schema} } from '@zyra/types'`) && 
+        !content.includes(`import { ${schema} } from '@zzyra/types'`) && 
         !content.includes(`import { ${schema},`) && 
-        !content.includes(`, ${schema} } from '@zyra/types'`) &&
+        !content.includes(`, ${schema} } from '@zzyra/types'`) &&
         !content.includes(`, ${schema},`)) {
       typesToImport.add(schema);
     }
@@ -70,7 +70,7 @@ function processFile(filePath) {
   
   // If we found types to import
   if (typesToImport.size > 0) {
-    const importStatement = `import { ${Array.from(typesToImport).join(', ')} } from '@zyra/types';\n`;
+    const importStatement = `import { ${Array.from(typesToImport).join(', ')} } from '@zzyra/types';\n`;
     
     // Add import to top of file (after any other imports)
     const lines = content.split('\n');

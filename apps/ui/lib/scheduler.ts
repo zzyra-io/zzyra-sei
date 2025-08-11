@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { workflowService } from "./services/workflow-service";
 import { ExecutionService } from "./services/execution-service";
 import { getBlockType, BlockType } from "@/types/workflow";
-import { BlockType } from '@zyra/types';
+import { BlockType } from '@zzyra/types';
 
 
 async function initScheduler() {

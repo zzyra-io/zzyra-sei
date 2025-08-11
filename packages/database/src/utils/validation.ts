@@ -2,11 +2,11 @@
  * Validation Utilities
  * 
  * This module provides utilities for validating data before database operations.
- * It integrates with Zod schemas from @zyra/types for consistent validation.
+ * It integrates with Zod schemas from @zzyra/types for consistent validation.
  */
 
 import { z } from 'zod';
-import { BlockType, NodeCategory } from '@zyra/types';
+import { BlockType, NodeCategory } from '@zzyra/types';
 
 /**
  * Validate workflow data

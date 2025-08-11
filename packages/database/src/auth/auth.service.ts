@@ -9,7 +9,7 @@ import { PrismaClient, User } from "@prisma/client";
 import { JwtService } from "./jwt.service";
 import { AuthError, AuthResult, JwtPayload, Session } from "./types";
 import { UserRepository } from "../repositories/user.repository";
-import { BlockType } from "@zyra/types";
+import { BlockType } from "@zzyra/types";
 
 export class AuthService {
   private jwtService: JwtService;

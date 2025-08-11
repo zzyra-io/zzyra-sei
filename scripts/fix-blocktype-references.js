@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Config
-const WORKER_DIR = path.resolve(__dirname, '../apps/zyra-worker');
+const WORKER_DIR = path.resolve(__dirname, '../apps/zzyra-worker');
 
 // Pattern to detect uninported BlockType usage
 const BLOCKTYPE_USAGE_REGEX = /const\s+blockType\s*=\s*BlockType\./g;
@@ -28,15 +28,15 @@ function processFile(filePath) {
         !content.includes('import { BlockType,')) {
       
       // Add import if not present
-      if (!content.includes('from \'@zyra/types\'')) {
-        content = 'import { BlockType } from \'@zyra/types\';\n' + content;
+      if (!content.includes('from \'@zzyra/types\'')) {
+        content = 'import { BlockType } from \'@zzyra/types\';\n' + content;
       } else {
         // Add BlockType to an existing import
         content = content.replace(
-          /import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]@zyra\/types['"]\s*;/g,
+          /import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]@zzyra\/types['"]\s*;/g,
           (match, importItems) => {
             if (!importItems.includes('BlockType')) {
-              return `import { BlockType, ${importItems} } from '@zyra/types';`;
+              return `import { BlockType, ${importItems} } from '@zzyra/types';`;
             }
             return match;
           }

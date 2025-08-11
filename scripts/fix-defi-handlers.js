@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Config
-const WORKER_DIR = path.resolve(__dirname, '../apps/zyra-worker');
+const WORKER_DIR = path.resolve(__dirname, '../apps/zzyra-worker');
 
 // Specific files to target
 const TARGET_FILES = [
@@ -30,7 +30,7 @@ function processFileContent(content, fileName) {
   if (/export\s+type\s+\w+Config\s*=/g.test(content)) {
     content = content.replace(
       /export\s+type\s+(\w+Config)\s*=/g, 
-      '// @zyra/types: Local type definition commented out\n// export type $1 ='
+      '// @zzyra/types: Local type definition commented out\n// export type $1 ='
     );
     modified = true;
   }
@@ -39,27 +39,27 @@ function processFileContent(content, fileName) {
   if (/export\s+const\s+\w+ConfigSchema\s*=/g.test(content)) {
     content = content.replace(
       /export\s+const\s+(\w+ConfigSchema)\s*=/g,
-      '// @zyra/types: Local schema definition commented out\n// export const $1 ='
+      '// @zzyra/types: Local schema definition commented out\n// export const $1 ='
     );
     modified = true;
   }
   
   // 3. Make sure BlockType is properly imported 
   if (!content.includes('import { BlockType') && content.includes('BlockType.')) {
-    // Add BlockType to an existing import from @zyra/types
-    if (content.includes('from \'@zyra/types\'')) {
+    // Add BlockType to an existing import from @zzyra/types
+    if (content.includes('from \'@zzyra/types\'')) {
       content = content.replace(
-        /import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]@zyra\/types['"]\s*;/,
+        /import\s*\{\s*([^}]+)\s*\}\s*from\s*['"]@zzyra\/types['"]\s*;/,
         (match, imports) => {
           if (!imports.includes('BlockType')) {
-            return `import { BlockType, ${imports} } from '@zyra/types';`;
+            return `import { BlockType, ${imports} } from '@zzyra/types';`;
           }
           return match;
         }
       );
     } else {
       // Add a new import
-      content = `import { BlockType } from '@zyra/types';\n${content}`;
+      content = `import { BlockType } from '@zzyra/types';\n${content}`;
     }
     modified = true;
   }

@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { AIAgentConfig, AIAgentExecution, MCPServerConfig } from "@zyra/types";
+import { AIAgentConfig, AIAgentExecution, MCPServerConfig } from "@zzyra/types";
 // Import defaultMCPs from the types package
-import { defaultMCPs } from "@zyra/types";
+import { defaultMCPs } from "@zzyra/types";
 import { randomUUID } from "crypto";
 
 @Injectable()
@@ -143,7 +143,7 @@ export class AIAgentService {
             params: {
               protocolVersion: "2024-11-05",
               capabilities: { tools: {} },
-              clientInfo: { name: "zyra-test", version: "1.0.0" },
+              clientInfo: { name: "zzyra-test", version: "1.0.0" },
             },
           };
 

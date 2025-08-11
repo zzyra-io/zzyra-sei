@@ -38,7 +38,7 @@ import {
   searchTemplates,
   getPopularTemplates,
   getTemplateById
-} from "@zyra/types/src/templates/transformation-templates";
+} from "@zzyra/types/src/templates/transformation-templates";
 
 interface TransformationTemplateSelectorProps {
   onApplyTemplate: (transformations: any[]) => void;

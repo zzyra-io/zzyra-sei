@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { UserRepository } from "@zyra/database";
+import { UserRepository } from "@zzyra/database";
 import {
   UpdateProfileDto,
   ProfileResponseDto,

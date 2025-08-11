@@ -26,7 +26,7 @@ import { z } from "zod";
 import {
   seiWalletListenerSchema,
   type SeiWalletListenerConfig,
-} from "@zyra/types";
+} from "@zzyra/types";
 
 interface BlockConfigProps {
   config: Record<string, unknown>;

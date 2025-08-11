@@ -1,6 +1,6 @@
 import { DefiNode, DefiEdge } from '@/types/defi-blocks';
 import { OllamaProvider } from '@/lib/ai/providers/ollama';
-import { BlockType } from '@zyra/types';
+import { BlockType } from '@zzyra/types';
 
 // Custom block types for the workflow optimizer
 type ExtendedBlockType = BlockType | 'gas_monitor' | 'network_monitor' | 'error_handler' | 'fallback';

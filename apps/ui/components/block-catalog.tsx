@@ -31,8 +31,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BlockType } from "@zyra/types";
-import { NodeCategory, getCategoryColor, BlockMetadata } from "@zyra/types";
+import { BlockType } from "@zzyra/types";
+import { NodeCategory, getCategoryColor, BlockMetadata } from "@zzyra/types";
 import api from "@/lib/services/api";
 
 interface BlockCatalogProps {

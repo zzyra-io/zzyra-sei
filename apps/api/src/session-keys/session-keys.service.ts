@@ -14,7 +14,7 @@ import {
   SessionUsageStats,
   SecurityViolationError,
   SessionEventType,
-} from "@zyra/types";
+} from "@zzyra/types";
 import { SessionKeyCryptoService } from "../shared/services/session-key-crypto.service";
 
 /**

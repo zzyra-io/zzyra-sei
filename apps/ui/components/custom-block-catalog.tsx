@@ -3,7 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import api from "@/lib/services/api";
-import { BlockMetadata, BlockType, getCategoryColor } from "@zyra/types";
+import { BlockMetadata, BlockType, getCategoryColor } from "@zzyra/types";
 import {
   Bell,
   Calculator,

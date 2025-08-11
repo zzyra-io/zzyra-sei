@@ -6,7 +6,7 @@ import {
   DataType,
   LogicType,
   NodeCategory,
-} from "@zyra/types";
+} from "@zzyra/types";
 
 // Helper function to generate logic from inputs and outputs
 const generateLogicFromInputsOutputs = (

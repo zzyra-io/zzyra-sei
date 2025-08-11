@@ -2,12 +2,12 @@
  * Database Types
  *
  * This module exports types for the database package.
- * It integrates with the @zyra/types package to ensure consistency.
+ * It integrates with the @zzyra/types package to ensure consistency.
  */
 
-import { BlockType, NodeCategory } from "@zyra/types";
+import { BlockType, NodeCategory } from "@zzyra/types";
 
-// Re-export types from @zyra/types for consistency
+// Re-export types from @zzyra/types for consistency
 export { BlockType, NodeCategory };
 
 // Export Prisma types

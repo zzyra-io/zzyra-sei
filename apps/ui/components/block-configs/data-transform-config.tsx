@@ -28,7 +28,7 @@ import {
   RefreshCw,
   ArrowUpDown,
 } from "lucide-react";
-import { enhancedDataTransformSchema } from "@zyra/types";
+import { enhancedDataTransformSchema } from "@zzyra/types";
 import { TransformationTemplateSelector } from "@/components/transformation-template-selector";
 
 interface DataTransformConfigProps {
@@ -72,7 +72,7 @@ export function DataTransformConfig({
   const [previewSteps, setPreviewSteps] = useState<any[]>([]);
   const [debouncedTransformations] = useDebounce(transformations, 500);
 
-  // Use the enhanced schema from @zyra/types
+  // Use the enhanced schema from @zzyra/types
   const schema = enhancedDataTransformSchema;
 
   // Initialize transformations from config

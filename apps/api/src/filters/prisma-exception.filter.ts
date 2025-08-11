@@ -6,7 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { Response } from "express";
-import { Prisma } from "@zyra/database";
+import { Prisma } from "@zzyra/database";
 
 @Catch(
   Prisma.PrismaClientKnownRequestError,

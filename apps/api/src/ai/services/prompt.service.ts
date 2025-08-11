@@ -1,12 +1,12 @@
 import { Injectable } from "@nestjs/common";
-import { BlockType, DataType } from "@zyra/types";
+import { BlockType, DataType } from "@zzyra/types";
 
 interface PromptTemplate {
   id: string;
   name: string;
   template: string;
   variables: string[];
-  category: 'system' | 'user' | 'refinement' | 'validation';
+  category: "system" | "user" | "refinement" | "validation";
 }
 
 interface PromptContext {
@@ -15,7 +15,7 @@ interface PromptContext {
   existingWorkflow?: boolean;
   domainHint?: string;
   detailedMode?: boolean;
-  userLevel?: 'beginner' | 'intermediate' | 'expert';
+  userLevel?: "beginner" | "intermediate" | "expert";
 }
 
 @Injectable()
@@ -30,14 +30,20 @@ export class PromptService {
    * Generate a dynamic system prompt based on context
    */
   generateSystemPrompt(context: PromptContext): string {
-    const baseTemplate = this.getTemplate('workflow_system_base');
-    
+    const baseTemplate = this.getTemplate("workflow_system_base");
+
     let prompt = baseTemplate.template;
-    
+
     // Replace variables
-    prompt = prompt.replace('{{BLOCK_TYPES}}', JSON.stringify(Object.values(BlockType), null, 2));
-    prompt = prompt.replace('{{DATA_TYPES}}', JSON.stringify(Object.values(DataType), null, 2));
-    
+    prompt = prompt.replace(
+      "{{BLOCK_TYPES}}",
+      JSON.stringify(Object.values(BlockType), null, 2)
+    );
+    prompt = prompt.replace(
+      "{{DATA_TYPES}}",
+      JSON.stringify(Object.values(DataType), null, 2)
+    );
+
     // Add domain-specific enhancements
     if (context.domainHint) {
       const domainTemplate = this.getDomainTemplate(context.domainHint);
@@ -45,13 +51,13 @@ export class PromptService {
         prompt += "\n\n" + domainTemplate.template;
       }
     }
-    
+
     // Add user-level specific instructions
     if (context.userLevel) {
       const userLevelTemplate = this.getUserLevelTemplate(context.userLevel);
       prompt += "\n\n" + userLevelTemplate.template;
     }
-    
+
     return prompt;
   }
 
@@ -59,22 +65,27 @@ export class PromptService {
    * Generate user context prompt
    */
   generateUserPrompt(
-    description: string, 
+    description: string,
     context: PromptContext & {
       existingNodes?: unknown[];
       existingEdges?: unknown[];
     }
   ): string {
     if (context.existingNodes && context.existingNodes.length > 0) {
-      const enhancementTemplate = this.getTemplate('workflow_enhancement');
+      const enhancementTemplate = this.getTemplate("workflow_enhancement");
       return enhancementTemplate.template
-        .replace('{{DESCRIPTION}}', description)
-        .replace('{{EXISTING_NODES}}', JSON.stringify(context.existingNodes, null, 2))
-        .replace('{{EXISTING_EDGES}}', JSON.stringify(context.existingEdges, null, 2));
+        .replace("{{DESCRIPTION}}", description)
+        .replace(
+          "{{EXISTING_NODES}}",
+          JSON.stringify(context.existingNodes, null, 2)
+        )
+        .replace(
+          "{{EXISTING_EDGES}}",
+          JSON.stringify(context.existingEdges, null, 2)
+        );
     } else {
-      const creationTemplate = this.getTemplate('workflow_creation');
-      return creationTemplate.template
-        .replace('{{DESCRIPTION}}', description);
+      const creationTemplate = this.getTemplate("workflow_creation");
+      return creationTemplate.template.replace("{{DESCRIPTION}}", description);
     }
   }
 
@@ -87,24 +98,27 @@ export class PromptService {
     edges: unknown[],
     options: Record<string, unknown> = {}
   ): string {
-    const refinementTemplate = this.getTemplate('workflow_refinement');
-    
+    const refinementTemplate = this.getTemplate("workflow_refinement");
+
     return refinementTemplate.template
-      .replace('{{REFINEMENT_REQUEST}}', refinementRequest)
-      .replace('{{CURRENT_NODES}}', JSON.stringify(nodes, null, 2))
-      .replace('{{CURRENT_EDGES}}', JSON.stringify(edges, null, 2))
-      .replace('{{OPTIONS}}', JSON.stringify(options, null, 2));
+      .replace("{{REFINEMENT_REQUEST}}", refinementRequest)
+      .replace("{{CURRENT_NODES}}", JSON.stringify(nodes, null, 2))
+      .replace("{{CURRENT_EDGES}}", JSON.stringify(edges, null, 2))
+      .replace("{{OPTIONS}}", JSON.stringify(options, null, 2));
   }
 
   /**
    * Generate block generation prompt
    */
   generateBlockPrompt(description: string): string {
-    const blockTemplate = this.getTemplate('block_generation');
-    
+    const blockTemplate = this.getTemplate("block_generation");
+
     return blockTemplate.template
-      .replace('{{DATA_TYPES}}', JSON.stringify(Object.values(DataType), null, 2))
-      .replace('{{DESCRIPTION}}', description);
+      .replace(
+        "{{DATA_TYPES}}",
+        JSON.stringify(Object.values(DataType), null, 2)
+      )
+      .replace("{{DESCRIPTION}}", description);
   }
 
   /**
@@ -128,8 +142,12 @@ export class PromptService {
   /**
    * Get all templates by category
    */
-  getTemplatesByCategory(category: PromptTemplate['category']): PromptTemplate[] {
-    return Array.from(this.templates.values()).filter(t => t.category === category);
+  getTemplatesByCategory(
+    category: PromptTemplate["category"]
+  ): PromptTemplate[] {
+    return Array.from(this.templates.values()).filter(
+      (t) => t.category === category
+    );
   }
 
   /**
@@ -137,9 +155,9 @@ export class PromptService {
    */
   private initializeTemplates(): void {
     // Base system template
-    this.templates.set('workflow_system_base', {
-      id: 'workflow_system_base',
-      name: 'Base Workflow System Prompt',
+    this.templates.set("workflow_system_base", {
+      id: "workflow_system_base",
+      name: "Base Workflow System Prompt",
       template: `You are an EXPERT WORKFLOW AI for Zyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
 
 🎯 **CORE MISSION**: Transform ANY natural language into sophisticated, executable workflows using our comprehensive block system.
@@ -185,27 +203,27 @@ export class PromptService {
 - Generate unique UUIDs for all IDs
 - Create intelligent positioning based on flow order
 - Ensure logical execution flow (TRIGGER → LOGIC → ACTION)`,
-      variables: ['BLOCK_TYPES', 'DATA_TYPES'],
-      category: 'system'
+      variables: ["BLOCK_TYPES", "DATA_TYPES"],
+      category: "system",
     });
 
     // Workflow creation template
-    this.templates.set('workflow_creation', {
-      id: 'workflow_creation',
-      name: 'New Workflow Creation',
+    this.templates.set("workflow_creation", {
+      id: "workflow_creation",
+      name: "New Workflow Creation",
       template: `NEW WORKFLOW CREATION REQUEST:
 
 **USER REQUEST**: "{{DESCRIPTION}}"
 
 **TASK**: Create a complete workflow from scratch that accomplishes the user's automation goal.`,
-      variables: ['DESCRIPTION'],
-      category: 'user'
+      variables: ["DESCRIPTION"],
+      category: "user",
     });
 
     // Workflow enhancement template
-    this.templates.set('workflow_enhancement', {
-      id: 'workflow_enhancement',
-      name: 'Workflow Enhancement',
+    this.templates.set("workflow_enhancement", {
+      id: "workflow_enhancement",
+      name: "Workflow Enhancement",
       template: `WORKFLOW ENHANCEMENT REQUEST:
 
 **CURRENT WORKFLOW**:
@@ -215,14 +233,14 @@ Edges: {{EXISTING_EDGES}}
 **USER ENHANCEMENT REQUEST**: "{{DESCRIPTION}}"
 
 **TASK**: Enhance the existing workflow by adding new functionality while maintaining existing capabilities.`,
-      variables: ['DESCRIPTION', 'EXISTING_NODES', 'EXISTING_EDGES'],
-      category: 'user'
+      variables: ["DESCRIPTION", "EXISTING_NODES", "EXISTING_EDGES"],
+      category: "user",
     });
 
     // Workflow refinement template
-    this.templates.set('workflow_refinement', {
-      id: 'workflow_refinement',
-      name: 'Workflow Refinement',
+    this.templates.set("workflow_refinement", {
+      id: "workflow_refinement",
+      name: "Workflow Refinement",
       template: `WORKFLOW REFINEMENT REQUEST:
 
 **CURRENT WORKFLOW**:
@@ -233,14 +251,19 @@ Edges: {{CURRENT_EDGES}}
 **OPTIONS**: {{OPTIONS}}
 
 **TASK**: Refine the existing workflow based on the user's request while maintaining the core functionality.`,
-      variables: ['REFINEMENT_REQUEST', 'CURRENT_NODES', 'CURRENT_EDGES', 'OPTIONS'],
-      category: 'refinement'
+      variables: [
+        "REFINEMENT_REQUEST",
+        "CURRENT_NODES",
+        "CURRENT_EDGES",
+        "OPTIONS",
+      ],
+      category: "refinement",
     });
 
     // Block generation template
-    this.templates.set('block_generation', {
-      id: 'block_generation',
-      name: 'Custom Block Generation',
+    this.templates.set("block_generation", {
+      id: "block_generation",
+      name: "Custom Block Generation",
       template: `You are an EXPERT CUSTOM BLOCK GENERATOR for Zyra automation platform.
 
 🎯 **MISSION**: Generate custom blocks based on user requirements.
@@ -286,8 +309,8 @@ Edges: {{CURRENT_EDGES}}
 }
 
 Return ONLY the JSON object with no additional text, explanations, or formatting.`,
-      variables: ['DATA_TYPES', 'DESCRIPTION'],
-      category: 'system'
+      variables: ["DATA_TYPES", "DESCRIPTION"],
+      category: "system",
     });
 
     // Domain-specific templates
@@ -300,9 +323,9 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
    */
   private initializeDomainTemplates(): void {
     // DeFi domain template
-    this.templates.set('domain_defi', {
-      id: 'domain_defi',
-      name: 'DeFi Domain Enhancement',
+    this.templates.set("domain_defi", {
+      id: "domain_defi",
+      name: "DeFi Domain Enhancement",
       template: `**DEFI DOMAIN SPECIALIZATION**:
 - Focus on blockchain protocols, DEXes, lending, yield farming
 - Prioritize security and gas optimization
@@ -310,13 +333,13 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
 - Consider MEV protection and frontrunning prevention
 - Use appropriate DeFi block types: SWAP, LEND, STAKE, FARM, etc.`,
       variables: [],
-      category: 'system'
+      category: "system",
     });
 
     // Healthcare domain template
-    this.templates.set('domain_healthcare', {
-      id: 'domain_healthcare',
-      name: 'Healthcare Domain Enhancement',
+    this.templates.set("domain_healthcare", {
+      id: "domain_healthcare",
+      name: "Healthcare Domain Enhancement",
       template: `**HEALTHCARE DOMAIN SPECIALIZATION**:
 - Ensure HIPAA compliance and patient data privacy
 - Focus on clinical workflows and patient care
@@ -324,13 +347,13 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
 - Prioritize reliability and audit trails
 - Use healthcare-specific block types when available`,
       variables: [],
-      category: 'system'
+      category: "system",
     });
 
     // Enterprise domain template
-    this.templates.set('domain_enterprise', {
-      id: 'domain_enterprise',
-      name: 'Enterprise Domain Enhancement',
+    this.templates.set("domain_enterprise", {
+      id: "domain_enterprise",
+      name: "Enterprise Domain Enhancement",
       template: `**ENTERPRISE DOMAIN SPECIALIZATION**:
 - Focus on scalability, reliability, and monitoring
 - Include proper error handling and rollback mechanisms
@@ -338,7 +361,7 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
 - Prioritize security and compliance requirements
 - Use enterprise-grade authentication and authorization`,
       variables: [],
-      category: 'system'
+      category: "system",
     });
   }
 
@@ -346,9 +369,9 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
    * Initialize user level templates
    */
   private initializeUserLevelTemplates(): void {
-    this.templates.set('user_beginner', {
-      id: 'user_beginner',
-      name: 'Beginner User Level',
+    this.templates.set("user_beginner", {
+      id: "user_beginner",
+      name: "Beginner User Level",
       template: `**BEGINNER USER ADAPTATIONS**:
 - Use simple, clear block labels and descriptions
 - Avoid complex logic blocks initially
@@ -356,12 +379,12 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
 - Focus on common use cases and templates
 - Include explanatory comments in generated workflows`,
       variables: [],
-      category: 'system'
+      category: "system",
     });
 
-    this.templates.set('user_expert', {
-      id: 'user_expert',
-      name: 'Expert User Level',
+    this.templates.set("user_expert", {
+      id: "user_expert",
+      name: "Expert User Level",
       template: `**EXPERT USER ADAPTATIONS**:
 - Use advanced block types and complex logic
 - Provide detailed configuration options
@@ -369,7 +392,7 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
 - Allow for custom code blocks and complex integrations
 - Focus on performance and scalability considerations`,
       variables: [],
-      category: 'system'
+      category: "system",
     });
   }
 
@@ -386,43 +409,52 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
    */
   private getUserLevelTemplate(level: string): PromptTemplate {
     const levelId = `user_${level.toLowerCase()}`;
-    return this.templates.get(levelId) || this.templates.get('user_intermediate')!;
+    return (
+      this.templates.get(levelId) || this.templates.get("user_intermediate")!
+    );
   }
 
   /**
    * Validate template variables
    */
-  validateTemplate(template: PromptTemplate, variables: Record<string, unknown>): string[] {
+  validateTemplate(
+    template: PromptTemplate,
+    variables: Record<string, unknown>
+  ): string[] {
     const missingVars: string[] = [];
-    
+
     for (const variable of template.variables) {
       if (!(variable in variables)) {
         missingVars.push(variable);
       }
     }
-    
+
     return missingVars;
   }
 
   /**
    * Render template with variables
    */
-  renderTemplate(templateId: string, variables: Record<string, unknown>): string {
+  renderTemplate(
+    templateId: string,
+    variables: Record<string, unknown>
+  ): string {
     const template = this.getTemplate(templateId);
     const missingVars = this.validateTemplate(template, variables);
-    
+
     if (missingVars.length > 0) {
-      throw new Error(`Missing template variables: ${missingVars.join(', ')}`);
+      throw new Error(`Missing template variables: ${missingVars.join(", ")}`);
     }
-    
+
     let rendered = template.template;
-    
+
     for (const [key, value] of Object.entries(variables)) {
       const placeholder = `{{${key}}}`;
-      const replacement = typeof value === 'string' ? value : JSON.stringify(value);
-      rendered = rendered.replace(new RegExp(placeholder, 'g'), replacement);
+      const replacement =
+        typeof value === "string" ? value : JSON.stringify(value);
+      rendered = rendered.replace(new RegExp(placeholder, "g"), replacement);
     }
-    
+
     return rendered;
   }
 
@@ -435,36 +467,37 @@ Return ONLY the JSON object with no additional text, explanations, or formatting
     variables: Record<string, unknown>
   ): Promise<Array<{ id: string; prompt: string }>> {
     const results: Array<{ id: string; prompt: string }> = [];
-    
+
     // Base version
     results.push({
-      id: 'base',
-      prompt: this.renderTemplate(baseTemplateId, variables)
+      id: "base",
+      prompt: this.renderTemplate(baseTemplateId, variables),
     });
-    
+
     // Variations
     for (const variation of variations) {
       const template = { ...this.getTemplate(baseTemplateId) };
-      
+
       // Apply changes
       for (const [key, change] of Object.entries(variation.changes)) {
         template.template = template.template.replace(key, change);
       }
-      
+
       // Render with variables
       let rendered = template.template;
       for (const [key, value] of Object.entries(variables)) {
         const placeholder = `{{${key}}}`;
-        const replacement = typeof value === 'string' ? value : JSON.stringify(value);
-        rendered = rendered.replace(new RegExp(placeholder, 'g'), replacement);
+        const replacement =
+          typeof value === "string" ? value : JSON.stringify(value);
+        rendered = rendered.replace(new RegExp(placeholder, "g"), replacement);
       }
-      
+
       results.push({
         id: variation.id,
-        prompt: rendered
+        prompt: rendered,
       });
     }
-    
+
     return results;
   }
 }

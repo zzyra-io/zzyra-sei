@@ -4,7 +4,7 @@ This guide provides instructions for setting up the Zzyra project for local deve
 
 ## Prerequisites
 
-- **Node.js:** v20.3.0 or higher (especially for `zyra-worker`)
+- **Node.js:** v20.3.0 or higher (especially for `zzyra-worker`)
 - **pnpm:** The package manager used in this project (`npm install -g pnpm`)
 - **Supabase Account:** A free or paid account at [supabase.com](https://supabase.com)
 - **Supabase CLI:** Install via instructions at [supabase.com/docs/guides/cli](https://supabase.com/docs/guides/cli)
@@ -18,7 +18,7 @@ This guide provides instructions for setting up the Zzyra project for local deve
 
     ```bash
     git clone <your-repository-url>
-    cd zyra
+    cd zzyra
     ```
 
 2.  **Install Dependencies:**
@@ -30,7 +30,7 @@ This guide provides instructions for setting up the Zzyra project for local deve
     # Or individually:
     # cd ui
     # pnpm install
-    # cd ../zyra-worker
+    # cd ../zzyra-worker
     # pnpm install
     # cd ..
     ```
@@ -56,7 +56,7 @@ This guide provides instructions for setting up the Zzyra project for local deve
       cd ..
       ```
     - **Environment Variables:**
-      - Copy `.env.example` to `.env` in **both** the `ui/` and `zyra-worker/` directories.
+      - Copy `.env.example` to `.env` in **both** the `ui/` and `zzyra-worker/` directories.
       - Fill in the required variables in both `.env` files:
         - `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
         - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase project anon key.
@@ -96,7 +96,7 @@ This guide provides instructions for setting up the Zzyra project for local deve
     - **Start the Backend (Worker):**
       Open a _new terminal window/tab_.
       ```bash
-      cd zyra-worker
+      cd zzyra-worker
       pnpm run start:dev # For development with hot-reloading
       # Or for production-like start:
       # pnpm run build
@@ -107,7 +107,7 @@ This guide provides instructions for setting up the Zzyra project for local deve
 ## Directory Structure Overview
 
 ```
-zyra/
+zzyra/
 ├── ui/                     # Next.js Frontend Application
 │   ├── app/                # App Router pages and API routes
 │   ├── components/         # React components
@@ -122,7 +122,7 @@ zyra/
 │   └── next.config.mjs
 │   └── tsconfig.json
 │
-├── zyra-worker/            # NestJS Backend Worker Service
+├── zzyra-worker/            # NestJS Backend Worker Service
 │   ├── src/                # Worker source code (controllers, services)
 │   │   └── main.ts         # Worker entry point
 │   ├── test/               # Unit/integration tests
@@ -139,7 +139,7 @@ zyra/
 ## Deployment
 
 - **Frontend (`ui/`):** Designed for deployment on platforms like Netlify or Vercel. Connect your Git repository and configure build settings (Framework: Next.js, Package Manager: pnpm, Build Command: `pnpm build`, Publish Directory: `ui/.next`).
-- **Backend (`zyra-worker/`):** Can be deployed as a standalone Node.js application. Options include:
+- **Backend (`zzyra-worker/`):** Can be deployed as a standalone Node.js application. Options include:
   - Containerizing with Docker and deploying to services like AWS Fargate, Google Cloud Run, or Kubernetes.
   - Deploying to a Virtual Machine (VM) or bare metal server using a process manager like PM2.
   - Potentially adapting parts to serverless functions (depending on task duration).

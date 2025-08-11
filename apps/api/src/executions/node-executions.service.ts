@@ -1,7 +1,7 @@
 import { Injectable, Inject, Logger } from "@nestjs/common";
 import { NodeExecutionDto } from "./dto/execution.dto";
 import { ExecutionRepository } from "../database/repositories/execution.repository";
-import { NodeExecution, NodeInput, NodeOutput } from "@zyra/database";
+import { NodeExecution, NodeInput, NodeOutput } from "@zzyra/database";
 
 @Injectable()
 export class NodeExecutionsService {

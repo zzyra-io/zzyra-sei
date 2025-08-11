@@ -34,8 +34,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { CustomBlockDefinition } from "@zyra/types";
-import { BlockType, NodeCategory } from "@zyra/types";
+import type { CustomBlockDefinition } from "@zzyra/types";
+import { BlockType, NodeCategory } from "@zzyra/types";
 import {
   BarChart3,
   Blocks,

@@ -10,7 +10,7 @@ import {
   TemplateQueryDto,
   TemplateResponseDto,
 } from "./dto/template.dto";
-import { Prisma } from "@zyra/database";
+import { Prisma } from "@zzyra/database";
 
 @Injectable()
 export class TemplateService {

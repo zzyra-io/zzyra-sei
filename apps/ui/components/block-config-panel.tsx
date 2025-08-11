@@ -81,7 +81,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { blockConfigRegistry } from "@/lib/block-config-registry";
-import { getBlockMetadata, getBlockType } from "@zyra/types";
+import { getBlockMetadata, getBlockType } from "@zzyra/types";
 import { ScrollArea } from "./ui/scroll-area";
 import {
   Accordion,

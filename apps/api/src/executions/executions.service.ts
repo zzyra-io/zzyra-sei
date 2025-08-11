@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { ExecutionRepository } from "@zyra/database";
+import { ExecutionRepository } from "@zzyra/database";
 import { CreateExecutionDto, UpdateExecutionDto } from "./dto/execution.dto";
 
 @Injectable()

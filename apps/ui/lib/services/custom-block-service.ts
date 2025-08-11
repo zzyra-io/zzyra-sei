@@ -1,5 +1,5 @@
-import type { CustomBlockDefinition } from "@zyra/types";
-import { DataType, LogicType, NodeCategory } from "@zyra/types";
+import type { CustomBlockDefinition } from "@zzyra/types";
+import { DataType, LogicType, NodeCategory } from "@zzyra/types";
 import api from "./api";
 
 interface CreateCustomBlockRequest {

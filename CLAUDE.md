@@ -80,7 +80,7 @@ This is a Turbo monorepo with the following structure:
 
 - **`apps/ui/`** - Next.js 15 frontend with App Router, React 19, TypeScript
 - **`apps/api/`** - NestJS API server for REST endpoints and authentication
-- **`apps/zyra-worker/`** - NestJS worker service for workflow execution and processing
+- **`apps/zzyra-worker/`** - NestJS worker service for workflow execution and processing
 - **`packages/database/`** - Prisma schema, migrations, repositories, and database utilities
 - **`packages/types/`** - Shared TypeScript types and schemas across all apps
 
@@ -104,7 +104,7 @@ The application is built around an AI-powered workflow automation platform:
 5. **Multi-Industry Support**: Templates for DeFi, Healthcare, Gaming, Enterprise automation
 
 #### Key Services
-- **Workflow Execution**: `apps/zyra-worker/src/workers/workflow-executor.ts`
+- **Workflow Execution**: `apps/zzyra-worker/src/workers/workflow-executor.ts`
 - **Block Management**: `apps/api/src/blocks/` and `apps/ui/components/blocks/`
 - **AI Integration**: `apps/ui/lib/ai/` and AI provider configurations
 - **Authentication**: Magic SDK integration with JWT tokens
@@ -160,7 +160,7 @@ The application is built around an AI-powered workflow automation platform:
 - Database repositories: `packages/database/src/repositories/`
 - Block definitions: `apps/ui/components/blocks/` and `packages/types/src/workflow/`
 - AI providers: `apps/ui/lib/ai-providers/`
-- Worker execution: `apps/zyra-worker/src/workers/`
+- Worker execution: `apps/zzyra-worker/src/workers/`
 
 ### Testing Strategy
 - Unit tests using Jest
@@ -179,7 +179,7 @@ The application is built around an AI-powered workflow automation platform:
 7. Follow the monorepo dependency guidelines in `.cursor/rules/`
 
 ### Environment Setup
-1. Copy `.env.example` to `.env` in `apps/ui/` and `apps/zyra-worker/`
+1. Copy `.env.example` to `.env` in `apps/ui/` and `apps/zzyra-worker/`
 2. Start Docker services: `docker-compose -f setup-compose.yml up -d`
 3. Run setup script: `./setup.sh` or follow manual setup in README
 4. Ensure PostgreSQL, Redis, and RabbitMQ are running for full functionality

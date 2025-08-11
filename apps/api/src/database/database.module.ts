@@ -6,7 +6,7 @@ import {
   ExecutionRepository,
   WalletRepository,
   NotificationRepository,
-} from "@zyra/database";
+} from "@zzyra/database";
 
 @Global()
 @Module({

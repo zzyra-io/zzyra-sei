@@ -49,7 +49,7 @@ Observability & Monitoring
 – Metrics dashboards (Prometheus/Grafana, PostHog events).
 – Alerting (Sentry/PagerDuty) on errors/timeouts.
 Testing & CI/CD
-• Present: Jest tests under zyra-worker/tests, basic lint/pre-commit.
+• Present: Jest tests under zzyra-worker/tests, basic lint/pre-commit.
 • Gaps:
 – E2E (Cypress/Playwright) for critical flows.
 – Performance/load tests for engine and UI.

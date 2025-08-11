@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { SUPPORTED_CHAINS } from "@zyra/types";
+import { SUPPORTED_CHAINS } from "@zzyra/types";
 import { RefreshCw, AlertTriangle, Info, ArrowDown } from "lucide-react";
 
 interface SwapTokensConfigProps {

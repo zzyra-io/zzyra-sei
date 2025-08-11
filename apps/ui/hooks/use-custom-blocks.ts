@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { CustomBlockDefinition } from "@zyra/types";
+import { CustomBlockDefinition } from "@zzyra/types";
 import api from "@/lib/services/api";
 import { toast } from "./use-toast";
 

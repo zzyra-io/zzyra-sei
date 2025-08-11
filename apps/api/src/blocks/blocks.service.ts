@@ -11,7 +11,7 @@ import {
   enhancedBlockSchemas,
   getEnhancedBlockSchema,
   hasEnhancedSchema,
-} from "@zyra/types";
+} from "@zzyra/types";
 
 export interface BlockType {
   id: string;
@@ -55,7 +55,7 @@ export class BlocksService {
     userId?: string
   ): Promise<BlockMetadata[]> {
     try {
-      // Get all predefined block types from the zyra types catalog
+      // Get all predefined block types from the zzyra types catalog
       const predefinedBlockTypes: BlockMetadata[] = Object.values(ZyraBlockType)
         .filter((blockType) => blockType !== ZyraBlockType.CUSTOM)
         .map((blockTypeKey) => {

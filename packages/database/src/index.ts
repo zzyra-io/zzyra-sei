@@ -1,5 +1,5 @@
 /**
- * @zyra/database
+ * @zzyra/database
  *
  * This package provides a centralized database access layer for the Zzyra platform.
  * It exports the Prisma client, repositories, authentication services, and utility functions.

@@ -1,5 +1,5 @@
 import { ComponentType } from "react";
-import { BlockType } from "@zyra/types";
+import { BlockType } from "@zzyra/types";
 
 // Core block config imports
 import { HttpRequestConfig } from "@/components/block-configs/http-request-config";

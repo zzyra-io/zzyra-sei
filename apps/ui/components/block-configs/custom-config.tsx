@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, AlertCircle } from "lucide-react";
 import { BlockConfigComponentProps } from "@/lib/block-config-registry";
 import { customBlockService } from "@/lib/services/custom-block-service";
-import { CustomBlockDefinition, BlockParameter } from "@zyra/types";
+import { CustomBlockDefinition, BlockParameter } from "@zzyra/types";
 
 export function CustomConfig({
   config,

@@ -4,7 +4,7 @@ import { LiquidityBlock } from './liquidity-block';
 import { YieldBlock } from './yield-block';
 import { PositionBlock } from './position-block';
 import { RebalanceBlock } from './rebalance-block';
-import { BlockType } from '@zyra/types';
+import { BlockType } from '@zzyra/types';
 
 
 interface DefiBlockProps {

@@ -62,7 +62,7 @@ export interface GenericBlockHandler {
 ### 1.3 Update Block Registry
 
 ```typescript
-// apps/zyra-worker/src/workers/handlers/BlockHandlerRegistry.ts
+// apps/zzyra-worker/src/workers/handlers/BlockHandlerRegistry.ts
 export class BlockHandlerRegistry {
   private legacyHandlers: Record<string, BlockHandler>;
   private genericHandlers: Record<string, GenericBlockHandler>;
@@ -94,7 +94,7 @@ export class BlockHandlerRegistry {
 ### 2.1 HTTP_REQUEST Handler (Priority #1)
 
 ```typescript
-// apps/zyra-worker/src/workers/handlers/generic/HttpRequestHandler.ts
+// apps/zzyra-worker/src/workers/handlers/generic/HttpRequestHandler.ts
 export class HttpRequestHandler implements GenericBlockHandler {
   async execute(
     config: GenericBlockConfig,
@@ -198,7 +198,7 @@ export class HttpRequestHandler implements GenericBlockHandler {
 ### 2.2 CALCULATOR Handler
 
 ```typescript
-// apps/zyra-worker/src/workers/handlers/generic/CalculatorHandler.ts
+// apps/zzyra-worker/src/workers/handlers/generic/CalculatorHandler.ts
 export class CalculatorHandler implements GenericBlockHandler {
   async execute(
     config: GenericBlockConfig,
@@ -303,7 +303,7 @@ export class CalculatorHandler implements GenericBlockHandler {
 ### 2.3 COMPARATOR Handler
 
 ```typescript
-// apps/zyra-worker/src/workers/handlers/generic/ComparatorHandler.ts
+// apps/zzyra-worker/src/workers/handlers/generic/ComparatorHandler.ts
 export class ComparatorHandler implements GenericBlockHandler {
   async execute(
     config: GenericBlockConfig,
@@ -423,7 +423,7 @@ const testWorkflow = {
 ### 3.2 Update Workflow Executor
 
 ```typescript
-// apps/zyra-worker/src/workers/workflow-executor.ts
+// apps/zzyra-worker/src/workers/workflow-executor.ts
 export class WorkflowExecutor {
   async executeNode(
     node: any,
@@ -499,7 +499,7 @@ interface WorkflowEdge {
 ### 4.1 Legacy-to-Generic Adapter
 
 ```typescript
-// apps/zyra-worker/src/workers/adapters/LegacyBlockAdapter.ts
+// apps/zzyra-worker/src/workers/adapters/LegacyBlockAdapter.ts
 export class LegacyBlockAdapter {
   static convertPriceMonitorToHttpRequest(
     legacyConfig: any

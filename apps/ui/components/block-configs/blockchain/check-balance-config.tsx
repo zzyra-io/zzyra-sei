@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { SUPPORTED_CHAINS } from "@zyra/types";
+import { SUPPORTED_CHAINS } from "@zzyra/types";
 import { Wallet, Info, Plus, X } from "lucide-react";
 
 interface CheckBalanceConfigProps {

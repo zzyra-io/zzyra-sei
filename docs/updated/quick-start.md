@@ -13,7 +13,7 @@
 
 ```bash
 git clone <repository-url>
-cd zyra
+cd zzyra
 pnpm install
 ```
 
@@ -46,16 +46,16 @@ NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY=your-magic-publishable-key
 **apps/api/.env:**
 
 ```env
-DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zyra?schema=public"
+DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zzyra?schema=public"
 JWT_SECRET="your-jwt-secret-key"
 MAGIC_SECRET_KEY="your-magic-secret-key"
 RABBIT_MQ_URL="amqp://guest:guest@localhost:5672"
 ```
 
-**apps/zyra-worker/.env:**
+**apps/zzyra-worker/.env:**
 
 ```env
-DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zyra?schema=public"
+DATABASE_URL="postgresql://zzyra:zzyra@localhost:5433/zzyra?schema=public"
 RABBIT_MQ_URL="amqp://guest:guest@localhost:5672"
 OPENROUTER_API_KEY="your-openrouter-key"
 ```
@@ -162,7 +162,7 @@ pnpm dev
 **Worker Service:**
 
 ```bash
-cd apps/zyra-worker
+cd apps/zzyra-worker
 pnpm dev
 # Check console output for execution logs
 ```

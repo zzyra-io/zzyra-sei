@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `@zyra/wallet` library provides a unified wallet management solution for the Zzyra platform, enabling blockchain interactions across both UI (browser) and worker (Node.js) environments. It offers Magic Link integration for a passwordless wallet experience, supports multiple blockchain networks, and ensures secure key management.
+The `@zzyra/wallet` library provides a unified wallet management solution for the Zzyra platform, enabling blockchain interactions across both UI (browser) and worker (Node.js) environments. It offers Magic Link integration for a passwordless wallet experience, supports multiple blockchain networks, and ensures secure key management.
 
 ## Table of Contents
 
@@ -40,10 +40,10 @@ The `@zyra/wallet` library provides a unified wallet management solution for the
 
 ## Architecture
 
-The `@zyra/wallet` package is designed as a shared library that can be used by both the UI (Next.js) and worker (NestJS) components of the Zzyra platform:
+The `@zzyra/wallet` package is designed as a shared library that can be used by both the UI (Next.js) and worker (NestJS) components of the Zzyra platform:
 
 ```
-@zyra/wallet/
+@zzyra/wallet/
 ├── core/                   # Environment-agnostic core logic
 │   ├── types.ts            # Type definitions
 │   ├── wallet-manager.ts   # Main wallet interface
@@ -83,7 +83,7 @@ The `@zyra/wallet` package is designed as a shared library that can be used by b
 
 ### Key Management
 
-The `@zyra/wallet` library implements a **zero client-side key storage** approach:
+The `@zzyra/wallet` library implements a **zero client-side key storage** approach:
 
 - **No Private Keys in Browser**: Private keys never exist in browser localStorage or memory
 - **Delegated Key Management**: Uses Magic's secure infrastructure for key operations

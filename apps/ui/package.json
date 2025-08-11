@@ -1,5 +1,5 @@
 {
-  "name": "zyra-web3-automation",
+  "name": "zzyra-web3-automation",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -56,8 +56,8 @@
     "@uiw/codemirror-theme-vscode": "^4.23.12",
     "@uiw/react-codemirror": "^4.23.12",
     "@xyflow/react": "^12.6.0",
-    "@zyra/database": "workspace:*",
-    "@zyra/types": "workspace:*",
+    "@zzyra/database": "workspace:*",
+    "@zzyra/types": "workspace:*",
     "amqplib": "^0.10.7",
     "axios": "^1.9.0",
     "bs58": "^5.0.0",

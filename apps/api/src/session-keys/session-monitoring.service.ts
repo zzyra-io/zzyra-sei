@@ -6,7 +6,7 @@ import {
   SessionEventType,
   AnomalyAlert,
   SessionKeyData,
-} from "@zyra/types";
+} from "@zzyra/types";
 
 /**
  * Service for monitoring session keys and detecting security anomalies

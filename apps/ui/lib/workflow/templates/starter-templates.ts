@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { BlockType } from "@zyra/types";
+import { BlockType } from "@zzyra/types";
 
 interface FlowNode {
   id: string;

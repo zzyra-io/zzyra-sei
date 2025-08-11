@@ -6,7 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { Response } from "express";
-import { DatabaseError } from "@zyra/database";
+import { DatabaseError } from "@zzyra/database";
 
 @Catch(DatabaseError)
 export class DatabaseExceptionFilter implements ExceptionFilter {

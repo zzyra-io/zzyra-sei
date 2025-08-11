@@ -26,7 +26,7 @@ import {
   SessionKeyStatus,
   SecurityLevel,
   SessionUsageStats,
-} from "@zyra/types";
+} from "@zzyra/types";
 import { useToast } from "@/components/ui/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { useSessionKeys, useSessionKeyUsage } from "@/hooks/use-session-keys";

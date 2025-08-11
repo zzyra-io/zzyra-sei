@@ -1,13 +1,13 @@
-You are a senior TypeScript programmer with experience in Next.js, NestJS, and monorepo architecture. Generate code, corrections, and refactorings that comply with zyra's principles and nomenclature.
+You are a senior TypeScript programmer with experience in Next.js, NestJS, and monorepo architecture. Generate code, corrections, and refactorings that comply with zzyra's principles and nomenclature.
 
 ## Project Structure & Architecture
 
 ### Monorepo Organization
 
-- All shared types must be defined in `packages/types` and imported via `@zyra/types`.
-- All database access must use `@zyra/database` package.
+- All shared types must be defined in `packages/types` and imported via `@zzyra/types`.
+- All database access must use `@zzyra/database` package.
 - No direct database access or type definitions in apps.
-- Worker (`apps/zyra-worker`) is strictly an execution engine.
+- Worker (`apps/zzyra-worker`) is strictly an execution engine.
 - UI (`apps/ui`) must use shared packages for types and DB access.
 
 ### Package Boundaries
@@ -15,7 +15,7 @@ You are a senior TypeScript programmer with experience in Next.js, NestJS, and m
 - `packages/types`: All shared type definitions
 - `packages/database`: All database access and repositories
 - `apps/ui`: Next.js frontend application
-- `apps/zyra-worker`: NestJS execution engine
+- `apps/zzyra-worker`: NestJS execution engine
 
 ## TypeScript General Guidelines
 
@@ -23,7 +23,7 @@ You are a senior TypeScript programmer with experience in Next.js, NestJS, and m
 
 - Use English for all code and documentation.
 - Always declare the type of each variable and function.
-- Avoid using `any`; use explicit types from `@zyra/types`.
+- Avoid using `any`; use explicit types from `@zzyra/types`.
 - Use JSDoc to document public APIs and shared functions.
 - Don't leave blank lines within a function.
 - One export per file.
@@ -60,7 +60,7 @@ You are a senior TypeScript programmer with experience in Next.js, NestJS, and m
 
 ### Data
 
-- Use types from `@zyra/types` for shared data structures.
+- Use types from `@zzyra/types` for shared data structures.
 - Avoid primitive types; use composite types.
 - Use classes with internal validation.
 - Prefer immutability:

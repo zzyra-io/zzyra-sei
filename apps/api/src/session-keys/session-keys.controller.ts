@@ -19,7 +19,7 @@ import { SessionMonitoringService } from "./session-monitoring.service";
 import { CreateSessionKeyDto } from "./dto/create-session-key.dto";
 import { ValidateSessionKeyDto } from "./dto/validate-session-key.dto";
 import { UpdateUsageDto } from "./dto/update-usage.dto";
-import { SessionKeyStatus } from "@zyra/types";
+import { SessionKeyStatus } from "@zzyra/types";
 
 /**
  * Controller for session key management endpoints

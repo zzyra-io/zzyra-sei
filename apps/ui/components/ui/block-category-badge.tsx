@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge, BadgeProps } from "@/components/ui/badge";
-import { NodeCategory } from "@zyra/types";
+import { NodeCategory } from "@zzyra/types";
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 import {

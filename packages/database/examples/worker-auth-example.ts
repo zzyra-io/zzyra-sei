@@ -10,8 +10,8 @@ import {
   ExecutionRepository,
   WorkflowRepository,
   PolicyContext
-} from '@zyra/database';
-import { ExecutionStatus } from '@zyra/types';
+} from '@zzyra/database';
+import { ExecutionStatus } from '@zzyra/types';
 
 // Initialize services
 const jwtService = new JwtService();

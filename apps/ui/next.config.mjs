@@ -11,7 +11,7 @@ const nextConfig = {
   },
   reactStrictMode: true,
   swcMinify: true,
-  transpilePackages: ["@zyra/wallet", "@zyra/types"],
+  transpilePackages: ["@zzyra/wallet", "@zzyra/types"],
   async rewrites() {
     return [
       {

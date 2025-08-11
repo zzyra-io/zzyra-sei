@@ -5,10 +5,10 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 
 // Import types from the types package
-import { BlockType, DataType } from "@zyra/types";
+import { BlockType, DataType } from "@zzyra/types";
 
 // Import MCP configurations
-import { defaultMCPs } from "@zyra/types";
+import { defaultMCPs } from "@zzyra/types";
 
 // Import new services
 import { WorkflowValidatorService } from "./services/workflow-validator.service";
@@ -1619,7 +1619,7 @@ Edges: ${JSON.stringify(edges, null, 2)}
               pass: "your-app-password",
             },
           },
-          from: "noreply@zyra.ai",
+          from: "noreply@zzyra.ai",
           retries: options?.autoHeal ? 3 : 1,
           ...config,
         };

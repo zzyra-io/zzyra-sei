@@ -45,7 +45,7 @@ if [ ! -f ".env" ]; then
     echo -e "${YELLOW}Creating .env file...${NC}"
     cat > .env << EOL
 # Database
-DATABASE_URL="postgresql://zzyra:zzyra@localhost:5432/zyra?schema=public"
+DATABASE_URL="postgresql://zzyra:zzyra@localhost:5432/zzyra?schema=public"
 
 # JWT
 JWT_SECRET="your-jwt-secret-key-change-in-production"
