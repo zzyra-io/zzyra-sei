@@ -1,7 +1,6 @@
 "use client";
 
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
-import { ZeroDevSmartWalletConnectors } from "@dynamic-labs/ethereum-aa";
 import {
   DynamicContextProvider,
   DynamicWidget,
@@ -13,9 +12,9 @@ import { ReactNode } from "react";
 import { http } from "viem";
 import { WagmiProvider, createConfig } from "wagmi";
 
-// SEI Testnet Configuration (EVM-compatible) - Updated to match ZeroDev
+// SEI Testnet Configuration (EVM-compatible)
 const seiNetwork = {
-  id: 1328, // SEI Testnet chain ID (matches ZeroDev dashboard)
+  id: 1328, // SEI Testnet chain ID
   name: "SEI Testnet",
   nativeCurrency: {
     decimals: 18,
@@ -73,10 +72,7 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
         <DynamicContextProvider
           settings={{
             environmentId,
-            walletConnectors: [
-              EthereumWalletConnectors,
-              ZeroDevSmartWalletConnectors,
-            ],
+            walletConnectors: [EthereumWalletConnectors],
             detectNewWalletsForLinking: true,
             // Event handlers for authentication lifecycle
             events: {

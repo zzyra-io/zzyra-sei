@@ -37,9 +37,9 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 import {
-  useAccountAbstraction,
+  usePimlicoSmartAccount,
   SmartWalletDelegationResult,
-} from "@/hooks/use-account-abstraction";
+} from "@/hooks/use-pimlico-smart-account";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import api from "@/lib/services/api";
 
@@ -190,8 +190,12 @@ export function EnhancedBlockchainAuthorizationModal({
 }: EnhancedBlockchainAuthorizationModalProps) {
   const { toast } = useToast();
   const { isLoggedIn, getCurrentUser } = useDynamicAuth();
-  const { createSmartWalletDelegation, isCreatingDelegation, getWalletStatus } =
-    useAccountAbstraction();
+  const {
+    createSmartWalletDelegation,
+    isCreatingDelegation,
+    smartAccountAddress,
+    isDeploying,
+  } = usePimlicoSmartAccount();
 
   // Detect blockchain operations - memoize to prevent infinite re-renders
   const authData = useMemo(() => detectBlockchainOperations(nodes), [nodes]);
@@ -478,7 +482,7 @@ export function EnhancedBlockchainAuthorizationModal({
         // Store PROPER delegation hierarchy data
         delegationSignature: JSON.stringify({
           useAA: true,
-          provider: "zerodev",
+          provider: "pimlico",
 
           // Delegation Chain: EOA → Smart Wallet → Session Key
           owner: delegation.ownerAddress, // EOA that signed the delegation
@@ -687,14 +691,17 @@ export function EnhancedBlockchainAuthorizationModal({
                     sending a small transaction (0.001 SEI) from your wallet to
                     trigger deployment, then refresh this page.
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      className="ml-2"
+                      variant='ghost'
+                      size='sm'
+                      className='ml-2'
                       onClick={() => {
-                        navigator.clipboard.writeText(walletStatus.address || "");
+                        navigator.clipboard.writeText(
+                          walletStatus.address || ""
+                        );
                         toast({
                           title: "Address Copied!",
-                          description: "Smart wallet address copied to clipboard",
+                          description:
+                            "Smart wallet address copied to clipboard",
                         });
                       }}>
                       📋 Copy Address

@@ -27,7 +27,7 @@ import { SeiDcaTradingBlock } from './trading/SeiDcaTradingBlock';
 import { CheckBalanceBlock } from './blockchain/CheckBalanceBlock';
 import { SwapTokensBlock } from './blockchain/SwapTokensBlock';
 import { CreateWalletBlock } from './blockchain/CreateWalletBlock';
-import { ZeroDevService } from '../../../services/zerodev.service';
+import { PimlicoService } from '../../../services/pimlico.service';
 
 // Import legacy blocks
 import { EmailBlockHandler } from '../EmailBlockHandler';
@@ -63,9 +63,9 @@ export class EnhancedBlockRegistry {
     this.registerEnhancedBlock(new MagicWalletBlockHandler());
 
     // Register blockchain blocks
-    const zeroDevService = new ZeroDevService(this.configService);
+    const pimlicoService = new PimlicoService();
     this.registerEnhancedBlock(
-      new SendTransactionBlock(this.configService, zeroDevService, this.databaseService),
+      new SendTransactionBlock(this.configService, pimlicoService, this.databaseService),
     );
     this.registerEnhancedBlock(new SeiDcaTradingBlock(this.configService));
     this.registerEnhancedBlock(new CheckBalanceBlock());

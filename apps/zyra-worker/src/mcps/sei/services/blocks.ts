@@ -20,7 +20,7 @@ export async function getBlockByNumber(
   network = DEFAULT_NETWORK,
 ): Promise<Block> {
   const client = getPublicClient(network);
-  return await client.getBlock({ blockNumber: BigInt(blockNumber) });
+  return (await client.getBlock({ blockNumber: BigInt(blockNumber) })) as any;
 }
 
 /**
@@ -31,7 +31,7 @@ export async function getBlockByHash(
   network = DEFAULT_NETWORK,
 ): Promise<Block> {
   const client = getPublicClient(network);
-  return await client.getBlock({ blockHash });
+  return (await client.getBlock({ blockHash })) as any;
 }
 
 /**
@@ -41,5 +41,5 @@ export async function getLatestBlock(
   network = DEFAULT_NETWORK,
 ): Promise<Block> {
   const client = getPublicClient(network);
-  return await client.getBlock();
+  return (await client.getBlock()) as any;
 }

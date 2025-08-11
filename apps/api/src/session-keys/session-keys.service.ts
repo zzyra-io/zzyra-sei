@@ -575,4 +575,30 @@ export class SessionKeysService {
         })) || [],
     };
   }
+
+  /**
+   * Decrypt session key private key for worker access
+   * Direct decryption without database lookup
+   */
+  async decryptSessionKeyForWorker(
+    encryptedPrivateKey: string,
+    userSignature: string
+  ): Promise<string> {
+    try {
+      this.logger.log("Decrypting session key for worker access");
+
+      const privateKey = await this.cryptoService.decryptSessionKey(
+        encryptedPrivateKey,
+        userSignature
+      );
+
+      this.logger.log("Session key decrypted successfully for worker");
+      return privateKey;
+    } catch (error) {
+      this.logger.error("Failed to decrypt session key for worker", error);
+      throw new Error(
+        `Session key decryption failed: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  }
 }

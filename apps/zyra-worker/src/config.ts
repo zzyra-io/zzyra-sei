@@ -46,31 +46,46 @@ export const WORKFLOW_SETTINGS = {
   maxRetries: Number(process.env.MAX_NODE_RETRIES || 3),
 };
 
-// Account Abstraction settings
+// Account Abstraction settings using Pimlico
 export const AA_CONFIG = {
-  // ZeroDev bundler and paymaster URLs for V1 dashboard (v2 API for SEI)
-  bundlerUrl:
-    process.env.AA_BUNDLER_URL ||
-    'https://rpc.zerodev.app/api/v2/bundler/8e6f4057-e935-485f-9b6d-f14696e92654',
-  paymasterUrl:
-    process.env.AA_PAYMASTER_URL ||
-    'https://rpc.zerodev.app/api/v2/paymaster/8e6f4057-e935-485f-9b6d-f14696e92654?selfFunded=true',
+  // Pimlico API configuration for SEI testnet
+  pimlicoApiKey: process.env.PIMLICO_API_KEY || 'pim_M6HVTohns99VGporUxitbs',
+  bundlerUrl: (chainId: number = 1328) =>
+    `https://api.pimlico.io/v2/${chainId}/rpc?apikey=${process.env.PIMLICO_API_KEY || 'pim_M6HVTohns99VGporUxitbs'}`,
+
+  // EntryPoint v0.6 for better compatibility
   entryPointAddress:
-    process.env.AA_ENTRY_POINT || '0x0000000071727De22E5E9d8BAf0edAc6f37da032', // EntryPoint v0.7
+    process.env.AA_ENTRY_POINT || '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789', // EntryPoint v0.6
+
   enabled: process.env.ENABLE_AA !== 'false', // Default enabled
 
-  // ZeroDev project configuration
-  projectId:
-    process.env.ZERODEV_PROJECT_ID || '8e6f4057-e935-485f-9b6d-f14696e92654',
+  // Simple Account Factory for Pimlico (standard address)
+  simpleAccountFactory:
+    process.env.SIMPLE_ACCOUNT_FACTORY ||
+    '0x9406Cc6185a346906296840746125a0E44976454',
 
-  // ZeroDev paymaster addresses for SEI network
-  verifyingPaymaster:
-    process.env.ZERODEV_VERIFYING_PAYMASTER ||
-    '0x6dcaa49D90033806799eDC614e61A9DFF4b39182',
-  erc20Paymaster:
-    process.env.ZERODEV_ERC20_PAYMASTER ||
-    '0x413eA2Bc98f3eff71091120e9386ed88D31F950A',
+  // Chain configurations
+  supportedChains: {
+    seiTestnet: {
+      id: 1328,
+      name: 'SEI Testnet',
+      rpcUrl: 'https://evm-rpc.sei-apis.com',
+      explorerUrl: 'https://seitrace.com',
+    },
+    sepolia: {
+      id: 11155111,
+      name: 'Sepolia',
+      rpcUrl: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY || ''}`,
+      explorerUrl: 'https://sepolia.etherscan.io',
+    },
+  },
 
-  // Disable simulation mode for production with real ZeroDev
+  // Gas sponsorship settings
+  gasSponsorship: {
+    enabled: process.env.PIMLICO_GAS_SPONSORSHIP !== 'false',
+    fallbackToUserPaid: process.env.PIMLICO_FALLBACK_USER_PAID === 'true',
+  },
+
+  // Development settings
   simulationMode: process.env.AA_SIMULATION_MODE === 'true', // Default to real execution
 };

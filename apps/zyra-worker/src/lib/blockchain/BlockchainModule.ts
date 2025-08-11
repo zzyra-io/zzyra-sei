@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { CircuitBreaker, DEFAULT_CIRCUIT_CONFIG } from './CircuitBreaker';
 import { CircuitBreakerDbService } from './CircuitBreakerDbService';
 import { CIRCUIT_BREAKER } from '../../config';
+import { PimlicoModule } from '../../services/pimlico.module';
 
 /**
  * Module that registers blockchain-related services
  * This allows proper DI for circuit breaker and related services
  */
 @Module({
+  imports: [PimlicoModule],
   providers: [
     {
       provide: CircuitBreaker,
@@ -23,6 +25,6 @@ import { CIRCUIT_BREAKER } from '../../config';
     },
     CircuitBreakerDbService,
   ],
-  exports: [CircuitBreaker, CircuitBreakerDbService],
+  exports: [CircuitBreaker, CircuitBreakerDbService, PimlicoModule],
 })
 export class BlockchainModule {}

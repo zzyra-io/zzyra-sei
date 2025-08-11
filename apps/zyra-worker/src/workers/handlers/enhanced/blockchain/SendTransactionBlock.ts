@@ -20,7 +20,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { ConfigService } from '@nestjs/config';
-import { ZeroDevService } from '../../../../services/zerodev.service';
+import { PimlicoService } from '../../../../services/pimlico.service';
 import { DatabaseService } from '../../../../services/database.service';
 
 /**
@@ -72,6 +72,7 @@ interface WalletConnection {
 interface SessionKeyWallet {
   address: string;
   privateKey: string;
+  ownerPrivateKey?: string; // EOA private key for smart wallet ownership
   chainId: string;
   sessionKeyId: string;
   permissions: any[];
@@ -98,7 +99,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly zeroDevService: ZeroDevService,
+    private readonly pimlicoService: PimlicoService,
     private readonly databaseService: DatabaseService,
   ) {}
 
@@ -388,51 +389,54 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     // The backend cannot access EOA private keys (which is correct for security)
     context.logger.error(
       `Smart wallet ${smartWalletAddress} is not deployed. ` +
-      `This workflow cannot proceed until the smart wallet is deployed.`
+        `This workflow cannot proceed until the smart wallet is deployed.`,
     );
-    
+
     // Check if this is a recent session key (user might still be in deployment process)
     let guidanceMessage = `Please use the Zyra frontend to create a new blockchain authorization with your current smart wallet. This will ensure the session key matches your deployed smart wallet address.`;
-    
-    try {
-      const sessionKeys = await this.databaseService.prisma.sessionKey.findMany({
-        where: {
-          userId: context.userId,
-          status: 'active',
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        take: 1,
-      });
 
-      const recentSessionKey = sessionKeys.find(sk => 
-        new Date().getTime() - new Date(sk.createdAt).getTime() < 5 * 60 * 1000 // Created within 5 minutes
+    try {
+      const sessionKeys = await this.databaseService.prisma.sessionKey.findMany(
+        {
+          where: {
+            userId: context.userId,
+            status: 'active',
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
+        },
       );
-      
+
+      const recentSessionKey = sessionKeys.find(
+        (sk) =>
+          new Date().getTime() - new Date(sk.createdAt).getTime() <
+          5 * 60 * 1000, // Created within 5 minutes
+      );
+
       const isRecentDelegation = !!recentSessionKey;
-      guidanceMessage = isRecentDelegation 
+      guidanceMessage = isRecentDelegation
         ? `It looks like you just created this delegation. The smart wallet deployment might still be in progress. Please wait 1-2 minutes and try running the workflow again.`
         : `Please use the Zyra frontend to create a new blockchain authorization with your current smart wallet (${smartWalletAddress}). This will ensure the session key matches your deployed smart wallet address.`;
-        
+
       context.logger.log('Smart wallet deployment guidance:', {
         hasRecentSession: isRecentDelegation,
         recentSessionKeyId: recentSessionKey?.id,
         smartWalletAddress,
         eoaAddress,
       });
-      
     } catch (dbError) {
       context.logger.error('Failed to check recent session keys:', dbError);
       // Keep the default guidance message
     }
-    
+
     throw new Error(
       `⚠️ Smart Wallet Not Deployed\n\n` +
-      `Smart wallet: ${smartWalletAddress}\n` +
-      `Owner EOA: ${eoaAddress}\n\n` +
-      `${guidanceMessage}\n\n` +
-      `This is a one-time setup step for Account Abstraction workflows.`
+        `Smart wallet: ${smartWalletAddress}\n` +
+        `Owner EOA: ${eoaAddress}\n\n` +
+        `${guidanceMessage}\n\n` +
+        `This is a one-time setup step for Account Abstraction workflows.`,
     );
   }
 
@@ -485,7 +489,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
     context.logger.info('Executing blockchain transaction', params);
 
-    // If we have a sessionKeyId, we should use AA execution with ZeroDev
+    // If we have a sessionKeyId, we should use AA execution with Pimlico
     if (authMethod.sessionKeyId || (authMethod.useAA && authMethod.aaData)) {
       // Execute via Account Abstraction
       context.logger.info('Using Account Abstraction execution path', {
@@ -493,7 +497,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         hasAAData: !!authMethod.aaData,
       });
 
-      // If we have sessionKeyId but no aaData, create minimal aaData for ZeroDev
+      // If we have sessionKeyId but no aaData, create minimal aaData for Pimlico
       if (authMethod.sessionKeyId && !authMethod.aaData) {
         const sessionWallet = await this.getSessionKeyWallet(
           context,
@@ -503,7 +507,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
           smartWalletAddress: sessionWallet.address,
           ownerAddress: sessionWallet.address, // For session keys, owner is the session key itself
           sessionKeyId: authMethod.sessionKeyId,
-          // Note: kernelClient will be created on-demand using ZeroDev service
+          // Note: smartAccountClient will be created on-demand using Pimlico service
         };
       }
 
@@ -584,7 +588,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
             operations: parsedData.operations,
             maxAmountPerTx: parsedData.maxAmountPerTx,
             maxDailyAmount: parsedData.maxDailyAmount,
-            // Note: kernelClient will be created on-demand using ZeroDev service
+            // Note: smartAccountClient will be created on-demand using Pimlico service
           },
         };
       }
@@ -771,13 +775,12 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
               });
 
               try {
-                // Create kernel client in delegated mode
-                kernelClient = await this.zeroDevService.createKernelAccount(
-                  formattedPk,
-                  chainIdNumber,
-                  'delegated',
-                  aaData.smartWalletAddress, // Smart wallet that owns the session key
-                );
+                // Create smart account in delegated mode
+                kernelClient = await this.pimlicoService.createSmartAccount({
+                  ownerEOA: aaData.ownerAddress,
+                  chainId: chainIdNumber,
+                  delegationMode: 'delegated',
+                });
               } catch (error) {
                 const errorMessage =
                   error instanceof Error ? error.message : String(error);
@@ -811,13 +814,13 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
                     );
 
                     // Retry the session key transaction now that the smart wallet is deployed
-                    kernelClient =
-                      await this.zeroDevService.createKernelAccount(
-                        formattedPk,
-                        chainIdNumber,
-                        'delegated',
-                        aaData.smartWalletAddress,
-                      );
+                    kernelClient = await this.pimlicoService.createSmartAccount(
+                      {
+                        ownerEOA: aaData.ownerAddress,
+                        chainId: chainIdNumber,
+                        delegationMode: 'delegated',
+                      },
+                    );
                   } catch (deployError) {
                     context.logger.error(
                       `Failed to deploy smart wallet: ${deployError}`,
@@ -845,12 +848,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
                 hybridSessionWallet.privateKey,
               );
 
-              kernelClient = await this.zeroDevService.createKernelAccount(
-                hybridFormattedPk,
-                chainIdNumber,
-                'hybrid',
-                aaData.smartWalletAddress,
-              );
+              kernelClient = await this.pimlicoService.createSmartAccount({
+                ownerEOA: aaData.ownerAddress,
+                chainId: chainIdNumber,
+                delegationMode: 'hybrid',
+              });
               break;
 
             default:
@@ -859,11 +861,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
           aaData.kernelClient = kernelClient;
 
-          context.logger.info('Kernel client created successfully', {
+          context.logger.info('Smart account client created successfully', {
             delegationMode,
             smartWallet: aaData.smartWalletAddress,
             sessionKeyId: aaData.sessionKeyId,
-            kernelClientAddress: kernelClient.account?.address,
+            smartAccountAddress: kernelClient.smartAccountAddress,
           });
         } catch (error) {
           const errorMessage =
@@ -879,13 +881,65 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
       let result: TransactionResult;
 
-      // Execute the transaction using ZeroDev service
-      context.logger.info('Executing transaction with kernel client', {
+      // Get session key for transaction execution
+      let sessionKeyData: any = null;
+      if (context.blockchainAuthorization?.sessionKeyId) {
+        try {
+          sessionKeyData =
+            await this.databaseService.prisma.sessionKey.findUnique({
+              where: { id: context.blockchainAuthorization.sessionKeyId },
+            });
+          if (!sessionKeyData) {
+            throw new Error(
+              `Session key not found: ${context.blockchainAuthorization.sessionKeyId}`,
+            );
+          }
+        } catch (error) {
+          context.logger.error('Failed to retrieve session key', {
+            sessionKeyId: context.blockchainAuthorization.sessionKeyId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+          throw error;
+        }
+      }
+
+      // Execute the transaction using Pimlico service
+      context.logger.info('Executing transaction with Pimlico', {
         delegationMode,
         operation,
         amount,
         recipient: recipientAddress,
+        hasSessionKey: !!sessionKeyData,
       });
+
+      // Parse delegation data for session key execution
+      let delegationData = null;
+      let userSignature = '';
+
+      try {
+        if (aaData.signature) {
+          delegationData = JSON.parse(aaData.signature);
+          // Extract the original user signature used for session key encryption
+          userSignature =
+            delegationData.signature ||
+            context.blockchainAuthorization?.delegationSignature ||
+            '';
+        } else {
+          userSignature =
+            context.blockchainAuthorization?.delegationSignature || '';
+        }
+
+        if (!userSignature) {
+          throw new Error(
+            'User signature not available for session key decryption',
+          );
+        }
+      } catch (error) {
+        context.logger.error('Failed to parse delegation data', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw new Error('Invalid delegation format for session key execution');
+      }
 
       if (params.tokenAddress) {
         // ERC20 transfer using contract interaction
@@ -895,21 +949,79 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
           params.tokenAddress,
         );
 
-        result = await this.zeroDevService.executeContractInteraction(
-          aaData.kernelClient,
-          params.tokenAddress,
-          erc20Data,
-          BigInt(0),
-          chainIdNumber,
+        // Decrypt session key using the user's original signature
+        const decryptedSessionKey = await this.decryptSessionKey(
+          sessionKeyData.encryptedPrivateKey,
+          userSignature,
         );
+
+        const pimlicoResult = await this.pimlicoService.executeWithSessionKey(
+          {
+            sessionPrivateKey: decryptedSessionKey,
+            ownerEOA: delegationData?.owner || aaData.ownerAddress, // EOA address for smart wallet ownership verification
+            smartWalletAddress: aaData.smartWalletAddress,
+            chainId: chainIdNumber,
+            permissions: {
+              operations: ['erc20_transfer'],
+              maxAmountPerTx: aaData.maxAmountPerTx || '1000',
+              maxDailyAmount: aaData.maxDailyAmount || '10000',
+              validUntil: new Date(
+                aaData.expiresAt || Date.now() + 24 * 60 * 60 * 1000,
+              ),
+            },
+            delegationData: delegationData, // Pass delegation data for signature verification
+          },
+          {
+            to: params.tokenAddress,
+            value: '0',
+            data: erc20Data,
+            chainId: chainIdNumber,
+          },
+        );
+
+        // Convert Pimlico result to TransactionResult format
+        result = {
+          transactionHash: pimlicoResult.hash,
+          status: pimlicoResult.success ? 'success' : 'failed',
+          gasUsed: pimlicoResult.gasUsed ? Number(pimlicoResult.gasUsed) : 0,
+        };
       } else {
         // Native token transfer
-        result = await this.zeroDevService.executeSimpleTransaction(
-          aaData.kernelClient,
-          recipientAddress,
-          amount,
-          chainIdNumber,
+        // Decrypt session key using the user's original signature (reuse if already decrypted above)
+        const decryptedSessionKey = await this.decryptSessionKey(
+          sessionKeyData.encryptedPrivateKey,
+          userSignature,
         );
+
+        const pimlicoResult = await this.pimlicoService.executeWithSessionKey(
+          {
+            sessionPrivateKey: decryptedSessionKey,
+            ownerEOA: delegationData?.owner || aaData.ownerAddress, // EOA address for smart wallet ownership verification
+            smartWalletAddress: aaData.smartWalletAddress,
+            chainId: chainIdNumber,
+            permissions: {
+              operations: ['eth_transfer'],
+              maxAmountPerTx: aaData.maxAmountPerTx || '1000',
+              maxDailyAmount: aaData.maxDailyAmount || '10000',
+              validUntil: new Date(
+                aaData.expiresAt || Date.now() + 24 * 60 * 60 * 1000,
+              ),
+            },
+            delegationData: delegationData, // Pass delegation data for signature verification
+          },
+          {
+            to: recipientAddress,
+            value: amount.toString(),
+            chainId: chainIdNumber,
+          },
+        );
+
+        // Convert Pimlico result to TransactionResult format
+        result = {
+          transactionHash: pimlicoResult.hash,
+          status: pimlicoResult.success ? 'success' : 'failed',
+          gasUsed: pimlicoResult.gasUsed ? Number(pimlicoResult.gasUsed) : 0,
+        };
       }
 
       context.logger.info(
@@ -959,7 +1071,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
     try {
       context.logger.info(
-        'Executing automated AA transaction using ZeroDev service',
+        'Executing automated AA transaction using Pimlico service',
         {
           chainId,
           smartWalletAddress: aaData.smartWalletAddress,
@@ -1003,11 +1115,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         maxAllowed: aaData.maxAmountPerTx,
       });
 
-      // Use ZeroDev service for the actual transaction
+      // Use Pimlico service for the actual transaction
       const chainIdNumber = this.getChainIdNumber(chainId);
 
-      // Execute AA transaction using ZeroDev service
-      context.logger.info('Executing AA transaction with ZeroDev service', {
+      // Execute AA transaction using Pimlico service
+      context.logger.info('Executing AA transaction with Pimlico service', {
         smartWallet: aaData.smartWalletAddress,
         owner: aaData.ownerAddress,
         operation,
@@ -1030,11 +1142,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
           const formattedPk = this.formatPrivateKey(sessionWallet.privateKey);
 
-          // createKernelAccount now returns the kernel client directly
-          aaData.kernelClient = await this.zeroDevService.createKernelAccount(
-            formattedPk,
-            chainIdNumber,
-          );
+          // createSmartAccount now returns the smart account info
+          aaData.kernelClient = await this.pimlicoService.createSmartAccount({
+            ownerEOA: aaData.ownerAddress,
+            chainId: chainIdNumber,
+          });
 
           context.logger.info('Kernel client created successfully', {
             smartWallet: aaData.smartWalletAddress,
@@ -1053,6 +1165,32 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
       let result: TransactionResult;
 
+      // Get session key for this AA transaction execution
+      const sessionWallet = await this.getSessionKeyWallet(context, chainId);
+
+      // Parse delegation data for proper session key execution
+      let sessionDelegationData = null;
+      let delegationUserSignature = '';
+
+      try {
+        if (aaData.signature) {
+          sessionDelegationData = JSON.parse(aaData.signature);
+          delegationUserSignature =
+            sessionDelegationData.signature ||
+            context.blockchainAuthorization?.delegationSignature ||
+            '';
+        } else {
+          delegationUserSignature =
+            context.blockchainAuthorization?.delegationSignature || '';
+        }
+      } catch (error) {
+        context.logger.warn('Failed to parse delegation signature', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        delegationUserSignature =
+          context.blockchainAuthorization?.delegationSignature || '';
+      }
+
       if (params.tokenAddress) {
         // ERC20 transfer using contract interaction
         const erc20Data = this.encodeERC20Transfer(
@@ -1061,21 +1199,67 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
           params.tokenAddress,
         );
 
-        result = await this.zeroDevService.executeContractInteraction(
-          aaData.kernelClient,
-          params.tokenAddress,
-          erc20Data,
-          BigInt(0),
-          chainIdNumber,
+        const pimlicoResult = await this.pimlicoService.executeWithSessionKey(
+          {
+            sessionPrivateKey: sessionWallet.privateKey,
+            ownerEOA: sessionDelegationData?.owner || aaData.ownerAddress, // EOA address for smart wallet ownership verification
+            smartWalletAddress: aaData.smartWalletAddress,
+            chainId: chainIdNumber,
+            permissions: {
+              operations: ['erc20_transfer'],
+              maxAmountPerTx: aaData.maxAmountPerTx || '1000',
+              maxDailyAmount: aaData.maxDailyAmount || '10000',
+              validUntil: new Date(
+                aaData.expiresAt || Date.now() + 24 * 60 * 60 * 1000,
+              ),
+            },
+            delegationData: sessionDelegationData,
+          },
+          {
+            to: params.tokenAddress,
+            value: '0',
+            data: erc20Data,
+            chainId: chainIdNumber,
+          },
         );
+
+        // Convert Pimlico result to TransactionResult format
+        result = {
+          transactionHash: pimlicoResult.hash,
+          status: pimlicoResult.success ? 'success' : 'failed',
+          gasUsed: pimlicoResult.gasUsed ? Number(pimlicoResult.gasUsed) : 0,
+        };
       } else {
         // Native token transfer
-        result = await this.zeroDevService.executeSimpleTransaction(
-          aaData.kernelClient,
-          recipientAddress,
-          amount,
-          chainIdNumber,
+        const pimlicoResult = await this.pimlicoService.executeWithSessionKey(
+          {
+            sessionPrivateKey: sessionWallet.privateKey,
+            ownerEOA: sessionDelegationData?.owner || aaData.ownerAddress, // EOA address for smart wallet ownership verification
+            smartWalletAddress: aaData.smartWalletAddress,
+            chainId: chainIdNumber,
+            permissions: {
+              operations: ['eth_transfer'],
+              maxAmountPerTx: aaData.maxAmountPerTx || '1000',
+              maxDailyAmount: aaData.maxDailyAmount || '10000',
+              validUntil: new Date(
+                aaData.expiresAt || Date.now() + 24 * 60 * 60 * 1000,
+              ),
+            },
+            delegationData: sessionDelegationData,
+          },
+          {
+            to: recipientAddress,
+            value: amount.toString(),
+            chainId: chainIdNumber,
+          },
         );
+
+        // Convert Pimlico result to TransactionResult format
+        result = {
+          transactionHash: pimlicoResult.hash,
+          status: pimlicoResult.success ? 'success' : 'failed',
+          gasUsed: pimlicoResult.gasUsed ? Number(pimlicoResult.gasUsed) : 0,
+        };
       }
 
       context.logger.info('AA transaction executed successfully', {
@@ -1193,7 +1377,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         'Smart wallet not deployed, including factory initCode',
       );
 
-      // ZeroDev factory address and createAccount calldata
+      // Pimlico factory address and createAccount calldata
       const factoryAddress = '0x5de4839a76cf55d0c90e2061ef4386d962E15ae3';
       const { encodeFunctionData } = require('viem');
 
@@ -1407,7 +1591,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
    * Get paymaster data for gas sponsorship
    */
   private getPaymasterData(paymasterUrl: string): string {
-    // For ZeroDev, the paymaster data is typically the paymaster address + additional data
+    // For Pimlico, the paymaster data is handled automatically by the middleware
     // This is a simplified version - in production you'd get this from the paymaster service
     return paymasterUrl + '0'.repeat(64);
   }
@@ -1967,7 +2151,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   }
 
   /**
-   * Get chain ID as number for ZeroDev service
+   * Get chain ID as number for Pimlico service
    */
   private getChainIdNumber(chainId: string): number {
     const chainIds = {

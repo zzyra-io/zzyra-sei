@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useEffect } from "react";
 import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
-import { isZeroDevConnector } from "@dynamic-labs/ethereum-aa";
+import { isPimlicoConnector } from "@dynamic-labs/ethereum-aa";
 import { useToast } from "@/components/ui/use-toast";
 import { parseEther } from "viem";
 
@@ -217,23 +217,48 @@ export function useAccountAbstraction() {
             description: `Step 2/3: Transaction submitted (${userOpHash.substring(0, 10)}...)`,
           });
 
-          // Wait for deployment to be processed
-          console.log("Waiting for smart wallet deployment confirmation...");
-          await new Promise((resolve) => setTimeout(resolve, 8000));
+          // Wait for the user operation to be mined first
+          console.log("Waiting for user operation to be mined...");
+          try {
+            const receipt = await kernelClient.waitForUserOperationReceipt({
+              hash: userOpHash,
+              timeout: 60000, // 60 second timeout
+            });
+            console.log("User operation mined:", receipt);
 
-          // Verify deployment with multiple attempts
-          const provider = "https://evm-rpc.sei-apis.com";
+            // Additional wait to ensure deployment is propagated
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+          } catch (receiptError) {
+            console.warn("Failed to get user operation receipt:", receiptError);
+            // Continue with deployment verification even if receipt fails
+            await new Promise((resolve) => setTimeout(resolve, 8000));
+          }
+
+          // Improved deployment verification with exponential backoff and multiple providers
+          const providers = [
+            "https://evm-rpc.sei-apis.com",
+            "https://rpc-sei.ecoswap.io",
+          ];
           let deploymentConfirmed = false;
           let attempts = 0;
-          const maxAttempts = 6;
+          const maxAttempts = 6; // Optimized attempts
+          let currentProviderIndex = 0;
 
           while (!deploymentConfirmed && attempts < maxAttempts) {
             attempts++;
+            const provider = providers[currentProviderIndex];
+
             console.log(
-              `Verifying deployment (attempt ${attempts}/${maxAttempts})...`
+              `Verifying deployment (attempt ${attempts}/${maxAttempts}) via ${provider}...`
             );
 
             try {
+              // Use exponential backoff for better network handling
+              const timeout = Math.min(5000 + attempts * 1000, 15000); // Max 15s timeout
+
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), timeout);
+
               const response = await fetch(provider, {
                 method: "POST",
                 headers: {
@@ -245,9 +270,23 @@ export function useAccountAbstraction() {
                   params: [smartWalletAddress, "latest"],
                   id: 1,
                 }),
+                signal: controller.signal,
               });
 
+              clearTimeout(timeoutId);
+
+              if (!response.ok) {
+                throw new Error(
+                  `HTTP ${response.status}: ${response.statusText}`
+                );
+              }
+
               const result = await response.json();
+
+              if (result.error) {
+                throw new Error(`RPC Error: ${result.error.message}`);
+              }
+
               const code = result.result;
 
               if (code && code !== "0x" && code !== "0x0") {
@@ -273,30 +312,94 @@ export function useAccountAbstraction() {
                     description: `Checking deployment status (${attempts}/${maxAttempts})...`,
                   });
                 }
-
-                if (attempts < maxAttempts) {
-                  await new Promise((resolve) => setTimeout(resolve, 3000));
-                }
               }
             } catch (verifyError) {
               console.warn(
-                `Verification attempt ${attempts} failed:`,
+                `Verification attempt ${attempts} failed with provider ${provider}:`,
                 verifyError
               );
-              if (attempts < maxAttempts) {
-                await new Promise((resolve) => setTimeout(resolve, 3000));
+
+              // Switch to next provider if current fails
+              if (
+                verifyError instanceof Error &&
+                verifyError.name === "AbortError"
+              ) {
+                console.log("Request timed out, switching provider");
+                currentProviderIndex =
+                  (currentProviderIndex + 1) % providers.length;
               }
+            }
+
+            // Wait between attempts with exponential backoff
+            if (attempts < maxAttempts) {
+              const delay = Math.min(2000 * Math.pow(1.5, attempts - 1), 8000); // Max 8s delay
+              await new Promise((resolve) => setTimeout(resolve, delay));
             }
           }
 
           if (!deploymentConfirmed) {
-            // Provide more specific timeout error
-            throw new Error(
-              `Smart wallet deployment timed out after ${maxAttempts} attempts. ` +
-                `The deployment transaction may still be processing. ` +
-                `Please wait 1-2 minutes and try creating the delegation again, ` +
-                `or send a small transaction manually to trigger deployment.`
-            );
+            // Final verification attempt using different RPC endpoint as fallback
+            console.log("Final verification attempt using fallback RPC...");
+            try {
+              const fallbackProvider = "https://rpc-sei.ecoswap.io";
+              const fallbackResponse = await fetch(fallbackProvider, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  jsonrpc: "2.0",
+                  method: "eth_getCode",
+                  params: [smartWalletAddress, "latest"],
+                  id: 1,
+                }),
+              });
+
+              const fallbackResult = await fallbackResponse.json();
+              const fallbackCode = fallbackResult.result;
+
+              if (
+                fallbackCode &&
+                fallbackCode !== "0x" &&
+                fallbackCode !== "0x0"
+              ) {
+                deploymentConfirmed = true;
+                console.log(
+                  "✅ Smart wallet deployment confirmed via fallback RPC!"
+                );
+
+                toast({
+                  title: "🎉 Deployment Confirmed!",
+                  description:
+                    "Step 3/3: Smart wallet is now live on SEI testnet",
+                });
+              }
+            } catch (fallbackError) {
+              console.warn("Fallback verification failed:", fallbackError);
+            }
+          }
+
+          if (!deploymentConfirmed) {
+            // Enhanced error with specific guidance
+            const errorMessage =
+              `Smart wallet deployment verification timed out after ${maxAttempts} attempts. ` +
+              `Transaction hash: ${userOpHash}. ` +
+              `The deployment transaction was submitted but confirmation is taking longer than expected. ` +
+              `This may be due to network congestion on SEI testnet. ` +
+              `Please wait 2-3 minutes and try creating the delegation again, ` +
+              `or check the transaction status in the SEI explorer.`;
+
+            console.error(errorMessage);
+
+            // Show user-friendly error but don't throw immediately
+            toast({
+              title: "⚠️ Deployment Verification Timeout",
+              description:
+                "Deployment may still be processing. Please wait and try again.",
+              variant: "destructive",
+            });
+
+            throw new Error(errorMessage);
           }
 
           console.log(
@@ -366,22 +469,22 @@ export function useAccountAbstraction() {
       primaryWallet.connector.name?.includes("SMS");
 
     // Check both connector type and on-chain deployment status
-    const isZeroDevConnectorType = isZeroDevConnector(primaryWallet.connector);
+    const isPimlicoConnectorType = isPimlicoConnector(primaryWallet.connector);
 
     // For embedded wallets, we should have a smart wallet address
     const hasSmartWalletAddress = !!primaryWallet.address;
 
     // Consider it a smart wallet if either:
-    // 1. It's a ZeroDev connector type, OR
+    // 1. It's a Pimlico connector type, OR
     // 2. It's an embedded wallet with an address (which should be a smart wallet)
     const hasSmartWallet =
-      isZeroDevConnectorType || (isEmbedded && hasSmartWalletAddress);
+      isPimlicoConnectorType || (isEmbedded && hasSmartWalletAddress);
 
     // Debug logging to understand wallet detection
     console.log("Wallet Status Debug:", {
       connectorName: primaryWallet.connector.name,
       isEmbedded,
-      isZeroDevConnectorType,
+      isPimlicoConnectorType,
       hasSmartWalletAddress,
       address: primaryWallet.address,
       finalHasSmartWallet: hasSmartWallet,
@@ -418,15 +521,15 @@ export function useAccountAbstraction() {
         return;
       }
 
-      // Check if this is a ZeroDev connector
-      const isZeroDev = isZeroDevConnector(primaryWallet.connector);
+      // Check if this is a Pimlico connector
+      const isPimlico = isPimlicoConnector(primaryWallet.connector);
       const isEmbedded =
         primaryWallet.connector.name?.includes("embedded") ||
         primaryWallet.connector.name?.includes("Email") ||
         primaryWallet.connector.name?.includes("SMS");
 
       console.log("Kernel client initialization check:", {
-        isZeroDev,
+        isPimlico,
         isEmbedded,
         connectorName: primaryWallet.connector.name,
         hasGetAccountAbstractionProvider:
@@ -434,19 +537,19 @@ export function useAccountAbstraction() {
             .getAccountAbstractionProvider === "function",
       });
 
-      // For embedded wallets, they should have smart wallet capabilities even if not detected as ZeroDev
-      if (!isZeroDev && !isEmbedded) {
+      // For embedded wallets, they should have smart wallet capabilities even if not detected as Pimlico
+      if (!isPimlico && !isEmbedded) {
         console.log(
-          "Primary wallet is not a ZeroDev smart wallet or embedded wallet"
+          "Primary wallet is not a Pimlico smart wallet or embedded wallet"
         );
         setKernelClient(null);
         return;
       }
 
-      // For embedded wallets that aren't detected as ZeroDev, skip kernel client setup but allow delegation
-      if (isEmbedded && !isZeroDev) {
+      // For embedded wallets that aren't detected as Pimlico, skip kernel client setup but allow delegation
+      if (isEmbedded && !isPimlico) {
         console.log(
-          "Embedded wallet detected but not ZeroDev connector - checking for AA provider"
+          "Embedded wallet detected but not Pimlico connector - checking for AA provider"
         );
         if (
           typeof (primaryWallet.connector as any)
@@ -505,7 +608,7 @@ export function useAccountAbstraction() {
         }
 
         // Debug: Log sponsorship configuration
-        console.log("ZeroDev Sponsorship Debug:", {
+        console.log("Pimlico Sponsorship Debug:", {
           withSponsorship: true,
           clientType: client?.constructor?.name,
           hasPaymaster: !!client?.paymaster,
@@ -562,7 +665,7 @@ export function useAccountAbstraction() {
   }, [primaryWallet, isClient]);
 
   /**
-   * Create a smart wallet delegation using Dynamic Labs + ZeroDev integration
+   * Create a smart wallet delegation using Dynamic Labs + Pimlico integration
    * This leverages Dynamic's built-in smart wallet management
    */
   const createSmartWalletDelegation = useCallback(
@@ -806,7 +909,7 @@ export function useAccountAbstraction() {
                 ? autoDeployError.message
                 : "Unknown deployment error";
 
-            // Check for specific ZeroDev sponsorship issues
+            // Check for specific Pimlico sponsorship issues
             const isSponsorshipError =
               deployErrorMessage.includes("selfFunded=true") ||
               deployErrorMessage.includes("paymaster") ||
@@ -826,12 +929,12 @@ export function useAccountAbstraction() {
 
             if (isSponsorshipError) {
               userGuidance =
-                "Gas sponsorship failed. This might be a ZeroDev configuration issue for SEI testnet.";
+                "Gas sponsorship failed. This might be a Pimlico configuration issue for SEI testnet.";
               technicalGuidance =
                 "Possible fixes: 1) Check Dynamic dashboard AA settings for SEI testnet, " +
-                "2) Verify ZeroDev project has SEI paymaster configured, " +
+                "2) Verify Pimlico project has SEI paymaster configured, " +
                 "3) Try manual deployment by sending 0.001 SEI to same address, " +
-                "4) Contact support if ZeroDev doesn't support SEI sponsorship yet.";
+                "4) Contact support if Pimlico doesn't support SEI sponsorship yet.";
             } else if (isTimeoutError) {
               userGuidance =
                 "The deployment transaction timed out. This is usually temporary - please try again.";
@@ -927,7 +1030,13 @@ export function useAccountAbstraction() {
         smartWalletAddress,
         ownerAddress: signerAddress,
         chainId: params.chainId,
-        // Backend will recreate kernel client using ZeroDev SDK
+        // Backend will recreate kernel client using Pimlico SDK
+      };
+
+      // Create the delegation object with proper signature
+      const delegationWithSignature = {
+        ...delegationMessage,
+        signature, // Add the actual signature for verification
       };
 
       const delegation: SmartWalletDelegation = {
@@ -942,7 +1051,7 @@ export function useAccountAbstraction() {
           validUntil,
         },
         kernelClientData, // Send serializable data instead of kernelClient object
-        delegationSignature: messageToSign, // Store the original message, not the signature
+        delegationSignature: JSON.stringify(delegationWithSignature), // Store complete delegation with signature
       };
 
       toast({
@@ -1014,7 +1123,7 @@ export function useAccountAbstraction() {
 
         console.log("Sending immediate user operation via kernel client");
 
-        // Send the user operation - ZeroDev handles bundling, gas estimation, etc.
+        // Send the user operation - Pimlico handles bundling, gas estimation, etc.
         const userOpHash = await kernelClient.sendUserOperation({
           callData,
         });
@@ -1068,7 +1177,7 @@ export function useAccountAbstraction() {
         // In the future, this could use actual simulation features
         return {
           success: true,
-          gasEstimate: "Sponsored", // Gas is sponsored via Dynamic/ZeroDev
+          gasEstimate: "Sponsored", // Gas is sponsored via Dynamic/Pimlico
         };
       } catch (error) {
         return {
@@ -1085,7 +1194,7 @@ export function useAccountAbstraction() {
    */
   const isSmartWallet = useCallback(() => {
     return !!(
-      primaryWallet?.connector && isZeroDevConnector(primaryWallet.connector)
+      primaryWallet?.connector && isPimlicoConnector(primaryWallet.connector)
     );
   }, [primaryWallet]);
 
@@ -1114,7 +1223,7 @@ export function useAccountAbstraction() {
         immediate: "Frontend kernel client executes transactions directly",
         automated:
           "Backend zyra-worker executes transactions using this delegation when workflows run",
-        gasSponsorship: "ZeroDev paymaster sponsors gas costs",
+        gasSponsorship: "Pimlico paymaster sponsors gas costs",
         security: "Spending limits and operation restrictions enforced",
       },
     };
@@ -1126,7 +1235,7 @@ export function useAccountAbstraction() {
   const getAddresses = useCallback(async () => {
     if (
       !primaryWallet?.connector ||
-      !isZeroDevConnector(primaryWallet.connector)
+      !isPimlicoConnector(primaryWallet.connector)
     ) {
       return null;
     }

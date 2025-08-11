@@ -492,7 +492,14 @@ function registerReadOnlyTools(server: McpServer) {
           params.data = data as `0x${string}`;
         }
 
-        const gas = await services.estimateGas(params, network);
+        const gas = await services.estimateGas(
+          {
+            ...params,
+            account:
+              '0x0000000000000000000000000000000000000000' as `0x${string}`,
+          },
+          network,
+        );
 
         return {
           content: [
