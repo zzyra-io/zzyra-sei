@@ -352,7 +352,9 @@ export class PimlicoService implements IAccountAbstractionService {
         success,
         status: success ? 'success' : 'failed',
         gasUsed,
-        blockNumber: receipt.receipt?.blockNumber ? Number(receipt.receipt.blockNumber) : undefined,
+        blockNumber: receipt.receipt?.blockNumber
+          ? Number(receipt.receipt.blockNumber)
+          : undefined,
         explorerUrl: this.getExplorerUrl(transaction.chainId, transactionHash),
       };
     } catch (error) {
@@ -641,7 +643,7 @@ export class PimlicoService implements IAccountAbstractionService {
         });
       }
 
-    userOp.signature = signature;
+      userOp.signature = signature;
 
       this.logger.debug('UserOperation signed successfully', {
         userOpHashPreview: userOpHash.slice(0, 10) + '...',
@@ -736,7 +738,7 @@ export class PimlicoService implements IAccountAbstractionService {
         if (result.result) {
           // Validate the receipt structure
           if (result.result.receipt || result.result.success !== undefined) {
-          return result.result;
+            return result.result;
           } else {
             this.logger.debug(
               'Invalid receipt structure received, retrying...',
@@ -1133,15 +1135,15 @@ export class PimlicoService implements IAccountAbstractionService {
           });
 
           response = await fetch(paymasterUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
               method: 'pm_sponsorUserOperation',
               params: parameterFormats[i],
-      }),
-    });
+            }),
+          });
 
           const testResult = await response.json();
 
@@ -1182,7 +1184,7 @@ export class PimlicoService implements IAccountAbstractionService {
         };
       }
 
-    const result = await response.json();
+      const result = await response.json();
 
       if (result.error) {
         this.logger.warn(`${description} failed`, {
@@ -1638,16 +1640,16 @@ export class PimlicoService implements IAccountAbstractionService {
     });
 
     try {
-    const response = await fetch(bundlerUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'eth_estimateUserOperationGas',
-        params: [userOp, ENTRYPOINT_ADDRESS_V07],
-      }),
-    });
+      const response = await fetch(bundlerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_estimateUserOperationGas',
+          params: [userOp, ENTRYPOINT_ADDRESS_V07],
+        }),
+      });
 
       if (!response.ok) {
         this.logger.warn(
@@ -1742,15 +1744,15 @@ export class PimlicoService implements IAccountAbstractionService {
           );
 
           response = await fetch(paymasterUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'pm_sponsorUserOperation',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'pm_sponsorUserOperation',
               params: parameterFormats[i],
-        }),
-      });
+            }),
+          });
 
           if (!response.ok) {
             this.logger.debug(`Format ${i + 1}: HTTP error ${response.status}`);
@@ -1836,11 +1838,11 @@ export class PimlicoService implements IAccountAbstractionService {
           'uint256',
           'bytes32',
         ],
-      [
-        userOp.sender as Address,
+        [
+          userOp.sender as Address,
           BigInt(userOp.nonce),
           keccak256(userOp.initCode as Hex),
-        keccak256(userOp.callData as Hex),
+          keccak256(userOp.callData as Hex),
           BigInt(userOp.callGasLimit),
           BigInt(userOp.verificationGasLimit),
           BigInt(userOp.preVerificationGas),
@@ -1992,8 +1994,6 @@ export class PimlicoService implements IAccountAbstractionService {
     });
   }
 
-
-
   /**
    * Execute ERC20 token transfer using AA
    */
@@ -2057,8 +2057,6 @@ export class PimlicoService implements IAccountAbstractionService {
       return '0';
     }
   }
-
-
 
   /**
    * Get the actual implementation address for proxy contracts
@@ -2590,7 +2588,9 @@ export class PimlicoService implements IAccountAbstractionService {
   /**
    * Estimate gas for a transaction (uses internal gas estimation)
    */
-  async estimateGas(transaction: BlockchainTransactionRequest): Promise<GasEstimate> {
+  async estimateGas(
+    transaction: BlockchainTransactionRequest,
+  ): Promise<GasEstimate> {
     try {
       // Create a dummy UserOperation for gas estimation
       const dummyUserOp = {
@@ -2694,7 +2694,9 @@ export class PimlicoService implements IAccountAbstractionService {
   /**
    * Validate a transaction before execution
    */
-  async validateTransaction(transaction: BlockchainTransactionRequest): Promise<{
+  async validateTransaction(
+    transaction: BlockchainTransactionRequest,
+  ): Promise<{
     valid: boolean;
     errors: string[];
   }> {
@@ -2786,7 +2788,7 @@ export class PimlicoService implements IAccountAbstractionService {
   private getExplorerUrl(chainId: number, transactionHash: string): string {
     const chain = this.supportedChains.find((c) => c.id === chainId);
     const baseUrl = chain?.blockExplorers?.default?.url;
-    
+
     if (!baseUrl) {
       return '';
     }
