@@ -28,6 +28,7 @@ import { CheckBalanceBlock } from './blockchain/CheckBalanceBlock';
 import { SwapTokensBlock } from './blockchain/SwapTokensBlock';
 import { CreateWalletBlock } from './blockchain/CreateWalletBlock';
 import { PimlicoService } from '../../../services/pimlico.service';
+import { EVMService } from '../../../services/blockchain/evm/EVMService';
 
 // Import legacy blocks
 import { EmailBlockHandler } from '../EmailBlockHandler';
@@ -64,10 +65,12 @@ export class EnhancedBlockRegistry {
 
     // Register blockchain blocks
     const pimlicoService = new PimlicoService();
+    const evmService = new EVMService();
     this.registerEnhancedBlock(
       new SendTransactionBlock(
         this.configService,
         pimlicoService,
+        evmService,
         this.databaseService,
       ),
     );

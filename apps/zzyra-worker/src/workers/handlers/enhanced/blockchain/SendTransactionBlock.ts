@@ -21,7 +21,12 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { ConfigService } from '@nestjs/config';
 import { PimlicoService } from '../../../../services/pimlico.service';
+import { EVMService } from '../../../../services/blockchain/evm/EVMService';
 import { DatabaseService } from '../../../../services/database.service';
+import {
+  TransactionRequest,
+  TransactionResult as BlockchainTransactionResult,
+} from '../../../../services/blockchain/types/blockchain.types';
 
 /**
  * SEI Network Configuration
@@ -103,6 +108,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   constructor(
     private readonly configService: ConfigService,
     private readonly pimlicoService: PimlicoService,
+    private readonly evmService: EVMService,
     private readonly databaseService: DatabaseService,
   ) {}
 
@@ -417,8 +423,8 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     let guidanceMessage = `Please use the Zyra frontend to create a new blockchain authorization with your current smart wallet. This will ensure the session key matches your deployed smart wallet address.`;
 
     try {
-      const sessionKeys = await this.databaseService.prisma.sessionKey.findMany(
-        {
+      const rawSessionKeys =
+        await this.databaseService.prisma.sessionKey.findMany({
           where: {
             userId: context.userId,
             status: 'active',
@@ -427,7 +433,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
             createdAt: 'desc',
           },
           take: 1,
-        },
+        });
+
+      // Convert BigInt fields to prevent serialization errors
+      const sessionKeys = rawSessionKeys.map((sk) =>
+        this.convertBigIntFields(sk),
       );
 
       const recentSessionKey = sessionKeys.find(
@@ -567,7 +577,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   }
 
   /**
-   * Execute transaction using session key (legacy path)
+   * Execute transaction using session key (legacy path) - now using EVMService
    */
   private async executeSessionKeyTransaction(params: {
     chainId: string;
@@ -577,17 +587,76 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     gasLimit: number;
     context: EnhancedBlockExecutionContext;
   }): Promise<TransactionResult> {
-    const { chainId } = params;
+    try {
+      // Get session key wallet for secure transaction signing
+      const sessionWallet = await this.getSessionKeyWallet(
+        params.context,
+        params.chainId,
+      );
 
-    // Route to appropriate blockchain handler
-    switch (chainId) {
-      case '1328':
-        return this.executeSeiTransaction(params);
-      case 'ethereum-sepolia':
-      case 'base-sepolia':
-        return this.executeEvmTransaction(params);
-      default:
-        throw new Error(`Unsupported chain: ${chainId}`);
+      // Convert chainId to number for service compatibility
+      const chainIdNumber = this.getChainIdNumber(params.chainId);
+
+      // Create transaction request
+      const transaction: TransactionRequest = {
+        to: params.recipientAddress,
+        value: params.amount,
+        data: params.tokenAddress
+          ? this.encodeERC20Transfer(
+              params.recipientAddress,
+              params.amount,
+              params.tokenAddress,
+            )
+          : undefined,
+        chainId: chainIdNumber,
+        gasLimit: params.gasLimit,
+      };
+
+      // Create wallet config
+      const walletConfig = {
+        privateKey: sessionWallet.privateKey,
+        address: sessionWallet.address,
+      };
+
+      params.context.logger.info('Executing transaction via EVMService', {
+        chainId: params.chainId,
+        chainIdNumber,
+        to: params.recipientAddress,
+        amount: params.amount,
+        tokenAddress: params.tokenAddress,
+        fromAddress: sessionWallet.address,
+      });
+
+      // Execute transaction using EVMService
+      if (params.tokenAddress) {
+        // ERC20 token transfer
+        const result = await this.evmService.executeERC20Transfer(
+          params.tokenAddress,
+          params.recipientAddress,
+          params.amount,
+          18, // Default to 18 decimals
+          transaction,
+          walletConfig,
+        );
+        return this.convertToLegacyTransactionResult(result);
+      } else {
+        // Native token transfer
+        const result = await this.evmService.executeTransaction(
+          transaction,
+          walletConfig,
+        );
+        return this.convertToLegacyTransactionResult(result);
+      }
+    } catch (error) {
+      params.context.logger.error('Session key transaction failed', {
+        error: error instanceof Error ? error.message : String(error),
+        chainId: params.chainId,
+      });
+
+      return {
+        transactionHash: '',
+        status: 'failed' as const,
+      };
     }
   }
 
@@ -741,6 +810,45 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     // - Verify delegation signature
     // - Check spending limits
     // - Validate against whitelist/blacklist
+  }
+
+  /**
+   * Utility to safely stringify objects with BigInt values
+   */
+  private safeStringify(obj: any): any {
+    return JSON.parse(
+      JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      ),
+    );
+  }
+
+  /**
+   * Convert BigInt fields in database results to strings
+   */
+  private convertBigIntFields(obj: any): any {
+    if (!obj || typeof obj !== 'object') return obj;
+
+    const converted = { ...obj };
+
+    // Common BigInt fields in SessionKey model
+    if (converted.nonce && typeof converted.nonce === 'bigint') {
+      converted.nonce = converted.nonce.toString();
+    }
+    if (
+      converted.totalUsedAmount &&
+      typeof converted.totalUsedAmount === 'bigint'
+    ) {
+      converted.totalUsedAmount = converted.totalUsedAmount.toString();
+    }
+    if (
+      converted.dailyUsedAmount &&
+      typeof converted.dailyUsedAmount === 'bigint'
+    ) {
+      converted.dailyUsedAmount = converted.dailyUsedAmount.toString();
+    }
+
+    return converted;
   }
 
   /**
@@ -960,7 +1068,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       let sessionKeyData: any = null;
       if (context.blockchainAuthorization?.sessionKeyId) {
         try {
-          // Query session key data (caching disabled to avoid BigInt serialization)
+          // Query session key data with BigInt serialization handling
           const rawSessionKeyData =
             await this.databaseService.prisma.sessionKey.findUnique({
               where: { id: context.blockchainAuthorization.sessionKeyId },
@@ -968,19 +1076,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
           // Convert BigInt fields to strings to avoid serialization issues
           if (rawSessionKeyData) {
-            sessionKeyData = {
-              ...rawSessionKeyData,
-              // Ensure all potentially BigInt fields are converted to strings
-              nonce: rawSessionKeyData.nonce
-                ? rawSessionKeyData.nonce.toString()
-                : '0',
-              totalUsedAmount: rawSessionKeyData.totalUsedAmount
-                ? rawSessionKeyData.totalUsedAmount.toString()
-                : '0',
-              dailyUsedAmount: rawSessionKeyData.dailyUsedAmount
-                ? rawSessionKeyData.dailyUsedAmount.toString()
-                : '0',
-            };
+            sessionKeyData = this.convertBigIntFields(rawSessionKeyData);
           }
           if (!sessionKeyData) {
             throw new Error(
@@ -2330,6 +2426,24 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   private isValidAddress(address: string): boolean {
     // Basic validation for EVM addresses
     return /^0x[a-fA-F0-9]{40}$/.test(address);
+  }
+
+  /**
+   * Convert new TransactionResult format to legacy format for backward compatibility
+   */
+  private convertToLegacyTransactionResult(
+    result: BlockchainTransactionResult,
+  ): TransactionResult {
+    return {
+      transactionHash: result.hash,
+      blockNumber: result.blockNumber,
+      gasUsed:
+        typeof result.gasUsed === 'string'
+          ? parseInt(result.gasUsed)
+          : result.gasUsed,
+      status: result.status,
+      explorerUrl: result.explorerUrl,
+    };
   }
 
   /**

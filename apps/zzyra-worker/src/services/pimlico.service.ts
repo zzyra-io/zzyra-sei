@@ -14,6 +14,13 @@ import {
 } from 'viem';
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { sepolia, base, baseSepolia, seiTestnet } from 'viem/chains';
+import { IAccountAbstractionService } from './blockchain/base/IBlockchainService';
+import {
+  TransactionRequest as BlockchainTransactionRequest,
+  TransactionResult as BlockchainTransactionResult,
+  GasEstimate,
+  ChainConfig,
+} from './blockchain/types/blockchain.types';
 
 // EntryPoint v0.6 address (widely supported by Pimlico)
 const ENTRYPOINT_ADDRESS_V07 = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789';
@@ -82,8 +89,12 @@ interface UserOperation {
 }
 
 @Injectable()
-export class PimlicoService {
+export class PimlicoService implements IAccountAbstractionService {
   private readonly logger = new Logger(PimlicoService.name);
+
+  // Store discovered implementation addresses for proxy contracts
+  private proxyImplementations = new Map<string, string>();
+
   private readonly pimlicoApiKey: string;
   private readonly supportedChains = [seiTestnet, sepolia, base, baseSepolia];
 
@@ -241,12 +252,7 @@ export class PimlicoService {
   async executeWithSessionKey(
     sessionConfig: SessionKeyConfig,
     transaction: TransactionRequest,
-  ): Promise<{
-    hash: string;
-    success: boolean;
-    gasUsed?: string;
-    error?: string;
-  }> {
+  ): Promise<BlockchainTransactionResult> {
     try {
       const { publicClient, chain, bundlerUrl, paymasterUrl } =
         this.createClients(transaction.chainId);
@@ -268,8 +274,19 @@ export class PimlicoService {
       this.validateTransactionPermissions(sessionConfig, transaction);
 
       // Create user operation for AA execution
-      const userOp = await this.createUserOperation(
+      // Use implementation address if this is a proxy contract
+      const actualSmartAccountAddress = this.getImplementationAddress(
         sessionConfig.smartWalletAddress,
+      );
+
+      this.logger.log('🔧 Creating UserOperation for smart account', {
+        originalAddress: sessionConfig.smartWalletAddress,
+        actualAddress: actualSmartAccountAddress,
+        isProxy: actualSmartAccountAddress !== sessionConfig.smartWalletAddress,
+      });
+
+      const userOp = await this.createUserOperation(
+        actualSmartAccountAddress, // Use implementation address for proxy contracts
         transaction,
         sessionKeySigner,
         bundlerUrl,
@@ -333,7 +350,10 @@ export class PimlicoService {
       return {
         hash: transactionHash,
         success,
+        status: success ? 'success' : 'failed',
         gasUsed,
+        blockNumber: receipt.receipt?.blockNumber ? Number(receipt.receipt.blockNumber) : undefined,
+        explorerUrl: this.getExplorerUrl(transaction.chainId, transactionHash),
       };
     } catch (error) {
       this.logger.error(
@@ -350,6 +370,7 @@ export class PimlicoService {
       return {
         hash: '',
         success: false,
+        status: 'failed',
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
@@ -620,7 +641,7 @@ export class PimlicoService {
         });
       }
 
-      userOp.signature = signature;
+    userOp.signature = signature;
 
       this.logger.debug('UserOperation signed successfully', {
         userOpHashPreview: userOpHash.slice(0, 10) + '...',
@@ -715,7 +736,7 @@ export class PimlicoService {
         if (result.result) {
           // Validate the receipt structure
           if (result.result.receipt || result.result.success !== undefined) {
-            return result.result;
+          return result.result;
           } else {
             this.logger.debug(
               'Invalid receipt structure received, retrying...',
@@ -1112,15 +1133,15 @@ export class PimlicoService {
           });
 
           response = await fetch(paymasterUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: 1,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
               method: 'pm_sponsorUserOperation',
               params: parameterFormats[i],
-            }),
-          });
+      }),
+    });
 
           const testResult = await response.json();
 
@@ -1161,7 +1182,7 @@ export class PimlicoService {
         };
       }
 
-      const result = await response.json();
+    const result = await response.json();
 
       if (result.error) {
         this.logger.warn(`${description} failed`, {
@@ -1260,14 +1281,9 @@ export class PimlicoService {
     publicClient: any,
   ): Promise<void> {
     try {
-      this.logger.log(
-        '🔍 CRITICAL: Identifying smart account type for AA23 troubleshooting',
-        {
-          smartAccountAddress,
-          reason:
-            'Smart account may not be SimpleAccount compatible, causing AA23 errors',
-        },
-      );
+      this.logger.debug('Identifying smart account type', {
+        smartAccountAddress,
+      });
 
       // Test for different smart account implementations
       const tests = [
@@ -1359,6 +1375,15 @@ export class PimlicoService {
           smartAccountAddress,
           publicClient,
         );
+
+        // For EIP-1967 proxies, we need to call the implementation contract
+        // Check if we detected a proxy in the deep analysis
+        if (supportedFunctions.length === 0) {
+          this.logger.log(
+            '🔧 NO STANDARD FUNCTIONS - Checking if this is a proxy contract',
+          );
+          await this.handleEIP1967Proxy(smartAccountAddress, publicClient);
+        }
       } else if (
         supportedFunctions.find((f) => f.name.includes('SimpleAccount'))
       ) {
@@ -1392,6 +1417,788 @@ export class PimlicoService {
       this.logger.error('Smart account type identification failed', {
         error: error instanceof Error ? error.message : String(error),
         smartAccountAddress,
+      });
+    }
+  }
+
+  /**
+   * Check paymaster contract balance
+   */
+  private async checkPaymasterBalance(
+    paymasterAddress: string,
+    chainId: number,
+  ): Promise<void> {
+    try {
+      const { publicClient } = this.createClients(chainId);
+
+      // Check native token balance
+      const balance = await publicClient.getBalance({
+        address: paymasterAddress as Address,
+      });
+
+      // Check if paymaster has a deposit in the EntryPoint
+      const entryPointDepositCall = await publicClient.call({
+        to: ENTRYPOINT_ADDRESS_V07 as `0x${string}`,
+        data: encodeFunctionData({
+          abi: [
+            {
+              name: 'balanceOf',
+              type: 'function',
+              inputs: [{ name: 'account', type: 'address' }],
+              outputs: [{ name: 'balance', type: 'uint256' }],
+              stateMutability: 'view',
+            },
+          ],
+          functionName: 'balanceOf',
+          args: [paymasterAddress as `0x${string}`],
+        }),
+      });
+
+      const entryPointBalance = entryPointDepositCall.data
+        ? parseInt(entryPointDepositCall.data, 16)
+        : 0;
+
+      this.logger.debug('Paymaster balance check', {
+        paymasterAddress,
+        nativeBalance: balance.toString(),
+        entryPointDeposit: entryPointBalance.toString(),
+        hasNativeFunds: balance > 0n,
+        hasEntryPointDeposit: entryPointBalance > 0,
+        chainId,
+      });
+
+      if (balance === 0n && entryPointBalance === 0) {
+        this.logger.warn('Paymaster appears to be unfunded', {
+          paymasterAddress,
+          chainId,
+        });
+      }
+    } catch (error) {
+      this.logger.warn('Could not check paymaster balance', {
+        error: error instanceof Error ? error.message : String(error),
+        paymasterAddress,
+        chainId,
+      });
+    }
+  }
+
+  /**
+   * Get the maximum gas limit between estimated and our minimum requirements
+   */
+  private getMaxGasLimit(
+    estimatedGas: string | undefined,
+    minimumGas: string,
+  ): string {
+    if (!estimatedGas) {
+      return minimumGas;
+    }
+
+    try {
+      const estimated = BigInt(estimatedGas);
+      const minimum = BigInt(minimumGas);
+      const maxGas = estimated > minimum ? estimated : minimum;
+
+      this.logger.debug('Gas limit comparison', {
+        estimated: estimated.toString(),
+        minimum: minimum.toString(),
+        selected: maxGas.toString(),
+        usedEstimated: estimated > minimum,
+      });
+
+      return toHex(maxGas);
+    } catch (error) {
+      this.logger.warn(`Failed to compare gas limits: ${error}, using minimum`);
+      return minimumGas;
+    }
+  }
+
+  /**
+   * Validate and normalize transaction value to prevent parseEther errors
+   */
+  private validateAndNormalizeValue(value: string): string {
+    if (!value && value !== '0') {
+      throw new Error('Transaction value is required');
+    }
+
+    // Handle empty or null values
+    if (value === '' || value === null || value === undefined) {
+      return '0';
+    }
+
+    // Convert to string and trim whitespace
+    const valueStr = String(value).trim();
+
+    // Handle empty string after trim
+    if (valueStr === '') {
+      return '0';
+    }
+
+    // Check if it's a valid number
+    const numValue = parseFloat(valueStr);
+    if (isNaN(numValue)) {
+      throw new Error(
+        `Invalid transaction value: ${valueStr}. Must be a valid number.`,
+      );
+    }
+
+    // Check for negative values
+    if (numValue < 0) {
+      throw new Error(
+        `Invalid transaction value: ${valueStr}. Cannot be negative.`,
+      );
+    }
+
+    // Return normalized value as string
+    return numValue.toString();
+  }
+
+  /**
+   * Helper methods for AA operations
+   */
+  private async getNonce(sender: string, bundlerUrl: string): Promise<number> {
+    try {
+      // Extract chain ID from bundlerUrl to get the correct RPC
+      const chainIdMatch = bundlerUrl.match(/\/v2\/(\d+)\//);
+      const chainId = chainIdMatch ? parseInt(chainIdMatch[1]) : 1328; // default to SEI
+
+      // Use regular chain RPC instead of bundler for eth_call
+      const { publicClient } = this.createClients(chainId);
+
+      // For Account Abstraction, query EntryPoint contract for nonce
+      const nonceCallData = encodeFunctionData({
+        abi: [
+          {
+            name: 'getNonce',
+            type: 'function',
+            inputs: [
+              { name: 'sender', type: 'address' },
+              { name: 'key', type: 'uint192' },
+            ],
+            outputs: [{ name: 'nonce', type: 'uint256' }],
+            stateMutability: 'view',
+          },
+        ],
+        functionName: 'getNonce',
+        args: [sender as `0x${string}`, BigInt(0)], // key = 0 for default nonce sequence
+      });
+
+      // Use the public client to make the call (not bundler)
+      const result = await publicClient.call({
+        to: ENTRYPOINT_ADDRESS_V07 as `0x${string}`,
+        data: nonceCallData as `0x${string}`,
+      });
+
+      if (!result.data) {
+        this.logger.warn('No nonce result from EntryPoint call, using nonce 0');
+        return 0;
+      }
+
+      // Parse the returned nonce (should be a hex string representing uint256)
+      const nonce = parseInt(result.data, 16);
+      if (isNaN(nonce)) {
+        this.logger.warn(
+          `Invalid nonce from EntryPoint: ${result.data}, using nonce 0`,
+        );
+        return 0;
+      }
+
+      this.logger.debug(`Retrieved nonce from EntryPoint: ${nonce}`, {
+        sender,
+        entryPoint: ENTRYPOINT_ADDRESS_V07,
+        chainId,
+      });
+      return nonce;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get nonce from EntryPoint: ${error}, using nonce 0`,
+      );
+      return 0;
+    }
+  }
+
+  private async estimateUserOperationGas(
+    userOp: any,
+    bundlerUrl: string,
+  ): Promise<any> {
+    // Use high default gas values to prevent AA23 errors during estimation
+    const defaultGasValues = {
+      callGasLimit: toHex(500000), // 500K (was 200K)
+      verificationGasLimit: toHex(600000), // 600K (was 100K)
+      preVerificationGas: toHex(100000), // 100K (was 21K)
+      maxFeePerGas: toHex(2000000000), // 2 gwei (was 1 gwei)
+      maxPriorityFeePerGas: toHex(1500000000), // 1.5 gwei (was 1 gwei)
+    };
+
+    this.logger.debug('Using high default gas values for AA23 prevention', {
+      callGasLimit: '500000',
+      verificationGasLimit: '600000',
+      preVerificationGas: '100000',
+      maxFeePerGas: '2000000000',
+      maxPriorityFeePerGas: '1500000000',
+    });
+
+    try {
+    const response = await fetch(bundlerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_estimateUserOperationGas',
+        params: [userOp, ENTRYPOINT_ADDRESS_V07],
+      }),
+    });
+
+      if (!response.ok) {
+        this.logger.warn(
+          `Gas estimation HTTP error ${response.status}, using defaults`,
+        );
+        return defaultGasValues;
+      }
+
+      const result = await response.json();
+
+      if (result.error) {
+        this.logger.warn(
+          `Gas estimation RPC error: ${result.error.message}, using defaults`,
+        );
+        return defaultGasValues;
+      }
+
+      if (!result.result) {
+        this.logger.warn('No gas estimation result, using defaults');
+        return defaultGasValues;
+      }
+
+      // Validate the returned gas values and ensure they meet our minimum requirements
+      const gasResult = result.result;
+      const validatedGasValues = {
+        callGasLimit: this.getMaxGasLimit(
+          gasResult.callGasLimit,
+          defaultGasValues.callGasLimit,
+        ),
+        verificationGasLimit: this.getMaxGasLimit(
+          gasResult.verificationGasLimit,
+          defaultGasValues.verificationGasLimit,
+        ),
+        preVerificationGas: this.getMaxGasLimit(
+          gasResult.preVerificationGas,
+          defaultGasValues.preVerificationGas,
+        ),
+        maxFeePerGas: gasResult.maxFeePerGas || defaultGasValues.maxFeePerGas,
+        maxPriorityFeePerGas:
+          gasResult.maxPriorityFeePerGas ||
+          defaultGasValues.maxPriorityFeePerGas,
+      };
+
+      this.logger.debug('Gas values after validation', {
+        estimated: {
+          callGasLimit: gasResult.callGasLimit,
+          verificationGasLimit: gasResult.verificationGasLimit,
+          preVerificationGas: gasResult.preVerificationGas,
+        },
+        final: {
+          callGasLimit: validatedGasValues.callGasLimit,
+          verificationGasLimit: validatedGasValues.verificationGasLimit,
+          preVerificationGas: validatedGasValues.preVerificationGas,
+        },
+      });
+
+      return validatedGasValues;
+    } catch (error) {
+      this.logger.warn(`Failed to estimate gas: ${error}, using defaults`);
+      return defaultGasValues;
+    }
+  }
+
+  private async getPaymasterData(
+    userOp: any,
+    paymasterUrl: string,
+  ): Promise<any> {
+    const defaultPaymasterData = { paymasterAndData: '0x' };
+
+    try {
+      // Try different parameter formats based on diagnostic findings
+      const parameterFormats = [
+        // Format 1: Object with entryPoint (current format)
+        [userOp, { entryPoint: ENTRYPOINT_ADDRESS_V07 }],
+        // Format 2: Direct EntryPoint string
+        [userOp, ENTRYPOINT_ADDRESS_V07],
+        // Format 3: Different field name
+        [userOp, { entryPointAddress: ENTRYPOINT_ADDRESS_V07 }],
+      ];
+
+      let response;
+      let result;
+
+      for (let i = 0; i < parameterFormats.length; i++) {
+        try {
+          this.logger.debug(
+            `Trying paymaster format ${i + 1} in getPaymasterData`,
+            {
+              format: i + 1,
+              entryPoint: ENTRYPOINT_ADDRESS_V07,
+            },
+          );
+
+          response = await fetch(paymasterUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'pm_sponsorUserOperation',
+              params: parameterFormats[i],
+        }),
+      });
+
+          if (!response.ok) {
+            this.logger.debug(`Format ${i + 1}: HTTP error ${response.status}`);
+            continue;
+          }
+
+          result = await response.json();
+
+          // If we got a successful result or a different error, use this format
+          if (
+            !result.error ||
+            result.error.message !== 'entryPoint is not a valid address'
+          ) {
+            this.logger.debug(
+              `Format ${i + 1} succeeded or gave different error`,
+            );
+            break;
+          } else {
+            this.logger.debug(`Format ${i + 1} failed with EntryPoint error`);
+          }
+        } catch (formatError) {
+          this.logger.debug(`Format ${i + 1} failed with exception`, {
+            formatError:
+              formatError instanceof Error
+                ? formatError.message
+                : String(formatError),
+          });
+        }
+      }
+
+      if (!response || !result) {
+        this.logger.warn(
+          'All paymaster parameter formats failed, using regular gas payment',
+        );
+        return defaultPaymasterData;
+      }
+
+      if (result.error) {
+        this.logger.warn(
+          `Paymaster RPC error: ${result.error.message}, using regular gas payment`,
+          {
+            errorCode: result.error.code,
+            errorMessage: result.error.message,
+            entryPoint: ENTRYPOINT_ADDRESS_V07,
+            fullError: result.error,
+            paymasterUrl: paymasterUrl.split('?')[0], // Remove API key
+          },
+        );
+        return defaultPaymasterData;
+      }
+
+      if (!result.result) {
+        this.logger.warn('No paymaster result, using regular gas payment');
+        return defaultPaymasterData;
+      }
+
+      return result.result;
+    } catch (error) {
+      this.logger.warn(
+        `Paymaster request failed: ${error}, using regular gas payment`,
+      );
+      return defaultPaymasterData;
+    }
+  }
+
+  private getUserOperationHash(
+    userOp: UserOperation,
+    entryPoint: string,
+    chainId: number,
+  ): string {
+    try {
+      // Pack UserOperation data according to EIP-4337 specification for EntryPoint v0.6
+      const packedUserOp = encodePacked(
+        [
+          'address',
+          'uint256',
+          'bytes32',
+          'bytes32',
+          'uint256',
+          'uint256',
+          'uint256',
+          'uint256',
+          'uint256',
+          'bytes32',
+        ],
+      [
+        userOp.sender as Address,
+          BigInt(userOp.nonce),
+          keccak256(userOp.initCode as Hex),
+        keccak256(userOp.callData as Hex),
+          BigInt(userOp.callGasLimit),
+          BigInt(userOp.verificationGasLimit),
+          BigInt(userOp.preVerificationGas),
+          BigInt(userOp.maxFeePerGas),
+          BigInt(userOp.maxPriorityFeePerGas),
+          keccak256(userOp.paymasterAndData as Hex),
+        ],
+      );
+
+      // Hash the packed UserOperation with EntryPoint and chain ID
+      const userOpHash = keccak256(packedUserOp);
+
+      // Create the final hash with EntryPoint and chain ID
+      const finalHash = keccak256(
+        encodePacked(
+          ['bytes32', 'address', 'uint256'],
+          [userOpHash, entryPoint as Address, BigInt(chainId)],
+        ),
+      );
+
+      this.logger.debug('Generated UserOperation hash', {
+        userOpHashPreview: finalHash.slice(0, 10) + '...',
+        entryPoint,
+        chainId,
+      });
+
+      return finalHash;
+    } catch (error) {
+      this.logger.error('Failed to generate UserOperation hash', { error });
+      // Fallback to simple hash if the complex one fails
+      const fallbackHash = keccak256(
+        encodePacked(
+          ['address', 'uint256', 'bytes32'],
+          [
+            userOp.sender as Address,
+            BigInt(userOp.nonce),
+            keccak256(userOp.callData as Hex),
+          ],
+        ),
+      );
+      return fallbackHash;
+    }
+  }
+
+  /**
+   * Deploy smart wallet if needed
+   */
+  async deploySmartWalletIfNeeded(
+    smartWalletAddress: string,
+    ownerPrivateKey: string,
+    chainId: number,
+  ): Promise<{
+    deployed: boolean;
+    deploymentHash?: string;
+    error?: string;
+  }> {
+    try {
+      const { publicClient } = this.createClients(chainId);
+
+      // Check if account has code
+      const code = await publicClient.getBytecode({
+        address: smartWalletAddress as Address,
+      });
+
+      if (code && code !== '0x') {
+        this.logger.log(`Smart wallet already deployed`, {
+          smartWalletAddress,
+          chainId,
+        });
+        return { deployed: true };
+      }
+
+      // For now, return that deployment is needed but not implemented
+      // In full implementation, you would deploy via first user operation
+      this.logger.log(`Smart wallet deployment needed`, {
+        smartWalletAddress,
+        chainId,
+      });
+
+      return {
+        deployed: false, // Will be deployed on first transaction
+      };
+    } catch (error) {
+      this.logger.error(`Failed to check wallet deployment: ${error}`, {
+        smartWalletAddress,
+        chainId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+
+      return {
+        deployed: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Validate transaction against session key permissions
+   */
+  private validateTransactionPermissions(
+    sessionConfig: SessionKeyConfig,
+    transaction: TransactionRequest,
+  ): void {
+    const { permissions } = sessionConfig;
+
+    // Check expiry
+    if (new Date() > permissions.validUntil) {
+      throw new Error('Session key has expired');
+    }
+
+    // Check transaction amount limits
+    const txValue = parseFloat(transaction.value);
+    const maxAmountPerTx = parseFloat(permissions.maxAmountPerTx);
+
+    if (txValue > maxAmountPerTx) {
+      throw new Error(
+        `Transaction amount ${txValue} exceeds maximum allowed ${maxAmountPerTx}`,
+      );
+    }
+
+    // Check operations (detailed validation)
+    const isSendOperation = transaction.to !== sessionConfig.smartWalletAddress;
+    if (isSendOperation) {
+      // Determine operation type based on transaction
+      const isEthTransfer = !transaction.data || transaction.data === '0x';
+      const isErc20Transfer = transaction.data && transaction.data !== '0x';
+
+      let requiredOperation: string;
+      if (isEthTransfer) {
+        requiredOperation = 'eth_transfer';
+      } else if (isErc20Transfer) {
+        requiredOperation = 'erc20_transfer';
+      } else {
+        requiredOperation = 'contract_interaction';
+      }
+
+      if (!permissions.operations.includes(requiredOperation)) {
+        throw new Error(
+          `${requiredOperation} operation not permitted for this session key. Allowed operations: ${permissions.operations.join(', ')}`,
+        );
+      }
+    }
+
+    this.logger.log(`Transaction permissions validated`, {
+      txValue,
+      maxAmountPerTx,
+      operations: permissions.operations,
+      validUntil: permissions.validUntil,
+    });
+  }
+
+
+
+  /**
+   * Execute ERC20 token transfer using AA
+   */
+  async executeERC20Transfer(
+    sessionConfig: SessionKeyConfig,
+    tokenAddress: string,
+    toAddress: string,
+    amount: string,
+    decimals: number = 18,
+  ): Promise<BlockchainTransactionResult> {
+    try {
+      // Validate and normalize amount
+      const normalizedAmount = this.validateAndNormalizeValue(amount);
+
+      // Encode ERC20 transfer data
+      const transferData = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'transfer',
+        args: [toAddress as Address, parseUnits(normalizedAmount, decimals)],
+      });
+
+      // Execute as contract interaction using AA
+      return await this.executeWithSessionKey(sessionConfig, {
+        to: tokenAddress,
+        value: '0',
+        data: transferData,
+        chainId: sessionConfig.chainId,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to execute ERC20 transfer: ${error}`);
+      return {
+        hash: '',
+        success: false,
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get ERC20 token balance
+   */
+  async getERC20Balance(
+    tokenAddress: string,
+    walletAddress: string,
+    chainId: number,
+  ): Promise<string> {
+    try {
+      const { publicClient } = this.createClients(chainId);
+
+      const balance = await publicClient.readContract({
+        address: tokenAddress as Address,
+        abi: ERC20_ABI,
+        functionName: 'balanceOf',
+        args: [walletAddress as Address],
+      });
+
+      return balance.toString();
+    } catch (error) {
+      this.logger.error(`Failed to get ERC20 balance: ${error}`);
+      return '0';
+    }
+  }
+
+
+
+  /**
+   * Get the actual implementation address for proxy contracts
+   */
+  private getImplementationAddress(smartAccountAddress: string): string {
+    return (
+      this.proxyImplementations.get(smartAccountAddress) || smartAccountAddress
+    );
+  }
+
+  /**
+   * Handle EIP-1967 proxy smart accounts by calling implementation contract
+   */
+  private async handleEIP1967Proxy(
+    proxyAddress: string,
+    publicClient: any,
+  ): Promise<void> {
+    try {
+      this.logger.log('🔧 Handling EIP-1967 proxy smart account', {
+        proxyAddress,
+        objective: 'Extract implementation address and test functions',
+      });
+
+      // Get implementation address from EIP-1967 storage slot
+      const implementationSlot =
+        '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc';
+
+      const implementationAddress = await publicClient.getStorageAt({
+        address: proxyAddress as `0x${string}`,
+        slot: implementationSlot as `0x${string}`,
+      });
+
+      if (
+        !implementationAddress ||
+        implementationAddress ===
+          '0x0000000000000000000000000000000000000000000000000000000000000000'
+      ) {
+        this.logger.error('❌ EIP-1967 proxy has no implementation address', {
+          proxyAddress,
+          implementationSlot,
+        });
+        return;
+      }
+
+      // Convert storage value to address (last 20 bytes)
+      const actualImplementation = '0x' + implementationAddress.slice(-40);
+
+      this.logger.log('🎯 Found EIP-1967 implementation contract', {
+        proxyAddress,
+        implementationAddress: actualImplementation,
+        storageValue: implementationAddress,
+      });
+
+      // Test functions on the implementation contract
+      await this.testImplementationContract(actualImplementation, publicClient);
+
+      // Store the implementation address for UserOperation creation
+      this.proxyImplementations.set(proxyAddress, actualImplementation);
+
+      this.logger.log(
+        '💾 Implementation address stored for UserOperation creation',
+        {
+          proxyAddress,
+          implementationAddress: actualImplementation,
+          storedAddresses: Array.from(this.proxyImplementations.entries()),
+          recommendation:
+            'UserOperation will now call functions on implementation, not proxy',
+        },
+      );
+    } catch (error) {
+      this.logger.error('❌ Failed to handle EIP-1967 proxy', {
+        error: error instanceof Error ? error.message : String(error),
+        proxyAddress,
+      });
+    }
+  }
+
+  /**
+   * Test functions on the implementation contract
+   */
+  private async testImplementationContract(
+    implementationAddress: string,
+    publicClient: any,
+  ): Promise<void> {
+    try {
+      this.logger.log('🧪 Testing implementation contract functions', {
+        implementationAddress,
+        objective: 'Find working ERC-4337 functions on implementation',
+      });
+
+      // Test ERC-4337 functions on implementation
+      const erc4337Tests = [
+        { name: 'validateUserOp', selector: '0x3a871cdd' },
+        { name: 'execute', selector: '0xb61d27f6' },
+        { name: 'isValidSignature', selector: '0x1626ba7e' },
+        { name: 'owner', selector: '0x8da5cb5b' },
+        { name: 'getNonce', selector: '0xd087d288' },
+      ];
+
+      const workingFunctions = [];
+
+      for (const test of erc4337Tests) {
+        try {
+          const result = await publicClient.call({
+            to: implementationAddress as `0x${string}`,
+            data: test.selector as `0x${string}`,
+          });
+
+          if (result.data && result.data !== '0x') {
+            workingFunctions.push({
+              name: test.name,
+              selector: test.selector,
+              result: result.data.slice(0, 20) + '...',
+            });
+          }
+        } catch (error) {
+          // Function doesn't exist or reverted - expected
+        }
+      }
+
+      if (workingFunctions.length > 0) {
+        this.logger.log('🎉 IMPLEMENTATION CONTRACT HAS WORKING FUNCTIONS!', {
+          implementationAddress,
+          workingFunctions,
+          count: workingFunctions.length,
+          solution: 'Use implementation address for UserOperation calls',
+        });
+      } else {
+        this.logger.warn(
+          '❌ Implementation contract also has no working functions',
+          {
+            implementationAddress,
+            testedFunctions: erc4337Tests.length,
+          },
+        );
+      }
+    } catch (error) {
+      this.logger.error('❌ Failed to test implementation contract', {
+        error: error instanceof Error ? error.message : String(error),
+        implementationAddress,
       });
     }
   }
@@ -1732,718 +2539,258 @@ export class PimlicoService {
     }
   }
 
-  /**
-   * Check paymaster contract balance
-   */
-  private async checkPaymasterBalance(
-    paymasterAddress: string,
-    chainId: number,
-  ): Promise<void> {
-    try {
-      const { publicClient } = this.createClients(chainId);
-
-      // Check native token balance
-      const balance = await publicClient.getBalance({
-        address: paymasterAddress as Address,
-      });
-
-      // Check if paymaster has a deposit in the EntryPoint
-      const entryPointDepositCall = await publicClient.call({
-        to: ENTRYPOINT_ADDRESS_V07 as `0x${string}`,
-        data: encodeFunctionData({
-          abi: [
-            {
-              name: 'balanceOf',
-              type: 'function',
-              inputs: [{ name: 'account', type: 'address' }],
-              outputs: [{ name: 'balance', type: 'uint256' }],
-              stateMutability: 'view',
-            },
-          ],
-          functionName: 'balanceOf',
-          args: [paymasterAddress as `0x${string}`],
-        }),
-      });
-
-      const entryPointBalance = entryPointDepositCall.data
-        ? parseInt(entryPointDepositCall.data, 16)
-        : 0;
-
-      this.logger.debug('Paymaster balance check', {
-        paymasterAddress,
-        nativeBalance: balance.toString(),
-        entryPointDeposit: entryPointBalance.toString(),
-        hasNativeFunds: balance > 0n,
-        hasEntryPointDeposit: entryPointBalance > 0,
-        chainId,
-      });
-
-      if (balance === 0n && entryPointBalance === 0) {
-        this.logger.warn('Paymaster appears to be unfunded', {
-          paymasterAddress,
-          chainId,
-        });
-      }
-    } catch (error) {
-      this.logger.warn('Could not check paymaster balance', {
-        error: error instanceof Error ? error.message : String(error),
-        paymasterAddress,
-        chainId,
-      });
-    }
-  }
+  // =============================================================================
+  // IBlockchainService Interface Implementation
+  // =============================================================================
 
   /**
-   * Get the maximum gas limit between estimated and our minimum requirements
+   * Get supported chain configurations
    */
-  private getMaxGasLimit(
-    estimatedGas: string | undefined,
-    minimumGas: string,
-  ): string {
-    if (!estimatedGas) {
-      return minimumGas;
-    }
-
-    try {
-      const estimated = BigInt(estimatedGas);
-      const minimum = BigInt(minimumGas);
-      const maxGas = estimated > minimum ? estimated : minimum;
-
-      this.logger.debug('Gas limit comparison', {
-        estimated: estimated.toString(),
-        minimum: minimum.toString(),
-        selected: maxGas.toString(),
-        usedEstimated: estimated > minimum,
-      });
-
-      return toHex(maxGas);
-    } catch (error) {
-      this.logger.warn(`Failed to compare gas limits: ${error}, using minimum`);
-      return minimumGas;
-    }
-  }
-
-  /**
-   * Validate and normalize transaction value to prevent parseEther errors
-   */
-  private validateAndNormalizeValue(value: string): string {
-    if (!value && value !== '0') {
-      throw new Error('Transaction value is required');
-    }
-
-    // Handle empty or null values
-    if (value === '' || value === null || value === undefined) {
-      return '0';
-    }
-
-    // Convert to string and trim whitespace
-    const valueStr = String(value).trim();
-
-    // Handle empty string after trim
-    if (valueStr === '') {
-      return '0';
-    }
-
-    // Check if it's a valid number
-    const numValue = parseFloat(valueStr);
-    if (isNaN(numValue)) {
-      throw new Error(
-        `Invalid transaction value: ${valueStr}. Must be a valid number.`,
-      );
-    }
-
-    // Check for negative values
-    if (numValue < 0) {
-      throw new Error(
-        `Invalid transaction value: ${valueStr}. Cannot be negative.`,
-      );
-    }
-
-    // Return normalized value as string
-    return numValue.toString();
-  }
-
-  /**
-   * Helper methods for AA operations
-   */
-  private async getNonce(sender: string, bundlerUrl: string): Promise<number> {
-    try {
-      // Extract chain ID from bundlerUrl to get the correct RPC
-      const chainIdMatch = bundlerUrl.match(/\/v2\/(\d+)\//);
-      const chainId = chainIdMatch ? parseInt(chainIdMatch[1]) : 1328; // default to SEI
-
-      // Use regular chain RPC instead of bundler for eth_call
-      const { publicClient } = this.createClients(chainId);
-
-      // For Account Abstraction, query EntryPoint contract for nonce
-      const nonceCallData = encodeFunctionData({
-        abi: [
-          {
-            name: 'getNonce',
-            type: 'function',
-            inputs: [
-              { name: 'sender', type: 'address' },
-              { name: 'key', type: 'uint192' },
-            ],
-            outputs: [{ name: 'nonce', type: 'uint256' }],
-            stateMutability: 'view',
-          },
-        ],
-        functionName: 'getNonce',
-        args: [sender as `0x${string}`, BigInt(0)], // key = 0 for default nonce sequence
-      });
-
-      // Use the public client to make the call (not bundler)
-      const result = await publicClient.call({
-        to: ENTRYPOINT_ADDRESS_V07 as `0x${string}`,
-        data: nonceCallData as `0x${string}`,
-      });
-
-      if (!result.data) {
-        this.logger.warn('No nonce result from EntryPoint call, using nonce 0');
-        return 0;
-      }
-
-      // Parse the returned nonce (should be a hex string representing uint256)
-      const nonce = parseInt(result.data, 16);
-      if (isNaN(nonce)) {
-        this.logger.warn(
-          `Invalid nonce from EntryPoint: ${result.data}, using nonce 0`,
-        );
-        return 0;
-      }
-
-      this.logger.debug(`Retrieved nonce from EntryPoint: ${nonce}`, {
-        sender,
-        entryPoint: ENTRYPOINT_ADDRESS_V07,
-        chainId,
-      });
-      return nonce;
-    } catch (error) {
-      this.logger.warn(
-        `Failed to get nonce from EntryPoint: ${error}, using nonce 0`,
-      );
-      return 0;
-    }
-  }
-
-  private async estimateUserOperationGas(
-    userOp: any,
-    bundlerUrl: string,
-  ): Promise<any> {
-    // Use high default gas values to prevent AA23 errors during estimation
-    const defaultGasValues = {
-      callGasLimit: toHex(500000), // 500K (was 200K)
-      verificationGasLimit: toHex(600000), // 600K (was 100K)
-      preVerificationGas: toHex(100000), // 100K (was 21K)
-      maxFeePerGas: toHex(2000000000), // 2 gwei (was 1 gwei)
-      maxPriorityFeePerGas: toHex(1500000000), // 1.5 gwei (was 1 gwei)
-    };
-
-    this.logger.debug('Using high default gas values for AA23 prevention', {
-      callGasLimit: '500000',
-      verificationGasLimit: '600000',
-      preVerificationGas: '100000',
-      maxFeePerGas: '2000000000',
-      maxPriorityFeePerGas: '1500000000',
-    });
-
-    try {
-      const response = await fetch(bundlerUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'eth_estimateUserOperationGas',
-          params: [userOp, ENTRYPOINT_ADDRESS_V07],
-        }),
-      });
-
-      if (!response.ok) {
-        this.logger.warn(
-          `Gas estimation HTTP error ${response.status}, using defaults`,
-        );
-        return defaultGasValues;
-      }
-
-      const result = await response.json();
-
-      if (result.error) {
-        this.logger.warn(
-          `Gas estimation RPC error: ${result.error.message}, using defaults`,
-        );
-        return defaultGasValues;
-      }
-
-      if (!result.result) {
-        this.logger.warn('No gas estimation result, using defaults');
-        return defaultGasValues;
-      }
-
-      // Validate the returned gas values and ensure they meet our minimum requirements
-      const gasResult = result.result;
-      const validatedGasValues = {
-        callGasLimit: this.getMaxGasLimit(
-          gasResult.callGasLimit,
-          defaultGasValues.callGasLimit,
-        ),
-        verificationGasLimit: this.getMaxGasLimit(
-          gasResult.verificationGasLimit,
-          defaultGasValues.verificationGasLimit,
-        ),
-        preVerificationGas: this.getMaxGasLimit(
-          gasResult.preVerificationGas,
-          defaultGasValues.preVerificationGas,
-        ),
-        maxFeePerGas: gasResult.maxFeePerGas || defaultGasValues.maxFeePerGas,
-        maxPriorityFeePerGas:
-          gasResult.maxPriorityFeePerGas ||
-          defaultGasValues.maxPriorityFeePerGas,
-      };
-
-      this.logger.debug('Gas values after validation', {
-        estimated: {
-          callGasLimit: gasResult.callGasLimit,
-          verificationGasLimit: gasResult.verificationGasLimit,
-          preVerificationGas: gasResult.preVerificationGas,
-        },
-        final: {
-          callGasLimit: validatedGasValues.callGasLimit,
-          verificationGasLimit: validatedGasValues.verificationGasLimit,
-          preVerificationGas: validatedGasValues.preVerificationGas,
-        },
-      });
-
-      return validatedGasValues;
-    } catch (error) {
-      this.logger.warn(`Failed to estimate gas: ${error}, using defaults`);
-      return defaultGasValues;
-    }
-  }
-
-  private async getPaymasterData(
-    userOp: any,
-    paymasterUrl: string,
-  ): Promise<any> {
-    const defaultPaymasterData = { paymasterAndData: '0x' };
-
-    try {
-      // Try different parameter formats based on diagnostic findings
-      const parameterFormats = [
-        // Format 1: Object with entryPoint (current format)
-        [userOp, { entryPoint: ENTRYPOINT_ADDRESS_V07 }],
-        // Format 2: Direct EntryPoint string
-        [userOp, ENTRYPOINT_ADDRESS_V07],
-        // Format 3: Different field name
-        [userOp, { entryPointAddress: ENTRYPOINT_ADDRESS_V07 }],
-      ];
-
-      let response;
-      let result;
-
-      for (let i = 0; i < parameterFormats.length; i++) {
-        try {
-          this.logger.debug(
-            `Trying paymaster format ${i + 1} in getPaymasterData`,
-            {
-              format: i + 1,
-              entryPoint: ENTRYPOINT_ADDRESS_V07,
-            },
-          );
-
-          response = await fetch(paymasterUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: 1,
-              method: 'pm_sponsorUserOperation',
-              params: parameterFormats[i],
-            }),
-          });
-
-          if (!response.ok) {
-            this.logger.debug(`Format ${i + 1}: HTTP error ${response.status}`);
-            continue;
-          }
-
-          result = await response.json();
-
-          // If we got a successful result or a different error, use this format
-          if (
-            !result.error ||
-            result.error.message !== 'entryPoint is not a valid address'
-          ) {
-            this.logger.debug(
-              `Format ${i + 1} succeeded or gave different error`,
-            );
-            break;
-          } else {
-            this.logger.debug(`Format ${i + 1} failed with EntryPoint error`);
-          }
-        } catch (formatError) {
-          this.logger.debug(`Format ${i + 1} failed with exception`, {
-            formatError:
-              formatError instanceof Error
-                ? formatError.message
-                : String(formatError),
-          });
-        }
-      }
-
-      if (!response || !result) {
-        this.logger.warn(
-          'All paymaster parameter formats failed, using regular gas payment',
-        );
-        return defaultPaymasterData;
-      }
-
-      if (result.error) {
-        this.logger.warn(
-          `Paymaster RPC error: ${result.error.message}, using regular gas payment`,
-          {
-            errorCode: result.error.code,
-            errorMessage: result.error.message,
-            entryPoint: ENTRYPOINT_ADDRESS_V07,
-            fullError: result.error,
-            paymasterUrl: paymasterUrl.split('?')[0], // Remove API key
-          },
-        );
-        return defaultPaymasterData;
-      }
-
-      if (!result.result) {
-        this.logger.warn('No paymaster result, using regular gas payment');
-        return defaultPaymasterData;
-      }
-
-      return result.result;
-    } catch (error) {
-      this.logger.warn(
-        `Paymaster request failed: ${error}, using regular gas payment`,
-      );
-      return defaultPaymasterData;
-    }
-  }
-
-  private getUserOperationHash(
-    userOp: UserOperation,
-    entryPoint: string,
-    chainId: number,
-  ): string {
-    try {
-      // Pack UserOperation data according to EIP-4337 specification for EntryPoint v0.6
-      const packedUserOp = encodePacked(
-        [
-          'address',
-          'uint256',
-          'bytes32',
-          'bytes32',
-          'uint256',
-          'uint256',
-          'uint256',
-          'uint256',
-          'uint256',
-          'bytes32',
-        ],
-        [
-          userOp.sender as Address,
-          BigInt(userOp.nonce),
-          keccak256(userOp.initCode as Hex),
-          keccak256(userOp.callData as Hex),
-          BigInt(userOp.callGasLimit),
-          BigInt(userOp.verificationGasLimit),
-          BigInt(userOp.preVerificationGas),
-          BigInt(userOp.maxFeePerGas),
-          BigInt(userOp.maxPriorityFeePerGas),
-          keccak256(userOp.paymasterAndData as Hex),
-        ],
-      );
-
-      // Hash the packed UserOperation with EntryPoint and chain ID
-      const userOpHash = keccak256(packedUserOp);
-
-      // Create the final hash with EntryPoint and chain ID
-      const finalHash = keccak256(
-        encodePacked(
-          ['bytes32', 'address', 'uint256'],
-          [userOpHash, entryPoint as Address, BigInt(chainId)],
-        ),
-      );
-
-      this.logger.debug('Generated UserOperation hash', {
-        userOpHashPreview: finalHash.slice(0, 10) + '...',
-        entryPoint,
-        chainId,
-      });
-
-      return finalHash;
-    } catch (error) {
-      this.logger.error('Failed to generate UserOperation hash', { error });
-      // Fallback to simple hash if the complex one fails
-      const fallbackHash = keccak256(
-        encodePacked(
-          ['address', 'uint256', 'bytes32'],
-          [
-            userOp.sender as Address,
-            BigInt(userOp.nonce),
-            keccak256(userOp.callData as Hex),
-          ],
-        ),
-      );
-      return fallbackHash;
-    }
-  }
-
-  /**
-   * Deploy smart wallet if needed
-   */
-  async deploySmartWalletIfNeeded(
-    smartWalletAddress: string,
-    ownerPrivateKey: string,
-    chainId: number,
-  ): Promise<{
-    deployed: boolean;
-    deploymentHash?: string;
-    error?: string;
-  }> {
-    try {
-      const { publicClient } = this.createClients(chainId);
-
-      // Check if account has code
-      const code = await publicClient.getBytecode({
-        address: smartWalletAddress as Address,
-      });
-
-      if (code && code !== '0x') {
-        this.logger.log(`Smart wallet already deployed`, {
-          smartWalletAddress,
-          chainId,
-        });
-        return { deployed: true };
-      }
-
-      // For now, return that deployment is needed but not implemented
-      // In full implementation, you would deploy via first user operation
-      this.logger.log(`Smart wallet deployment needed`, {
-        smartWalletAddress,
-        chainId,
-      });
-
-      return {
-        deployed: false, // Will be deployed on first transaction
-      };
-    } catch (error) {
-      this.logger.error(`Failed to check wallet deployment: ${error}`, {
-        smartWalletAddress,
-        chainId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-
-      return {
-        deployed: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  }
-
-  /**
-   * Validate transaction against session key permissions
-   */
-  private validateTransactionPermissions(
-    sessionConfig: SessionKeyConfig,
-    transaction: TransactionRequest,
-  ): void {
-    const { permissions } = sessionConfig;
-
-    // Check expiry
-    if (new Date() > permissions.validUntil) {
-      throw new Error('Session key has expired');
-    }
-
-    // Check transaction amount limits
-    const txValue = parseFloat(transaction.value);
-    const maxAmountPerTx = parseFloat(permissions.maxAmountPerTx);
-
-    if (txValue > maxAmountPerTx) {
-      throw new Error(
-        `Transaction amount ${txValue} exceeds maximum allowed ${maxAmountPerTx}`,
-      );
-    }
-
-    // Check operations (detailed validation)
-    const isSendOperation = transaction.to !== sessionConfig.smartWalletAddress;
-    if (isSendOperation) {
-      // Determine operation type based on transaction
-      const isEthTransfer = !transaction.data || transaction.data === '0x';
-      const isErc20Transfer = transaction.data && transaction.data !== '0x';
-
-      let requiredOperation: string;
-      if (isEthTransfer) {
-        requiredOperation = 'eth_transfer';
-      } else if (isErc20Transfer) {
-        requiredOperation = 'erc20_transfer';
-      } else {
-        requiredOperation = 'contract_interaction';
-      }
-
-      if (!permissions.operations.includes(requiredOperation)) {
-        throw new Error(
-          `${requiredOperation} operation not permitted for this session key. Allowed operations: ${permissions.operations.join(', ')}`,
-        );
-      }
-    }
-
-    this.logger.log(`Transaction permissions validated`, {
-      txValue,
-      maxAmountPerTx,
-      operations: permissions.operations,
-      validUntil: permissions.validUntil,
-    });
-  }
-
-  /**
-   * Get supported chains
-   */
-  getSupportedChains(): Array<{ id: number; name: string; testnet: boolean }> {
+  getSupportedChains(): ChainConfig[] {
     return this.supportedChains.map((chain) => ({
       id: chain.id,
       name: chain.name,
+      rpcUrl: chain.rpcUrls.default.http[0],
+      explorerUrl: chain.blockExplorers?.default?.url || '',
+      nativeCurrency: chain.nativeCurrency,
       testnet: 'testnet' in chain ? chain.testnet : false,
     }));
   }
 
   /**
-   * Execute ERC20 token transfer using AA
+   * Check if a chain is supported by this service
    */
-  async executeERC20Transfer(
-    sessionConfig: SessionKeyConfig,
-    tokenAddress: string,
-    toAddress: string,
-    amount: string,
-    decimals: number = 18,
-  ): Promise<{
-    hash: string;
-    success: boolean;
-    gasUsed?: string;
-    error?: string;
-  }> {
+  isChainSupported(chainId: number): boolean {
+    return this.supportedChains.some((chain) => chain.id === chainId);
+  }
+
+  /**
+   * Execute a standard blockchain transaction (delegates to executeWithSessionKey)
+   */
+  async executeTransaction(
+    transaction: BlockchainTransactionRequest,
+    walletConfig: { privateKey: string; address: string },
+  ): Promise<BlockchainTransactionResult> {
+    // Convert wallet config to session config for AA execution
+    const sessionConfig = {
+      sessionPrivateKey: walletConfig.privateKey,
+      smartWalletAddress: walletConfig.address,
+      chainId: transaction.chainId,
+      permissions: {
+        operations: ['eth_transfer', 'erc20_transfer', 'contract_interaction'],
+        maxAmountPerTx: '1000000', // High limit for general use
+        maxDailyAmount: '10000000', // High limit for general use
+        validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      },
+    };
+
+    return await this.executeWithSessionKey(sessionConfig, transaction);
+  }
+
+  /**
+   * Estimate gas for a transaction (uses internal gas estimation)
+   */
+  async estimateGas(transaction: BlockchainTransactionRequest): Promise<GasEstimate> {
     try {
-      // Validate and normalize amount
-      const normalizedAmount = this.validateAndNormalizeValue(amount);
+      // Create a dummy UserOperation for gas estimation
+      const dummyUserOp = {
+        sender: transaction.to, // Use recipient as dummy sender
+        nonce: '0x0',
+        initCode: '0x',
+        callData: transaction.data || '0x',
+        callGasLimit: '0x0',
+        verificationGasLimit: '0x0',
+        preVerificationGas: '0x0',
+        maxFeePerGas: '0x0',
+        maxPriorityFeePerGas: '0x0',
+        paymasterAndData: '0x',
+        signature: '0x',
+      };
 
-      // Encode ERC20 transfer data
-      const transferData = encodeFunctionData({
-        abi: ERC20_ABI,
-        functionName: 'transfer',
-        args: [toAddress as Address, parseUnits(normalizedAmount, decimals)],
-      });
+      const { bundlerUrl } = this.createClients(transaction.chainId);
+      const gasEstimates = await this.estimateUserOperationGas(
+        dummyUserOp,
+        bundlerUrl,
+      );
 
-      // Execute as contract interaction using AA
-      return await this.executeWithSessionKey(sessionConfig, {
-        to: tokenAddress,
-        value: '0',
-        data: transferData,
-        chainId: sessionConfig.chainId,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to execute ERC20 transfer: ${error}`);
       return {
-        hash: '',
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        callGasLimit: gasEstimates.callGasLimit,
+        verificationGasLimit: gasEstimates.verificationGasLimit,
+        preVerificationGas: gasEstimates.preVerificationGas,
+        maxFeePerGas: gasEstimates.maxFeePerGas,
+        maxPriorityFeePerGas: gasEstimates.maxPriorityFeePerGas,
+      };
+    } catch (error) {
+      this.logger.warn('Gas estimation failed, using defaults', { error });
+      return {
+        callGasLimit: '500000',
+        verificationGasLimit: '600000',
+        preVerificationGas: '100000',
+        maxFeePerGas: '2000000000',
+        maxPriorityFeePerGas: '1000000000',
       };
     }
   }
 
   /**
-   * Get ERC20 token balance
+   * Get current gas prices for the network
    */
-  async getERC20Balance(
-    tokenAddress: string,
-    walletAddress: string,
-    chainId: number,
-  ): Promise<string> {
+  async getCurrentGasPrices(chainId: number): Promise<{
+    maxFeePerGas: string;
+    maxPriorityFeePerGas: string;
+  }> {
     try {
       const { publicClient } = this.createClients(chainId);
 
-      const balance = await publicClient.readContract({
-        address: tokenAddress as Address,
-        abi: ERC20_ABI,
-        functionName: 'balanceOf',
-        args: [walletAddress as Address],
+      const gasPrice = await publicClient.getGasPrice();
+      const maxFeePerGas = (gasPrice * 110n) / 100n; // 110% of current gas price
+      const maxPriorityFeePerGas = gasPrice / 10n; // 10% tip
+
+      return {
+        maxFeePerGas: maxFeePerGas.toString(),
+        maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
+      };
+    } catch (error) {
+      this.logger.warn('Failed to get gas prices, using defaults', { error });
+      return {
+        maxFeePerGas: '2000000000', // 2 gwei
+        maxPriorityFeePerGas: '1000000000', // 1 gwei
+      };
+    }
+  }
+
+  /**
+   * Get native token balance for an address
+   */
+  async getNativeBalance(address: string, chainId: number): Promise<string> {
+    try {
+      const { publicClient } = this.createClients(chainId);
+      const balance = await publicClient.getBalance({
+        address: address as Address,
       });
 
-      return balance.toString();
+      return (Number(balance) / 1e18).toString(); // Convert wei to ether
     } catch (error) {
-      this.logger.error(`Failed to get ERC20 balance: ${error}`);
+      this.logger.error('Failed to get native balance', {
+        error,
+        address,
+        chainId,
+      });
       return '0';
     }
   }
 
   /**
-   * Health check - verify Pimlico API connectivity
+   * Get ERC20 token balance for an address (already implemented)
    */
-  async healthCheck(): Promise<{
+  async getTokenBalance(
+    tokenAddress: string,
+    walletAddress: string,
+    chainId: number,
+  ): Promise<string> {
+    return await this.getERC20Balance(tokenAddress, walletAddress, chainId);
+  }
+
+  /**
+   * Validate a transaction before execution
+   */
+  async validateTransaction(transaction: BlockchainTransactionRequest): Promise<{
+    valid: boolean;
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+
+    // Validate chain support
+    if (!this.isChainSupported(transaction.chainId)) {
+      errors.push(`Unsupported chain ID: ${transaction.chainId}`);
+    }
+
+    // Validate recipient address
+    if (!this.isValidAddress(transaction.to)) {
+      errors.push(`Invalid recipient address: ${transaction.to}`);
+    }
+
+    // Validate amount
+    if (!this.isValidAmount(transaction.value)) {
+      errors.push(`Invalid amount: ${transaction.value}`);
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Health check for the service (already implemented)
+   */
+  async healthCheck(chainId?: number): Promise<{
     healthy: boolean;
-    pimlicoApiConfigured: boolean;
-    supportedChains: number[];
-    bundlerConnectivity?: boolean;
-    paymasterConnectivity?: boolean;
+    latency?: number;
+    blockNumber?: number;
     error?: string;
   }> {
     try {
-      const pimlicoApiConfigured = !!this.pimlicoApiKey;
+      const targetChainId = chainId || seiTestnet.id;
+      const startTime = Date.now();
 
-      if (!pimlicoApiConfigured) {
-        return {
-          healthy: false,
-          pimlicoApiConfigured: false,
-          supportedChains: [],
-          error: 'PIMLICO_API_KEY not configured',
-        };
-      }
-
-      // Test connectivity to SEI testnet
-      const { publicClient, bundlerUrl } = this.createClients(seiTestnet.id);
-
-      // Test basic connectivity
-      let bundlerConnectivity = false;
-      try {
-        const blockNumber = await publicClient.getBlockNumber();
-        bundlerConnectivity = !!blockNumber;
-      } catch (error) {
-        this.logger.warn('SEI testnet connectivity test failed', error);
-      }
-
-      // Test Pimlico API URL configuration
-      let paymasterConnectivity = false;
-      try {
-        // Simple test - bundler URL is properly configured
-        paymasterConnectivity =
-          !!bundlerUrl && bundlerUrl.includes(this.pimlicoApiKey);
-      } catch (error) {
-        this.logger.warn('Pimlico URL configuration test failed', error);
-      }
-
-      const healthy = bundlerConnectivity && paymasterConnectivity;
+      const { publicClient } = this.createClients(targetChainId);
+      const blockNumber = await publicClient.getBlockNumber();
+      const latency = Date.now() - startTime;
 
       return {
-        healthy,
-        pimlicoApiConfigured: true,
-        supportedChains: this.supportedChains.map((c) => c.id),
-        bundlerConnectivity,
-        paymasterConnectivity,
+        healthy: true,
+        latency,
+        blockNumber: Number(blockNumber),
       };
     } catch (error) {
-      this.logger.error(`Pimlico health check failed: ${error}`);
       return {
         healthy: false,
-        pimlicoApiConfigured: !!this.pimlicoApiKey,
-        supportedChains: this.supportedChains.map((c) => c.id),
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  // =============================================================================
+  // Helper Methods for Interface Implementation
+  // =============================================================================
+
+  /**
+   * Check if an address is valid
+   */
+  private isValidAddress(address: string): boolean {
+    if (!address || typeof address !== 'string') {
+      return false;
+    }
+
+    // Basic Ethereum address validation
+    const addressRegex = /^0x[a-fA-F0-9]{40}$/;
+    return addressRegex.test(address);
+  }
+
+  /**
+   * Check if an amount is valid
+   */
+  private isValidAmount(amount: string): boolean {
+    if (!amount && amount !== '0') {
+      return false;
+    }
+
+    const numValue = parseFloat(amount);
+    return !isNaN(numValue) && numValue >= 0;
+  }
+
+  /**
+   * Get explorer URL for a transaction
+   */
+  private getExplorerUrl(chainId: number, transactionHash: string): string {
+    const chain = this.supportedChains.find((c) => c.id === chainId);
+    const baseUrl = chain?.blockExplorers?.default?.url;
+    
+    if (!baseUrl) {
+      return '';
+    }
+
+    return `${baseUrl}/tx/${transactionHash}`;
   }
 }
