@@ -72,10 +72,13 @@ interface WalletConnection {
 interface SessionKeyWallet {
   address: string;
   privateKey: string;
+  smartWalletAddress: string; // The actual smart wallet address that owns this session key
   ownerPrivateKey?: string; // EOA private key for smart wallet ownership
   chainId: string;
   sessionKeyId: string;
   permissions: any[];
+  validUntil: string;
+  delegationSignature: string;
 }
 
 /**
@@ -211,8 +214,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         });
       } else {
         // Enhanced session key validation
+        // Determine operation type based on transaction
+        const operation = tokenAddress ? 'erc20_transfer' : 'eth_transfer';
+
         const sessionKeyValidation = await this.validateSessionKey(context, {
-          operation: 'send',
+          operation,
           chainId,
           amount,
           toAddress: recipientAddress,
@@ -266,20 +272,35 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         },
       );
 
+      // Check if transaction actually succeeded
+      const isSuccess =
+        transactionResult.status === 'success' &&
+        !!transactionResult.transactionHash;
+
       return [
         {
           json: {
-            success: true,
-            transactionHash: transactionResult.transactionHash,
+            success: isSuccess,
+            transactionHash: transactionResult.transactionHash || '',
             chainId,
             recipientAddress,
             amount,
             tokenAddress,
-            gasUsed: transactionResult.gasUsed,
-            blockNumber: transactionResult.blockNumber,
+            // Convert BigInt values to numbers to prevent serialization errors
+            gasUsed:
+              typeof transactionResult.gasUsed === 'bigint'
+                ? Number(transactionResult.gasUsed)
+                : transactionResult.gasUsed || 0,
+            blockNumber:
+              typeof transactionResult.blockNumber === 'bigint'
+                ? Number(transactionResult.blockNumber)
+                : transactionResult.blockNumber || 0,
             executionTime,
             sessionKeyId: context.blockchainAuthorization?.sessionKeyId,
             timestamp: new Date().toISOString(),
+            error: !isSuccess
+              ? 'Transaction failed or returned empty hash'
+              : undefined,
           },
         },
       ];
@@ -504,11 +525,33 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
           params.chainId,
         );
         authMethod.aaData = {
-          smartWalletAddress: sessionWallet.address,
-          ownerAddress: sessionWallet.address, // For session keys, owner is the session key itself
+          smartWalletAddress: sessionWallet.smartWalletAddress, // Use the actual smart wallet address
+          ownerAddress: sessionWallet.smartWalletAddress, // Smart wallet owner address
+          sessionKeyAddress: sessionWallet.address, // Session key address for signing
           sessionKeyId: authMethod.sessionKeyId,
+          // Add required fields for validation from session key data
+          signature: sessionWallet.delegationSignature,
+          expiresAt: sessionWallet.validUntil,
+          operations: sessionWallet.permissions.map((p) => p.operation) || [
+            'eth_transfer',
+            'erc20_transfer',
+          ],
+          maxAmountPerTx:
+            sessionWallet.permissions.length > 0
+              ? sessionWallet.permissions[0].maxAmountPerTx
+              : '1.0',
           // Note: smartAccountClient will be created on-demand using Pimlico service
         };
+
+        context.logger.info('Created AA data for session key', {
+          sessionKeyAddress: sessionWallet.address,
+          smartWalletAddress: sessionWallet.smartWalletAddress,
+          sessionKeyId: authMethod.sessionKeyId,
+          aaDataSmartWallet: authMethod.aaData.smartWalletAddress,
+          aaDataOwner: authMethod.aaData.ownerAddress,
+          hasSignature: !!authMethod.aaData.signature,
+          expiresAt: authMethod.aaData.expiresAt,
+        });
       }
 
       return this.executeAATransactionWithDelegation(
@@ -593,8 +636,27 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         };
       }
 
-      // Fallback: Check for legacy useAA format
+      // Fallback: Check for legacy useAA format or session key delegation
       if (parsedData.useAA === true) {
+        // If this has a sessionKeyId, we need to fetch session key data to get smart wallet address
+        if (parsedData.sessionKeyId) {
+          context.logger.info(
+            'Detected session key delegation with useAA=true',
+            {
+              sessionKeyId: parsedData.sessionKeyId,
+              operations: parsedData.operations,
+            },
+          );
+
+          return {
+            useAA: true,
+            delegationMode: 'delegated', // Session key delegation
+            sessionKeyId: parsedData.sessionKeyId,
+            // aaData will be populated later in executeTransactionWithAuth
+          };
+        }
+
+        // Legacy AA format without session key
         return {
           useAA: true,
           delegationMode: 'hybrid',
@@ -635,8 +697,21 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       recipientAddress: string;
     },
   ): Promise<void> {
+    // Debug: Log AA data at validation point
+    this.logger.log('Validating AA authorization', {
+      hasAAData: !!aaData,
+      smartWalletAddress: aaData?.smartWalletAddress,
+      ownerAddress: aaData?.ownerAddress,
+      sessionKeyId: aaData?.sessionKeyId,
+      hasSignature: !!aaData?.signature,
+      expiresAt: aaData?.expiresAt,
+    });
+
     // Basic AA data validation
     if (!aaData.smartWalletAddress) {
+      this.logger.error('AA validation failed: missing smartWalletAddress', {
+        aaData,
+      });
       throw new Error('Smart wallet address is required for AA transactions');
     }
 
@@ -777,7 +852,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
               try {
                 // Create smart account in delegated mode
                 kernelClient = await this.pimlicoService.createSmartAccount({
-                  ownerEOA: aaData.ownerAddress,
+                  ownerPrivateKey: formattedPk,
                   chainId: chainIdNumber,
                   delegationMode: 'delegated',
                 });
@@ -816,7 +891,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
                     // Retry the session key transaction now that the smart wallet is deployed
                     kernelClient = await this.pimlicoService.createSmartAccount(
                       {
-                        ownerEOA: aaData.ownerAddress,
+                        ownerPrivateKey: formattedPk,
                         chainId: chainIdNumber,
                         delegationMode: 'delegated',
                       },
@@ -849,7 +924,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
               );
 
               kernelClient = await this.pimlicoService.createSmartAccount({
-                ownerEOA: aaData.ownerAddress,
+                ownerPrivateKey: hybridSessionWallet.privateKey,
                 chainId: chainIdNumber,
                 delegationMode: 'hybrid',
               });
@@ -885,10 +960,28 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       let sessionKeyData: any = null;
       if (context.blockchainAuthorization?.sessionKeyId) {
         try {
-          sessionKeyData =
+          // Query session key data (caching disabled to avoid BigInt serialization)
+          const rawSessionKeyData =
             await this.databaseService.prisma.sessionKey.findUnique({
               where: { id: context.blockchainAuthorization.sessionKeyId },
             });
+
+          // Convert BigInt fields to strings to avoid serialization issues
+          if (rawSessionKeyData) {
+            sessionKeyData = {
+              ...rawSessionKeyData,
+              // Ensure all potentially BigInt fields are converted to strings
+              nonce: rawSessionKeyData.nonce
+                ? rawSessionKeyData.nonce.toString()
+                : '0',
+              totalUsedAmount: rawSessionKeyData.totalUsedAmount
+                ? rawSessionKeyData.totalUsedAmount.toString()
+                : '0',
+              dailyUsedAmount: rawSessionKeyData.dailyUsedAmount
+                ? rawSessionKeyData.dailyUsedAmount.toString()
+                : '0',
+            };
+          }
           if (!sessionKeyData) {
             throw new Error(
               `Session key not found: ${context.blockchainAuthorization.sessionKeyId}`,
@@ -912,34 +1005,29 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         hasSessionKey: !!sessionKeyData,
       });
 
-      // Parse delegation data for session key execution
-      let delegationData = null;
-      let userSignature = '';
+      // For session key execution, use the signature directly (it's already the parent delegation signature)
+      const userSignature = aaData.signature;
 
-      try {
-        if (aaData.signature) {
-          delegationData = JSON.parse(aaData.signature);
-          // Extract the original user signature used for session key encryption
-          userSignature =
-            delegationData.signature ||
-            context.blockchainAuthorization?.delegationSignature ||
-            '';
-        } else {
-          userSignature =
-            context.blockchainAuthorization?.delegationSignature || '';
-        }
-
-        if (!userSignature) {
-          throw new Error(
-            'User signature not available for session key decryption',
-          );
-        }
-      } catch (error) {
-        context.logger.error('Failed to parse delegation data', {
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        throw new Error('Invalid delegation format for session key execution');
+      if (!userSignature) {
+        context.logger.error(
+          'Missing user signature for session key decryption',
+          {
+            hasSignature: !!aaData.signature,
+            aaDataKeys: Object.keys(aaData),
+          },
+        );
+        throw new Error(
+          'User signature not available for session key decryption',
+        );
       }
+
+      context.logger.debug(
+        'Using parent delegation signature for session key decryption',
+        {
+          signatureLength: userSignature.length,
+          signaturePreview: userSignature.substring(0, 20) + '...',
+        },
+      );
 
       if (params.tokenAddress) {
         // ERC20 transfer using contract interaction
@@ -958,7 +1046,6 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         const pimlicoResult = await this.pimlicoService.executeWithSessionKey(
           {
             sessionPrivateKey: decryptedSessionKey,
-            ownerEOA: delegationData?.owner || aaData.ownerAddress, // EOA address for smart wallet ownership verification
             smartWalletAddress: aaData.smartWalletAddress,
             chainId: chainIdNumber,
             permissions: {
@@ -969,7 +1056,6 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
                 aaData.expiresAt || Date.now() + 24 * 60 * 60 * 1000,
               ),
             },
-            delegationData: delegationData, // Pass delegation data for signature verification
           },
           {
             to: params.tokenAddress,
@@ -996,7 +1082,6 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         const pimlicoResult = await this.pimlicoService.executeWithSessionKey(
           {
             sessionPrivateKey: decryptedSessionKey,
-            ownerEOA: delegationData?.owner || aaData.ownerAddress, // EOA address for smart wallet ownership verification
             smartWalletAddress: aaData.smartWalletAddress,
             chainId: chainIdNumber,
             permissions: {
@@ -1007,7 +1092,6 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
                 aaData.expiresAt || Date.now() + 24 * 60 * 60 * 1000,
               ),
             },
-            delegationData: delegationData, // Pass delegation data for signature verification
           },
           {
             to: recipientAddress,
@@ -1144,7 +1228,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
           // createSmartAccount now returns the smart account info
           aaData.kernelClient = await this.pimlicoService.createSmartAccount({
-            ownerEOA: aaData.ownerAddress,
+            ownerPrivateKey: formattedPk,
             chainId: chainIdNumber,
           });
 
@@ -1202,7 +1286,6 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         const pimlicoResult = await this.pimlicoService.executeWithSessionKey(
           {
             sessionPrivateKey: sessionWallet.privateKey,
-            ownerEOA: sessionDelegationData?.owner || aaData.ownerAddress, // EOA address for smart wallet ownership verification
             smartWalletAddress: aaData.smartWalletAddress,
             chainId: chainIdNumber,
             permissions: {
@@ -1213,7 +1296,6 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
                 aaData.expiresAt || Date.now() + 24 * 60 * 60 * 1000,
               ),
             },
-            delegationData: sessionDelegationData,
           },
           {
             to: params.tokenAddress,
@@ -1234,7 +1316,6 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         const pimlicoResult = await this.pimlicoService.executeWithSessionKey(
           {
             sessionPrivateKey: sessionWallet.privateKey,
-            ownerEOA: sessionDelegationData?.owner || aaData.ownerAddress, // EOA address for smart wallet ownership verification
             smartWalletAddress: aaData.smartWalletAddress,
             chainId: chainIdNumber,
             permissions: {
@@ -1245,7 +1326,6 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
                 aaData.expiresAt || Date.now() + 24 * 60 * 60 * 1000,
               ),
             },
-            delegationData: sessionDelegationData,
           },
           {
             to: recipientAddress,
@@ -1827,19 +1907,33 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
       const { data: sessionKey } = await response.json();
 
-      // Determine the decryption message: support wrapped JSON or raw string
-      const rawDelegation = context.blockchainAuthorization.delegationSignature;
-      let decryptionMessage = rawDelegation;
-      try {
-        const parsed = JSON.parse(rawDelegation);
-        if (parsed && typeof parsed.encryptionMessage === 'string') {
-          decryptionMessage = parsed.encryptionMessage;
-        }
-      } catch {
-        // keep raw string
-      }
+      // Debug: Log the session key data to verify smartWalletOwner is present
+      this.logger.log('Session key data received from API', {
+        sessionKeyId: sessionKeyId.substring(0, 8) + '...',
+        walletAddress: sessionKey.walletAddress,
+        smartWalletOwner: sessionKey.smartWalletOwner,
+        chainId: sessionKey.chainId,
+        hasPermissions: sessionKey.permissions?.length > 0,
+        validUntil: sessionKey.validUntil,
+        hasEncryptedKey: !!sessionKey.encryptedPrivateKey,
+        hasParentSignature: !!sessionKey.parentDelegationSignature,
+        parentSignatureLength:
+          sessionKey.parentDelegationSignature?.length || 0,
+        parentSignaturePreview:
+          sessionKey.parentDelegationSignature?.substring(0, 20) + '...',
+      });
 
-      // Decrypt the session private key using the delegation message
+      // Use the actual user signature from the database for decryption
+      // The parentDelegationSignature is the signature that was used to encrypt the session key
+      const decryptionMessage = sessionKey.parentDelegationSignature;
+
+      this.logger.debug('Using parent delegation signature for decryption', {
+        sessionKeyId: sessionKeyId.substring(0, 8) + '...',
+        hasParentSignature: !!decryptionMessage,
+        signatureLength: decryptionMessage?.length || 0,
+      });
+
+      // Decrypt the session private key using the parent delegation signature
       const privateKey = await this.decryptSessionKey(
         sessionKey.encryptedPrivateKey,
         decryptionMessage,
@@ -1848,9 +1942,12 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       return {
         address: sessionKey.walletAddress,
         privateKey: privateKey,
+        smartWalletAddress: sessionKey.smartWalletOwner,
         chainId: chainId,
         sessionKeyId: sessionKeyId,
         permissions: sessionKey.permissions,
+        validUntil: sessionKey.validUntil,
+        delegationSignature: sessionKey.parentDelegationSignature,
       };
     } catch (error) {
       this.logger.error('Failed to get session key wallet', {
@@ -1887,6 +1984,17 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       const crypto = require('crypto');
       const { promisify } = require('util');
 
+      this.logger.debug('Starting session key decryption', {
+        encryptedKeyLength: encryptedPrivateKey?.length || 0,
+        signatureLength: delegationSignature?.length || 0,
+        signatureType: typeof delegationSignature,
+        signaturePreview: delegationSignature?.substring(0, 20) + '...',
+      });
+
+      if (!encryptedPrivateKey || !delegationSignature) {
+        throw new Error('Missing encrypted key or delegation signature');
+      }
+
       // Constants matching SessionKeyCryptoService
       const algorithm = 'aes-256-gcm';
       const keyLength = 32;
@@ -1895,7 +2003,22 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       const saltLength = 32;
 
       // Parse the base64 encoded data (salt + iv + tag + encrypted)
-      const combined = Buffer.from(encryptedPrivateKey, 'base64');
+      let combined;
+      try {
+        combined = Buffer.from(encryptedPrivateKey, 'base64');
+        this.logger.debug('Successfully parsed base64 encrypted key', {
+          combinedLength: combined.length,
+          expectedMinLength: saltLength + ivLength + tagLength + 32, // minimum for encrypted data
+        });
+      } catch (error) {
+        throw new Error(`Invalid base64 encrypted key: ${error.message}`);
+      }
+
+      if (combined.length < saltLength + ivLength + tagLength) {
+        throw new Error(
+          `Encrypted key too short: ${combined.length} bytes, expected at least ${saltLength + ivLength + tagLength}`,
+        );
+      }
 
       // Extract components
       const salt = combined.slice(0, saltLength);
@@ -1906,25 +2029,54 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       );
       const encrypted = combined.slice(saltLength + ivLength + tagLength);
 
+      this.logger.debug('Extracted encryption components', {
+        saltLength: salt.length,
+        ivLength: iv.length,
+        tagLength: tag.length,
+        encryptedLength: encrypted.length,
+      });
+
       // Derive key from delegation signature using scrypt (same as encryption)
       const scryptAsync = promisify(crypto.scrypt);
-      const key = await scryptAsync(delegationSignature, salt, keyLength);
+      let key;
+      try {
+        key = await scryptAsync(delegationSignature, salt, keyLength);
+        this.logger.debug('Successfully derived decryption key');
+      } catch (error) {
+        throw new Error(`Key derivation failed: ${error.message}`);
+      }
 
       // Create decipher
-      const decipher = crypto.createDecipheriv(algorithm, key, iv);
-      decipher.setAuthTag(tag);
+      let decipher;
+      try {
+        decipher = crypto.createDecipheriv(algorithm, key, iv);
+        decipher.setAuthTag(tag);
+        this.logger.debug('Successfully created decipher');
+      } catch (error) {
+        throw new Error(`Decipher creation failed: ${error.message}`);
+      }
 
       // Decrypt the private key
-      let decrypted = decipher.update(encrypted, null, 'utf8');
-      decrypted += decipher.final('utf8');
+      let decrypted;
+      try {
+        decrypted = decipher.update(encrypted, null, 'utf8');
+        decrypted += decipher.final('utf8');
+        this.logger.debug('Session key decrypted successfully', {
+          decryptedLength: decrypted?.length || 0,
+        });
+      } catch (error) {
+        throw new Error(`Decryption failed: ${error.message}`);
+      }
 
-      this.logger.debug('Session key decrypted successfully');
       return decrypted;
     } catch (error) {
       this.logger.error('Failed to decrypt session key', {
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      throw new Error('Session key decryption failed');
+      throw new Error(
+        `Session key decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -2156,11 +2308,20 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   private getChainIdNumber(chainId: string): number {
     const chainIds = {
       '1328': 1328,
+      'sei-testnet': 1328, // Added mapping for sei-testnet
       'ethereum-sepolia': 11155111,
       'base-sepolia': 84532,
     };
 
-    return chainIds[chainId as keyof typeof chainIds] || 713715;
+    const result = chainIds[chainId as keyof typeof chainIds];
+    if (!result) {
+      this.logger.error(
+        `Unsupported chain ID: ${chainId}. Supported chains: ${Object.keys(chainIds).join(', ')}`,
+      );
+      throw new Error(`Unsupported chain ID: ${chainId}`);
+    }
+
+    return result;
   }
 
   /**

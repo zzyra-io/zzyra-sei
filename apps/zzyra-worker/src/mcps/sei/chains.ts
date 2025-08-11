@@ -1,4 +1,5 @@
 import type { Chain } from 'viem';
+import { seiTestnet } from 'viem/chains';
 // SEI chains not available in viem v1.19.4, define manually
 const sei = {
   id: 1329,
@@ -26,21 +27,6 @@ const seiDevnet = {
   blockExplorers: {
     default: { name: 'Seitrace', url: 'https://seitrace.com' },
   },
-} as const;
-
-const seiTestnet = {
-  id: 1328,
-  name: 'SEI Testnet',
-  network: 'sei-testnet',
-  nativeCurrency: { name: 'SEI', symbol: 'SEI', decimals: 18 },
-  rpcUrls: {
-    default: { http: ['https://evm-rpc.sei-apis.com'] },
-    public: { http: ['https://evm-rpc.sei-apis.com'] },
-  },
-  blockExplorers: {
-    default: { name: 'Seitrace', url: 'https://seitrace.com' },
-  },
-  testnet: true,
 } as const;
 
 // Default configuration values - Using testnet for development

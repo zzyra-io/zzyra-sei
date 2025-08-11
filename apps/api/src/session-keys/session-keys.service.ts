@@ -550,6 +550,8 @@ export class SessionKeysService {
       id: sessionKey.id,
       userId: sessionKey.userId,
       walletAddress: sessionKey.walletAddress,
+      smartWalletOwner: sessionKey.smartWalletOwner, // Added for worker
+      parentWalletAddress: sessionKey.parentWalletAddress, // Added for worker
       chainId: sessionKey.chainId,
       sessionPublicKey: sessionKey.sessionPublicKey,
       encryptedPrivateKey: sessionKey.encryptedPrivateKey,
@@ -564,6 +566,7 @@ export class SessionKeysService {
       dailyUsedAmount: sessionKey.dailyUsedAmount.toString(),
       lastUsedAt: sessionKey.lastUsedAt,
       dailyResetAt: sessionKey.dailyResetAt,
+      parentDelegationSignature: sessionKey.parentDelegationSignature, // Added for decryption
       permissions:
         sessionKey.permissions?.map((p: any) => ({
           operation: p.operation,

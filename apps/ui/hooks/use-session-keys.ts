@@ -157,22 +157,23 @@ export function useSessionKeyMetrics() {
 
 /**
  * Hook for creating session keys with Dynamic SDK integration
+ * FIXED: Now uses real wallet signatures for proper encryption
  */
 export function useSessionKeyCreation() {
   const [isCreating, setIsCreating] = useState(false);
   const { createSessionKey } = useSessionKeys();
-  const { isLoggedIn, getCurrentUser } = useDynamicAuth();
+  const { isLoggedIn, getCurrentUser, primaryWallet } = useDynamicAuth();
 
   const createWithDynamic = useCallback(
     async (request: CreateSessionKeyRequest) => {
       setIsCreating(true);
       try {
         const currentUser = getCurrentUser();
-        if (!isLoggedIn || !currentUser?.walletAddress) {
-          throw new Error("No wallet address found");
+        if (!isLoggedIn || !currentUser?.walletAddress || !primaryWallet) {
+          throw new Error("Wallet not properly connected");
         }
 
-        // Create delegation message
+        // Create delegation message for signing
         const delegationMessage = {
           userAddress: currentUser.walletAddress,
           chainId: request.chainId,
@@ -180,30 +181,41 @@ export function useSessionKeyCreation() {
           validUntil: request.validUntil.toISOString(),
           permissions: request.permissions,
           timestamp: new Date().toISOString(),
+          purpose: "zyra_session_key_delegation",
         };
 
-        // Sign the delegation message with the user's wallet using Dynamic SDK
-        const messageToSign = JSON.stringify(delegationMessage);
+        // Sign the delegation message with the user's REAL wallet
+        const messageToSign = JSON.stringify(delegationMessage, null, 2);
+        const userSignature = await primaryWallet.signMessage(messageToSign);
+        
+        if (!userSignature) {
+          throw new Error("User signature required for session key creation");
+        }
 
-        // For now, use a simple signature mechanism
-        // In production, you would use Dynamic's wallet signing
-        const signature = Buffer.from(messageToSign).toString("base64");
+        console.log("Real wallet signature obtained for session key", {
+          messageLength: messageToSign.length,
+          signatureLength: userSignature.length,
+          walletAddress: currentUser.walletAddress
+        });
 
-        // Create session key via API with Dynamic authentication
+        // Create session key via API with REAL signature
         const result = await createSessionKey({
           request: {
             ...request,
             walletAddress: currentUser.walletAddress,
           },
-          signature: signature,
+          signature: userSignature, // REAL cryptographic signature
         });
 
         return result;
+      } catch (error) {
+        console.error("Failed to create session key with real signature:", error);
+        throw error;
       } finally {
         setIsCreating(false);
       }
     },
-    [createSessionKey, isLoggedIn, getCurrentUser]
+    [createSessionKey, isLoggedIn, getCurrentUser, primaryWallet]
   );
 
   return {

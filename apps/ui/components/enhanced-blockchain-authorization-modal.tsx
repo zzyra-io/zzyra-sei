@@ -36,12 +36,8 @@ import {
 } from "@zzyra/types";
 import { useToast } from "@/components/ui/use-toast";
 import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
-import {
-  usePimlicoSmartAccount,
-  SmartWalletDelegationResult,
-} from "@/hooks/use-pimlico-smart-account";
+import { useSmartWalletDelegation } from "@/hooks/use-smart-wallet-delegation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import api from "@/lib/services/api";
 
 interface SelectedTool {
   id: string;
@@ -152,6 +148,13 @@ function detectChainsFromTools(tools: SelectedTool[]): string[] {
   return Array.from(chains);
 }
 
+// Memoize default spending values
+const DEFAULT_SPENDING_BY_CHAIN = {
+  "1328": "1.0",
+  "base-sepolia": "0.01",
+  "ethereum-sepolia": "0.001",
+} as const;
+
 function calculateEstimatedSpendingByChain(
   blockchainNodes: BlockchainNode[]
 ): Record<string, string> {
@@ -168,12 +171,10 @@ function calculateEstimatedSpendingByChain(
         );
         spending[chain] = (current + additional).toString();
       } else {
-        const defaults = {
-          "1328": "1.0",
-          "base-sepolia": "0.01",
-          "ethereum-sepolia": "0.001",
-        };
-        const defaultValue = defaults[chain as keyof typeof defaults];
+        const defaultValue =
+          DEFAULT_SPENDING_BY_CHAIN[
+            chain as keyof typeof DEFAULT_SPENDING_BY_CHAIN
+          ];
         spending[chain] = defaultValue || "1.0";
       }
     });
@@ -191,14 +192,43 @@ export function EnhancedBlockchainAuthorizationModal({
   const { toast } = useToast();
   const { isLoggedIn, getCurrentUser } = useDynamicAuth();
   const {
-    createSmartWalletDelegation,
-    isCreatingDelegation,
-    smartAccountAddress,
-    isDeploying,
-  } = usePimlicoSmartAccount();
+    createDelegation,
+    createDelegationWithPasskey,
+    isCreating,
+    getWalletStatus,
+  } = useSmartWalletDelegation();
+
+  // Add error boundary state
+  const [hasError, setHasError] = useState(false);
+
+  // Reset error state when modal opens
+  useEffect(() => {
+    if (open) {
+      setHasError(false);
+    }
+  }, [open]);
 
   // Detect blockchain operations - memoize to prevent infinite re-renders
-  const authData = useMemo(() => detectBlockchainOperations(nodes), [nodes]);
+  const authData = useMemo(() => {
+    if (!nodes || nodes.length === 0) {
+      return {
+        blockchainNodes: [],
+        supportedChains: [],
+        estimatedSpending: {},
+      };
+    }
+    try {
+      return detectBlockchainOperations(nodes);
+    } catch (error) {
+      console.error("Error detecting blockchain operations in modal:", error);
+      setHasError(true);
+      return {
+        blockchainNodes: [],
+        supportedChains: [],
+        estimatedSpending: {},
+      };
+    }
+  }, [nodes]);
 
   // Enhanced state for session key configuration
   const [securityLevel, setSecurityLevel] = useState<SecurityLevel>(
@@ -217,124 +247,81 @@ export function EnhancedBlockchainAuthorizationModal({
   >({});
 
   const [duration, setDuration] = useState("24");
-  const [deploymentAttempts, setDeploymentAttempts] = useState(0);
-  const [isRetryingDeployment, setIsRetryingDeployment] = useState(false);
 
   // Error dialog state
   const [errorDialog, setErrorDialog] = useState<{
     show: boolean;
-    error?: NonNullable<SmartWalletDelegationResult["error"]>;
+    error?: {
+      message: string;
+      userGuidance: string;
+      technicalDetails: string;
+      canRetry: boolean;
+      type?: string;
+    };
   }>({ show: false });
 
   // Get wallet status for better error handling
   const walletStatus = getWalletStatus();
-  const canCreateDelegation = isLoggedIn && walletStatus.hasSmartWallet;
 
   // Use ref to prevent unnecessary effect runs
   const hasInitialized = useRef(false);
 
-  // Update chainConfigs only when authData changes, not on every render
+  // Initialize chainConfigs when modal opens and authData changes
   useEffect(() => {
-    if (authData?.supportedChains && Array.isArray(authData.supportedChains)) {
-      setChainConfigs((prevConfigs) => {
-        // Check if we actually need to update anything
-        const hasChanges = authData.supportedChains.some((chain) => {
-          const existing = prevConfigs[chain];
-          const newSpending = authData.estimatedSpending[chain] || "1.0";
-          return !existing || existing.spending !== newSpending;
-        });
+    if (open && authData && !hasInitialized.current) {
+      const supportedChains = authData.supportedChains || [];
+      const estimatedSpending = authData.estimatedSpending || {};
 
-        // Only update if there are actual changes
-        if (!hasChanges) {
-          return prevConfigs;
-        }
-
+      if (supportedChains.length > 0) {
         const newConfigs: Record<
           string,
           { spending: string; enabled: boolean }
         > = {};
-        authData.supportedChains.forEach((chain) => {
-          // Preserve existing config if available, otherwise create new
-          newConfigs[chain] = prevConfigs[chain] || {
-            spending: authData.estimatedSpending[chain] || "1.0",
+
+        supportedChains.forEach((chain) => {
+          newConfigs[chain] = {
+            spending: estimatedSpending[chain] || "1.0",
             enabled: true,
           };
         });
 
+        setChainConfigs(newConfigs);
         hasInitialized.current = true;
-        return newConfigs;
-      });
+      }
     }
-  }, [authData]); // Use the memoized authData object
+  }, [open, authData]);
 
   const handleClose = () => {
+    // Reset all state when closing to prevent issues
+    hasInitialized.current = false;
+    setChainConfigs({});
+    setSecurityLevel(SecurityLevel.BASIC);
+    setRequireConfirmation(false);
     onCancel();
   };
 
-  const showDeploymentErrorDialog = (
-    error: NonNullable<SmartWalletDelegationResult["error"]>
-  ) => {
-    setErrorDialog({ show: true, error });
-  };
-
-  const showManualActionDialog = (
-    error: NonNullable<SmartWalletDelegationResult["error"]>
-  ) => {
-    setErrorDialog({ show: true, error });
-  };
+  // Reset state when modal is closed
+  useEffect(() => {
+    if (!open) {
+      hasInitialized.current = false;
+      setChainConfigs({});
+    }
+  }, [open]);
 
   const closeErrorDialog = () => {
     setErrorDialog({ show: false });
   };
 
-  const retrySmartWalletDeployment = async () => {
-    if (!walletStatus.hasSmartWallet) {
-      toast({
-        title: "Smart Wallet Required",
-        description:
-          "Please ensure you have an embedded wallet (Email/SMS login) before retrying.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsRetryingDeployment(true);
-    setDeploymentAttempts((prev) => prev + 1);
-
-    try {
-      // Show immediate feedback
-      toast({
-        title: "Retrying Smart Wallet Setup",
-        description: `Attempt ${deploymentAttempts + 1}: Setting up your smart wallet...`,
-      });
-
-      // Try the delegation creation again
-      await handleAuthorize();
-    } catch (error) {
-      console.error("Retry failed:", error);
-      toast({
-        title: "Retry Failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Smart wallet setup failed again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRetryingDeployment(false);
-    }
-  };
-
   const handleAuthorize = async () => {
+    // Get wallet status for all checks
+    const walletStatus = getWalletStatus();
+
     // Pre-flight wallet status check
     if (!walletStatus.hasSmartWallet) {
-      const errorMsg = walletStatus.isEmbedded
-        ? "Smart wallet not available. This might be a configuration issue. Please check the wallet status below or try refreshing the page."
-        : "Smart wallet required. Please disconnect your current wallet and login with Email/SMS to create an embedded wallet with Account Abstraction support.";
-
       toast({
-        title: "Smart Wallet Required",
-        description: errorMsg,
+        title: "Wallet Required",
+        description:
+          "Please connect your wallet and complete login to continue.",
         variant: "destructive",
       });
       return;
@@ -374,11 +361,17 @@ export function EnhancedBlockchainAuthorizationModal({
       }
 
       const currentUser = getCurrentUser();
+      console.log("🔍 Authentication state check:", {
+        isLoggedIn,
+        hasCurrentUser: !!currentUser,
+        currentUser,
+        walletStatus,
+      });
+
       if (!isLoggedIn || !currentUser) {
         throw new Error("Dynamic wallet not connected");
       }
       console.log("selectedChains", selectedChains);
-      console.log("Wallet status:", walletStatus);
 
       // Get the first selected chain (we know it exists due to the length check above)
       const primaryChain = selectedChains[0];
@@ -386,89 +379,66 @@ export function EnhancedBlockchainAuthorizationModal({
         throw new Error("No primary chain selected");
       }
 
-      // Create Smart Wallet (AA) delegation - Single production path
-      const delegationResult = await createSmartWalletDelegation({
-        chainId: primaryChain.chainId,
-        operations: ["eth_transfer", "erc20_transfer"],
-        maxAmountPerTx: primaryChain.maxDailySpending,
-        maxDailyAmount: primaryChain.maxDailySpending,
-        duration: parseInt(duration),
+      // Create delegation for the primary chain (simplified approach)
+      // Only use passkey for explicitly Dynamic embedded wallets
+      // Everything else (including MetaMask, WalletConnect, etc.) uses regular wallet signing
+      const isEmbeddedWallet =
+        walletStatus.walletType &&
+        (walletStatus.walletType.includes("Dynamic") ||
+          walletStatus.walletType.includes("Embedded"));
+
+      console.log("🔍 Wallet detection for delegation:", {
+        walletType: walletStatus.walletType,
+        connectorName: walletStatus.walletType,
+        isEmbeddedWallet,
+        hasSmartWallet: walletStatus.hasSmartWallet,
+        detectionLogic: {
+          hasWalletType: !!walletStatus.walletType,
+          includesMetaMask: walletStatus.walletType?.includes("MetaMask"),
+          includesWalletConnect:
+            walletStatus.walletType?.includes("WalletConnect"),
+        },
       });
 
-      // Handle structured error response
-      if (!delegationResult.success) {
-        const error = delegationResult.error!;
-
-        // Show user-friendly error dialog with retry options
-        if (error.type === "DEPLOYMENT_FAILED" && error.canRetry) {
-          // Show deployment error with retry options
-          showDeploymentErrorDialog(error);
-          return;
-        } else if (
-          error.type === "KERNEL_CLIENT_UNAVAILABLE" &&
-          error.requiresManualAction
-        ) {
-          // Show manual action required error
-          showManualActionDialog(error);
-          return;
-        } else {
-          // Show generic error
-          throw new Error(error.message);
-        }
-      }
-
-      const delegation = delegationResult.delegation!;
-
-      // Create a session key OWNED BY the smart wallet for automated execution
-      const validUntilIso = new Date(
-        Date.now() + parseInt(duration) * 60 * 60 * 1000
-      ).toISOString();
-
-      const createSessionKeyPayload = {
-        walletAddress: delegation.signerAddress, // EOA that authorized the smart wallet
-        smartWalletOwner: delegation.smartWalletAddress, // Smart wallet that owns the session key
+      const delegationParams = {
+        operations: ["eth_transfer", "erc20_transfer", "contract_interaction"],
+        maxAmountPerTx: primaryChain.maxDailySpending,
+        maxDailyAmount: primaryChain.maxDailySpending,
+        validUntil: new Date(Date.now() + parseInt(duration) * 60 * 60 * 1000),
         chainId: primaryChain.chainId,
-        securityLevel,
-        validUntil: validUntilIso,
-        permissions: [
-          {
-            operation: "eth_transfer",
-            maxAmountPerTx: primaryChain.maxDailySpending,
-            maxDailyAmount: primaryChain.maxDailySpending,
-            allowedContracts: [],
-            requireConfirmation,
-            emergencyStop: false,
-          },
-          {
-            operation: "erc20_transfer",
-            maxAmountPerTx: primaryChain.maxDailySpending,
-            maxDailyAmount: primaryChain.maxDailySpending,
-            allowedContracts: [],
-            requireConfirmation,
-            emergencyStop: false,
-          },
-          {
-            operation: "conditional_transfer", // For delayed execution
-            maxAmountPerTx: primaryChain.maxDailySpending,
-            maxDailyAmount: primaryChain.maxDailySpending,
-            allowedContracts: [],
-            requireConfirmation: false, // Automated conditional execution
-            emergencyStop: false,
-          },
-        ],
-        userSignature: delegation.delegationSignature,
+        securityLevel: securityLevel as unknown as
+          | "BASIC"
+          | "ENHANCED"
+          | "MAXIMUM",
       };
 
-      const sessionKeyResponse = await api.post(
-        "/session-keys",
-        createSessionKeyPayload
-      );
-      const sessionKeyId: string =
-        sessionKeyResponse?.data?.data?.sessionKey?.id;
+      // Use passkey method for embedded wallets, regular method for external wallets
+      const delegationResult = isEmbeddedWallet
+        ? await createDelegationWithPasskey(delegationParams)
+        : await createDelegation(delegationParams);
 
-      if (!sessionKeyId) {
-        throw new Error("Failed to create session key for automated execution");
+      // Handle error response
+      if (!delegationResult.success) {
+        toast({
+          title: "Smart Wallet Setup Failed",
+          description:
+            delegationResult.error ||
+            "An unexpected error occurred during smart wallet setup.",
+          variant: "destructive",
+        });
+        return;
       }
+
+      if (!delegationResult.sessionKeyId) {
+        toast({
+          title: "Session Key Creation Failed",
+          description: "Failed to create session key for automated execution.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const sessionKeyId = delegationResult.sessionKeyId;
 
       // Create AA authorization config
       const config: SecureBlockchainAuthConfig = {
@@ -479,24 +449,11 @@ export function EnhancedBlockchainAuthorizationModal({
         requireConfirmation,
         emergencyContacts,
         spendingAlerts,
-        // Store PROPER delegation hierarchy data
+        // Store simplified delegation data
         delegationSignature: JSON.stringify({
           useAA: true,
-          provider: "pimlico",
-
-          // Delegation Chain: EOA → Smart Wallet → Session Key
-          owner: delegation.ownerAddress, // EOA that signed the delegation
-          smartWallet: delegation.smartWalletAddress, // Smart wallet address
-          sessionKeyId: sessionKeyId, // Session key owned by smart wallet
-
-          // Authorization hierarchy
-          delegationChain: {
-            eoa: delegation.ownerAddress,
-            smartWallet: delegation.smartWalletAddress,
-            sessionKey: sessionKeyId,
-          },
-
-          // Permitted operations
+          provider: "dynamic_labs",
+          sessionKeyId: sessionKeyId,
           operations: [
             "eth_transfer",
             "erc20_transfer",
@@ -504,11 +461,10 @@ export function EnhancedBlockchainAuthorizationModal({
           ],
           maxAmountPerTx: primaryChain.maxDailySpending,
           maxDailyAmount: primaryChain.maxDailySpending,
-          validUntil: validUntilIso,
-
-          // Original message used for session key encryption/decryption
-          signature: delegation.delegationSignature,
-          encryptionMessage: delegation.delegationSignature,
+          validUntil: new Date(
+            Date.now() + parseInt(duration) * 60 * 60 * 1000
+          ).toISOString(),
+          authMethod: isEmbeddedWallet ? "passkey" : "wallet",
         }),
         sessionKeyId,
       };
@@ -517,34 +473,18 @@ export function EnhancedBlockchainAuthorizationModal({
 
       toast({
         title: "Smart Wallet Created",
-        description: `AA delegation created for ${selectedChains.length} chain(s) with ${securityLevel} security level.`,
+        description: `AA delegation created for ${selectedChains.length} chain(s) with ${securityLevel} security level using ${isEmbeddedWallet ? "passkey authentication" : "wallet signing"}.`,
       });
     } catch (error) {
       console.error("Authorization error:", error);
-
-      // Enhanced error handling with actionable guidance
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      const isDeploymentError =
-        errorMessage.includes("Smart wallet setup required") ||
-        errorMessage.includes("not deployed") ||
-        errorMessage.includes("deployment");
 
-      if (isDeploymentError) {
-        // This is a deployment-related error - show specific guidance
-        toast({
-          title: "Smart Wallet Setup Required",
-          description: `Your smart wallet needs to be deployed first. ${deploymentAttempts > 0 ? `(Attempt ${deploymentAttempts + 1})` : ""}`,
-          variant: "destructive",
-        });
-      } else {
-        // Other types of errors
-        toast({
-          title: "Authorization Failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Authorization Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
   };
 
@@ -582,7 +522,48 @@ export function EnhancedBlockchainAuthorizationModal({
     });
   };
 
-  // Safety check: don't render if no blockchain operations detected
+  // Safety check: don't render if no blockchain operations detected or if not open
+  if (!open) {
+    return null;
+  }
+
+  // Error state fallback
+  if (hasError) {
+    return (
+      <Dialog open={open} onOpenChange={onCancel}>
+        <DialogContent className='sm:max-w-[400px]'>
+          <DialogHeader>
+            <DialogTitle className='flex items-center gap-3'>
+              <AlertTriangle className='h-6 w-6 text-destructive' />
+              Configuration Error
+            </DialogTitle>
+          </DialogHeader>
+          <div className='space-y-4'>
+            <Alert>
+              <AlertTriangle className='h-4 w-4' />
+              <AlertDescription>
+                There was an error analyzing your workflow for blockchain
+                operations. Please try refreshing the page or contact support if
+                the issue persists.
+              </AlertDescription>
+            </Alert>
+            <div className='flex gap-2 pt-4 border-t'>
+              <Button variant='outline' onClick={onCancel} className='flex-1'>
+                Close
+              </Button>
+              <Button
+                onClick={() => window.location.reload()}
+                className='flex-1'>
+                Refresh Page
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Don't render if no blockchain operations detected
   if (!authData?.blockchainNodes || authData.blockchainNodes.length === 0) {
     return null;
   }
@@ -604,110 +585,27 @@ export function EnhancedBlockchainAuthorizationModal({
           </DialogTitle>
         </DialogHeader>
         <div className='space-y-6'>
-          {/* Wallet Status Warning */}
-          {!walletStatus.hasSmartWallet && (
+          {/* Wallet Status */}
+          {!walletStatus.hasSmartWallet ? (
             <Alert>
               <AlertTriangle className='h-4 w-4' />
               <AlertDescription>
-                <strong>Smart Wallet Required</strong>
+                <strong>Wallet Connection Required</strong>
                 <br />
-                {walletStatus.isEmbedded ? (
-                  <>
-                    You have an embedded wallet but smart wallet is not
-                    available. This might be due to:
-                    <ul className='list-disc list-inside mt-2 space-y-1 text-sm'>
-                      <li>
-                        Smart wallet still being deployed (this can take a
-                        moment)
-                      </li>
-                      <li>Smart wallets not enabled in Dynamic dashboard</li>
-                      <li>ZeroDev configuration issue</li>
-                      <li>Network connectivity issues</li>
-                    </ul>
-                    <div className='mt-3 flex gap-2'>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        onClick={() => window.location.reload()}
-                        disabled={isRetryingDeployment}>
-                        Refresh Page
-                      </Button>
-                      {deploymentAttempts > 0 && (
-                        <Button
-                          variant='outline'
-                          size='sm'
-                          onClick={retrySmartWalletDeployment}
-                          disabled={isRetryingDeployment}>
-                          {isRetryingDeployment
-                            ? "Retrying..."
-                            : `Retry (${deploymentAttempts})`}
-                        </Button>
-                      )}
-                    </div>
-                    <div className='mt-2 text-xs text-muted-foreground'>
-                      Current wallet: {walletStatus.walletType || "Unknown"} |
-                      Status: {walletStatus.message || "Unknown"}
-                      {deploymentAttempts > 0 &&
-                        ` | Deployment attempts: ${deploymentAttempts}`}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    Account Abstraction only works with embedded wallets.
-                    Please:
-                    <ol className='list-decimal list-inside mt-2 space-y-1 text-sm'>
-                      <li>
-                        Disconnect your current wallet
-                        {walletStatus.walletType
-                          ? ` (${walletStatus.walletType})`
-                          : ""}
-                      </li>
-                      <li>
-                        Login with Email or SMS to create an embedded wallet
-                      </li>
-                      <li>Smart wallet will be automatically created</li>
-                    </ol>
-                  </>
-                )}
+                {!walletStatus.connected
+                  ? "Please connect your wallet to continue."
+                  : "Please complete the login process with Dynamic to enable smart wallet features."}
               </AlertDescription>
             </Alert>
-          )}
-          {walletStatus.hasSmartWallet && (
+          ) : (
             <Alert>
               <CheckCircle className='h-4 w-4' />
               <AlertDescription>
-                <strong>Smart Wallet Ready</strong>
+                <strong>Wallet Ready</strong>
                 <br />
-                Your wallet supports Account Abstraction. Ready to create
-                delegation for automated workflows.
-                <div className='mt-1 text-xs text-muted-foreground'>
-                  Smart Wallet: {walletStatus.address?.substring(0, 10)}...
-                  {deploymentAttempts > 0 &&
-                    ` | Previous attempts: ${deploymentAttempts}`}
-                </div>
-                {deploymentAttempts > 2 && (
-                  <div className='mt-2 p-2 bg-yellow-50 rounded text-sm'>
-                    💡 <strong>Tip:</strong> If you continue having issues, try
-                    sending a small transaction (0.001 SEI) from your wallet to
-                    trigger deployment, then refresh this page.
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='ml-2'
-                      onClick={() => {
-                        navigator.clipboard.writeText(
-                          walletStatus.address || ""
-                        );
-                        toast({
-                          title: "Address Copied!",
-                          description:
-                            "Smart wallet address copied to clipboard",
-                        });
-                      }}>
-                      📋 Copy Address
-                    </Button>
-                  </div>
-                )}
+                Connected: {walletStatus.address?.substring(0, 10)}...
+                <br />
+                Ready to create delegation for automated blockchain operations.
               </AlertDescription>
             </Alert>
           )}
@@ -970,32 +868,16 @@ export function EnhancedBlockchainAuthorizationModal({
             <Button
               onClick={handleAuthorize}
               className='flex-1'
-              disabled={
-                isCreatingDelegation ||
-                isRetryingDeployment ||
-                !canCreateDelegation
-              }>
-              {isCreatingDelegation || isRetryingDeployment ? (
+              disabled={isCreating || !walletStatus.hasSmartWallet}>
+              {isCreating ? (
                 <>
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
-                  {isRetryingDeployment
-                    ? `Retrying Setup (${deploymentAttempts})...`
-                    : "Creating Smart Wallet..."}
+                  Creating Delegation...
                 </>
               ) : !walletStatus.hasSmartWallet ? (
-                walletStatus.isEmbedded ? (
-                  deploymentAttempts > 0 ? (
-                    "Try Setup Again"
-                  ) : (
-                    "Smart Wallet Not Available"
-                  )
-                ) : (
-                  "Embedded Wallet Required"
-                )
-              ) : deploymentAttempts > 0 ? (
-                "Create Delegation (Retry)"
+                "Wallet Required"
               ) : (
-                "Create Smart Wallet & Execute"
+                "Create Delegation & Execute"
               )}
             </Button>
           </div>
@@ -1070,10 +952,9 @@ export function EnhancedBlockchainAuthorizationModal({
                   <Button
                     onClick={() => {
                       closeErrorDialog();
-                      retrySmartWalletDeployment();
-                    }}
-                    disabled={isRetryingDeployment}>
-                    {isRetryingDeployment ? "Retrying..." : "Try Again"}
+                      handleAuthorize();
+                    }}>
+                    Try Again
                   </Button>
                 )}
               </div>
@@ -1087,21 +968,34 @@ export function EnhancedBlockchainAuthorizationModal({
 
 /**
  * Hook for detecting blockchain operations in workflow nodes
+ * Uses a stable comparison to prevent excessive re-renders
  */
 export function useBlockchainDetection(nodes: UnifiedWorkflowNode[]) {
-  // Safety check for empty or undefined nodes
-  if (!nodes || nodes.length === 0) {
-    return {
-      hasBlockchainOperations: false,
-      blockchainNodes: [],
-      supportedChains: [],
-      estimatedSpending: {},
-    };
-  }
+  return useMemo(() => {
+    // Safety check for empty or undefined nodes
+    if (!nodes || nodes.length === 0) {
+      return {
+        hasBlockchainOperations: false,
+        blockchainNodes: [],
+        supportedChains: [],
+        estimatedSpending: {},
+      };
+    }
 
-  const authData = detectBlockchainOperations(nodes);
-  return {
-    hasBlockchainOperations: authData.blockchainNodes.length > 0,
-    ...authData,
-  };
+    try {
+      const authData = detectBlockchainOperations(nodes);
+      return {
+        hasBlockchainOperations: authData.blockchainNodes.length > 0,
+        ...authData,
+      };
+    } catch (error) {
+      console.error("Error detecting blockchain operations:", error);
+      return {
+        hasBlockchainOperations: false,
+        blockchainNodes: [],
+        supportedChains: [],
+        estimatedSpending: {},
+      };
+    }
+  }, [nodes]);
 }

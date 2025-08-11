@@ -2,7 +2,7 @@
 
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 import { isZeroDevConnector } from "@dynamic-labs/ethereum-aa";
-import { useAccountAbstraction } from "@/hooks/use-account-abstraction";
+import { useSmartWalletDelegation } from "@/hooks/use-smart-wallet-delegation";
 import {
   Card,
   CardContent,
@@ -17,7 +17,7 @@ import { CheckCircle, XCircle, AlertCircle, Info } from "lucide-react";
 
 export function SmartWalletDebugComponent() {
   const { primaryWallet, user } = useDynamicContext();
-  const { getWalletStatus } = useAccountAbstraction();
+  const { getWalletStatus } = useSmartWalletDelegation();
 
   const walletStatus = getWalletStatus();
 

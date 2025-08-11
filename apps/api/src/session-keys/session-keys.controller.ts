@@ -61,6 +61,7 @@ export class SessionKeysController {
         userId,
         {
           walletAddress: createSessionKeyDto.walletAddress,
+          smartWalletOwner: createSessionKeyDto.smartWalletOwner,
           chainId: createSessionKeyDto.chainId,
           securityLevel: createSessionKeyDto.securityLevel,
           validUntil: new Date(createSessionKeyDto.validUntil),

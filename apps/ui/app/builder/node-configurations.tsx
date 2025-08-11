@@ -21,7 +21,6 @@ export const useNodeConfigurations = () => {
       // object
     };
 
-    console.log("nodesMMMPSDS", nodes);
     return nodes;
   }, []);
   //   const edgeTypes = useMemo(() => {

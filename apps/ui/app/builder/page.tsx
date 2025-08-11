@@ -62,11 +62,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  DynamicEmbeddedWidget,
-  DynamicWidget,
-} from "@dynamic-labs/sdk-react-core";
-import { DynamicWagmiConnector } from "@dynamic-labs/wagmi-connector";
+import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
 
 // Simplified save state interface
 interface SaveState {
@@ -152,7 +148,9 @@ export default function BuilderPage() {
 
   // Blockchain authorization state
   const [showBlockchainAuth, setShowBlockchainAuth] = useState(false);
-  const blockchainDetection = useBlockchainDetection(nodes);
+  const blockchainDetection = useBlockchainDetection(
+    nodes as UnifiedWorkflowNode[]
+  );
 
   // Set isClient to true only after the component mounts on the client
   useEffect(() => {
@@ -170,105 +168,107 @@ export default function BuilderPage() {
 
   // Render a fallback during SSR or before client-side mount
 
-  // Load workflow on mount if ID is provided
+  // Load workflow on mount if ID is provided - with debouncing
   useEffect(() => {
     // Prevent repeated loading of the same workflow
     if (hasLoadedWorkflow.current && workflowId === initialId) {
-      console.log("BuilderPage: Workflow already loaded, skipping:", initialId);
       return;
     }
 
-    console.log("BuilderPage: initialId changed to:", initialId);
+    // Add debounce to prevent excessive loading
+    const timeoutId = setTimeout(() => {
+      if (initialId) {
+        (async () => {
+          setLoading(true);
+          try {
+            console.log("BuilderPage: Loading workflow with ID:", initialId);
+            const workflow = await workflowService.getWorkflow(initialId);
+            if (workflow) {
+              console.log(
+                "BuilderPage: Workflow loaded successfully:",
+                workflow.id
+              );
+              setWorkflowId(workflow.id);
+              setWorkflowName(workflow.name);
+              setWorkflowDescription(workflow.description || "");
+              setNodes((workflow.nodes || []) as Node[]);
+              setEdges((workflow.edges || []) as Edge[]);
+              setHasUnsavedChanges(false);
+              hasLoadedNodes.current = true; // Mark that we have loaded nodes
+              hasLoadedWorkflow.current = true; // Mark that we have loaded this workflow
+              justLoadedWorkflow.current = true; // Mark that we just loaded a workflow
 
-    if (initialId) {
-      (async () => {
-        setLoading(true);
-        try {
-          console.log("BuilderPage: Loading workflow with ID:", initialId);
-          const workflow = await workflowService.getWorkflow(initialId);
-          if (workflow) {
-            console.log(
-              "BuilderPage: Workflow loaded successfully:",
-              workflow.id
-            );
-            setWorkflowId(workflow.id);
-            setWorkflowName(workflow.name);
-            setWorkflowDescription(workflow.description || "");
-            setNodes((workflow.nodes || []) as Node[]);
-            setEdges((workflow.edges || []) as Edge[]);
-            setHasUnsavedChanges(false);
-            hasLoadedNodes.current = true; // Mark that we have loaded nodes
-            hasLoadedWorkflow.current = true; // Mark that we have loaded this workflow
-            justLoadedWorkflow.current = true; // Mark that we just loaded a workflow
+              // Clear any existing draft for this workflow since we loaded from server
+              DraftManager.clearDraft(workflow.id);
 
-            // Clear any existing draft for this workflow since we loaded from server
-            DraftManager.clearDraft(workflow.id);
+              toast({
+                title: "Workflow loaded",
+                description: "Your workflow has been loaded successfully.",
+              });
 
+              // Clear the just loaded flag after a delay to allow for URL changes
+              setTimeout(() => {
+                justLoadedWorkflow.current = false;
+              }, 2000);
+            } else {
+              console.log("BuilderPage: Workflow not found for ID:", initialId);
+              toast({
+                title: "Workflow not found",
+                description: "The requested workflow could not be found.",
+                variant: "destructive",
+              });
+            }
+          } catch (error: unknown) {
+            const err = error as Error;
+            console.error("BuilderPage: Error loading workflow:", error);
             toast({
-              title: "Workflow loaded",
-              description: "Your workflow has been loaded successfully.",
-            });
-
-            // Clear the just loaded flag after a delay to allow for URL changes
-            setTimeout(() => {
-              justLoadedWorkflow.current = false;
-            }, 2000);
-          } else {
-            console.log("BuilderPage: Workflow not found for ID:", initialId);
-            toast({
-              title: "Workflow not found",
-              description: "The requested workflow could not be found.",
+              title: "Error",
+              description: err.message || "Failed to load workflow.",
               variant: "destructive",
             });
+            // Don't reset flow on error - keep the URL intact
+          } finally {
+            setLoading(false);
           }
-        } catch (error: unknown) {
-          const err = error as Error;
-          console.error("BuilderPage: Error loading workflow:", error);
-          toast({
-            title: "Error",
-            description: err.message || "Failed to load workflow.",
-            variant: "destructive",
-          });
-          // Don't reset flow on error - keep the URL intact
-        } finally {
-          setLoading(false);
-        }
-      })();
-    } else {
-      console.log(
-        "BuilderPage: No initialId provided, checking if we should reset flow"
-      );
-      // Only reset if we're not in the middle of loading a workflow AND we don't have a workflowId
-      // AND we don't have loaded nodes (which would indicate a loaded workflow)
-      if (
-        !isLoading &&
-        !workflowId &&
-        !hasLoadedNodes.current &&
-        nodesLengthRef.current === 0 &&
-        !justLoadedWorkflow.current
-      ) {
-        console.log(
-          "BuilderPage: Resetting flow - no loading, no workflowId, no loaded nodes"
-        );
-        hasLoadedNodes.current = false; // Reset the flag
-        hasLoadedWorkflow.current = false; // Reset the workflow loaded flag
-        resetFlow();
+        })();
       } else {
         console.log(
-          "BuilderPage: Not resetting flow - isLoading:",
-          isLoading,
-          "workflowId:",
-          workflowId,
-          "hasLoadedNodes:",
-          hasLoadedNodes.current,
-          "nodesLength:",
-          nodesLengthRef.current,
-          "justLoadedWorkflow:",
-          justLoadedWorkflow.current
+          "BuilderPage: No initialId provided, checking if we should reset flow"
         );
+        // Only reset if we're not in the middle of loading a workflow AND we don't have a workflowId
+        // AND we don't have loaded nodes (which would indicate a loaded workflow)
+        if (
+          !isLoading &&
+          !workflowId &&
+          !hasLoadedNodes.current &&
+          nodesLengthRef.current === 0 &&
+          !justLoadedWorkflow.current
+        ) {
+          console.log(
+            "BuilderPage: Resetting flow - no loading, no workflowId, no loaded nodes"
+          );
+          hasLoadedNodes.current = false; // Reset the flag
+          hasLoadedWorkflow.current = false; // Reset the workflow loaded flag
+          resetFlow();
+        } else {
+          console.log(
+            "BuilderPage: Not resetting flow - isLoading:",
+            isLoading,
+            "workflowId:",
+            workflowId,
+            "hasLoadedNodes:",
+            hasLoadedNodes.current,
+            "nodesLength:",
+            nodesLengthRef.current,
+            "justLoadedWorkflow:",
+            justLoadedWorkflow.current
+          );
+        }
       }
-    }
-  }, [initialId, isLoading, workflowId]);
+    }, 100); // 100ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [initialId]); // Only depend on initialId to prevent infinite loops
 
   // Update nodes length ref when nodes change
   useEffect(() => {
@@ -1535,12 +1535,14 @@ export default function BuilderPage() {
         />
 
         {/* Enhanced Blockchain Authorization Modal */}
-        <EnhancedBlockchainAuthorizationModal
-          nodes={nodes}
-          open={showBlockchainAuth}
-          onAuthorize={handleBlockchainAuthorization}
-          onCancel={handleBlockchainCancel}
-        />
+        {showBlockchainAuth && (
+          <EnhancedBlockchainAuthorizationModal
+            nodes={nodes as UnifiedWorkflowNode[]}
+            open={showBlockchainAuth}
+            onAuthorize={handleBlockchainAuthorization}
+            onCancel={handleBlockchainCancel}
+          />
+        )}
 
         {/* Exit Confirmation Dialog */}
         <AlertDialog open={isExitDialogOpen} onOpenChange={setIsExitDialogOpen}>
