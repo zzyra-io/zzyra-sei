@@ -1763,14 +1763,25 @@ export class PimlicoService implements IAccountAbstractionService {
     const defaultPaymasterData = { paymasterAndData: '0x' };
 
     try {
-      // Try different parameter formats based on diagnostic findings
+      // ✅ FIX: Use correct Pimlico paymaster method for SEI testnet
+      this.logger.debug('Requesting Pimlico paymaster sponsorship', {
+        method: 'pm_sponsorUserOperation',
+        entryPoint: ENTRYPOINT_ADDRESS_V07,
+        sender: userOp.sender,
+        paymasterUrl: paymasterUrl.split('?')[0], // Remove API key from logs
+      });
+
+      // Try different parameter formats for Pimlico paymaster
       const parameterFormats = [
-        // Format 1: Object with entryPoint (current format)
+        // Format 1: Standard Pimlico format with entryPoint
         [userOp, { entryPoint: ENTRYPOINT_ADDRESS_V07 }],
-        // Format 2: Direct EntryPoint string
+        // Format 2: Alternative format with sponsorshipPolicyId
+        [userOp, { 
+          entryPoint: ENTRYPOINT_ADDRESS_V07,
+          sponsorshipPolicyId: 'sp_crazy_kangaroo' // Default policy ID
+        }],
+        // Format 3: Direct EntryPoint string
         [userOp, ENTRYPOINT_ADDRESS_V07],
-        // Format 3: Different field name
-        [userOp, { entryPointAddress: ENTRYPOINT_ADDRESS_V07 }],
       ];
 
       let response;
@@ -1834,14 +1845,23 @@ export class PimlicoService implements IAccountAbstractionService {
       }
 
       if (result.error) {
-        this.logger.warn(
-          `Paymaster RPC error: ${result.error.message}, using regular gas payment`,
+        // ✅ ENHANCED: Better error reporting for paymaster issues
+        this.logger.error(
+          `🚨 Pimlico Paymaster Error: ${result.error.message}`,
           {
             errorCode: result.error.code,
             errorMessage: result.error.message,
             entryPoint: ENTRYPOINT_ADDRESS_V07,
             fullError: result.error,
-            paymasterUrl: paymasterUrl.split('?')[0], // Remove API key
+            paymasterUrl: paymasterUrl.split('?')[0],
+            sender: userOp.sender,
+            // Add troubleshooting info
+            possibleCauses: [
+              'No sponsorship policy configured',
+              'Insufficient paymaster funds',
+              'UserOperation exceeds spending limits',
+              'Chain not supported for sponsorship'
+            ]
           },
         );
         return defaultPaymasterData;
@@ -1851,6 +1871,13 @@ export class PimlicoService implements IAccountAbstractionService {
         this.logger.warn('No paymaster result, using regular gas payment');
         return defaultPaymasterData;
       }
+
+      // ✅ SUCCESS: Paymaster sponsorship obtained!
+      this.logger.log('✅ Pimlico paymaster sponsorship successful!', {
+        paymasterAndData: result.result.paymasterAndData ? 'obtained' : 'empty',
+        paymasterAndDataLength: result.result.paymasterAndData?.length || 0,
+        sponsorshipActive: result.result.paymasterAndData !== '0x',
+      });
 
       return result.result;
     } catch (error) {
