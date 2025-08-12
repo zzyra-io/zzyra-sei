@@ -9,7 +9,6 @@ import { NotificationModule } from './services/notification.module';
 import { ExecutionWorker } from './workers/execution-worker';
 import { DatabaseModule } from './services/database.module';
 import { RabbitMQService } from './services/rabbitmq.service';
-import { MagicModule } from './services/magic.module';
 import { ExecutionGateway } from './gateways/execution.gateway';
 import { ExecutionMonitorService } from './services/execution-monitor.service';
 import { BlockchainModule } from './lib/blockchain/BlockchainModule';
@@ -63,7 +62,6 @@ const configValidationSchema = {
     WorkflowModule,
     HealthModule,
     NotificationModule,
-    MagicModule,
     BlockchainModule,
   ],
   controllers: [AppController],

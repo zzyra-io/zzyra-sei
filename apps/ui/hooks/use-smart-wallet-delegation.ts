@@ -224,13 +224,13 @@ export function useSmartWalletDelegation() {
         permissions: createPermissionConfigs(permissions),
       };
 
-      if (isPimlico) {
-        return {
-          ...baseData,
-          userSignature,
-          smartAccountAddress,
-        };
-      }
+      // if (isPimlico) {
+      //   return {
+      //     ...baseData,
+      //     userSignature,
+      //     smartAccountAddress,
+      //   };
+      // }
 
       return {
         ...baseData,
@@ -311,7 +311,8 @@ export function useSmartWalletDelegation() {
           throw new Error("User signature required for delegation");
         }
 
-        const endpoint = isPimlico ? "/session-keys/pimlico" : "/session-keys";
+        // const endpoint = isPimlico ? "/session-keys/pimlico" : "/session-keys";
+        const endpoint = "/session-keys";
         const requestData = prepareRequestData(
           permissions,
           chainId,
