@@ -107,6 +107,7 @@ export interface SessionEvent {
 export interface CreateSessionKeyRequest {
   walletAddress: string; // EOA address that initially authorized
   smartWalletOwner?: string; // Smart wallet address that owns the session key
+  smartAccountAddress?: string; // Real SimpleAccount address from frontend (for Pimlico integration)
   chainId: string;
   securityLevel: SecurityLevel;
   validUntil: Date;

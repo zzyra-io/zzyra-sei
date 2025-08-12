@@ -1222,6 +1222,12 @@ model SessionKey {
   nonce                BigInt            @default(autoincrement())
   parentDelegationSignature String?      @map("parent_delegation_signature") // Original Dynamic delegation
   
+  // Smart account provider metadata
+  providerType         String            @default("dynamic_zerodev") @map("provider_type") // dynamic_zerodev, pimlico_simple_account
+  smartAccountMetadata Json              @default("{}") @map("smart_account_metadata") // Provider-specific metadata
+  smartAccountFactory  String?           @map("smart_account_factory") // Factory contract address
+  entryPoint           String?           @map("entry_point") // EntryPoint contract address
+  
   // Security and permissions
   securityLevel        SecurityLevel     @default(basic) @map("security_level")
   status               SessionKeyStatus  @default(active)
@@ -1251,6 +1257,8 @@ model SessionKey {
   @@index([status])
   @@index([validUntil])
   @@index([createdAt])
+  @@index([providerType])
+  @@index([chainId, providerType])
 }
 
 model SessionPermission {

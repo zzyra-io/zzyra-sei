@@ -17,6 +17,7 @@ import { Public } from "../auth/decorators/public.decorator";
 import { SessionKeysService } from "./session-keys.service";
 import { SessionMonitoringService } from "./session-monitoring.service";
 import { CreateSessionKeyDto } from "./dto/create-session-key.dto";
+import { CreatePimlicoSessionKeyDto } from "./dto/create-pimlico-session-key.dto";
 import { ValidateSessionKeyDto } from "./dto/validate-session-key.dto";
 import { UpdateUsageDto } from "./dto/update-usage.dto";
 import { SessionKeyStatus } from "@zzyra/types";
@@ -85,6 +86,82 @@ export class SessionKeysController {
       this.logger.error("Failed to create session key", error);
       throw new HttpException(
         (error as Error).message || "Failed to create session key",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+  }
+
+  /**
+   * Create a new Pimlico session key for supported chains
+   * POST /api/session-keys/pimlico
+   */
+  @Post("pimlico")
+  async createPimlicoSessionKey(
+    @Body() createPimlicoSessionKeyDto: CreatePimlicoSessionKeyDto,
+    @Request() req: any
+  ) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        throw new HttpException(
+          "User not authenticated",
+          HttpStatus.UNAUTHORIZED
+        );
+      }
+
+      // Validate chain ID for Pimlico support
+      const chainId = parseInt(createPimlicoSessionKeyDto.chainId);
+      const supportedChains = [1328, 8453, 84532]; // SEI Testnet, Base, Base Sepolia
+      
+      if (!supportedChains.includes(chainId)) {
+        throw new HttpException(
+          `Chain ID ${chainId} is not supported for Pimlico integration. Supported chains: ${supportedChains.join(", ")}`,
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      this.logger.log("Creating Pimlico session key", {
+        userId,
+        chainId: createPimlicoSessionKeyDto.chainId,
+        walletAddress: createPimlicoSessionKeyDto.walletAddress,
+      });
+
+      const result = await this.sessionKeysService.createPimlicoSessionKey(
+        userId,
+        {
+          walletAddress: createPimlicoSessionKeyDto.walletAddress,
+          smartAccountAddress: createPimlicoSessionKeyDto.smartAccountAddress, // ✅ Real SimpleAccount address from frontend
+          chainId: createPimlicoSessionKeyDto.chainId,
+          securityLevel: createPimlicoSessionKeyDto.securityLevel,
+          validUntil: new Date(createPimlicoSessionKeyDto.validUntil),
+          permissions: createPimlicoSessionKeyDto.permissions.map(p => ({
+            operation: p.operation,
+            maxAmountPerTx: p.maxAmountPerTx,
+            maxDailyAmount: p.maxDailyAmount,
+            allowedContracts: p.allowedContracts,
+            requireConfirmation: p.requireConfirmation,
+            emergencyStop: p.emergencyStop,
+          })),
+        },
+        createPimlicoSessionKeyDto.userSignature
+      );
+
+      return {
+        success: true,
+        data: {
+          sessionKey: {
+            ...result.sessionKey,
+            // Ensure BigInt-like fields are serializable
+            nonce: result.sessionKey.nonce,
+          },
+          delegationMessage: result.delegationMessage,
+          smartAccountInfo: result.smartAccountInfo,
+        },
+      };
+    } catch (error) {
+      this.logger.error("Failed to create Pimlico session key", error);
+      throw new HttpException(
+        (error as Error).message || "Failed to create Pimlico session key",
         HttpStatus.BAD_REQUEST
       );
     }

@@ -134,14 +134,20 @@ function detectChainsFromTools(tools: SelectedTool[]): string[] {
   const chains = new Set<string>();
 
   tools.forEach((tool) => {
-    if (tool.description?.toLowerCase().includes("sei")) {
-      chains.add("1328");
-    } else if (tool.description?.toLowerCase().includes("base")) {
-      chains.add("base-sepolia");
-    } else if (tool.description?.toLowerCase().includes("ethereum")) {
-      chains.add("ethereum-sepolia");
+    // If the tool has a chainId in its config, use that
+    if (tool.config?.chainId) {
+      chains.add(tool.config.chainId as string);
     } else {
-      chains.add("1328"); // Default to SEI
+      // Fallback to description-based detection
+      if (tool.description?.toLowerCase().includes("sei")) {
+        chains.add("1328");
+      } else if (tool.description?.toLowerCase().includes("base")) {
+        chains.add("base-sepolia");
+      } else if (tool.description?.toLowerCase().includes("ethereum")) {
+        chains.add("ethereum-sepolia");
+      } else {
+        chains.add("1328"); // Default to SEI
+      }
     }
   });
 
@@ -191,12 +197,8 @@ export function EnhancedBlockchainAuthorizationModal({
 }: EnhancedBlockchainAuthorizationModalProps) {
   const { toast } = useToast();
   const { isLoggedIn, getCurrentUser } = useDynamicAuth();
-  const {
-    createDelegation,
-    createDelegationWithPasskey,
-    isCreating,
-    getWalletStatus,
-  } = useSmartWalletDelegation();
+  const { createDelegation, isCreating, getWalletStatus } =
+    useSmartWalletDelegation();
 
   // Add error boundary state
   const [hasError, setHasError] = useState(false);
@@ -331,6 +333,7 @@ export function EnhancedBlockchainAuthorizationModal({
       const selectedChains = authData.supportedChains
         .filter((chain) => chainConfigs[chain]?.enabled)
         .map((chain) => {
+          console.log("chain", chain);
           const config = chainConfigs[chain];
           if (!config) {
             // Skip chains without config
@@ -379,26 +382,8 @@ export function EnhancedBlockchainAuthorizationModal({
         throw new Error("No primary chain selected");
       }
 
+      console.log("primaryChain", primaryChain);
       // Create delegation for the primary chain (simplified approach)
-      // Only use passkey for explicitly Dynamic embedded wallets
-      // Everything else (including MetaMask, WalletConnect, etc.) uses regular wallet signing
-      const isEmbeddedWallet =
-        walletStatus.walletType &&
-        (walletStatus.walletType.includes("Dynamic") ||
-          walletStatus.walletType.includes("Embedded"));
-
-      console.log("🔍 Wallet detection for delegation:", {
-        walletType: walletStatus.walletType,
-        connectorName: walletStatus.walletType,
-        isEmbeddedWallet,
-        hasSmartWallet: walletStatus.hasSmartWallet,
-        detectionLogic: {
-          hasWalletType: !!walletStatus.walletType,
-          includesMetaMask: walletStatus.walletType?.includes("MetaMask"),
-          includesWalletConnect:
-            walletStatus.walletType?.includes("WalletConnect"),
-        },
-      });
 
       const delegationParams = {
         operations: ["eth_transfer", "erc20_transfer", "contract_interaction"],
@@ -406,16 +391,11 @@ export function EnhancedBlockchainAuthorizationModal({
         maxDailyAmount: primaryChain.maxDailySpending,
         validUntil: new Date(Date.now() + parseInt(duration) * 60 * 60 * 1000),
         chainId: primaryChain.chainId,
-        securityLevel: securityLevel as unknown as
-          | "BASIC"
-          | "ENHANCED"
-          | "MAXIMUM",
+        securityLevel: securityLevel,
       };
 
-      // Use passkey method for embedded wallets, regular method for external wallets
-      const delegationResult = isEmbeddedWallet
-        ? await createDelegationWithPasskey(delegationParams)
-        : await createDelegation(delegationParams);
+      // Use regular method for all wallets
+      const delegationResult = await createDelegation(delegationParams);
 
       // Handle error response
       if (!delegationResult.success) {
@@ -464,7 +444,7 @@ export function EnhancedBlockchainAuthorizationModal({
           validUntil: new Date(
             Date.now() + parseInt(duration) * 60 * 60 * 1000
           ).toISOString(),
-          authMethod: isEmbeddedWallet ? "passkey" : "wallet",
+          authMethod: "wallet",
         }),
         sessionKeyId,
       };
@@ -473,7 +453,7 @@ export function EnhancedBlockchainAuthorizationModal({
 
       toast({
         title: "Smart Wallet Created",
-        description: `AA delegation created for ${selectedChains.length} chain(s) with ${securityLevel} security level using ${isEmbeddedWallet ? "passkey authentication" : "wallet signing"}.`,
+        description: `AA delegation created for ${selectedChains.length} chain(s) with ${securityLevel} security level using wallet signing.`,
       });
     } catch (error) {
       console.error("Authorization error:", error);

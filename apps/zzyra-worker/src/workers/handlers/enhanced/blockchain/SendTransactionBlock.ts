@@ -84,6 +84,11 @@ interface SessionKeyWallet {
   permissions: any[];
   validUntil: string;
   delegationSignature: string;
+  // Provider-specific metadata for routing
+  providerType?: string; // 'dynamic_zerodev' | 'pimlico_simple_account'
+  smartAccountMetadata?: any;
+  smartAccountFactory?: string;
+  entryPoint?: string;
 }
 
 /**
@@ -594,8 +599,21 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         params.chainId,
       );
 
+      // Determine provider routing
+      const providerInfo = this.getSmartAccountProvider(sessionWallet);
+
+      params.context.logger.info(
+        'Executing session key transaction with provider routing',
+        {
+          chainId: params.chainId,
+          provider: providerInfo.provider,
+          providerType: sessionWallet.providerType,
+          isPimlicoChain: providerInfo.isPimlicoChain,
+        },
+      );
+
       // Convert chainId to number for service compatibility
-      const chainIdNumber = this.getChainIdNumber(params.chainId);
+      const chainIdNumber = providerInfo.chainId;
 
       // Create transaction request
       const transaction: TransactionRequest = {
@@ -618,34 +636,91 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         address: sessionWallet.address,
       };
 
-      params.context.logger.info('Executing transaction via EVMService', {
-        chainId: params.chainId,
-        chainIdNumber,
-        to: params.recipientAddress,
-        amount: params.amount,
-        tokenAddress: params.tokenAddress,
-        fromAddress: sessionWallet.address,
-      });
+      // Route transaction execution based on provider type
+      if (providerInfo.provider === 'pimlico' && providerInfo.isPimlicoChain) {
+        params.context.logger.info(
+          'Routing to Pimlico service for session key transaction',
+          {
+            chainId: params.chainId,
+            chainIdNumber,
+            provider: providerInfo.provider,
+            to: params.recipientAddress,
+            amount: params.amount,
+            tokenAddress: params.tokenAddress,
+          },
+        );
 
-      // Execute transaction using EVMService
-      if (params.tokenAddress) {
-        // ERC20 token transfer
-        const result = await this.evmService.executeERC20Transfer(
-          params.tokenAddress,
-          params.recipientAddress,
-          params.amount,
-          18, // Default to 18 decimals
-          transaction,
-          walletConfig,
+        // Use Pimlico service for SEI/Base chains with Pimlico session keys
+        const pimlicoResult = await this.pimlicoService.executeWithSessionKey(
+          {
+            sessionPrivateKey: sessionWallet.privateKey,
+            smartWalletAddress: sessionWallet.smartWalletAddress,
+            chainId: chainIdNumber,
+            permissions: {
+              operations: params.tokenAddress
+                ? ['erc20_transfer']
+                : ['eth_transfer'],
+              maxAmountPerTx:
+                sessionWallet.permissions[0]?.maxAmountPerTx || '1000',
+              maxDailyAmount:
+                sessionWallet.permissions[0]?.maxDailyAmount || '10000',
+              validUntil: new Date(sessionWallet.validUntil),
+            },
+          },
+          {
+            to: params.tokenAddress || params.recipientAddress,
+            value: params.tokenAddress ? '0' : params.amount,
+            data: params.tokenAddress
+              ? this.encodeERC20Transfer(
+                  params.recipientAddress,
+                  params.amount,
+                  params.tokenAddress,
+                )
+              : undefined,
+            chainId: chainIdNumber,
+          },
         );
-        return this.convertToLegacyTransactionResult(result);
+
+        return {
+          transactionHash: pimlicoResult.hash,
+          status: pimlicoResult.success ? 'success' : 'failed',
+          gasUsed: pimlicoResult.gasUsed ? Number(pimlicoResult.gasUsed) : 0,
+          blockNumber: pimlicoResult.blockNumber,
+        };
       } else {
-        // Native token transfer
-        const result = await this.evmService.executeTransaction(
-          transaction,
-          walletConfig,
+        params.context.logger.info(
+          'Routing to EVMService for session key transaction',
+          {
+            chainId: params.chainId,
+            chainIdNumber,
+            provider: providerInfo.provider,
+            to: params.recipientAddress,
+            amount: params.amount,
+            tokenAddress: params.tokenAddress,
+            fromAddress: sessionWallet.address,
+          },
         );
-        return this.convertToLegacyTransactionResult(result);
+
+        // Use EVMService for other chains or ZeroDev session keys
+        if (params.tokenAddress) {
+          // ERC20 token transfer
+          const result = await this.evmService.executeERC20Transfer(
+            params.tokenAddress,
+            params.recipientAddress,
+            params.amount,
+            18, // Default to 18 decimals
+            transaction,
+            walletConfig,
+          );
+          return this.convertToLegacyTransactionResult(result);
+        } else {
+          // Native token transfer
+          const result = await this.evmService.executeTransaction(
+            transaction,
+            walletConfig,
+          );
+          return this.convertToLegacyTransactionResult(result);
+        }
       }
     } catch (error) {
       params.context.logger.error('Session key transaction failed', {
@@ -852,6 +927,48 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   }
 
   /**
+   * Determine smart account provider based on session key metadata
+   */
+  private getSmartAccountProvider(sessionWallet: SessionKeyWallet): {
+    provider: 'pimlico' | 'zerodev';
+    chainId: number;
+    isPimlicoChain: boolean;
+  } {
+    const chainIdNumber = this.getChainIdNumber(sessionWallet.chainId);
+
+    // Check if this is a Pimlico-supported chain
+    const pimlicoChains = [1328, 8453, 84532]; // SEI Testnet, Base, Base Sepolia
+    const isPimlicoChain = pimlicoChains.includes(chainIdNumber);
+
+    // Check session key provider metadata
+    const providerType = sessionWallet.providerType || 'dynamic_zerodev';
+    const isPimlicoProvider = providerType === 'pimlico_simple_account';
+
+    // Provider routing logic:
+    // 1. If session was created via Pimlico endpoint -> use Pimlico
+    // 2. If chain is Pimlico-supported (SEI, Base) -> use Pimlico
+    // 3. Otherwise -> use ZeroDev
+    const shouldUsePimlico = isPimlicoProvider || isPimlicoChain;
+
+    this.logger.log('Determining smart account provider', {
+      chainId: sessionWallet.chainId,
+      chainIdNumber,
+      providerType,
+      isPimlicoChain,
+      isPimlicoProvider,
+      shouldUsePimlico,
+      smartAccountFactory: sessionWallet.smartAccountFactory,
+      entryPoint: sessionWallet.entryPoint,
+    });
+
+    return {
+      provider: shouldUsePimlico ? 'pimlico' : 'zerodev',
+      chainId: chainIdNumber,
+      isPimlicoChain,
+    };
+  }
+
+  /**
    * Execute transaction using Account Abstraction with proper delegation hierarchy
    * Supports: immediate (EOA → Smart Wallet), delegated (Session Key → Smart Wallet), hybrid
    */
@@ -870,6 +987,10 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     const { chainId, recipientAddress, amount, context } = params;
 
     try {
+      // Get session key wallet for provider routing
+      const sessionWallet = await this.getSessionKeyWallet(context, chainId);
+      const providerInfo = this.getSmartAccountProvider(sessionWallet);
+
       context.logger.info(
         'Executing AA transaction with delegation hierarchy',
         {
@@ -882,6 +1003,10 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
           amount,
           operations: aaData.operations,
           executionId: context.executionId,
+          // Provider routing info
+          provider: providerInfo.provider,
+          providerType: sessionWallet.providerType,
+          isPimlicoChain: providerInfo.isPimlicoChain,
         },
       );
 
@@ -919,15 +1044,20 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         maxAllowed: aaData.maxAmountPerTx,
       });
 
-      const chainIdNumber = this.getChainIdNumber(chainId);
+      const chainIdNumber = providerInfo.chainId;
 
-      // Create kernel client based on delegation mode
+      // Create kernel client based on delegation mode and provider type
       if (!aaData.kernelClient) {
-        context.logger.info('Creating kernel client based on delegation mode', {
-          delegationMode,
-          smartWallet: aaData.smartWalletAddress,
-          chainId,
-        });
+        context.logger.info(
+          'Creating kernel client based on delegation mode and provider',
+          {
+            delegationMode,
+            smartWallet: aaData.smartWalletAddress,
+            chainId,
+            provider: providerInfo.provider,
+            isPimlicoChain: providerInfo.isPimlicoChain,
+          },
+        );
 
         try {
           let kernelClient;
@@ -944,10 +1074,6 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
 
             case 'delegated':
               // Session key operates on behalf of smart wallet
-              const sessionWallet = await this.getSessionKeyWallet(
-                context,
-                chainId,
-              );
               const formattedPk = this.formatPrivateKey(
                 sessionWallet.privateKey,
               );
@@ -955,15 +1081,35 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
               context.logger.info('Creating delegated kernel client', {
                 sessionKeyAddress: sessionWallet.address,
                 smartWalletAddress: aaData.smartWalletAddress,
+                provider: providerInfo.provider,
               });
 
               try {
-                // Create smart account in delegated mode
-                kernelClient = await this.pimlicoService.createSmartAccount({
-                  ownerPrivateKey: formattedPk,
-                  chainId: chainIdNumber,
-                  delegationMode: 'delegated',
-                });
+                // Route to appropriate provider based on session key metadata
+                if (providerInfo.provider === 'pimlico') {
+                  context.logger.log(
+                    'Using Pimlico SimpleAccount for transaction execution',
+                  );
+
+                  // Create smart account in delegated mode using Pimlico
+                  kernelClient = await this.pimlicoService.createSmartAccount({
+                    ownerPrivateKey: formattedPk,
+                    chainId: chainIdNumber,
+                    delegationMode: 'delegated',
+                  });
+                } else {
+                  context.logger.log(
+                    'Using ZeroDev Kernel for transaction execution',
+                  );
+
+                  // For ZeroDev, continue using existing Pimlico service as it handles both
+                  // In a full implementation, you'd have a separate ZeroDevService
+                  kernelClient = await this.pimlicoService.createSmartAccount({
+                    ownerPrivateKey: formattedPk,
+                    chainId: chainIdNumber,
+                    delegationMode: 'delegated',
+                  });
+                }
               } catch (error) {
                 const errorMessage =
                   error instanceof Error ? error.message : String(error);
@@ -2017,6 +2163,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
           sessionKey.parentDelegationSignature?.length || 0,
         parentSignaturePreview:
           sessionKey.parentDelegationSignature?.substring(0, 20) + '...',
+        // Provider-specific metadata for routing
+        providerType: sessionKey.providerType || 'dynamic_zerodev',
+        hasSmartAccountMetadata: !!sessionKey.smartAccountMetadata,
+        smartAccountFactory: sessionKey.smartAccountFactory,
+        entryPoint: sessionKey.entryPoint,
       });
 
       // Use the actual user signature from the database for decryption
@@ -2044,6 +2195,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         permissions: sessionKey.permissions,
         validUntil: sessionKey.validUntil,
         delegationSignature: sessionKey.parentDelegationSignature,
+        // Provider metadata for routing decisions
+        providerType: sessionKey.providerType || 'dynamic_zerodev',
+        smartAccountMetadata: sessionKey.smartAccountMetadata,
+        smartAccountFactory: sessionKey.smartAccountFactory,
+        entryPoint: sessionKey.entryPoint,
       };
     } catch (error) {
       this.logger.error('Failed to get session key wallet', {

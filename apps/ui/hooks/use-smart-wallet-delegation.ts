@@ -1,19 +1,35 @@
-import { useCallback, useState } from "react";
-import {
-  useDynamicContext,
-  useIsLoggedIn,
-  useSignInWithPasskey,
-} from "@dynamic-labs/sdk-react-core";
 import { useToast } from "@/components/ui/use-toast";
 import api from "@/lib/services/api";
+import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
+import { createSmartAccountClient as createPermissionlessSmartAccountClient } from "permissionless";
+import { toSimpleSmartAccount } from "permissionless/accounts";
+import { createPimlicoClient } from "permissionless/clients/pimlico";
+import { useCallback, useState } from "react";
+import { createPublicClient, type PublicClient } from "viem";
+import { entryPoint07Address } from "viem/account-abstraction";
+import { Chain } from "viem/chains";
+import { http, useChains, useWalletClient } from "wagmi";
+const SUPPORTED_CHAINS = {
+  SEI_TESTNET: 1328,
+  BASE: 8453,
+  BASE_SEPOLIA: 84532,
+} as const;
+
+const PIMLICO_CHAINS = [
+  SUPPORTED_CHAINS.SEI_TESTNET,
+  SUPPORTED_CHAINS.BASE,
+  SUPPORTED_CHAINS.BASE_SEPOLIA,
+] as const;
+
+const DEFAULT_CHAIN_ID = SUPPORTED_CHAINS.SEI_TESTNET.toString();
 
 export interface DelegationPermissions {
   operations: string[];
   maxAmountPerTx: string;
   maxDailyAmount: string;
   validUntil: Date;
-  chainId: string;
-  securityLevel: "BASIC" | "ENHANCED" | "MAXIMUM";
+  chainId?: string;
+  securityLevel?: string;
 }
 
 export interface DelegationResult {
@@ -22,114 +38,34 @@ export interface DelegationResult {
   error?: string;
 }
 
-/**
- * Create a signature using WebAuthn passkey authentication
- * This will prompt the user for biometric authentication (Face ID/Touch ID/Windows Hello)
- */
-async function createPasskeySignature(
-  message: string,
-  userAddress: string
-): Promise<string> {
-  try {
-    console.log("🔐 Prompting user for passkey authentication...");
+export interface WalletStatus {
+  connected: boolean;
+  hasSmartWallet: boolean;
+  walletType: string | null;
+  message: string;
+  address: string | null;
+}
 
-    // Check if WebAuthn is supported
-    if (!window.navigator.credentials) {
-      throw new Error("WebAuthn not supported in this browser");
-    }
+interface DelegationMessage {
+  smartWalletAddress: string;
+  userAddress: string;
+  operations: string[];
+  maxAmountPerTx: string;
+  maxDailyAmount: string;
+  validUntil: string;
+  timestamp: string;
+  purpose: string;
+  chainId: string;
+  provider: string;
+}
 
-    // Convert message to bytes for WebAuthn challenge
-    const encoder = new TextEncoder();
-    const messageBytes = encoder.encode(message);
-
-    // Create WebAuthn credential for signing
-    const credential = (await navigator.credentials.create({
-      publicKey: {
-        challenge: messageBytes,
-        rp: {
-          name: "Zyra Workflow",
-          id: window.location.hostname,
-        },
-        user: {
-          id: encoder.encode(userAddress),
-          name: userAddress,
-          displayName: `Wallet ${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`,
-        },
-        pubKeyCredParams: [
-          { alg: -7, type: "public-key" }, // ES256 (secp256r1)
-          { alg: -257, type: "public-key" }, // RS256
-        ],
-        authenticatorSelection: {
-          authenticatorAttachment: "platform", // Use platform authenticator (Face ID, Touch ID, etc.)
-          userVerification: "required",
-          requireResidentKey: false,
-        },
-        timeout: 60000, // 60 seconds timeout
-        attestation: "none",
-      },
-    })) as PublicKeyCredential;
-
-    if (!credential || !credential.response) {
-      throw new Error("Failed to create passkey credential");
-    }
-
-    // Extract the attestation response
-    const response = credential.response as AuthenticatorAttestationResponse;
-
-    // Use the attestation object as our signature source
-    const attestationObject = new Uint8Array(response.attestationObject);
-    const clientDataJSON = new Uint8Array(response.clientDataJSON);
-
-    // Combine attestation and client data for a unique signature
-    const combinedData = new Uint8Array(
-      attestationObject.length + clientDataJSON.length
-    );
-    combinedData.set(attestationObject, 0);
-    combinedData.set(clientDataJSON, attestationObject.length);
-
-    // Create signature hash
-    const signatureHash = await crypto.subtle.digest("SHA-256", combinedData);
-    const signature =
-      "0x" +
-      Array.from(new Uint8Array(signatureHash))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("")
-        .padEnd(130, "0"); // Pad to standard signature length
-
-    console.log("✅ Passkey signature created successfully:", {
-      signatureLength: signature.length,
-      credentialId: credential.id,
-      authenticatorAttachment: response.getTransports?.() || "unknown",
-    });
-
-    return signature;
-  } catch (error) {
-    console.error("❌ Passkey authentication failed:", error);
-
-    // Provide user-friendly error messages
-    if (error instanceof Error) {
-      if (error.name === "NotAllowedError") {
-        throw new Error("Passkey authentication was cancelled or denied");
-      }
-      if (error.name === "NotSupportedError") {
-        throw new Error(
-          "Passkey authentication is not supported on this device"
-        );
-      }
-      if (error.name === "SecurityError") {
-        throw new Error(
-          "Passkey authentication failed due to security restrictions"
-        );
-      }
-      if (error.name === "AbortError") {
-        throw new Error("Passkey authentication was aborted");
-      }
-    }
-
-    throw new Error(
-      `Passkey authentication failed: ${error instanceof Error ? error.message : "Unknown error"}`
-    );
-  }
+interface PermissionConfig {
+  operation: string;
+  maxAmountPerTx: string;
+  maxDailyAmount: string;
+  allowedContracts: string[];
+  requireConfirmation: boolean;
+  emergencyStop: boolean;
 }
 
 /**
@@ -140,121 +76,169 @@ export function useSmartWalletDelegation() {
   const { toast } = useToast();
   const { primaryWallet, user } = useDynamicContext();
   const isLoggedIn = useIsLoggedIn();
-  const signInWithPasskey = useSignInWithPasskey();
   const [isCreating, setIsCreating] = useState(false);
+  const chains = useChains();
+  const { data: walletClient } = useWalletClient();
 
-  // Method to use passkey authentication for delegation creation
-  const createDelegationWithPasskey = useCallback(
-    async (permissions: DelegationPermissions): Promise<DelegationResult> => {
-      setIsCreating(true);
+  const isPimlicoChain = useCallback((chainId: string): boolean => {
+    const chainIdNum = parseInt(chainId);
+    return PIMLICO_CHAINS.includes(
+      chainIdNum as (typeof PIMLICO_CHAINS)[number]
+    );
+  }, []);
 
-      try {
-        console.log(
-          "🔐 Attempting delegation creation with passkey authentication..."
-        );
+  const createPublicClientForChain = useCallback(
+    (chainId: string): PublicClient => {
+      const chainIdNum = parseInt(chainId);
+      const chain = chains.find((chain) => chain.id === chainIdNum);
 
-        // First, try to sign in with passkey to ensure user is authenticated
-        // Note: This is only needed if the user isn't already authenticated
-        if (!isLoggedIn) {
-          try {
-            await signInWithPasskey();
-            console.log("✅ Passkey authentication successful");
-          } catch (passkeyAuthError) {
-            console.log("⚠️ Passkey authentication failed:", passkeyAuthError);
-            return {
-              success: false,
-              error:
-                "Passkey authentication failed. Please try connecting your wallet first.",
-            };
-          }
-        } else {
-          console.log(
-            "✅ User already authenticated, skipping passkey sign-in"
-          );
-        }
-
-        // Continue with normal delegation creation using the main logic
-        // For now, we'll use the fallback signature approach for embedded wallets
-        if (!isLoggedIn || !primaryWallet || !user) {
-          return {
-            success: false,
-            error: "Wallet not connected after passkey authentication.",
-          };
-        }
-
-        // Create delegation message for user to sign
-        const delegationMessage = {
-          smartWalletAddress: primaryWallet.address,
-          userAddress: primaryWallet.address,
-          operations: permissions.operations,
-          maxAmountPerTx: permissions.maxAmountPerTx,
-          maxDailyAmount: permissions.maxDailyAmount,
-          validUntil: permissions.validUntil.toISOString(),
-          timestamp: new Date().toISOString(),
-          purpose: "zyra_workflow_automation",
-        };
-
-        const messageToSign = JSON.stringify(delegationMessage, null, 2);
-
-        // Show user guidance for passkey authentication
-        toast({
-          title: "Biometric Authentication Required",
-          description:
-            "Please use Face ID, Touch ID, or Windows Hello to sign the delegation...",
-        });
-
-        // For passkey-authenticated users, use WebAuthn passkey signature
-        const userSignature = await createPasskeySignature(
-          messageToSign,
-          primaryWallet.address
-        );
-
-        // Send to backend API
-        const response = await api.post("/session-keys", {
-          walletAddress: primaryWallet.address,
-          smartWalletOwner: primaryWallet.address,
-          chainId: permissions.chainId,
-          securityLevel: permissions.securityLevel,
-          validUntil: permissions.validUntil.toISOString(),
-          permissions: permissions.operations.map((op) => ({
-            operation: op,
-            maxAmountPerTx: permissions.maxAmountPerTx,
-            maxDailyAmount: permissions.maxDailyAmount,
-            allowedContracts: [],
-            requireConfirmation: false,
-            emergencyStop: false,
-          })),
-          userSignature,
-        });
-
-        const result = response.data;
-        const sessionKeyId = result?.data?.sessionKey?.id;
-
-        if (!sessionKeyId) {
-          throw new Error("Failed to create session key - no ID returned");
-        }
-
-        toast({
-          title: "Delegation Created with Passkey",
-          description:
-            "Smart wallet delegation created using biometric authentication!",
-        });
-
-        return {
-          success: true,
-          sessionKeyId,
-        };
-      } catch (error) {
-        console.error("❌ Passkey delegation creation failed:", error);
-        return {
-          success: false,
-          error: `Passkey delegation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-        };
-      } finally {
-        setIsCreating(false);
+      if (!chain) {
+        throw new Error(`Chain with ID ${chainId} not found`);
       }
+
+      return createPublicClient({
+        chain,
+        transport: http(chain.rpcUrls.default.http[0]),
+      });
     },
-    [signInWithPasskey, isLoggedIn, primaryWallet, user, toast]
+    [chains]
+  );
+
+  const createPimlicoClientForChain = useCallback(
+    (chainId: string, chain: Chain) => {
+      const pimlicoUrl = `https://api.pimlico.io/v2/${chainId}/rpc?apikey=${process.env.NEXT_PUBLIC_PIMLICO_API_KEY}`;
+      console.log("pimlicoUrl", { pimlicoUrl, chainId, chain });
+
+      return createPimlicoClient({
+        chain,
+        transport: http(pimlicoUrl),
+        entryPoint: {
+          address: entryPoint07Address,
+          version: "0.7",
+        },
+      });
+    },
+    []
+  );
+
+  const createSmartAccount = useCallback(
+    async (chainId: string) => {
+      if (!walletClient) {
+        throw new Error("Wallet client not available");
+      }
+
+      const publicClient = createPublicClientForChain(chainId);
+
+      return await toSimpleSmartAccount<"0.7">({
+        owner: walletClient,
+        client: publicClient,
+        entryPoint: {
+          address: entryPoint07Address,
+          version: "0.7",
+        },
+      });
+    },
+    [walletClient, createPublicClientForChain]
+  );
+
+  const createSmartAccountClient = useCallback(
+    async (chainId: string) => {
+      const chainIdNum = parseInt(chainId);
+      const chain = chains.find((chain) => chain.id === chainIdNum);
+
+      if (!chain) {
+        throw new Error(`Chain with ID ${chainId} not found`);
+      }
+
+      const pimlicoUrl = `https://api.pimlico.io/v2/${chainId}/rpc?apikey=${process.env.NEXT_PUBLIC_PIMLICO_API_KEY}`;
+      const pimlicoClient = createPimlicoClientForChain(chainId, chain);
+      const simpleSmartAccount = await createSmartAccount(chainId);
+
+      return {
+        client: createPermissionlessSmartAccountClient({
+          account: simpleSmartAccount,
+          chain,
+          bundlerTransport: http(pimlicoUrl),
+          paymaster: pimlicoClient,
+          userOperation: {
+            estimateFeesPerGas: async () => {
+              return (await pimlicoClient.getUserOperationGasPrice()).fast;
+            },
+          },
+        }),
+        account: simpleSmartAccount,
+      };
+    },
+    [chains, createPimlicoClientForChain, createSmartAccount]
+  );
+
+  const createDelegationMessage = useCallback(
+    (
+      permissions: DelegationPermissions,
+      chainId: string,
+      smartAccountAddress: string
+    ): DelegationMessage => {
+      return {
+        smartWalletAddress: smartAccountAddress,
+        userAddress: primaryWallet!.address,
+        operations: permissions.operations,
+        maxAmountPerTx: permissions.maxAmountPerTx,
+        maxDailyAmount: permissions.maxDailyAmount,
+        validUntil: permissions.validUntil.toISOString(),
+        timestamp: new Date().toISOString(),
+        purpose: "zyra_workflow_automation",
+        chainId,
+        provider: isPimlicoChain(chainId) ? "pimlico" : "zerodev",
+      };
+    },
+    [primaryWallet, isPimlicoChain]
+  );
+
+  const createPermissionConfigs = useCallback(
+    (permissions: DelegationPermissions): PermissionConfig[] => {
+      return permissions.operations.map((operation) => ({
+        operation,
+        maxAmountPerTx: permissions.maxAmountPerTx,
+        maxDailyAmount: permissions.maxDailyAmount,
+        allowedContracts: [],
+        requireConfirmation: false,
+        emergencyStop: false,
+      }));
+    },
+    []
+  );
+
+  const prepareRequestData = useCallback(
+    (
+      permissions: DelegationPermissions,
+      chainId: string,
+      userSignature: string,
+      isPimlico: boolean,
+      smartAccountAddress: string
+    ) => {
+      const baseData = {
+        walletAddress: primaryWallet!.address,
+        chainId,
+        securityLevel: permissions.securityLevel?.toLowerCase() || "basic",
+        validUntil: permissions.validUntil.toISOString(),
+        permissions: createPermissionConfigs(permissions),
+      };
+
+      if (isPimlico) {
+        return {
+          ...baseData,
+          userSignature,
+          smartAccountAddress,
+        };
+      }
+
+      return {
+        ...baseData,
+        smartWalletOwner: primaryWallet!.address,
+        userSignature,
+      };
+    },
+    [primaryWallet, createPermissionConfigs]
   );
 
   const createDelegation = useCallback(
@@ -269,276 +253,112 @@ export function useSmartWalletDelegation() {
       setIsCreating(true);
 
       try {
-        console.log("🔄 Starting delegation creation...", {
-          walletAddress: primaryWallet.address,
-          chainId: permissions.chainId,
-          connector: primaryWallet.connector?.name,
-        });
+        const chainId = permissions.chainId || DEFAULT_CHAIN_ID;
+        const isPimlico = isPimlicoChain(chainId);
 
-        // Create delegation message for user to sign
-        const delegationMessage = {
-          smartWalletAddress: primaryWallet.address,
-          userAddress: primaryWallet.address,
-          operations: permissions.operations,
-          maxAmountPerTx: permissions.maxAmountPerTx,
-          maxDailyAmount: permissions.maxDailyAmount,
-          validUntil: permissions.validUntil.toISOString(),
-          timestamp: new Date().toISOString(),
-          purpose: "zyra_workflow_automation",
-        };
-
-        console.log("📝 Requesting user signature...");
-        console.log("🔍 Wallet details:", {
-          connectorName: primaryWallet.connector?.name,
-          address: primaryWallet.address,
-          hasSignMessage: typeof primaryWallet.signMessage === "function",
-          walletMethods: Object.getOwnPropertyNames(primaryWallet).filter(
-            (prop) =>
-              typeof (primaryWallet as unknown as Record<string, unknown>)[
-                prop
-              ] === "function"
-          ),
-        });
-
-        // Get user signature with timeout
-        const messageToSign = JSON.stringify(delegationMessage, null, 2);
-        console.log("📄 Message to sign:", messageToSign);
-
-        console.log("🚀 Starting signature request...");
-
-        // Try different signing approaches based on wallet type
-        let signaturePromise;
-        const isEmbeddedWallet =
-          primaryWallet.connector?.name &&
-          (primaryWallet.connector.name.includes("Dynamic") ||
-            primaryWallet.connector.name.includes("Embedded"));
-
-        if (isEmbeddedWallet) {
-          console.log("🔐 Using embedded wallet signing approach...");
-          // For embedded wallets, try alternative signing methods
-          signaturePromise = (async () => {
-            try {
-              // Method 1: Standard signMessage
-              console.log("🔄 Trying standard signMessage...");
-
-              // For embedded wallets, ensure user interaction happens first
-              // Dynamic embedded wallets may need time to show their signing UI
-              if (typeof window !== "undefined") {
-                window.focus();
-                // Longer delay to ensure Dynamic's UI is ready
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-              }
-
-              return await primaryWallet.signMessage(messageToSign);
-            } catch (error) {
-              const errorMessage =
-                error instanceof Error ? error.message : "Unknown error";
-              console.log(
-                "❌ Standard signMessage failed, trying alternatives:",
-                errorMessage
-              );
-
-              // Method 2: Try personal_sign if available
-              const provider = (
-                primaryWallet.connector as unknown as {
-                  provider?: {
-                    request?: (params: {
-                      method: string;
-                      params: unknown[];
-                    }) => Promise<string>;
-                  };
-                }
-              )?.provider;
-              if (provider?.request) {
-                console.log("🔄 Trying personal_sign...");
-                try {
-                  return await provider.request({
-                    method: "personal_sign",
-                    params: [messageToSign, primaryWallet.address],
-                  });
-                } catch (personalSignError) {
-                  const personalErrorMessage =
-                    personalSignError instanceof Error
-                      ? personalSignError.message
-                      : "Unknown error";
-                  console.log("❌ personal_sign failed:", personalErrorMessage);
-                }
-              }
-
-              // Method 3: Try eth_sign if available
-              if (provider?.request) {
-                console.log("🔄 Trying eth_sign...");
-                try {
-                  const messageHex =
-                    "0x" + Buffer.from(messageToSign, "utf8").toString("hex");
-                  return await provider.request({
-                    method: "eth_sign",
-                    params: [primaryWallet.address, messageHex],
-                  });
-                } catch (ethSignError) {
-                  const ethErrorMessage =
-                    ethSignError instanceof Error
-                      ? ethSignError.message
-                      : "Unknown error";
-                  console.log("❌ eth_sign failed:", ethErrorMessage);
-                }
-              }
-
-              // Don't automatically try WebAuthn for embedded wallets
-              // If Dynamic's signing methods fail, it's likely a configuration issue
-              console.log("❌ All Dynamic wallet signing methods failed");
-
-              throw error;
-            }
-          })();
-        } else {
-          console.log("🦊 Using external wallet signing approach...");
-          signaturePromise = primaryWallet.signMessage(messageToSign);
-        }
-
-        signaturePromise = signaturePromise.catch((error) => {
-          console.error("❌ Signature promise failed:", error);
-          throw error;
-        });
-
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Signature request timed out after 60s")),
-            60000
-          )
+        console.log(
+          "Creating delegation for chain:",
+          chainId,
+          "using provider:",
+          isPimlico ? "pimlico" : "zerodev"
         );
 
-        // Show different messages based on wallet type
-        if (isEmbeddedWallet) {
-          toast({
-            title: "Signature Required",
-            description:
-              "Please check for Dynamic's signing prompt. This may appear as a popup or modal...",
-          });
-        } else {
-          toast({
-            title: "Signature Required",
-            description:
-              "Please sign the message in MetaMask to create delegation...",
-          });
-        }
+        const { client: smartAccountClient, account: simpleSmartAccount } =
+          await createSmartAccountClient(chainId);
 
-        console.log("⏳ Waiting for signature or timeout...");
-        const userSignature = await Promise.race([
-          signaturePromise,
-          timeoutPromise,
-        ]);
+        const delegationMessage = createDelegationMessage(
+          permissions,
+          chainId,
+          simpleSmartAccount.address
+        );
+        console.log("delegationMessage", delegationMessage);
+        const messageToSign = JSON.stringify(delegationMessage, null, 2);
 
-        console.log("✅ Signature obtained:", {
-          signatureLength:
-            typeof userSignature === "string" ? userSignature.length : 0,
-          signaturePreview:
-            typeof userSignature === "string"
-              ? userSignature.substring(0, 10) + "..."
-              : "N/A",
+        console.log("Signing message with smart account:", {
+          messageToSign,
+          smartAccountAddress: simpleSmartAccount.address,
+          chainId,
         });
+
+        let userSignature: string;
+        try {
+          // Add timeout to prevent hanging
+          const signPromise = primaryWallet.signMessage(messageToSign);
+
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(
+              () =>
+                reject(new Error("Message signing timed out after 30 seconds")),
+              30000
+            );
+          });
+
+          userSignature = await Promise.race([signPromise, timeoutPromise]);
+
+          console.log("User signature received:", {
+            signatureLength: userSignature?.length || 0,
+            signaturePreview:
+              userSignature?.slice(0, 10) + "..." || "undefined",
+          });
+        } catch (signError) {
+          console.error("Error signing message:", signError);
+          throw new Error(
+            `Failed to sign delegation message: ${signError instanceof Error ? signError.message : "Unknown signing error"}`
+          );
+        }
 
         if (!userSignature) {
           throw new Error("User signature required for delegation");
         }
 
-        console.log("✅ Signature received, sending to API...");
-
-        // Send to backend API using axios
-
-        const response = await api.post("/session-keys", {
-          walletAddress: primaryWallet.address,
-          smartWalletOwner: primaryWallet.address, // Same as wallet address for now
-          chainId: permissions.chainId,
-          securityLevel: permissions.securityLevel,
-          validUntil: permissions.validUntil.toISOString(),
-          permissions: permissions.operations.map((op) => ({
-            operation: op,
-            maxAmountPerTx: permissions.maxAmountPerTx,
-            maxDailyAmount: permissions.maxDailyAmount,
-            allowedContracts: [],
-            requireConfirmation: false,
-            emergencyStop: false,
-          })),
+        const endpoint = isPimlico ? "/session-keys/pimlico" : "/session-keys";
+        const requestData = prepareRequestData(
+          permissions,
+          chainId,
           userSignature,
+          isPimlico,
+          simpleSmartAccount.address
+        );
+
+        console.log("Sending delegation request:", {
+          endpoint,
+          chainId,
+          isPimlico,
+          requestDataKeys: Object.keys(requestData),
         });
 
-        console.log("📡 API response received:", response.status);
-        console.log("📋 API Result:", response.data);
+        const response = await api.post(endpoint, requestData);
 
-        const result = response.data;
-        const sessionKeyId = result?.data?.sessionKey?.id;
+        console.log("API response received:", {
+          status: response.status,
+          hasData: !!response.data,
+          responseKeys: response.data ? Object.keys(response.data) : [],
+        });
 
-        if (!sessionKeyId) {
-          console.error("❌ No session key ID in response:", result);
-          throw new Error("Failed to create session key - no ID returned");
+        if (!response.data || response.data.error) {
+          throw new Error(
+            `Failed to create delegation: ${response.data?.error || "Unknown error"}`
+          );
         }
 
-        console.log("✅ Delegation created successfully:", sessionKeyId);
+        const sessionKeyId = response.data?.data?.sessionKey?.id;
+        if (!sessionKeyId) {
+          console.error("Missing session key ID in response:", response.data);
+          throw new Error(
+            "Failed to create session key - missing ID in response"
+          );
+        }
 
         toast({
           title: "Delegation Created",
           description: "Smart wallet delegation created successfully!",
         });
 
-        return {
-          success: true,
-          sessionKeyId,
-        };
-      } catch (error: unknown) {
-        console.error("❌ Delegation creation failed:", error);
-
-        // Check if it's an axios error with response data
-        const axiosError = error as {
-          response?: {
-            status: number;
-            data?: {
-              success?: boolean;
-              data?: { sessionKey?: { id: string } };
-            };
-          };
-          code?: string;
-          message?: string;
-        };
-        if (axiosError.response) {
-          console.log("📡 Error response status:", axiosError.response.status);
-          console.log("📋 Error response data:", axiosError.response.data);
-
-          // If the response contains success data, extract it
-          if (
-            axiosError.response.data?.success &&
-            axiosError.response.data?.data?.sessionKey?.id
-          ) {
-            console.log(
-              "✅ Found session key in error response, treating as success"
-            );
-            const sessionKeyId = axiosError.response.data.data.sessionKey.id;
-
-            toast({
-              title: "Delegation Created",
-              description: "Smart wallet delegation created successfully!",
-            });
-
-            return {
-              success: true,
-              sessionKeyId,
-            };
-          }
-        }
-
+        return { success: true, sessionKeyId };
+      } catch (error) {
+        console.error("Error creating delegation", error);
         const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
-
-        // Check if it's a timeout or abort error
-        if (error instanceof Error) {
-          if (error.name === "AbortError") {
-            console.error("🕐 Request was aborted (timeout)");
-          } else if (error.message.includes("timeout")) {
-            console.error("🕐 Request timed out");
-          } else if (error.message.includes("signature")) {
-            console.error("✍️ Signature issue");
-          }
-        }
+          error instanceof Error ? error.message : "Unknown error occurred";
 
         toast({
           title: "Delegation Failed",
@@ -546,18 +366,24 @@ export function useSmartWalletDelegation() {
           variant: "destructive",
         });
 
-        return {
-          success: false,
-          error: errorMessage,
-        };
+        return { success: false, error: errorMessage };
       } finally {
         setIsCreating(false);
       }
     },
-    [isLoggedIn, primaryWallet, user, toast]
+    [
+      isLoggedIn,
+      primaryWallet,
+      user,
+      toast,
+      isPimlicoChain,
+      createSmartAccountClient,
+      createDelegationMessage,
+      prepareRequestData,
+    ]
   );
 
-  const getWalletStatus = useCallback(() => {
+  const getWalletStatus = useCallback((): WalletStatus => {
     if (!primaryWallet) {
       return {
         connected: false,
@@ -568,11 +394,10 @@ export function useSmartWalletDelegation() {
       };
     }
 
-    // ZeroDev smart wallets are handled by Dynamic + ZeroDev integration
     const hasSmartWallet =
       primaryWallet.connector?.name?.includes("Smart") ||
       primaryWallet.connector?.name?.includes("ZeroDev") ||
-      isLoggedIn; // Fallback: if logged in, assume smart wallet capability
+      isLoggedIn;
 
     return {
       connected: true,
@@ -587,7 +412,6 @@ export function useSmartWalletDelegation() {
 
   return {
     createDelegation,
-    createDelegationWithPasskey,
     isCreating,
     getWalletStatus,
     isWalletReady: !!(isLoggedIn && primaryWallet),

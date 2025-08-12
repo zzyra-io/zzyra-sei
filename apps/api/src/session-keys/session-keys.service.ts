@@ -579,6 +579,142 @@ export class SessionKeysService {
     };
   }
 
+
+
+  /**
+   * Create Pimlico SimpleAccount session key
+   * Uses existing infrastructure for Pimlico SimpleAccount integration
+   */
+  async createPimlicoSessionKey(
+    userId: string,
+    request: CreateSessionKeyRequest,
+    userSignature: string
+  ): Promise<{
+    sessionKey: SessionKeyData;
+    delegationMessage: string;
+    smartAccountInfo: any;
+  }> {
+    try {
+      this.logger.log("Creating Pimlico SimpleAccount session key", {
+        userId,
+        chainId: request.chainId,
+        walletAddress: request.walletAddress,
+      });
+
+      // Generate session key pair
+      const { address: sessionKeyAddress, privateKey } =
+        await this.cryptoService.generateSessionKeyPair();
+
+      // Use the real smart account address provided by the frontend
+      const smartAccountAddress = request.smartAccountAddress!;
+
+      this.logger.log(
+        "✅ Using real smart account address from frontend",
+        {
+          eoaAddress: request.walletAddress,
+          smartAccountAddress,
+          chainId: request.chainId,
+          sessionKeyAddress,
+          source: "frontend_permissionless_js",
+        }
+      );
+
+      // Encrypt private key with user signature
+      const encryptedPrivateKey = await this.cryptoService.encryptSessionKey(
+        privateKey,
+        userSignature
+      );
+
+      // Store session key with Pimlico provider metadata
+      const sessionKey = await this.prisma.client.$transaction(async (tx) => {
+        const newSessionKey = await tx.sessionKey.create({
+          data: {
+            userId,
+            walletAddress: sessionKeyAddress, // Session key's own address
+            smartWalletOwner: smartAccountAddress, // ✅ Correct smart account address
+            parentWalletAddress: request.walletAddress, // Original EOA address
+            chainId: request.chainId,
+            sessionPublicKey: sessionKeyAddress,
+            encryptedPrivateKey,
+            securityLevel: request.securityLevel,
+            validUntil: request.validUntil,
+            dailyResetAt: new Date(),
+            parentDelegationSignature: userSignature,
+            // Pimlico provider metadata
+            providerType: "pimlico_simple_account",
+            smartAccountMetadata: {
+              ownerAddress: request.walletAddress,
+              smartAccountAddress: smartAccountAddress,
+              provider: "pimlico",
+              createdAt: new Date().toISOString(),
+            },
+            smartAccountFactory: "0x5de4839a76cf55d0c90e2061ef4386d962E15ae3", // Standard SimpleAccount factory
+            entryPoint: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789", // EntryPoint v0.6
+          },
+          include: { permissions: true },
+        });
+
+        // Create permissions
+        for (const permission of request.permissions) {
+          await tx.sessionPermission.create({
+            data: {
+              sessionKeyId: newSessionKey.id,
+              operation: permission.operation,
+              maxAmountPerTx: permission.maxAmountPerTx,
+              maxDailyAmount: permission.maxDailyAmount,
+              allowedContracts: permission.allowedContracts,
+              requireConfirmation: permission.requireConfirmation,
+              emergencyStop: permission.emergencyStop,
+            },
+          });
+        }
+
+        // Create creation event
+        await tx.sessionEvent.create({
+          data: {
+            sessionKeyId: newSessionKey.id,
+            eventType: SessionEventType.CREATED,
+            eventData: {
+              provider: "pimlico_simple_account",
+              securityLevel: request.securityLevel,
+              chainId: request.chainId,
+              permissionCount: request.permissions.length,
+            },
+            severity: "info",
+          },
+        });
+
+        return newSessionKey;
+      });
+
+      const sessionKeyData = await this.getSessionKeyById(sessionKey.id);
+
+      this.logger.log("Pimlico session key created successfully", {
+        sessionKeyId: sessionKey.id,
+        userId,
+      });
+
+      return {
+        sessionKey: sessionKeyData!,
+        delegationMessage: JSON.stringify({
+          sessionKeyAddress,
+          chainId: request.chainId,
+          provider: "pimlico_simple_account",
+          ownerAddress: request.walletAddress,
+          timestamp: new Date().toISOString(),
+        }),
+        smartAccountInfo: {
+          provider: "pimlico_simple_account",
+          ownerAddress: request.walletAddress,
+          chainId: request.chainId,
+        },
+      };
+    } catch (error) {
+      this.logger.error("Failed to create Pimlico session key", error);
+      throw new BadRequestException("Failed to create Pimlico session key");
+    }
+  }
+
   /**
    * Decrypt session key private key for worker access
    * Direct decryption without database lookup

@@ -141,33 +141,76 @@ export class PimlicoService implements IAccountAbstractionService {
   }
 
   /**
-   * Calculate smart account address using CREATE2
+   * Calculate smart account address using CREATE2 with proper initCode
    */
   private calculateSmartAccountAddress(
     owner: string,
     salt: string = '0x0000000000000000000000000000000000000000000000000000000000000000',
   ): string {
-    // SimpleAccount initCode hash calculation
-    const initCodeHash = keccak256(
-      // Simplified initCode hash for testing
-      '0xabcd1234' as `0x${string}`,
-    );
-
-    // CREATE2 address calculation
-    const address = keccak256(
-      encodePacked(
-        ['bytes1', 'address', 'bytes32', 'bytes32'],
+    try {
+      // Create proper initCode for SimpleAccount creation
+      // This represents the bytecode that will be deployed
+      const initCode = encodePacked(
+        ['address', 'bytes'],
         [
-          '0xff',
           SIMPLE_ACCOUNT_FACTORY as Address,
-          salt as `0x${string}`,
-          initCodeHash,
+          encodeFunctionData({
+            abi: [
+              {
+                inputs: [
+                  { name: 'owner', type: 'address' },
+                  { name: 'salt', type: 'uint256' },
+                ],
+                name: 'createAccount',
+                outputs: [{ name: '', type: 'address' }],
+                stateMutability: 'nonpayable',
+                type: 'function',
+              },
+            ],
+            functionName: 'createAccount',
+            args: [owner as Address, BigInt(salt)],
+          }),
         ],
-      ),
-    );
+      );
 
-    // Take the last 20 bytes and convert to address
-    return `0x${address.slice(26)}` as Address;
+      // Calculate initCode hash
+      const initCodeHash = keccak256(initCode);
+
+      // CREATE2 address calculation: keccak256(0xff ++ factory ++ salt ++ initCodeHash)
+      const address = keccak256(
+        encodePacked(
+          ['bytes1', 'address', 'bytes32', 'bytes32'],
+          [
+            '0xff',
+            SIMPLE_ACCOUNT_FACTORY as Address,
+            salt as `0x${string}`,
+            initCodeHash,
+          ],
+        ),
+      );
+
+      // Take the last 20 bytes and convert to address
+      const calculatedAddress = `0x${address.slice(26)}` as Address;
+      
+      this.logger.log('✅ Calculated smart account address using CREATE2', {
+        owner,
+        salt,
+        calculatedAddress,
+        factory: SIMPLE_ACCOUNT_FACTORY,
+        method: 'create2_deterministic',
+      });
+
+      return calculatedAddress;
+    } catch (error) {
+      this.logger.error('❌ Failed to calculate smart account address', {
+        error: error instanceof Error ? error.message : String(error),
+        owner,
+        salt,
+      });
+      throw new Error(
+        `Failed to calculate smart account address: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

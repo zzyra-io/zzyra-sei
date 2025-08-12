@@ -163,9 +163,10 @@ export function SendTransactionConfig({
             <Label htmlFor='chainId'>Chain</Label>
             <Select
               value={(config.chainId as string) || "1328"}
-              onValueChange={(value) =>
-                handleChangeWithValidation("chainId", value)
-              }>
+              onValueChange={(value) => {
+                console.log("value", value);
+                handleChangeWithValidation("chainId", value);
+              }}>
               <SelectTrigger id='chainId'>
                 <SelectValue placeholder='Select blockchain network' />
               </SelectTrigger>

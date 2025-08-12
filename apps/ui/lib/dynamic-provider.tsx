@@ -13,6 +13,7 @@ import { ReactNode, Component } from "react";
 import { http } from "viem";
 import { WagmiProvider, createConfig } from "wagmi";
 import { baseSepolia } from "viem/chains";
+import { PermissionlessProvider } from "@permissionless/wagmi";
 
 // Error boundary for Dynamic Labs
 class DynamicErrorBoundary extends Component<
@@ -129,10 +130,9 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
               environmentId,
               walletConnectors: [
                 EthereumWalletConnectors,
-                ZeroDevSmartWalletConnectors,
+                // ZeroDevSmartWalletConnectors,
               ],
               // Enable passkey authentication for embedded wallets
-              enablePasskeys: true,
               // Add custom chains for Dynamic to recognize
               overrides: {
                 evmNetworks: [
@@ -153,7 +153,15 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
               // Remove event handlers to prevent setState during render issues
             }}>
             <WagmiProvider config={wagmiConfig}>
-              <DynamicWagmiConnector>{children}</DynamicWagmiConnector>
+              <PermissionlessProvider
+                capabilities={{
+                  smartWallet: {
+                    create: true,
+                    delegate: true,
+                  },
+                }}>
+                <DynamicWagmiConnector>{children}</DynamicWagmiConnector>
+              </PermissionlessProvider>
             </WagmiProvider>
           </DynamicContextProvider>
         </DynamicErrorBoundary>
