@@ -1,10 +1,8 @@
-import { Json } from './supabase';
-
 export interface ExecutionContext {
   executionId: string;
   workflowId: string;
   userId: string;
-  data?: Json;
+  data?: any;
 }
 
 export interface ExecutionLog {
@@ -13,7 +11,7 @@ export interface ExecutionLog {
   node_id: string;
   level: 'info' | 'error' | 'warn';
   message: string;
-  data?: Json;
+  data?: any;
   timestamp: string;
   created_at: string;
 }
@@ -34,7 +32,7 @@ export interface WorkflowExecution {
   started_at: string;
   completed_at?: string;
   error?: string;
-  data?: Json;
+  data?: any;
   created_at: string;
   user_id: string;
   retry_count: number;
