@@ -24,6 +24,7 @@ export interface QueueMessage {
   payload?: any;
   retryCount?: number;
   timestamp?: string;
+  messageId?: string;
   blockchainAuthorization?: any;
 }
 
@@ -351,14 +352,12 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         ...message,
         timestamp: new Date().toISOString(),
         retryCount: message.retryCount || 0,
+        messageId: `exec-${message.executionId}-${Date.now()}`,
       };
 
       await this.channelWrapper.sendToQueue(
         EXECUTION_QUEUE,
         messageWithTimestamp,
-        {
-          messageId: `exec-${message.executionId}-${Date.now()}`,
-        },
       );
 
       this.logger.log(`📤 Published execution message: ${message.executionId}`);
@@ -378,14 +377,12 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         ...message,
         retryCount: (message.retryCount || 0) + 1,
         timestamp: new Date().toISOString(),
+        messageId: `retry-${message.executionId}-${Date.now()}`,
       };
 
       await this.channelWrapper.sendToQueue(
         EXECUTION_RETRY_QUEUE,
         retryMessage,
-        {
-          messageId: `retry-${message.executionId}-${Date.now()}`,
-        },
       );
 
       this.logger.log(
@@ -412,26 +409,22 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
       // Wait for connection to be ready
       await this.waitForConnection();
 
-      await this.channelWrapper.consume(
-        EXECUTION_QUEUE,
-        async (msg) => {
-          if (!msg) return;
+      await this.channelWrapper.consume(EXECUTION_QUEUE, async (msg) => {
+        if (!msg) return;
 
-          try {
-            const message: QueueMessage = JSON.parse(msg.content.toString());
+        try {
+          const message: QueueMessage = JSON.parse(msg.content.toString());
 
-            await handler(
-              message,
-              () => this.channelWrapper.ack(msg),
-              (requeue = false) =>
-                this.channelWrapper.nack(msg, false, requeue),
-            );
-          } catch (error) {
-            this.logger.error('Error processing message:', error);
-            this.channelWrapper.nack(msg, false, false); // Send to DLQ
-          }
-        },
-      );
+          await handler(
+            message,
+            () => this.channelWrapper.ack(msg),
+            (requeue = false) => this.channelWrapper.nack(msg, false, requeue),
+          );
+        } catch (error) {
+          this.logger.error('Error processing message:', error);
+          this.channelWrapper.nack(msg, false, false); // Send to DLQ
+        }
+      });
 
       this.logger.log(`👂 Consumer setup for ${EXECUTION_QUEUE}`);
     } catch (error) {
@@ -463,7 +456,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
             this.channelWrapper.ack(msg); // Always ack DLQ messages
           }
         },
-  {},
+        {},
       );
 
       this.logger.log(`👂 DLQ consumer setup for ${EXECUTION_DLQ}`);
@@ -701,14 +694,12 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
               ...message,
               timestamp: new Date().toISOString(),
               retryCount: message.retryCount || 0,
+              messageId: `exec-${message.executionId}-${Date.now()}`,
             };
 
             await this.channelWrapper.sendToQueue(
               EXECUTION_QUEUE,
               messageWithTimestamp,
-              {
-                messageId: `exec-${message.executionId}-${Date.now()}`,
-              },
             );
             return true;
           } catch (error) {
