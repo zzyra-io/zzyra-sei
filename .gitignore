@@ -32,3 +32,7 @@ Thumbs.db
 # Turbo
 .turbo
 
+
+Dockerfile.api-final
+output/
+output-*

@@ -1,19 +1,19 @@
 import {
   Injectable,
   Logger,
-  OnModuleInit,
   OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as amqp from 'amqplib';
 import {
   AmqpConnectionManager,
-  connect,
   ChannelWrapper,
+  connect,
 } from 'amqp-connection-manager';
+import * as amqp from 'amqplib';
 import {
-  EXECUTION_QUEUE,
   EXECUTION_DLQ,
+  EXECUTION_QUEUE,
   EXECUTION_RETRY_QUEUE,
 } from '../config';
 
@@ -357,10 +357,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         EXECUTION_QUEUE,
         messageWithTimestamp,
         {
-          persistent: true,
-          priority: this.calculatePriority(message),
           messageId: `exec-${message.executionId}-${Date.now()}`,
-          timestamp: Date.now(),
         },
       );
 
@@ -387,8 +384,6 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         EXECUTION_RETRY_QUEUE,
         retryMessage,
         {
-          persistent: true,
-          expiration: delayMs.toString(),
           messageId: `retry-${message.executionId}-${Date.now()}`,
         },
       );
@@ -436,10 +431,6 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
             this.channelWrapper.nack(msg, false, false); // Send to DLQ
           }
         },
-        {
-          noAck: false,
-          consumerTag: `worker-${process.pid}`,
-        },
       );
 
       this.logger.log(`👂 Consumer setup for ${EXECUTION_QUEUE}`);
@@ -472,7 +463,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
             this.channelWrapper.ack(msg); // Always ack DLQ messages
           }
         },
-        { noAck: false },
+  {},
       );
 
       this.logger.log(`👂 DLQ consumer setup for ${EXECUTION_DLQ}`);
@@ -716,10 +707,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
               EXECUTION_QUEUE,
               messageWithTimestamp,
               {
-                persistent: true,
-                priority: this.calculatePriority(message),
                 messageId: `exec-${message.executionId}-${Date.now()}`,
-                timestamp: Date.now(),
               },
             );
             return true;
