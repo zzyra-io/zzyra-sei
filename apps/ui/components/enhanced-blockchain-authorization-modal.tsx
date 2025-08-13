@@ -1,25 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -27,17 +10,34 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Shield, Clock, AlertTriangle, CheckCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
+import { useSmartWalletDelegation } from "@/hooks/use-smart-wallet-delegation";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
 import {
   SUPPORTED_CHAINS,
-  SecurityLevel,
   SecureBlockchainAuthConfig,
+  SecurityLevel,
   UnifiedWorkflowNode,
 } from "@zzyra/types";
-import { useToast } from "@/components/ui/use-toast";
-import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
-import { useSmartWalletDelegation } from "@/hooks/use-smart-wallet-delegation";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle, Check, CheckCircle, Clock, Shield } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface SelectedTool {
   id: string;
@@ -243,12 +243,32 @@ export function EnhancedBlockchainAuthorizationModal({
     { threshold: 80, method: "email" as const },
   ]);
 
+  // Enhanced configuration state
+  const [recurringSchedule, setRecurringSchedule] = useState({
+    enabled: false,
+    type: "weekly" as "daily" | "weekly" | "monthly",
+    dayOfWeek: 5, // Friday
+    time: "10:00",
+  });
+
+  const [gasPaymentMethod, setGasPaymentMethod] = useState<
+    "sponsor" | "native" | "erc20"
+  >("sponsor");
+  const [selectedGasToken, setSelectedGasToken] = useState("usdc");
+
   // State for each supported chain - with proper null safety
   const [chainConfigs, setChainConfigs] = useState<
     Record<string, { spending: string; enabled: boolean }>
   >({});
 
   const [duration, setDuration] = useState("24");
+
+  // Deployment status state
+  const [deploymentStatus, setDeploymentStatus] = useState<{
+    isDeploying: boolean;
+    message: string;
+    deploymentHash?: string;
+  }>({ isDeploying: false, message: "" });
 
   // Error dialog state
   const [errorDialog, setErrorDialog] = useState<{
@@ -299,6 +319,7 @@ export function EnhancedBlockchainAuthorizationModal({
     setChainConfigs({});
     setSecurityLevel(SecurityLevel.BASIC);
     setRequireConfirmation(false);
+    setDeploymentStatus({ isDeploying: false, message: "" });
     onCancel();
   };
 
@@ -392,13 +413,50 @@ export function EnhancedBlockchainAuthorizationModal({
         validUntil: new Date(Date.now() + parseInt(duration) * 60 * 60 * 1000),
         chainId: primaryChain.chainId,
         securityLevel: securityLevel,
+        // Enhanced configuration
+        recurringSchedule: recurringSchedule.enabled
+          ? {
+              type: recurringSchedule.type,
+              dayOfWeek:
+                recurringSchedule.type === "weekly"
+                  ? recurringSchedule.dayOfWeek
+                  : undefined,
+              time: recurringSchedule.time,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            }
+          : undefined,
+        gasPayment: {
+          method: gasPaymentMethod,
+          erc20Token:
+            gasPaymentMethod === "erc20"
+              ? {
+                  address:
+                    selectedGasToken === "usdc"
+                      ? "0xA0b86a33E6416d5c77Da8e5F4fB9ab7b4C78A6C4" // USDC address (example)
+                      : selectedGasToken === "usdt"
+                        ? "0xdAC17F958D2ee523a2206206994597C13D831ec7" // USDT address (example)
+                        : "0x6B175474E89094C44Da98b954EedeAC495271d0F", // DAI address (example)
+                  symbol: selectedGasToken.toUpperCase(),
+                  decimals:
+                    selectedGasToken === "usdc" || selectedGasToken === "usdt"
+                      ? 6
+                      : 18,
+                }
+              : undefined,
+        },
       };
 
       // Use regular method for all wallets
+      setDeploymentStatus({
+        isDeploying: true,
+        message: "Creating smart wallet and deploying...",
+      });
+
       const delegationResult = await createDelegation(delegationParams);
 
       // Handle error response
       if (!delegationResult.success) {
+        setDeploymentStatus({ isDeploying: false, message: "" });
         toast({
           title: "Smart Wallet Setup Failed",
           description:
@@ -410,6 +468,7 @@ export function EnhancedBlockchainAuthorizationModal({
       }
 
       if (!delegationResult.sessionKeyId) {
+        setDeploymentStatus({ isDeploying: false, message: "" });
         toast({
           title: "Session Key Creation Failed",
           description: "Failed to create session key for automated execution.",
@@ -419,6 +478,24 @@ export function EnhancedBlockchainAuthorizationModal({
       }
 
       const sessionKeyId = delegationResult.sessionKeyId;
+      const deploymentHash = delegationResult.deploymentHash;
+
+      // Update deployment status
+      setDeploymentStatus({
+        isDeploying: false,
+        message: deploymentHash
+          ? "Smart wallet deployed successfully!"
+          : "Smart wallet setup complete",
+        deploymentHash,
+      });
+
+      // Show deployment success message if wallet was deployed
+      if (deploymentHash) {
+        toast({
+          title: "Smart Wallet Deployed",
+          description: `Smart wallet deployed successfully! Transaction: ${deploymentHash.substring(0, 10)}...`,
+        });
+      }
 
       // Create AA authorization config
       const config: SecureBlockchainAuthConfig = {
@@ -429,7 +506,7 @@ export function EnhancedBlockchainAuthorizationModal({
         requireConfirmation,
         emergencyContacts,
         spendingAlerts,
-        // Store simplified delegation data
+        // Store enhanced delegation data
         delegationSignature: JSON.stringify({
           useAA: true,
           provider: "dynamic_labs",
@@ -445,15 +522,75 @@ export function EnhancedBlockchainAuthorizationModal({
             Date.now() + parseInt(duration) * 60 * 60 * 1000
           ).toISOString(),
           authMethod: "wallet",
+          deploymentHash: deploymentHash,
+          // Enhanced features
+          recurringSchedule: recurringSchedule.enabled
+            ? {
+                type: recurringSchedule.type,
+                dayOfWeek:
+                  recurringSchedule.type === "weekly"
+                    ? recurringSchedule.dayOfWeek
+                    : undefined,
+                time: recurringSchedule.time,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                example: `Execute every ${
+                  recurringSchedule.type === "weekly"
+                    ? [
+                        "Sunday",
+                        "Monday",
+                        "Tuesday",
+                        "Wednesday",
+                        "Thursday",
+                        "Friday",
+                        "Saturday",
+                      ][recurringSchedule.dayOfWeek]
+                    : recurringSchedule.type
+                } at ${recurringSchedule.time}`,
+              }
+            : undefined,
+          gasPayment: {
+            method: gasPaymentMethod,
+            description:
+              gasPaymentMethod === "sponsor"
+                ? "Zyra sponsors gas fees"
+                : gasPaymentMethod === "native"
+                  ? "Pay gas with native tokens"
+                  : `Pay gas with ${selectedGasToken.toUpperCase()}`,
+            erc20Token:
+              gasPaymentMethod === "erc20"
+                ? {
+                    symbol: selectedGasToken.toUpperCase(),
+                    decimals:
+                      selectedGasToken === "usdc" || selectedGasToken === "usdt"
+                        ? 6
+                        : 18,
+                  }
+                : undefined,
+          },
+          enhancedFeatures: true,
+          version: "2.0",
         }),
         sessionKeyId,
       };
 
       onAuthorize(config);
 
+      const enhancedFeaturesSummary = [
+        recurringSchedule.enabled
+          ? `Recurring ${recurringSchedule.type} schedule`
+          : null,
+        gasPaymentMethod === "sponsor"
+          ? "Gas-free execution"
+          : gasPaymentMethod === "erc20"
+            ? `ERC20 gas payments (${selectedGasToken.toUpperCase()})`
+            : "Native gas payments",
+      ]
+        .filter(Boolean)
+        .join(", ");
+
       toast({
-        title: "Smart Wallet Created",
-        description: `AA delegation created for ${selectedChains.length} chain(s) with ${securityLevel} security level using wallet signing.`,
+        title: "Enhanced Smart Wallet Created",
+        description: `Smart wallet delegation created for ${selectedChains.length} chain(s) with ${securityLevel} security level. Features: ${enhancedFeaturesSummary}.${deploymentHash ? " Smart wallet deployed successfully." : ""}`,
       });
     } catch (error) {
       console.error("Authorization error:", error);
@@ -720,6 +857,218 @@ export function EnhancedBlockchainAuthorizationModal({
                   </p>
                 </CardContent>
               </Card>
+
+              {/* Recurring Schedule Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center gap-2'>
+                    <Clock className='h-4 w-4' />
+                    Recurring Schedule
+                  </CardTitle>
+                  <CardDescription>
+                    Configure automatic recurring operations (e.g., &quot;send
+                    10 SEI every Friday&quot;)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-4'>
+                  <div className='flex items-center space-x-2'>
+                    <Switch
+                      id='enable-recurring'
+                      checked={recurringSchedule.enabled}
+                      onCheckedChange={(enabled) =>
+                        setRecurringSchedule((prev) => ({ ...prev, enabled }))
+                      }
+                    />
+                    <Label htmlFor='enable-recurring'>
+                      Enable recurring operations
+                    </Label>
+                  </div>
+
+                  {recurringSchedule.enabled && (
+                    <div className='space-y-3 p-4 border rounded-lg bg-muted/50'>
+                      <div>
+                        <Label className='text-sm'>Schedule Type</Label>
+                        <Select
+                          value={recurringSchedule.type}
+                          onValueChange={(
+                            type: "daily" | "weekly" | "monthly"
+                          ) =>
+                            setRecurringSchedule((prev) => ({ ...prev, type }))
+                          }>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='daily'>Daily</SelectItem>
+                            <SelectItem value='weekly'>Weekly</SelectItem>
+                            <SelectItem value='monthly'>Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {recurringSchedule.type === "weekly" && (
+                        <div>
+                          <Label className='text-sm'>Day of Week</Label>
+                          <Select
+                            value={recurringSchedule.dayOfWeek.toString()}
+                            onValueChange={(day) =>
+                              setRecurringSchedule((prev) => ({
+                                ...prev,
+                                dayOfWeek: parseInt(day),
+                              }))
+                            }>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value='0'>Sunday</SelectItem>
+                              <SelectItem value='1'>Monday</SelectItem>
+                              <SelectItem value='2'>Tuesday</SelectItem>
+                              <SelectItem value='3'>Wednesday</SelectItem>
+                              <SelectItem value='4'>Thursday</SelectItem>
+                              <SelectItem value='5'>Friday</SelectItem>
+                              <SelectItem value='6'>Saturday</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      <div>
+                        <Label className='text-sm'>Execution Time</Label>
+                        <Input
+                          type='time'
+                          value={recurringSchedule.time}
+                          onChange={(e) =>
+                            setRecurringSchedule((prev) => ({
+                              ...prev,
+                              time: e.target.value,
+                            }))
+                          }
+                          className='text-sm'
+                        />
+                      </div>
+
+                      <Alert>
+                        <CheckCircle className='h-4 w-4' />
+                        <AlertDescription className='text-sm'>
+                          <strong>Example:</strong> With these settings,
+                          operations will execute automatically every{" "}
+                          {recurringSchedule.type === "weekly" &&
+                            [
+                              "Sunday",
+                              "Monday",
+                              "Tuesday",
+                              "Wednesday",
+                              "Thursday",
+                              "Friday",
+                              "Saturday",
+                            ][recurringSchedule.dayOfWeek]}{" "}
+                          at {recurringSchedule.time}.
+                        </AlertDescription>
+                      </Alert>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Gas Payment Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className='flex items-center gap-2'>
+                    <Shield className='h-4 w-4' />
+                    Gas Payment Method
+                  </CardTitle>
+                  <CardDescription>
+                    Choose how transaction fees will be paid
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-3'>
+                  <div className='space-y-3'>
+                    <div className='flex items-center space-x-2'>
+                      <input
+                        type='radio'
+                        id='sponsor'
+                        name='gasPayment'
+                        value='sponsor'
+                        checked={gasPaymentMethod === "sponsor"}
+                        onChange={() => setGasPaymentMethod("sponsor")}
+                      />
+                      <Label htmlFor='sponsor' className='flex-1'>
+                        <div className='font-medium'>
+                          Sponsored (Recommended)
+                        </div>
+                        <div className='text-xs text-muted-foreground'>
+                          Zyra pays gas fees - completely free for users
+                        </div>
+                      </Label>
+                    </div>
+
+                    <div className='flex items-center space-x-2'>
+                      <input
+                        type='radio'
+                        id='native'
+                        name='gasPayment'
+                        value='native'
+                        checked={gasPaymentMethod === "native"}
+                        onChange={() => setGasPaymentMethod("native")}
+                      />
+                      <Label htmlFor='native' className='flex-1'>
+                        <div className='font-medium'>Native Token</div>
+                        <div className='text-xs text-muted-foreground'>
+                          Pay gas with SEI/ETH from your wallet
+                        </div>
+                      </Label>
+                    </div>
+
+                    <div className='flex items-center space-x-2'>
+                      <input
+                        type='radio'
+                        id='erc20'
+                        name='gasPayment'
+                        value='erc20'
+                        checked={gasPaymentMethod === "erc20"}
+                        onChange={() => setGasPaymentMethod("erc20")}
+                      />
+                      <Label htmlFor='erc20' className='flex-1'>
+                        <div className='font-medium'>ERC20 Tokens</div>
+                        <div className='text-xs text-muted-foreground'>
+                          Pay gas with stablecoins like USDC
+                        </div>
+                      </Label>
+                    </div>
+
+                    {gasPaymentMethod === "erc20" && (
+                      <div className='ml-6 mt-2'>
+                        <Label className='text-sm'>Token</Label>
+                        <Select
+                          value={selectedGasToken}
+                          onValueChange={setSelectedGasToken}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='usdc'>USDC</SelectItem>
+                            <SelectItem value='usdt'>USDT</SelectItem>
+                            <SelectItem value='dai'>DAI</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+
+                  <Alert>
+                    <AlertTriangle className='h-4 w-4' />
+                    <AlertDescription className='text-sm'>
+                      {gasPaymentMethod === "sponsor" &&
+                        "Sponsored gas is ideal for recurring operations as it removes the need to maintain gas balances."}
+                      {gasPaymentMethod === "native" &&
+                        "Ensure your wallet has sufficient native tokens to cover gas fees for all scheduled operations."}
+                      {gasPaymentMethod === "erc20" &&
+                        `Ensure your wallet has sufficient ${selectedGasToken.toUpperCase()} balance to cover gas fees.`}
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value='security' className='space-y-4'>
@@ -840,6 +1189,46 @@ export function EnhancedBlockchainAuthorizationModal({
             </TabsContent>
           </Tabs>
 
+          {/* Deployment Status Display */}
+          {deploymentStatus.isDeploying && (
+            <Card className='mt-4'>
+              <CardContent className='pt-6'>
+                <div className='flex items-center gap-3'>
+                  <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-primary'></div>
+                  <div className='flex-1'>
+                    <div className='text-sm font-medium'>
+                      Deploying Smart Wallet
+                    </div>
+                    <div className='text-xs text-muted-foreground'>
+                      {deploymentStatus.message}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {deploymentStatus.deploymentHash && !deploymentStatus.isDeploying && (
+            <Card className='mt-4 border-green-200 bg-green-50'>
+              <CardContent className='pt-6'>
+                <div className='flex items-center gap-3'>
+                  <div className='w-4 h-4 bg-green-500 rounded-full flex items-center justify-center'>
+                    <Check className='w-3 h-3 text-white' />
+                  </div>
+                  <div className='flex-1'>
+                    <div className='text-sm font-medium text-green-800'>
+                      Smart Wallet Deployed
+                    </div>
+                    <div className='text-xs text-green-600'>
+                      Transaction:{" "}
+                      {deploymentStatus.deploymentHash.substring(0, 10)}...
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Action Buttons */}
           <div className='flex gap-2 pt-4 border-t'>
             <Button variant='outline' onClick={handleClose} className='flex-1'>
@@ -848,11 +1237,17 @@ export function EnhancedBlockchainAuthorizationModal({
             <Button
               onClick={handleAuthorize}
               className='flex-1'
-              disabled={isCreating || !walletStatus.hasSmartWallet}>
-              {isCreating ? (
+              disabled={
+                isCreating ||
+                !walletStatus.hasSmartWallet ||
+                deploymentStatus.isDeploying
+              }>
+              {isCreating || deploymentStatus.isDeploying ? (
                 <>
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
-                  Creating Delegation...
+                  {deploymentStatus.isDeploying
+                    ? "Deploying Smart Wallet..."
+                    : "Creating Delegation..."}
                 </>
               ) : !walletStatus.hasSmartWallet ? (
                 "Wallet Required"

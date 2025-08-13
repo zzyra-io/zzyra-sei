@@ -130,9 +130,10 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
               environmentId,
               walletConnectors: [
                 EthereumWalletConnectors,
-                // ZeroDevSmartWalletConnectors,
+                ZeroDevSmartWalletConnectors,
               ],
               // Enable passkey authentication for embedded wallets
+              // Note: Passkey support is enabled by default in Dynamic Labs v4
               // Add custom chains for Dynamic to recognize
               overrides: {
                 evmNetworks: [

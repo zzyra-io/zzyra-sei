@@ -1,0 +1,23 @@
+{
+  "cursor.ai.enableFullContext": true,
+  "cursor.ai.maxTokens": 8000,
+  "cursor.ai.temperature": 0.1,
+  "cursor.ai.enableCodeActions": true,
+  "cursor.ai.enableInlineCompletions": true,
+  "cursor.ai.useFullFileContext": true,
+  "cursor.ai.enableSmartContext": true,
+  "cursor.ai.contextWindowSize": "large",
+  "cursor.ai.enableAdvancedFeatures": true,
+  "typescript.preferences.includePackageJsonAutoImports": "auto",
+  "typescript.suggest.autoImports": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "files.associations": {
+    "*.ts": "typescript",
+    "*.tsx": "typescriptreact"
+  }
+}

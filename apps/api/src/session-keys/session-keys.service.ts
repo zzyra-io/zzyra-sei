@@ -1,20 +1,19 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
-  BadRequestException,
 } from "@nestjs/common";
-import { PrismaService } from "../database/prisma.service";
 import {
+  CreateSessionKeyRequest,
+  SecurityLevel,
+  SessionEventType,
   SessionKeyData,
   SessionKeyStatus,
-  SecurityLevel,
-  CreateSessionKeyRequest,
   SessionKeyValidationResult,
   SessionUsageStats,
-  SecurityViolationError,
-  SessionEventType,
 } from "@zzyra/types";
+import { PrismaService } from "../database/prisma.service";
 import { SessionKeyCryptoService } from "../shared/services/session-key-crypto.service";
 
 /**
@@ -579,8 +578,6 @@ export class SessionKeysService {
     };
   }
 
-
-
   /**
    * Create Pimlico SimpleAccount session key
    * Uses existing infrastructure for Pimlico SimpleAccount integration
@@ -608,16 +605,13 @@ export class SessionKeysService {
       // Use the real smart account address provided by the frontend
       const smartAccountAddress = request.smartAccountAddress!;
 
-      this.logger.log(
-        "✅ Using real smart account address from frontend",
-        {
-          eoaAddress: request.walletAddress,
-          smartAccountAddress,
-          chainId: request.chainId,
-          sessionKeyAddress,
-          source: "frontend_permissionless_js",
-        }
-      );
+      this.logger.log("✅ Using real smart account address from frontend", {
+        eoaAddress: request.walletAddress,
+        smartAccountAddress,
+        chainId: request.chainId,
+        sessionKeyAddress,
+        source: "frontend_permissionless_js",
+      });
 
       // Encrypt private key with user signature
       const encryptedPrivateKey = await this.cryptoService.encryptSessionKey(
@@ -739,5 +733,271 @@ export class SessionKeysService {
         `Session key decryption failed: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     }
+  }
+
+  /**
+   * Get session keys that are due for recurring execution
+   * Used by worker to find scheduled operations
+   */
+  async getDueRecurringOperations(
+    tolerance: number = 5 * 60 * 1000
+  ): Promise<SessionKeyData[]> {
+    try {
+      const now = new Date();
+
+      // Get all active session keys that have recurring schedules
+      const sessionKeys = await this.prisma.client.sessionKey.findMany({
+        where: {
+          status: SessionKeyStatus.ACTIVE,
+          validUntil: {
+            gt: now,
+          },
+          // Add filter for session keys with recurring metadata
+          // This would be stored in a JSON field or separate table
+        },
+        include: {
+          permissions: true,
+        },
+      });
+
+      // Filter to those that are due for execution
+      const dueOperations: SessionKeyData[] = [];
+
+      for (const sessionKey of sessionKeys) {
+        const sessionKeyData = this.mapToSessionKeyData(sessionKey);
+
+        // Check if this session key has recurring schedule configured
+        // This would be enhanced with proper storage of recurring schedule data
+        const isRecurringDue = this.isRecurringOperationDue(
+          sessionKeyData,
+          now,
+          tolerance
+        );
+
+        if (isRecurringDue) {
+          dueOperations.push(sessionKeyData);
+        }
+      }
+
+      this.logger.log(
+        `Found ${dueOperations.length} due recurring operations`,
+        {
+          total: sessionKeys.length,
+          due: dueOperations.length,
+        }
+      );
+
+      return dueOperations;
+    } catch (error) {
+      this.logger.error("Failed to get due recurring operations", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update session key with recurring execution log
+   * Tracks when recurring operations are executed
+   */
+  async logRecurringExecution(
+    sessionKeyId: string,
+    executionResult: {
+      success: boolean;
+      transactionHash?: string;
+      error?: string;
+      nextScheduledTime?: Date;
+    }
+  ): Promise<void> {
+    try {
+      await this.prisma.client.$transaction(async (tx) => {
+        // Update last execution time
+        await tx.sessionKey.update({
+          where: { id: sessionKeyId },
+          data: {
+            lastUsedAt: new Date(),
+          },
+        });
+
+        // Log execution event
+        await tx.sessionEvent.create({
+          data: {
+            sessionKeyId,
+            eventType: executionResult.success
+              ? SessionEventType.USED
+              : SessionEventType.SECURITY_ALERT,
+            eventData: {
+              executionType: "recurring",
+              transactionHash: executionResult.transactionHash,
+              error: executionResult.error,
+              nextScheduledTime:
+                executionResult.nextScheduledTime?.toISOString(),
+            },
+            severity: executionResult.success ? "info" : "warning",
+          },
+        });
+      });
+
+      this.logger.log("Recurring execution logged", {
+        sessionKeyId,
+        success: executionResult.success,
+      });
+    } catch (error) {
+      this.logger.error("Failed to log recurring execution", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create session key with enhanced recurring schedule support
+   */
+  async createEnhancedSessionKey(
+    userId: string,
+    request: CreateSessionKeyRequest & {
+      recurringSchedule?: {
+        type: "daily" | "weekly" | "monthly";
+        dayOfWeek?: number;
+        dayOfMonth?: number;
+        time?: string;
+        timezone?: string;
+      };
+      gasPayment?: {
+        method: "sponsor" | "native" | "erc20";
+        erc20Token?: {
+          address: string;
+          symbol: string;
+          decimals: number;
+        };
+      };
+    },
+    userSignature: string
+  ): Promise<{ sessionKey: SessionKeyData; delegationMessage: string }> {
+    try {
+      this.logger.log("Creating enhanced session key with recurring support", {
+        userId,
+        chainId: request.chainId,
+        hasRecurringSchedule: !!request.recurringSchedule,
+        gasPaymentMethod: request.gasPayment?.method || "native",
+      });
+
+      // Generate session key pair
+      const { address: sessionKeyAddress, privateKey } =
+        await this.cryptoService.generateSessionKeyPair();
+
+      // Encrypt private key with user signature
+      const encryptedPrivateKey = await this.cryptoService.encryptSessionKey(
+        privateKey,
+        userSignature
+      );
+
+      // Generate nonce
+      const nonce = this.cryptoService.generateNonce();
+
+      // Create enhanced delegation message with recurring schedule
+      const delegationMessage = {
+        smartWalletAddress: request.smartWalletOwner,
+        sessionKeyAddress,
+        delegatedBy: request.walletAddress,
+        chainId: request.chainId,
+        securityLevel: request.securityLevel,
+        validUntil: request.validUntil.toISOString(),
+        nonce: nonce.toString(),
+        permissions: request.permissions,
+        recurringSchedule: request.recurringSchedule,
+        gasPayment: request.gasPayment,
+        timestamp: new Date().toISOString(),
+        purpose: "enhanced_workflow_automation",
+        parentSignature: userSignature,
+      };
+
+      // Create session key in database with enhanced features
+      const sessionKey = await this.prisma.client.$transaction(async (tx) => {
+        const newSessionKey = await tx.sessionKey.create({
+          data: {
+            userId,
+            walletAddress: sessionKeyAddress,
+            smartWalletOwner: request.smartWalletOwner,
+            parentWalletAddress: request.walletAddress,
+            chainId: request.chainId,
+            sessionPublicKey: sessionKeyAddress,
+            encryptedPrivateKey,
+            securityLevel: request.securityLevel,
+            validUntil: request.validUntil,
+            dailyResetAt: new Date(),
+            parentDelegationSignature: userSignature,
+            // Enhanced configuration is stored in the delegation message for now
+            // TODO: Add proper schema fields for recurringSchedule and gasPayment when needed
+          },
+          include: {
+            permissions: true,
+          },
+        });
+
+        // Create permissions with enhanced features
+        for (const permission of request.permissions) {
+          await tx.sessionPermission.create({
+            data: {
+              sessionKeyId: newSessionKey.id,
+              operation: permission.operation,
+              maxAmountPerTx: permission.maxAmountPerTx,
+              maxDailyAmount: permission.maxDailyAmount,
+              allowedContracts: permission.allowedContracts,
+              requireConfirmation: permission.requireConfirmation,
+              emergencyStop: permission.emergencyStop,
+            },
+          });
+        }
+
+        // Create creation event with enhanced data
+        await tx.sessionEvent.create({
+          data: {
+            sessionKeyId: newSessionKey.id,
+            eventType: SessionEventType.CREATED,
+            eventData: {
+              securityLevel: request.securityLevel,
+              chainId: request.chainId,
+              permissionCount: request.permissions.length,
+              hasRecurringSchedule: !!request.recurringSchedule,
+              gasPaymentMethod: request.gasPayment?.method || "native",
+              enhancedFeatures: true,
+            },
+            severity: "info",
+          },
+        });
+
+        return newSessionKey;
+      });
+
+      // Convert to SessionKeyData format
+      const sessionKeyData = await this.getSessionKeyById(sessionKey.id);
+
+      this.logger.log("Enhanced session key created successfully", {
+        sessionKeyId: sessionKey.id,
+        userId,
+        hasRecurringSchedule: !!request.recurringSchedule,
+      });
+
+      return {
+        sessionKey: sessionKeyData!,
+        delegationMessage: JSON.stringify(delegationMessage),
+      };
+    } catch (error) {
+      this.logger.error("Failed to create enhanced session key", error);
+      throw new BadRequestException("Failed to create enhanced session key");
+    }
+  }
+
+  /**
+   * Private helper to check if recurring operation is due
+   */
+  private isRecurringOperationDue(
+    sessionKey: SessionKeyData,
+    currentTime: Date,
+    tolerance: number
+  ): boolean {
+    // This is a simplified check - in production, this would be more sophisticated
+    // and would read the recurring schedule from the session key metadata
+
+    // For now, return false as this needs proper implementation with stored schedule data
+    // This would be enhanced to check against stored recurring schedule configuration
+    return false;
   }
 }

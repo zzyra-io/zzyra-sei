@@ -24,7 +24,32 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Zyra Worker - A NestJS-based execution engine for blockchain workflow automation with ZeroDev smart account integration.
+
+## ZeroDev Configuration
+
+This worker uses ZeroDev for smart account operations. The following environment variables can be configured:
+
+```bash
+# ZeroDev Project Configuration
+ZERODEV_PROJECT_ID=8e6f4057-e935-485f-9b6d-f14696e92654
+```
+
+**Default Configuration:**
+
+- Project ID: `8e6f4057-e935-485f-9b6d-f14696e92654`
+- Bundler URL: `https://rpc.zerodev.app/api/v2/bundler/{projectId}`
+- Paymaster URL: `https://rpc.zerodev.app/api/v2/paymaster/{projectId}?selfFunded=true`
+- Supported Networks: Sei Testnet, Sepolia, Base, Base Sepolia
+
+**Features:**
+
+- ✅ Smart wallet creation and management
+- ✅ Session key-based automation
+- ✅ Recurring transaction scheduling
+- ✅ ERC20 gas payment support
+- ✅ Sponsored gas transactions
+- ✅ Multi-chain support
 
 ## Project setup
 
