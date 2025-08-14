@@ -12,7 +12,7 @@ RUN npx turbo prune zzyra-worker --docker --out-dir=./output
 FROM base AS installer
 COPY --from=builder /usr/src/app/output/full .
 COPY --from=builder /usr/src/app/pnpm-lock.yaml .
-RUN pnpm install --frozen-lockfile && \
+RUN pnpm install && \
     pnpm turbo build --filter=zzyra-worker
 
 FROM base AS runner
