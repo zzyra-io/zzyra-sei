@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' next build",
+    "build:max": "next build",
     "start": "next start",
     "lint": "next lint",
     "db:push": "supabase db push && pnpm run db:generate-types",
