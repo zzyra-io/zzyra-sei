@@ -1,8 +1,8 @@
-# Zyra Platform - Feature Comparison
+# Zzyra Platform - Feature Comparison
 
 ## Overview
 
-This document provides a detailed comparison of features available across Zyra's pricing tiers, helping users understand the value proposition of each plan and make informed decisions about their subscription.
+This document provides a detailed comparison of features available across Zzyra's pricing tiers, helping users understand the value proposition of each plan and make informed decisions about their subscription.
 
 ## Pricing Tiers Summary
 
@@ -395,4 +395,4 @@ This document provides a detailed comparison of features available across Zyra's
 - Enterprise governance tools
 - Global expansion features
 
-This feature comparison demonstrates the clear value progression across Zyra's pricing tiers, with each level providing significant additional capabilities and ROI for users.
+This feature comparison demonstrates the clear value progression across Zzyra's pricing tiers, with each level providing significant additional capabilities and ROI for users.

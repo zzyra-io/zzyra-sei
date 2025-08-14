@@ -1,6 +1,6 @@
 /**
  * Session Key Types for Secure Blockchain Delegation
- * Following TypeScript general guidelines and Zyra patterns
+ * Following TypeScript general guidelines and Zzyra patterns
  */
 
 // ================ Enums ================
@@ -49,7 +49,7 @@ export interface SessionKeyData {
   id: string;
   userId: string;
   walletAddress: string; // Session key's own address
-  smartWalletOwner?: string; // Smart wallet that owns this session key  
+  smartWalletOwner?: string; // Smart wallet that owns this session key
   parentWalletAddress?: string; // Original EOA address
   chainId: string;
   sessionPublicKey: string;

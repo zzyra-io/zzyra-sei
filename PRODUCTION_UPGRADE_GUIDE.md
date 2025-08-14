@@ -1,4 +1,4 @@
-# Zyra AI Workflow Generation - Production Upgrade Guide
+# Zzyra AI Workflow Generation - Production Upgrade Guide
 
 This guide covers the comprehensive upgrade from a basic AI service to a production-grade, enterprise-ready workflow generation system.
 
@@ -7,6 +7,7 @@ This guide covers the comprehensive upgrade from a basic AI service to a product
 ### Backend Enhancements
 
 #### 1. **Enhanced AI Service Architecture** (`apps/api/src/ai/`)
+
 - **Before**: Single `ai.service.ts` handling everything
 - **After**: Modular architecture with specialized services:
   - `enhanced-ai.service.ts` - Main orchestration
@@ -19,6 +20,7 @@ This guide covers the comprehensive upgrade from a basic AI service to a product
   - `services/feedback.service.ts` - Continuous learning
 
 #### 2. **Production Features Added**
+
 - ✅ Multi-layered validation (schema, business rules, graph analysis)
 - ✅ Auto-healing of workflow issues
 - ✅ Security validation (prompt injection, code analysis)
@@ -31,6 +33,7 @@ This guide covers the comprehensive upgrade from a basic AI service to a product
 ### Frontend Enhancements
 
 #### 1. **Enhanced UI Components** (`apps/ui/components/`)
+
 - **Enhanced NL Generator**: `workflow/enhanced-nl-workflow-generator.tsx`
 - **Validation Feedback**: `workflow/validation-feedback.tsx`
 - **Version Manager**: `workflow/version-manager.tsx`
@@ -39,6 +42,7 @@ This guide covers the comprehensive upgrade from a basic AI service to a product
 - **Enhanced Generation Status**: `workflow/enhanced-generation-status.tsx`
 
 #### 2. **New API Integration** (`apps/ui/lib/api/`)
+
 - **Enhanced API**: `enhanced-workflow-generation.ts`
 - Comprehensive type definitions
 - Enhanced error handling
@@ -50,13 +54,14 @@ This guide covers the comprehensive upgrade from a basic AI service to a product
 ### Step 1: Backend Integration
 
 1. **Import the new services in your AI module**:
+
 ```typescript
 // apps/api/src/ai/ai.module.ts
 @Module({
   providers: [
     // Existing services
     AiService, // Keep for backward compatibility
-    
+
     // New production services
     WorkflowValidatorService,
     SecurityService,
@@ -76,6 +81,7 @@ export class AiModule {}
 ```
 
 2. **Update your controllers to use enhanced services**:
+
 ```typescript
 // Option 1: Gradual migration (recommended)
 constructor(
@@ -90,6 +96,7 @@ constructor(
 ```
 
 3. **Add new endpoints for enhanced features**:
+
 ```typescript
 @Post('enhanced/generate-workflow')
 async enhancedGenerateWorkflow(@Body() dto: EnhancedGenerateWorkflowDto) {
@@ -108,6 +115,7 @@ async enhancedGenerateWorkflow(@Body() dto: EnhancedGenerateWorkflowDto) {
 ### Step 2: Frontend Integration
 
 1. **Update your workflow builder page**:
+
 ```typescript
 // Replace the old component
 import { NlWorkflowGenerator } from "@/components/workflow/nl-workflow-generator";
@@ -120,7 +128,7 @@ import { EnhancedNlWorkflowGenerator } from "@/components/workflow/enhanced-nl-w
     // Handle the enhanced result with validation/security info
     setNodes(result.nodes);
     setEdges(result.edges);
-    
+
     // Show validation feedback if needed
     if (result.validationResult) {
       setValidationResult(result.validationResult);
@@ -135,6 +143,7 @@ import { EnhancedNlWorkflowGenerator } from "@/components/workflow/enhanced-nl-w
 ```
 
 2. **Add validation feedback display**:
+
 ```typescript
 import { ValidationFeedback } from "@/components/workflow/validation-feedback";
 
@@ -148,6 +157,7 @@ import { ValidationFeedback } from "@/components/workflow/validation-feedback";
 ```
 
 3. **Add version management** (optional):
+
 ```typescript
 import { VersionManager } from "@/components/workflow/version-manager";
 
@@ -162,6 +172,7 @@ import { VersionManager } from "@/components/workflow/version-manager";
 ### Step 3: Environment Configuration
 
 Add new environment variables:
+
 ```bash
 # Security Configuration
 ALLOWED_DOMAINS=api.openrouter.ai,api.openai.com,localhost
@@ -181,6 +192,7 @@ ENABLE_FEEDBACK_COLLECTION=true
 ## 🎯 Key Benefits
 
 ### For Users
+
 - **Enhanced Reliability**: Auto-healing fixes common workflow issues
 - **Better Security**: Prompt injection protection and code validation
 - **Improved Quality**: Comprehensive validation with helpful suggestions
@@ -188,6 +200,7 @@ ENABLE_FEEDBACK_COLLECTION=true
 - **Real-time Feedback**: Live validation and security status
 
 ### For Developers
+
 - **Comprehensive Monitoring**: Full observability with metrics and alerts
 - **Audit Compliance**: Complete audit trail for enterprise requirements
 - **Modular Architecture**: Easy to extend and customize
@@ -195,6 +208,7 @@ ENABLE_FEEDBACK_COLLECTION=true
 - **Performance Insights**: Detailed metrics and analytics
 
 ### For Operations
+
 - **Production Ready**: Enterprise-grade error handling and recovery
 - **Scalable Architecture**: Designed for high-volume production use
 - **Security Compliant**: Built-in security validation and sandboxing
@@ -203,6 +217,7 @@ ENABLE_FEEDBACK_COLLECTION=true
 ## 🔍 Validation & Testing
 
 ### Backend Testing
+
 ```bash
 # Test the enhanced services
 pnpm test:api
@@ -212,6 +227,7 @@ pnpm test apps/api/src/ai/services/
 ```
 
 ### Frontend Testing
+
 ```bash
 # Test the enhanced UI components
 pnpm test:ui
@@ -221,6 +237,7 @@ pnpm test apps/ui/components/workflow/
 ```
 
 ### Integration Testing
+
 ```bash
 # Full end-to-end testing
 pnpm test:e2e
@@ -228,23 +245,25 @@ pnpm test:e2e
 
 ## 📈 Performance Comparison
 
-| Feature | Before | After | Improvement |
-|---------|---------|--------|-------------|
-| Validation | Basic schema only | Multi-layer + auto-healing | 95% fewer errors |
-| Security | None | Comprehensive scanning | 100% coverage |
-| Monitoring | Basic logs | Full observability | Complete visibility |
-| User Experience | Basic generation | Enhanced with feedback | 90% better UX |
-| Error Recovery | Manual intervention | Auto-healing | 80% self-recovery |
-| Version Control | None | Full versioning | Complete history |
+| Feature         | Before              | After                      | Improvement         |
+| --------------- | ------------------- | -------------------------- | ------------------- |
+| Validation      | Basic schema only   | Multi-layer + auto-healing | 95% fewer errors    |
+| Security        | None                | Comprehensive scanning     | 100% coverage       |
+| Monitoring      | Basic logs          | Full observability         | Complete visibility |
+| User Experience | Basic generation    | Enhanced with feedback     | 90% better UX       |
+| Error Recovery  | Manual intervention | Auto-healing               | 80% self-recovery   |
+| Version Control | None                | Full versioning            | Complete history    |
 
 ## 🚨 Breaking Changes
 
 ### API Changes
+
 1. **Enhanced generation response**: Now includes validation, security, and metrics data
 2. **New parameters**: User ID and session ID now required for enhanced features
 3. **Response structure**: Enhanced with additional metadata
 
 ### Backward Compatibility
+
 - **Old `AiService`**: Still available for existing integrations
 - **Gradual migration**: Use both old and new services during transition
 - **Feature flags**: Enable new features progressively
@@ -261,6 +280,7 @@ pnpm test:e2e
 ## 📞 Support
 
 For questions or issues during migration:
+
 - Check the component documentation in each file
 - Review the comprehensive README in `apps/api/src/ai/README.md`
 - Test with the enhanced examples and templates

@@ -158,7 +158,7 @@ export class PromptService {
     this.templates.set("workflow_system_base", {
       id: "workflow_system_base",
       name: "Base Workflow System Prompt",
-      template: `You are an EXPERT WORKFLOW AI for Zyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
+      template: `You are an EXPERT WORKFLOW AI for Zzyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
 
 🎯 **CORE MISSION**: Transform ANY natural language into sophisticated, executable workflows using our comprehensive block system.
 
@@ -264,7 +264,7 @@ Edges: {{CURRENT_EDGES}}
     this.templates.set("block_generation", {
       id: "block_generation",
       name: "Custom Block Generation",
-      template: `You are an EXPERT CUSTOM BLOCK GENERATOR for Zyra automation platform.
+      template: `You are an EXPERT CUSTOM BLOCK GENERATOR for Zzyra automation platform.
 
 🎯 **MISSION**: Generate custom blocks based on user requirements.
 

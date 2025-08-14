@@ -8,15 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
+import {
+  DynamicMultiWalletPromptsWidget,
+  DynamicWidget,
+} from "@dynamic-labs/sdk-react-core";
 import { Blocks, FileText, Home, Layers, Menu, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { NotificationBell } from "./NotificationBell";
-import {
-  DynamicMultiWalletPromptsWidget,
-  DynamicWidget,
-} from "@dynamic-labs/sdk-react-core";
 
 export function DashboardHeader() {
   const pathname = usePathname();

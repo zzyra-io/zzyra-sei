@@ -1,4 +1,4 @@
-# Zyra Platform - Case Studies
+# Zzyra Platform - Case Studies
 
 ## Case Study 1: DeFi Portfolio Manager
 
@@ -351,4 +351,4 @@ Revenue Collection → Reward Calculation → Distribution → Reporting
 4. **Risk Reduction**: Automated systems improve consistency and reduce errors
 5. **Accessibility**: No-code automation democratizes access to complex strategies
 
-These case studies demonstrate Zyra's ability to deliver substantial value across diverse use cases, from individual traders to enterprise organizations, making it an attractive investment opportunity and valuable tool for users.
+These case studies demonstrate Zzyra's ability to deliver substantial value across diverse use cases, from individual traders to enterprise organizations, making it an attractive investment opportunity and valuable tool for users.

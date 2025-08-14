@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,8 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { Button } from "./ui/button";
-import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 
 const DevelopmentWarning = () => {
   const [open, setOpen] = useState(false);
@@ -27,9 +27,9 @@ const DevelopmentWarning = () => {
         </DialogHeader>
         <DialogDescription>
           <Alert variant='default'>
-            <AlertTitle>Zyra Development Build</AlertTitle>
+            <AlertTitle>Zzyra Development Build</AlertTitle>
             <AlertDescription>
-              This is a development version of Zyra. Some features may be
+              This is a development version of Zzyra. Some features may be
               experimental or incomplete.
               <br />
               For production use, please use the official release.

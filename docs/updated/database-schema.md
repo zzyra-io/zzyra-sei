@@ -1,8 +1,8 @@
-# Zyra Platform - Database Schema
+# Zzyra Platform - Database Schema
 
 ## Overview
 
-The Zyra platform uses PostgreSQL with Prisma ORM. The schema is located at `packages/database/prisma/schema.prisma` and includes models for users, workflows, executions, blocks, and system management.
+The Zzyra platform uses PostgreSQL with Prisma ORM. The schema is located at `packages/database/prisma/schema.prisma` and includes models for users, workflows, executions, blocks, and system management.
 
 ## Core Models
 
@@ -422,4 +422,4 @@ CREATE INDEX idx_notification_user_read ON "Notification"("userId", "read");
 - Block code validation
 - User permission checks
 
-This schema provides the foundation for the Zyra platform's core functionality. The models support user management, workflow creation and execution, block system, team collaboration, and billing features.
+This schema provides the foundation for the Zzyra platform's core functionality. The models support user management, workflow creation and execution, block system, team collaboration, and billing features.

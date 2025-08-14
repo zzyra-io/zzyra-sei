@@ -1,6 +1,6 @@
-import { NestFactory } from "@nestjs/core";
-import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { ValidationPipe } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import * as cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 
@@ -34,8 +34,8 @@ async function bootstrap() {
 
   // Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle("Zyra API")
-    .setDescription("API for Zyra workflow automation platform")
+    .setTitle("Zzyra API")
+    .setDescription("API for Zzyra workflow automation platform")
     // .setVersion("1.0")
     .addBearerAuth()
     .setVersion("1.0.0")
@@ -46,7 +46,7 @@ async function bootstrap() {
   // Start server
   const port = process.env.PORT || 3002;
   await app.listen(port);
-  console.log(`🚀 Zyra API is running on: http://localhost:${port}/api`);
+  console.log(`🚀 Zzyra API is running on: http://localhost:${port}/api`);
   console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
   console.log(`Health Dashboard: http://localhost:${port}/api/health`);
 }

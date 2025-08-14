@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
+import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import jwt, { JwtPayload } from "jsonwebtoken";
 
@@ -54,7 +54,7 @@ export class DynamicJwtService {
           cacheMaxEntries: 5,
           cacheMaxAge: 600000, // 10 minutes
           timeout: 10000, // Reduced timeout to 10 seconds
-          requestHeaders: { "User-Agent": "Zyra-API/1.0" },
+          requestHeaders: { "User-Agent": "Zzyra-API/1.0" },
         });
 
         this.logger.log("JWKS client initialized lazily", { jwksUrl });

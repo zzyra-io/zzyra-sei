@@ -1,6 +1,6 @@
 # Circuit Breaker Configuration
 
-The Zyra worker includes a configurable circuit breaker system that can be enabled or disabled via environment variables.
+The Zzyra worker includes a configurable circuit breaker system that can be enabled or disabled via environment variables.
 
 ## Overview
 

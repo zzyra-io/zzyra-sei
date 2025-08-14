@@ -1,10 +1,10 @@
-# Zyra Platform - Investor Pitch
+# Zzyra Platform - Investor Pitch
 
 ## Investment Opportunity
 
 ### Executive Summary
 
-Zyra is a Web3 automation platform positioned to capture the rapidly growing market for no-code blockchain automation. With a first-mover advantage in visual workflow building for DeFi and Web3 operations, Zyra addresses a $10B+ addressable market with strong product-market fit and proven user engagement.
+Zzyra is a Web3 automation platform positioned to capture the rapidly growing market for no-code blockchain automation. With a first-mover advantage in visual workflow building for DeFi and Web3 operations, Zzyra addresses a $10B+ addressable market with strong product-market fit and proven user engagement.
 
 **Investment Ask**: $2M Series A
 **Use of Funds**: Product development, team expansion, market expansion
@@ -184,21 +184,18 @@ Zyra is a Web3 automation platform positioned to capture the rapidly growing mar
 ### $2M Series A Allocation
 
 - **Product Development (40%)**: $800K
-
   - AI engine enhancement
   - Advanced analytics features
   - Mobile app development
   - Enterprise features
 
 - **Team Expansion (35%)**: $700K
-
   - Engineering team (5 developers)
   - Sales team (3 sales representatives)
   - Marketing team (2 marketers)
   - Customer success (2 representatives)
 
 - **Marketing & Sales (15%)**: $300K
-
   - Digital marketing campaigns
   - Content marketing
   - Sales enablement tools
@@ -297,7 +294,7 @@ Zyra is a Web3 automation platform positioned to capture the rapidly growing mar
 
 ## Conclusion
 
-Zyra represents a compelling investment opportunity in the rapidly growing Web3 automation market. With strong product-market fit, proven user engagement, and a clear path to scale, Zyra is positioned to become the leading platform for no-code Web3 automation.
+Zzyra represents a compelling investment opportunity in the rapidly growing Web3 automation market. With strong product-market fit, proven user engagement, and a clear path to scale, Zzyra is positioned to become the leading platform for no-code Web3 automation.
 
 **Key Investment Highlights:**
 
@@ -313,4 +310,4 @@ Zyra represents a compelling investment opportunity in the rapidly growing Web3 
 - Multiple exit opportunities
 - Strong downside protection through diversified revenue streams
 
-This investment will enable Zyra to accelerate growth, expand market presence, and capture significant market share in the emerging Web3 automation industry.
+This investment will enable Zzyra to accelerate growth, expand market presence, and capture significant market share in the emerging Web3 automation industry.

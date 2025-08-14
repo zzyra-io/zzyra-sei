@@ -1,13 +1,13 @@
-import { Controller, Get, Res, Header, Post } from '@nestjs/common';
+import { Controller, Get, Header, Post, Res } from '@nestjs/common';
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
+import { Response } from 'express';
 import { Counter, Gauge } from 'prom-client';
-import { QueueHealthIndicator } from './queue.health';
-import { WorkerHealthIndicator } from './worker.health';
-import { HealthService } from './health.service';
 import { DatabaseService } from '../services/database.service';
 import { RabbitMQService } from '../services/rabbitmq.service';
-import { Response } from 'express';
+import { HealthService } from './health.service';
+import { QueueHealthIndicator } from './queue.health';
+import { WorkerHealthIndicator } from './worker.health';
 
 interface HealthData {
   status: 'healthy' | 'warning' | 'error';
@@ -647,7 +647,7 @@ export class HealthController {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zyra Worker Health - Error</title>
+    <title>Zzyra Worker Health - Error</title>
     <style>
         :root {
             --color-error-50: #fef2f2;

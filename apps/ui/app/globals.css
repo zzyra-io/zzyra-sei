@@ -95,8 +95,154 @@
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
-/* Dynamic Wallet Styling Overrides */
-/* Make Dynamic match your app's design system using official CSS variables */
+/* Essential Dynamic modal positioning fixes */
+.dynamic-shadow-dom {
+  position: relative;
+  z-index: 9999;
+}
+
+/* Ensure ALL Dynamic components appear on top */
+.dynamic-shadow-dom * {
+  z-index: inherit;
+}
+
+/* Force Dynamic modals and overlays to be on top */
+.dynamic-shadow-dom [role="dialog"],
+.dynamic-shadow-dom [role="presentation"],
+.dynamic-shadow-dom .modal,
+.dynamic-shadow-dom .modal-overlay,
+.dynamic-shadow-dom .wallet-modal,
+.dynamic-shadow-dom .wallet-overlay,
+.dynamic-shadow-dom .dynamic-modal,
+.dynamic-shadow-dom .dynamic-overlay,
+.dynamic-shadow-dom .dynamic-widget,
+.dynamic-shadow-dom .dynamic-wallet-widget {
+  z-index: 10001 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
+/* Fix wallet prompts widget positioning */
+.dynamic-shadow-dom .wallet-prompts-widget,
+.dynamic-shadow-dom .wallet-widget {
+  position: relative;
+  z-index: 10000;
+}
+
+/* Force Dynamic components to be properly positioned */
+.dynamic-shadow-dom > div {
+  position: relative;
+}
+
+/* Handle iframe positioning for Dynamic auth */
+iframe[src*="dynamicauth.com"] {
+  z-index: 10002 !important;
+  position: fixed !important;
+}
+
+/* Prevent Dynamic components from breaking layout */
+.dynamic-shadow-dom {
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+/* Ensure wallet prompts don't interfere with dashboard */
+.dynamic-shadow-dom .wallet-prompts-widget {
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: auto !important;
+  min-width: 300px !important;
+}
+
+/* Additional fixes for builder page and other contexts */
+.dynamic-shadow-dom .dynamic-widget,
+.dynamic-shadow-dom .dynamic-wallet-widget,
+.dynamic-shadow-dom [data-dynamic-component] {
+  z-index: 10003 !important;
+  position: relative !important;
+}
+
+/* Force all Dynamic elements to be above everything */
+.dynamic-shadow-dom,
+.dynamic-shadow-dom *,
+.dynamic-shadow-dom [class*="dynamic"],
+.dynamic-shadow-dom [class*="wallet"] {
+  z-index: 9999 !important;
+}
+
+/* Builder page specific fixes */
+.builder-page .dynamic-shadow-dom,
+.workflow-builder .dynamic-shadow-dom {
+  z-index: 10000 !important;
+}
+
+/* Ensure Dynamic components in builder context are always on top */
+.builder-page .dynamic-shadow-dom *,
+.workflow-builder .dynamic-shadow-dom * {
+  z-index: 10001 !important;
+}
+
+/* Force Dynamic modals in builder to be above everything */
+.builder-page .dynamic-shadow-dom [role="dialog"],
+.builder-page .dynamic-shadow-dom .modal,
+.builder-page .dynamic-shadow-dom .dynamic-modal {
+  z-index: 10004 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
+/* Additional builder page Dynamic fixes */
+.builder-page .dynamic-shadow-dom .dynamic-widget,
+.builder-page .dynamic-shadow-dom .dynamic-wallet-widget {
+  z-index: 10005 !important;
+}
+
+/* Force all Dynamic elements in builder to be above everything */
+.builder-page .dynamic-shadow-dom,
+.builder-page .dynamic-shadow-dom *,
+.builder-page .dynamic-shadow-dom [class*="dynamic"],
+.builder-page .dynamic-shadow-dom [class*="wallet"] {
+  z-index: 10006 !important;
+}
+
+/* Ensure Dynamic components don't get hidden by other elements */
+.builder-page .dynamic-shadow-dom {
+  position: relative !important;
+}
+
+.builder-page .dynamic-shadow-dom > * {
+  position: relative !important;
+}
+
+/* Global Dynamic z-index override - ensure they're always on top */
+.dynamic-shadow-dom {
+  z-index: 99999 !important;
+}
+
+.dynamic-shadow-dom * {
+  z-index: 99999 !important;
+}
+
+/* Force Dynamic components to be above ALL other elements */
+.dynamic-shadow-dom,
+.dynamic-shadow-dom *,
+.dynamic-shadow-dom [class*="dynamic"],
+.dynamic-shadow-dom [class*="wallet"],
+.dynamic-shadow-dom [role="dialog"],
+.dynamic-shadow-dom [role="presentation"] {
+  z-index: 99999 !important;
+  position: relative !important;
+}
 
 /* Light theme - matches your app's design */
 .dynamic-shadow-dom {
@@ -203,93 +349,6 @@
     rgba(0, 0, 0, 0.1) 20%,
     rgba(0, 0, 0, 0.2) 60%,
     rgba(0, 0, 0, 0)
-  );
-}
-
-/* Dark theme - matches your app's dark design */
-.dark .dynamic-shadow-dom {
-  /* Base colors - dark theme */
-  --dynamic-base-1: hsl(240, 10%, 3.9%);
-  --dynamic-base-2: hsl(240, 3.7%, 15.9%);
-  --dynamic-base-3: hsl(240, 3.7%, 15.9%);
-  --dynamic-base-4: hsl(240, 10%, 5.9%);
-  --dynamic-base-5: hsl(240, 10%, 3.9%);
-
-  /* Text colors */
-  --dynamic-text-primary: hsl(0, 0%, 98%);
-  --dynamic-text-secondary: hsl(240, 5%, 64.9%);
-  --dynamic-text-tertiary: hsla(0, 0%, 98%, 0.65);
-  --dynamic-text-link: hsl(246, 100%, 68%);
-
-  /* Hover states */
-  --dynamic-hover: hsla(240, 3.7%, 15.9%, 0.5);
-
-  /* Success/Error colors */
-  --dynamic-connection-green: hsl(142, 76%, 45%);
-  --dynamic-error-1: hsl(0, 84.2%, 65.2%);
-  --dynamic-error-2: hsla(0, 84.2%, 65.2%, 0.1);
-
-  /* Modal styling */
-  --dynamic-modal-border: 1px solid hsl(240, 3.7%, 15.9%);
-
-  /* Footer styling */
-  --dynamic-footer-background-color: hsl(240, 10%, 3.9%);
-  --dynamic-footer-text-color: hsl(0, 0%, 98%);
-  --dynamic-footer-border: 1px solid hsl(240, 3.7%, 15.9%);
-
-  /* Wallet list styling */
-  --dynamic-wallet-list-tile-background: hsl(240, 10%, 3.9%);
-  --dynamic-wallet-list-tile-border: 1px solid hsl(240, 3.7%, 15.9%);
-  --dynamic-wallet-list-tile-shadow: 0px 1px 3px rgba(0, 0, 0, 0.3);
-  --dynamic-wallet-list-tile-background-hover: hsl(240, 3.7%, 15.9%);
-  --dynamic-wallet-list-tile-border-hover: 1px solid hsl(240, 3.7%, 15.9%);
-  --dynamic-wallet-list-tile-shadow-hover: 0px 4px 12px rgba(0, 0, 0, 0.4);
-
-  /* Connect button styling */
-  --dynamic-connect-button-background: hsl(240, 10%, 3.9%);
-  --dynamic-connect-button-color: hsl(0, 0%, 98%);
-  --dynamic-connect-button-border: 1px solid hsl(240, 3.7%, 15.9%);
-  --dynamic-connect-button-shadow: 0px 1px 3px rgba(0, 0, 0, 0.3);
-  --dynamic-connect-button-background-hover: hsl(240, 3.7%, 15.9%);
-  --dynamic-connect-button-color-hover: hsl(0, 0%, 98%);
-  --dynamic-connect-button-border-hover: 1px solid hsl(240, 3.7%, 15.9%);
-  --dynamic-connect-button-shadow-hover: 0px 4px 12px rgba(0, 0, 0, 0.4);
-
-  /* Search bar styling */
-  --dynamic-search-bar-background: hsl(240, 10%, 3.9%);
-  --dynamic-search-bar-background-hover: hsl(240, 3.7%, 15.9%);
-  --dynamic-search-bar-background-focus: hsl(240, 10%, 3.9%);
-  --dynamic-search-bar-border: 1px solid hsl(240, 3.7%, 15.9%);
-  --dynamic-search-bar-border-hover: 1px solid hsl(240, 3.7%, 15.9%);
-  --dynamic-search-bar-border-focus: 1px solid hsl(246, 100%, 68%);
-
-  /* Badge styling */
-  --dynamic-badge-background: hsl(0, 0%, 98%);
-  --dynamic-badge-color: hsl(240, 10%, 3.9%);
-  --dynamic-badge-dot-background: hsl(240, 10%, 3.9%);
-  --dynamic-badge-primary-background: hsl(246, 100%, 68%);
-  --dynamic-badge-primary-color: hsl(0, 0%, 98%);
-
-  /* Tooltip styling */
-  --dynamic-tooltip-color: hsl(0, 0%, 98%);
-  --dynamic-tooltip-text-color: hsl(240, 10%, 3.9%);
-
-  /* Overlay */
-  --dynamic-overlay: hsla(240, 10%, 3.9%, 0.8);
-
-  /* Shadows */
-  --dynamic-shadow-down-1: 0px 1px 3px rgba(0, 0, 0, 0.4);
-  --dynamic-shadow-down-2: 0px 4px 6px rgba(0, 0, 0, 0.4);
-  --dynamic-shadow-down-3: 0px 10px 15px rgba(0, 0, 0, 0.4);
-  --dynamic-shadow-up-1: 0px -8px 48px -8px rgba(0, 0, 0, 0.4);
-
-  /* Loading animation */
-  --dynamic-loading-animation-gradient: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0,
-    rgba(255, 255, 255, 0.1) 20%,
-    rgba(255, 255, 255, 0.2) 60%,
-    rgba(255, 255, 255, 0)
   );
 }
 

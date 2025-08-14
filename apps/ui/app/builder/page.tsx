@@ -25,44 +25,47 @@ import { UpdateWorkflowDialog } from "@/components/update-workflow-dialog";
 import { WorkflowRefinement } from "@/components/workflow-refinement";
 import { WorkflowToolbar } from "@/components/workflow-toolbar";
 import NlWorkflowGenerator from "@/components/workflow/enhanced-nl-workflow-generator";
-import { useSaveAndExecute } from "@/hooks/use-save-and-execute";
 import { useCreateCustomBlock } from "@/hooks/use-custom-blocks";
+import { useSaveAndExecute } from "@/hooks/use-save-and-execute";
 import { useWorkflowExecution } from "@/hooks/use-workflow-execution";
 
-import { generateFlow } from "@/lib/api";
-import { refineWorkflow } from "@/lib/api/workflow-generation";
-import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
-import { useWorkflowExecutionValidation } from "@/lib/hooks/use-workflow-execution-validation";
-import { WorkflowValidationProvider } from "@/lib/contexts/workflow-validation-context";
-import { workflowService } from "@/lib/services/workflow-service";
-import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
-import { BlockType, CustomBlockDefinition } from "@zzyra/types";
-import type { UnifiedWorkflowNode } from "@zzyra/types";
-import {
-  ensureValidWorkflowNode,
-  prepareNodesForApi,
-  prepareEdgesForApi,
-} from "@zzyra/types";
-import { ArrowLeft, Loader2, Play, Save, AlertCircle } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState, useRef } from "react";
-import { useHotkeys } from "react-hotkeys-hook";
-import type { Node, Edge } from "@xyflow/react";
-import { logsService } from "@/lib/services/logs-service";
-import { DraftManager } from "@/lib/utils/draft-manager";
-import { ExecutionTimeline } from "@/components/execution/execution-timeline";
 import {
   EnhancedBlockchainAuthorizationModal,
   useBlockchainDetection,
 } from "@/components/enhanced-blockchain-authorization-modal";
-import type { SecureBlockchainAuthConfig } from "@zzyra/types";
+import { ExecutionTimeline } from "@/components/execution/execution-timeline";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { generateFlow } from "@/lib/api";
+import { refineWorkflow } from "@/lib/api/workflow-generation";
+import { WorkflowValidationProvider } from "@/lib/contexts/workflow-validation-context";
+import { useWorkflowExecutionValidation } from "@/lib/hooks/use-workflow-execution-validation";
+import { useWorkflowValidation } from "@/lib/hooks/use-workflow-validation";
+import { logsService } from "@/lib/services/logs-service";
+import { workflowService } from "@/lib/services/workflow-service";
+import { useFlowToolbar, useWorkflowStore } from "@/lib/store/workflow-store";
+import { DraftManager } from "@/lib/utils/draft-manager";
 import { DynamicWidget } from "@dynamic-labs/sdk-react-core";
+import type { Edge, Node } from "@xyflow/react";
+import type {
+  SecureBlockchainAuthConfig,
+  UnifiedWorkflowNode,
+} from "@zzyra/types";
+import {
+  BlockType,
+  CustomBlockDefinition,
+  ensureValidWorkflowNode,
+  prepareEdgesForApi,
+  prepareNodesForApi,
+} from "@zzyra/types";
+import { AlertCircle, ArrowLeft, Loader2, Play, Save } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 
 // Simplified save state interface
 interface SaveState {
@@ -1120,7 +1123,7 @@ export default function BuilderPage() {
 
   return (
     <>
-      <div className='flex flex-col h-screen'>
+      <div className='flex flex-col h-screen builder-page'>
         {/* Header */}
         <div className='flex justify-between items-center p-4 border-b flex-shrink-0 bg-background/95 backdrop-blur-sm'>
           <div className='flex items-center gap-3'>

@@ -1,5 +1,5 @@
 {
-  "name": "Zyra API Documentation",
+  "name": "Zzyra API Documentation",
   "port": 8080,
   "output": "documentation",
   "theme": "gitbook",

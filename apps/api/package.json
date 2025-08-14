@@ -1,7 +1,7 @@
 {
   "name": "@zzyra/api",
   "version": "0.1.0",
-  "description": "NestJS API for Zyra",
+  "description": "NestJS API for Zzyra",
   "private": true,
   "scripts": {
     "build": "nest build",

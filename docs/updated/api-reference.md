@@ -1,8 +1,8 @@
-# Zyra Platform - API Reference
+# Zzyra Platform - API Reference
 
 ## Overview
 
-The Zyra API is built with NestJS and provides RESTful endpoints for workflow automation, user management, and system administration. The API uses JWT authentication and follows REST conventions.
+The Zzyra API is built with NestJS and provides RESTful endpoints for workflow automation, user management, and system administration. The API uses JWT authentication and follows REST conventions.
 
 ## Base URL
 
@@ -695,4 +695,4 @@ curl -X POST http://localhost:3002/api/workflows/workflow-id/execute \
   -d '{"input":{"param1":"value1"}}'
 ```
 
-This API reference covers the core endpoints available in the current Zyra platform implementation. Additional endpoints may be available based on the specific modules and features enabled in your deployment.
+This API reference covers the core endpoints available in the current Zzyra platform implementation. Additional endpoints may be available based on the specific modules and features enabled in your deployment.

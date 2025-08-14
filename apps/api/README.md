@@ -1,6 +1,6 @@
-# Zyra API
+# Zzyra API
 
-NestJS backend for the Zyra application.
+NestJS backend for the Zzyra application.
 
 ## Setup
 

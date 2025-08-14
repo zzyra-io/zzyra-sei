@@ -25,7 +25,7 @@ export class MultiLevelCircuitBreakerService {
   ) {}
 
   /**
-   * Generate circuit breaker levels for Zyra's multi-level strategy
+   * Generate circuit breaker levels for Zzyra's multi-level strategy
    */
   private generateCircuitLevels(
     context: ExecutionContext,

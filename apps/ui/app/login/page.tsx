@@ -5,14 +5,9 @@
  */
 "use client";
 
-import { DynamicEmbeddedWidget } from "@dynamic-labs/sdk-react-core";
+import { DynamicLoadingState } from "@/components/auth/dynamic-loading-state";
 import { Logo } from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
-import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
-import { DynamicLoadingState } from "@/components/auth/dynamic-loading-state";
-import { useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -20,7 +15,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Zap, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
+import { DynamicEmbeddedWidget } from "@dynamic-labs/sdk-react-core";
+import { AlertCircle, ArrowRight, CheckCircle2, Zap } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 /**
  * Login Page Component
@@ -68,7 +68,7 @@ export default function LoginPage() {
                 </div>
 
                 <CardTitle className='text-2xl font-semibold mb-2'>
-                  Welcome to Zyra
+                  Welcome to Zzyra
                 </CardTitle>
                 <CardDescription className='text-base text-muted-foreground'>
                   Your all-in-one platform for building powerful Web3 automation

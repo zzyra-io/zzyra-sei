@@ -1,8 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText } from "ai";
-import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
+import { z } from "zod";
 
 // Import types from the types package
 import { BlockType, DataType } from "@zzyra/types";
@@ -11,17 +11,13 @@ import { BlockType, DataType } from "@zzyra/types";
 import { defaultMCPs } from "@zzyra/types";
 
 // Import new services
-import { WorkflowValidatorService } from "./services/workflow-validator.service";
+import { AuditService, type GenerationMetrics } from "./services/audit.service";
 import { SecurityService } from "./services/security.service";
-import { AuditService } from "./services/audit.service";
+import { WorkflowValidatorService } from "./services/workflow-validator.service";
 import {
   WorkflowVersioningService,
   type RollbackResult,
 } from "./services/workflow-versioning.service";
-import {
-  type AuditEvent,
-  type GenerationMetrics,
-} from "./services/audit.service";
 
 const MODEL_TO_USE = "gpt-4o-mini";
 
@@ -176,7 +172,7 @@ export class EnhancedAiService {
 
       const sanitizedPrompt = securityValidation.sanitizedInput || prompt;
 
-      const systemPrompt = `You are an EXPERT CUSTOM BLOCK GENERATOR for Zyra automation platform.
+      const systemPrompt = `You are an EXPERT CUSTOM BLOCK GENERATOR for Zzyra automation platform.
 
 🎯 **MISSION**: Generate custom blocks based on user requirements.
 
@@ -1584,7 +1580,7 @@ Edges: ${JSON.stringify(edges, null, 2)}
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            "User-Agent": "Zyra-Workflow/1.0",
+            "User-Agent": "Zzyra-Workflow/1.0",
           },
           timeout: userLevel === "beginner" ? 10000 : 30000,
           retries: options?.autoHeal ? 3 : 1,
@@ -1695,7 +1691,7 @@ Edges: ${JSON.stringify(edges, null, 2)}
     const autoHealInstructions = autoHeal ? this.getAutoHealInstructions() : "";
     const detailLevel = detailedMode ? "COMPREHENSIVE" : "CONCISE";
 
-    return `You are an EXPERT WORKFLOW AI for Zyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
+    return `You are an EXPERT WORKFLOW AI for Zzyra automation platform with deep understanding of blockchain, crypto, and automation workflows.
 
 🎯 **CORE MISSION**: Transform ANY natural language into sophisticated, executable workflows using our comprehensive block system.
 
@@ -1803,7 +1799,7 @@ EVERY AI_AGENT block MUST include selectedTools from availableMCPServers above. 
     "id": "fetch",
     "name": "HTTP Requests",
     "type": "mcp", 
-    "config": { "userAgent": "Zyra-AI-Agent/1.0", "timeout": 30000 },
+    "config": { "userAgent": "Zzyra-AI-Agent/1.0", "timeout": 30000 },
     "description": "Make HTTP requests to APIs and web services",
     "category": "api",
     "enabled": true
@@ -1865,7 +1861,7 @@ Generate workflows that users can execute immediately with full functionality.`;
       : "";
     const autoHealInstructions = autoHeal ? this.getAutoHealInstructions() : "";
 
-    return `You are an EXPERT WORKFLOW REFINEMENT AI for Zyra automation platform.
+    return `You are an EXPERT WORKFLOW REFINEMENT AI for Zzyra automation platform.
 
 👤 **USER LEVEL**: ${userLevel.toUpperCase()}
 ${levelInstructions}

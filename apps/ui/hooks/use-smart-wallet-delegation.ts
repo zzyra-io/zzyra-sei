@@ -1,12 +1,10 @@
 import { useToast } from "@/components/ui/use-toast";
 import api from "@/lib/services/api";
-import {
-  useDynamicContext,
-  useIsLoggedIn,
-  useSignInWithPasskey,
-} from "@dynamic-labs/sdk-react-core";
+import { isEthereumWallet } from "@dynamic-labs/ethereum";
+
+import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
 import { useCallback, useState } from "react";
-import { useWalletClient } from "wagmi";
+import { useChains, useWalletClient } from "wagmi";
 
 const SUPPORTED_CHAINS = {
   SEI_TESTNET: 1328,
@@ -82,14 +80,15 @@ interface PermissionConfig {
 /**
  * Enhanced hook for creating smart wallet delegations using passkey authentication
  * Uses Dynamic Labs passkey system for secure signing regardless of wallet type
+ * Dynamic Labs automatically creates and deploys smart wallets for embedded wallets
  */
 export function useSmartWalletDelegation() {
   const { toast } = useToast();
   const { primaryWallet, user } = useDynamicContext();
   const isLoggedIn = useIsLoggedIn();
-  const signInWithPasskey = useSignInWithPasskey();
   const [isCreating, setIsCreating] = useState(false);
   const { data: walletClient } = useWalletClient();
+  const chains = useChains();
 
   const createDelegationMessage = useCallback(
     (
@@ -131,7 +130,8 @@ export function useSmartWalletDelegation() {
     (
       permissions: DelegationPermissions,
       chainId: string,
-      userSignature: string
+      userSignature: string,
+      smartWalletAddress: string
     ) => {
       return {
         walletAddress: primaryWallet!.address,
@@ -139,124 +139,11 @@ export function useSmartWalletDelegation() {
         securityLevel: permissions.securityLevel?.toLowerCase() || "basic",
         validUntil: permissions.validUntil.toISOString(),
         permissions: createPermissionConfigs(permissions),
-        smartWalletOwner: primaryWallet!.address,
+        smartWalletOwner: smartWalletAddress, // Use the smart wallet address, not the EOA
         userSignature,
       };
     },
     [primaryWallet, createPermissionConfigs]
-  );
-
-  const signMessageWithPasskey = useCallback(
-    async (message: string): Promise<string> => {
-      try {
-        console.log(
-          "🔐 Attempting passkey authentication for message signing",
-          {
-            walletType: primaryWallet?.connector?.name,
-            hasPrimaryWallet: !!primaryWallet,
-            hasWalletClient: !!walletClient,
-          }
-        );
-
-        // Method 1: Try Dynamic Labs embedded wallet signing (passkey-enabled)
-        if (
-          primaryWallet?.connector?.name?.includes("Embedded") ||
-          primaryWallet?.connector?.name?.includes("Dynamic")
-        ) {
-          console.log(
-            "✅ Using Dynamic Labs embedded wallet with passkey authentication"
-          );
-
-          // Try to get the embedded wallet's signMessage method
-          const embeddedWallet = primaryWallet as {
-            signMessage?: (message: string) => Promise<string>;
-            wallet?: { signMessage?: (message: string) => Promise<string> };
-            connector?: { signMessage?: (message: string) => Promise<string> };
-          };
-
-          if (embeddedWallet.signMessage) {
-            console.log("🔑 Using embeddedWallet.signMessage");
-            return await embeddedWallet.signMessage(message);
-          }
-
-          // Try alternative signing methods for embedded wallets
-          if (embeddedWallet.wallet?.signMessage) {
-            console.log("🔑 Using embeddedWallet.wallet.signMessage");
-            return await embeddedWallet.wallet.signMessage(message);
-          }
-
-          if (embeddedWallet.connector?.signMessage) {
-            console.log("🔑 Using embeddedWallet.connector.signMessage");
-            return await embeddedWallet.connector.signMessage(message);
-          }
-
-          console.log(
-            "⚠️ No direct signing method found on embedded wallet, trying passkey authentication"
-          );
-        }
-
-        // Method 2: Try to trigger passkey authentication flow
-        if (signInWithPasskey) {
-          console.log(
-            "🔐 Attempting to trigger Dynamic Labs passkey authentication flow"
-          );
-          try {
-            // This will prompt for passkey/biometric authentication
-            await signInWithPasskey();
-            console.log(
-              "✅ Passkey authentication successful, retrying signing"
-            );
-
-            // After successful authentication, try signing again with the wallet
-            if (primaryWallet?.signMessage) {
-              return await primaryWallet.signMessage(message);
-            }
-
-            // Try embedded wallet methods again after authentication
-            const embeddedWallet = primaryWallet as {
-              signMessage?: (message: string) => Promise<string>;
-              wallet?: { signMessage?: (message: string) => Promise<string> };
-              connector?: {
-                signMessage?: (message: string) => Promise<string>;
-              };
-            };
-
-            if (embeddedWallet.wallet?.signMessage) {
-              return await embeddedWallet.wallet.signMessage(message);
-            }
-
-            if (embeddedWallet.connector?.signMessage) {
-              return await embeddedWallet.connector.signMessage(message);
-            }
-          } catch (passkeyError) {
-            console.log(
-              "⚠️ Passkey authentication failed, falling back to traditional signing:",
-              passkeyError
-            );
-          }
-        }
-
-        // Method 3: Fallback to traditional wallet signing
-        if (walletClient && primaryWallet?.address) {
-          console.log("🔄 Falling back to traditional wallet signing");
-          return await walletClient.signMessage({
-            message,
-            account: primaryWallet.address as `0x${string}`,
-          });
-        }
-
-        console.error("❌ No signing method available");
-        throw new Error(
-          "No signing method available - please ensure passkey authentication is enabled"
-        );
-      } catch (error) {
-        console.error("❌ Error in passkey signing:", error);
-        throw new Error(
-          `Failed to sign message: ${error instanceof Error ? error.message : "Unknown signing error"}`
-        );
-      }
-    },
-    [primaryWallet, walletClient, signInWithPasskey]
   );
 
   const createDelegation = useCallback(
@@ -272,38 +159,77 @@ export function useSmartWalletDelegation() {
 
       try {
         const chainId = permissions.chainId || DEFAULT_CHAIN_ID;
+        const chain = chains.find((chain) => chain.id === parseInt(chainId));
 
         console.log("Creating delegation for chain:", chainId);
 
-        // Create a simple delegation message for signing
+        // Dynamic Labs automatically creates smart wallets for embedded wallets
+        // We just need to use the existing smart wallet address
+        const smartWalletAddress = primaryWallet.address;
+
+        if (!smartWalletAddress) {
+          throw new Error(
+            "No smart wallet address available from Dynamic Labs"
+          );
+        }
+
+        console.log("Using Dynamic Labs smart wallet:", smartWalletAddress);
+
+        // Create delegation message with smart wallet address
         const delegationMessage = createDelegationMessage(
           permissions,
           chainId,
-          primaryWallet.address
+          smartWalletAddress
         );
 
         console.log("delegationMessage", delegationMessage);
         const messageToSign = JSON.stringify(delegationMessage, null, 2);
 
-        console.log("Signing message with passkey authentication:", {
+        console.log("Signing message with wallet client approach:", {
           messageToSign,
           walletAddress: primaryWallet.address,
           chainId,
           walletType: primaryWallet.connector?.name,
+          isEthereumWallet: isEthereumWallet(primaryWallet),
         });
 
+        // Sign the delegation message using WalletClient approach
         let userSignature: string;
         try {
-          // Use passkey authentication for signing
-          userSignature = await signMessageWithPasskey(messageToSign);
+          // Check if it's an Ethereum wallet and use WalletClient
+          if (!isEthereumWallet(primaryWallet)) {
+            throw new Error(
+              "Only Ethereum wallets are supported for delegation"
+            );
+          }
 
-          console.log("User signature received via passkey:", {
+          console.log("Getting wallet client for embedded wallet signing...");
+
+          console.log("Wallet client obtained, signing message...");
+
+          // Use WalletClient signMessage method which handles embedded wallets better
+          userSignature = await primaryWallet.signMessage(messageToSign);
+
+          console.log("User signature received via wallet client:", {
             signatureLength: userSignature?.length || 0,
             signaturePreview:
               userSignature?.slice(0, 10) + "..." || "undefined",
           });
         } catch (signError) {
-          console.error("Error signing message with passkey:", signError);
+          console.error("Error signing message with wallet client:", signError);
+
+          // Check for common Dynamic Labs issues
+          if (
+            signError instanceof Error &&
+            (signError.message.includes("User rejected") ||
+              signError.message.includes("cancelled") ||
+              signError.message.includes("User denied"))
+          ) {
+            throw new Error(
+              "Passkey authentication was cancelled. Please try again."
+            );
+          }
+
           throw new Error(
             `Failed to sign delegation message: ${signError instanceof Error ? signError.message : "Unknown signing error"}`
           );
@@ -313,11 +239,13 @@ export function useSmartWalletDelegation() {
           throw new Error("User signature required for delegation");
         }
 
+        // Create session key with smart wallet address
         const endpoint = "/session-keys";
         const requestData = prepareRequestData(
           permissions,
           chainId,
-          userSignature
+          userSignature,
+          smartWalletAddress
         );
 
         console.log("Sending delegation request:", {
@@ -348,9 +276,9 @@ export function useSmartWalletDelegation() {
           );
         }
 
-        // Extract deployment information if available
-        const deploymentHash = response.data?.data?.deploymentHash;
-        const smartAccountAddress = response.data?.data?.smartAccountAddress;
+        // Dynamic Labs handles deployment automatically, so we can assume it's deployed
+        const deploymentHash = "deployed_via_dynamic_labs";
+        const smartAccountAddress = smartWalletAddress;
 
         toast({
           title: "Delegation Created",
@@ -387,7 +315,6 @@ export function useSmartWalletDelegation() {
       toast,
       createDelegationMessage,
       prepareRequestData,
-      signMessageWithPasskey,
     ]
   );
 

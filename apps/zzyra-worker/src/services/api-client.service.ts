@@ -48,7 +48,7 @@ export class ApiClientService {
           headers: {
             'Content-Type': 'application/json',
             // Add worker authentication headers if needed
-            'User-Agent': 'Zyra-Worker/1.0',
+            'User-Agent': 'Zzyra-Worker/1.0',
           },
         },
       );
@@ -96,7 +96,7 @@ export class ApiClientService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Zyra-Worker/1.0',
+          'User-Agent': 'Zzyra-Worker/1.0',
         },
         body: JSON.stringify({
           encryptedPrivateKey,

@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  DialogContent as BaseDialogContent,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -37,7 +38,18 @@ import {
   UnifiedWorkflowNode,
 } from "@zzyra/types";
 import { AlertTriangle, Check, CheckCircle, Clock, Shield } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
+// Custom DialogContent without close button
+const CustomDialogContent = React.forwardRef<
+  React.ElementRef<typeof BaseDialogContent>,
+  React.ComponentPropsWithoutRef<typeof BaseDialogContent>
+>(({ className, children, ...props }, ref) => (
+  <BaseDialogContent ref={ref} className={className} {...props}>
+    {children}
+  </BaseDialogContent>
+));
+CustomDialogContent.displayName = "CustomDialogContent";
 
 interface SelectedTool {
   id: string;
@@ -552,7 +564,7 @@ export function EnhancedBlockchainAuthorizationModal({
             method: gasPaymentMethod,
             description:
               gasPaymentMethod === "sponsor"
-                ? "Zyra sponsors gas fees"
+                ? "Zzyra sponsors gas fees"
                 : gasPaymentMethod === "native"
                   ? "Pay gas with native tokens"
                   : `Pay gas with ${selectedGasToken.toUpperCase()}`,
@@ -596,6 +608,29 @@ export function EnhancedBlockchainAuthorizationModal({
       console.error("Authorization error:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
+
+      // Always reset deployment status on error
+      setDeploymentStatus({ isDeploying: false, message: "" });
+
+      // Check for specific Dynamic Labs signing issues
+      if (
+        errorMessage.includes("passkey") ||
+        errorMessage.includes("wallet client") ||
+        errorMessage.includes("Failed to sign")
+      ) {
+        setErrorDialog({
+          show: true,
+          error: {
+            message: "Wallet Signing Failed",
+            userGuidance:
+              "There was an issue signing the delegation message with your embedded wallet. This can happen due to passkey authentication issues.",
+            technicalDetails: errorMessage,
+            canRetry: true,
+            type: "SIGNING_FAILED",
+          },
+        });
+        return;
+      }
 
       toast({
         title: "Authorization Failed",
@@ -647,8 +682,11 @@ export function EnhancedBlockchainAuthorizationModal({
   // Error state fallback
   if (hasError) {
     return (
-      <Dialog open={open} onOpenChange={onCancel}>
-        <DialogContent className='sm:max-w-[400px]'>
+      <Dialog open={open} onOpenChange={() => {}}>
+        <DialogContent
+          className='sm:max-w-[400px]'
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className='flex items-center gap-3'>
               <AlertTriangle className='h-6 w-6 text-destructive' />
@@ -686,8 +724,11 @@ export function EnhancedBlockchainAuthorizationModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className='sm:max-w-[700px] max-h-[80vh] overflow-y-auto'>
+    <Dialog open={open} onOpenChange={() => {}}>
+      <CustomDialogContent
+        className='sm:max-w-[700px] max-h-[80vh] overflow-y-auto'
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-3'>
             <Shield className='h-6 w-6 text-primary' />
@@ -998,7 +1039,7 @@ export function EnhancedBlockchainAuthorizationModal({
                           Sponsored (Recommended)
                         </div>
                         <div className='text-xs text-muted-foreground'>
-                          Zyra pays gas fees - completely free for users
+                          Zzyra pays gas fees - completely free for users
                         </div>
                       </Label>
                     </div>
@@ -1257,11 +1298,14 @@ export function EnhancedBlockchainAuthorizationModal({
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </CustomDialogContent>
 
       {/* Error Dialog */}
-      <Dialog open={errorDialog.show} onOpenChange={closeErrorDialog}>
-        <DialogContent className='sm:max-w-[500px]'>
+      <Dialog open={errorDialog.show} onOpenChange={() => {}}>
+        <CustomDialogContent
+          className='sm:max-w-[500px]'
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className='flex items-center gap-2 text-destructive'>
               <AlertTriangle className='h-5 w-5' />
@@ -1277,7 +1321,27 @@ export function EnhancedBlockchainAuthorizationModal({
 
               <div className='space-y-3'>
                 <h4 className='font-medium text-sm'>Solutions:</h4>
-                {errorDialog.error.type === "DEPLOYMENT_FAILED" ? (
+                {errorDialog.error.type === "SIGNING_FAILED" ? (
+                  <ol className='list-decimal list-inside text-sm space-y-2 text-muted-foreground'>
+                    <li>
+                      <strong>Try again</strong> - Wallet client signing
+                      sometimes works on the second attempt
+                    </li>
+                    <li>
+                      <strong>Use MetaMask instead</strong> - Connect with
+                      MetaMask for more reliable signing
+                    </li>
+                    <li>
+                      <strong>Refresh the page</strong> - This can help reset
+                      Dynamic Labs wallet state
+                    </li>
+                    <li>
+                      <strong>Check passkey authentication</strong> - Ensure
+                      your device supports passkeys and biometric authentication
+                      is working
+                    </li>
+                  </ol>
+                ) : errorDialog.error.type === "DEPLOYMENT_FAILED" ? (
                   <ol className='list-decimal list-inside text-sm space-y-2 text-muted-foreground'>
                     <li>
                       Close this dialog and retry - deployment may work on
@@ -1335,7 +1399,7 @@ export function EnhancedBlockchainAuthorizationModal({
               </div>
             </div>
           )}
-        </DialogContent>
+        </CustomDialogContent>
       </Dialog>
     </Dialog>
   );

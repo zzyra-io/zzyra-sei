@@ -25,9 +25,9 @@ import { WorkflowCard } from "@/components/workflow-card";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetricsData";
 import {
   useDeleteWorkflow,
+  useInfiniteScroll,
   useToggleFavorite,
   useWorkflowsInfinite,
-  useInfiniteScroll,
 } from "@/hooks/useWorkflowsData";
 import {
   ArrowUpDown,

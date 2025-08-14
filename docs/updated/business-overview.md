@@ -1,8 +1,8 @@
-# Zyra Platform - Business Overview
+# Zzyra Platform - Business Overview
 
 ## Executive Summary
 
-Zyra is a Web3 automation platform that enables users to create, deploy, and manage automated workflows for blockchain and DeFi operations. The platform combines visual workflow building with AI-powered automation to democratize access to complex Web3 operations.
+Zzyra is a Web3 automation platform that enables users to create, deploy, and manage automated workflows for blockchain and DeFi operations. The platform combines visual workflow building with AI-powered automation to democratize access to complex Web3 operations.
 
 ## Value Proposition
 
@@ -287,4 +287,4 @@ Zyra is a Web3 automation platform that enables users to create, deploy, and man
 - **API Response Time**: <100ms average response time
 - **Security Incidents**: Zero major security breaches
 
-This business overview demonstrates Zyra's strong market position, technical capabilities, and growth potential, making it an attractive investment opportunity in the rapidly growing Web3 automation market.
+This business overview demonstrates Zzyra's strong market position, technical capabilities, and growth potential, making it an attractive investment opportunity in the rapidly growing Web3 automation market.

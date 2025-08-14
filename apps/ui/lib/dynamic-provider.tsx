@@ -8,12 +8,12 @@ import {
   IsBrowser,
 } from "@dynamic-labs/sdk-react-core";
 import { DynamicWagmiConnector } from "@dynamic-labs/wagmi-connector";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactNode, Component } from "react";
-import { http } from "viem";
-import { WagmiProvider, createConfig } from "wagmi";
-import { baseSepolia } from "viem/chains";
 import { PermissionlessProvider } from "@permissionless/wagmi";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Component, ReactNode } from "react";
+import { http } from "viem";
+import { baseSepolia } from "viem/chains";
+import { WagmiProvider, createConfig } from "wagmi";
 
 // Error boundary for Dynamic Labs
 class DynamicErrorBoundary extends Component<
@@ -112,9 +112,7 @@ interface DynamicProviderProps {
  * Uses IsBrowser to prevent hydration mismatches
  */
 export function DynamicProvider({ children }: DynamicProviderProps) {
-  const environmentId =
-    process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID ||
-    "4610f76b-ca5b-4e06-b048-d70f669055c2";
+  const environmentId = process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID;
 
   if (!environmentId) {
     console.error("Dynamic Labs: Missing NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID");
@@ -122,37 +120,40 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <DynamicErrorBoundary>
       <IsBrowser>
-        <DynamicErrorBoundary>
-          <DynamicContextProvider
-            settings={{
-              environmentId,
-              walletConnectors: [
-                EthereumWalletConnectors,
-                ZeroDevSmartWalletConnectors,
+        <DynamicContextProvider
+          settings={{
+            environmentId,
+            walletConnectors: [
+              EthereumWalletConnectors,
+              ZeroDevSmartWalletConnectors,
+            ],
+            // Enable passkey authentication for embedded wallets
+            // Note: Passkey support is enabled by default in Dynamic Labs v4
+            // Add custom chains for Dynamic to recognize
+            overrides: {
+              showFiat: true,
+              multiAsset: true,
+
+              evmNetworks: [
+                // SEI Testnet (Base Sepolia is already known by Dynamic)
+                {
+                  blockExplorerUrls: ["https://seitrace.com"],
+                  chainId: seiTestnet.id,
+                  chainName: seiTestnet.name,
+                  iconUrls: [],
+                  name: seiTestnet.name,
+                  nativeCurrency: seiTestnet.nativeCurrency,
+                  networkId: seiTestnet.id,
+                  rpcUrls: ["https://evm-rpc.sei-apis.com"],
+                  vanityName: "SEI Testnet",
+                },
               ],
-              // Enable passkey authentication for embedded wallets
-              // Note: Passkey support is enabled by default in Dynamic Labs v4
-              // Add custom chains for Dynamic to recognize
-              overrides: {
-                evmNetworks: [
-                  // SEI Testnet (Base Sepolia is already known by Dynamic)
-                  {
-                    blockExplorerUrls: ["https://seitrace.com"],
-                    chainId: seiTestnet.id,
-                    chainName: seiTestnet.name,
-                    iconUrls: [],
-                    name: seiTestnet.name,
-                    nativeCurrency: seiTestnet.nativeCurrency,
-                    networkId: seiTestnet.id,
-                    rpcUrls: ["https://evm-rpc.sei-apis.com"],
-                    vanityName: "SEI Testnet",
-                  },
-                ],
-              },
-              // Remove event handlers to prevent setState during render issues
-            }}>
+            },
+            // Remove event handlers to prevent setState during render issues
+          }}>
+          <QueryClientProvider client={queryClient}>
             <WagmiProvider config={wagmiConfig}>
               <PermissionlessProvider
                 capabilities={{
@@ -164,10 +165,10 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
                 <DynamicWagmiConnector>{children}</DynamicWagmiConnector>
               </PermissionlessProvider>
             </WagmiProvider>
-          </DynamicContextProvider>
-        </DynamicErrorBoundary>
+          </QueryClientProvider>
+        </DynamicContextProvider>
       </IsBrowser>
-    </QueryClientProvider>
+    </DynamicErrorBoundary>
   );
 }
 

@@ -1,8 +1,8 @@
-# Zyra Platform - Current Architecture Documentation
+# Zzyra Platform - Current Architecture Documentation
 
 ## Overview
 
-Zyra is a Web3 automation platform built as a monorepo with three main components: a Next.js frontend (`ui/`), a NestJS API server (`api/`), and a NestJS worker service (`zzyra-worker/`). The platform uses PostgreSQL with Prisma ORM for data persistence and RabbitMQ for message queuing.
+Zzyra is a Web3 automation platform built as a monorepo with three main components: a Next.js frontend (`ui/`), a NestJS API server (`api/`), and a NestJS worker service (`zzyra-worker/`). The platform uses PostgreSQL with Prisma ORM for data persistence and RabbitMQ for message queuing.
 
 ## Technology Stack
 

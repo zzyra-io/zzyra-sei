@@ -446,7 +446,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       const isRecentDelegation = !!recentSessionKey;
       guidanceMessage = isRecentDelegation
         ? `It looks like you just created this delegation. The smart wallet deployment might still be in progress. Please wait 1-2 minutes and try running the workflow again.`
-        : `Please use the Zyra frontend to create a new blockchain authorization. The frontend will automatically deploy the smart wallet during the process.`;
+        : `Please use the Zzyra frontend to create a new blockchain authorization. The frontend will automatically deploy the smart wallet during the process.`;
 
       context.logger.log('Smart wallet deployment guidance:', {
         hasRecentSession: isRecentDelegation,
@@ -528,7 +528,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   }
 
   /**
-   * Execute transaction using ZeroDev with integrated Zyra session system
+   * Execute transaction using ZeroDev with integrated Zzyra session system
    */
   private async executeZeroDevTransaction(params: {
     chainId: string;
@@ -541,7 +541,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
     try {
       const { context } = params;
 
-      // Get session key data from Zyra database
+      // Get session key data from Zzyra database
       const sessionKeyId = context.blockchainAuthorization?.sessionKeyId;
       if (!sessionKeyId) {
         throw new Error(
@@ -549,7 +549,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         );
       }
 
-      context.logger.info('Retrieving session key from Zyra database', {
+      context.logger.info('Retrieving session key from Zzyra database', {
         sessionKeyId,
         chainId: params.chainId,
       });
@@ -569,7 +569,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       const sessionKeyData = this.convertBigIntFields(rawSessionKeyData);
 
       context.logger.info(
-        'Executing transaction with integrated ZeroDev + Zyra session key',
+        'Executing transaction with integrated ZeroDev + Zzyra session key',
         {
           sessionKeyId: sessionKeyData.id,
           sessionKeyAddress: sessionKeyData.walletAddress,
@@ -621,7 +621,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         transaction,
       );
 
-      // Update Zyra's session key usage tracking
+      // Update Zzyra's session key usage tracking
       await this.updateSessionKeyUsage(
         sessionKeyId,
         params.amount,
@@ -629,7 +629,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       );
 
       context.logger.info(
-        'Integrated ZeroDev + Zyra transaction completed successfully',
+        'Integrated ZeroDev + Zzyra transaction completed successfully',
         {
           transactionHash: result.hash,
           sessionKeyId: sessionKeyData.id,
@@ -647,7 +647,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       };
     } catch (error) {
       params.context.logger.error(
-        'Integrated ZeroDev + Zyra transaction failed',
+        'Integrated ZeroDev + Zzyra transaction failed',
         {
           error: error instanceof Error ? error.message : String(error),
           chainId: params.chainId,

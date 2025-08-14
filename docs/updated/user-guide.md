@@ -1,4 +1,4 @@
-# Zyra Platform - User Guide
+# Zzyra Platform - User Guide
 
 ## Getting Started
 
@@ -6,7 +6,7 @@
 
 **Step 1: Access the Workflow Builder**
 
-- Log into your Zyra account
+- Log into your Zzyra account
 - Click "Create New Workflow" from the dashboard
 - Choose a template or start from scratch
 
@@ -306,4 +306,4 @@ async function execute(input) {
 - Implement error handling
 - Regular security updates
 
-This user guide provides comprehensive coverage of Zyra's features and best practices, helping users maximize the value of their automation workflows.
+This user guide provides comprehensive coverage of Zzyra's features and best practices, helping users maximize the value of their automation workflows.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Transform Zyra's template system into a comprehensive marketplace where users can create, discover, purchase, and customize workflow automation solutions.
+Transform Zzyra's template system into a comprehensive marketplace where users can create, discover, purchase, and customize workflow automation solutions.
 
 ## 1. Template Structure & Enhanced Metadata
 
@@ -111,28 +111,24 @@ interface TemplateDetails {
 ### Primary Categories
 
 - **Finance & Investment**
-
   - Portfolio Management
   - Trading Automation
   - Risk Management
   - Compliance Reporting
 
 - **Business Process Automation**
-
   - Expense Management
   - Invoice Processing
   - Document Workflows
   - Approval Chains
 
 - **HR & Employee Management**
-
   - Onboarding Workflows
   - Performance Reviews
   - Leave Management
   - Payroll Automation
 
 - **Marketing & Sales**
-
   - Lead Nurturing
   - Campaign Management
   - Customer Onboarding
@@ -341,7 +337,7 @@ interface TemplateCustomization {
 ### Revenue Model
 
 - **70% to Creator** - Template sales revenue
-- **20% to Platform** - Zyra marketplace fee
+- **20% to Platform** - Zzyra marketplace fee
 - **10% to Community** - Bug bounties, improvements
 
 ### Creator Tools
@@ -439,4 +435,4 @@ interface TemplateCustomization {
 - Review scores
 - Support responsiveness
 
-This marketplace system will transform Zyra into a comprehensive automation platform where users can find, purchase, and deploy sophisticated workflow solutions tailored to their specific needs.
+This marketplace system will transform Zzyra into a comprehensive automation platform where users can find, purchase, and deploy sophisticated workflow solutions tailored to their specific needs.

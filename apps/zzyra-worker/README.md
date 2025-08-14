@@ -24,7 +24,7 @@
 
 ## Description
 
-Zyra Worker - A NestJS-based execution engine for blockchain workflow automation with ZeroDev smart account integration.
+Zzyra Worker - A NestJS-based execution engine for blockchain workflow automation with ZeroDev smart account integration.
 
 ## ZeroDev Configuration
 

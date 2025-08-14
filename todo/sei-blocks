@@ -1,4 +1,4 @@
-Here’s a detailed breakdown for each block, including all the info you should gather and consider before building them for Zyra on Sei:
+Here’s a detailed breakdown for each block, including all the info you should gather and consider before building them for Zzyra on Sei:
 
 ---
 
@@ -303,7 +303,7 @@ Monitors, mints, or transfers NFTs on Sei.
 
 ---
 
-Here are three real-world use cases that utilize **all five Sei-related blocks** (Wallet Listener, Smart Contract Call, Onchain Data Fetch, Payment, NFT) and also incorporate existing Zyra blocks (from `blockSchemas.ts`), such as HTTP Request, Notification, Condition, Schedule, and Data Transform. Each use case is designed to be practical and demonstrates how these blocks can be composed in a workflow.
+Here are three real-world use cases that utilize **all five Sei-related blocks** (Wallet Listener, Smart Contract Call, Onchain Data Fetch, Payment, NFT) and also incorporate existing Zzyra blocks (from `blockSchemas.ts`), such as HTTP Request, Notification, Condition, Schedule, and Data Transform. Each use case is designed to be practical and demonstrates how these blocks can be composed in a workflow.
 
 ---
 
@@ -383,7 +383,7 @@ A collector wants to automatically buy rare NFTs as soon as they are listed belo
 
 ---
 
-### **How These Use Cases Leverage Existing Zyra Blocks**
+### **How These Use Cases Leverage Existing Zzyra Blocks**
 
 - **Condition Block:** For logic and branching (e.g., thresholds, eligibility).
 - **Notification Block:** For multi-channel user alerts.

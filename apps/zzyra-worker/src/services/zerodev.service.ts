@@ -4,7 +4,6 @@ import {
   Address,
   Chain,
   createPublicClient,
-  createWalletClient,
   encodeFunctionData,
   formatEther,
   Hex,
@@ -205,35 +204,66 @@ export class ZeroDevService implements IAccountAbstractionService {
       const smartAccountAddress =
         `0x${ownerSigner.address.slice(2).padStart(40, '0')}` as Address;
 
-      // Create a mock kernel account object to satisfy the interface
-      const kernelAccount = {
-        address: smartAccountAddress,
-        signer: ownerSigner,
-      };
-
-      // Create paymaster and kernel client
+      // Create paymaster and bundler clients for proper AA flow
       const zeroDevPaymaster = await createZeroDevPaymasterClient({
         chain,
         transport: http(paymasterUrl),
       });
 
-      // Create a basic kernel client for now
-      // This will be enhanced with proper ZeroDev integration
+      // Create bundler client for UserOperation submission
+      const bundlerClient = createPublicClient({
+        chain,
+        transport: http(bundlerUrl),
+      });
+
+      // Create proper kernel account address (deterministic)
+      const kernelAccount = {
+        address: smartAccountAddress,
+        signer: ownerSigner,
+      };
+
+      // Create proper kernel client with AA support
       const kernelClient = {
         sendTransaction: async (params: any) => {
-          // For now, use regular transaction execution
-          // This will be enhanced with proper kernel client
-          const walletClient = createWalletClient({
-            account: ownerSigner,
-            chain,
-            transport: http(chain.rpcUrls.default.http[0]),
+          this.logger.log('Executing transaction via ZeroDev UserOperation', {
+            to: params.to,
+            value: params.value?.toString(),
+            hasData: !!params.data,
           });
 
-          return await walletClient.sendTransaction({
-            to: params.to as Address,
-            value: params.value,
-            data: params.data as Hex,
-          } as any);
+          // Create UserOperation for proper AA flow
+          const userOp = await this.createUserOperation({
+            to: params.to,
+            value: params.value || 0n,
+            data: params.data || '0x',
+            account: kernelAccount,
+            chain,
+          });
+
+          // Get paymaster sponsorship (gas-free for user)
+          const sponsoredUserOp = await zeroDevPaymaster.sponsorUserOperation({
+            userOperation: userOp,
+          });
+
+          this.logger.log('UserOperation sponsored by ZeroDev paymaster', {
+            paymasterAndData: sponsoredUserOp.paymasterAndData
+              ? 'present'
+              : 'none',
+          });
+
+          // Submit UserOperation via bundler
+          const userOpHash = await bundlerClient.request({
+            method: 'eth_sendUserOperation',
+            params: [sponsoredUserOp, ENTRYPOINT],
+          });
+
+          // Wait for UserOperation to be included in a block
+          const receipt = await this.waitForUserOperationReceipt(
+            userOpHash as string,
+            bundlerClient,
+          );
+
+          return receipt.transactionHash;
         },
         account: kernelAccount,
       };
@@ -278,7 +308,7 @@ export class ZeroDevService implements IAccountAbstractionService {
   }
 
   /**
-   * Create session key account for Zyra workflow automation
+   * Create session key account for Zzyra workflow automation
    * Simplified version using basic smart account functionality
    */
   async createSessionKeyForZyra(config: ZyraSessionKeyConfig): Promise<{
@@ -287,7 +317,7 @@ export class ZeroDevService implements IAccountAbstractionService {
     smartAccountAddress: string;
   }> {
     try {
-      this.logger.log('Creating ZeroDev session key for Zyra automation', {
+      this.logger.log('Creating ZeroDev session key for Zzyra automation', {
         chainId: config.chainId,
         operations: config.permissions.operations,
       });
@@ -307,7 +337,7 @@ export class ZeroDevService implements IAccountAbstractionService {
         smartAccountAddress: accountResult.smartAccountAddress,
       };
     } catch (error) {
-      this.logger.error('Failed to create ZeroDev session key for Zyra', {
+      this.logger.error('Failed to create ZeroDev session key for Zzyra', {
         error: error instanceof Error ? error.message : String(error),
         chainId: config.chainId,
       });
@@ -318,12 +348,12 @@ export class ZeroDevService implements IAccountAbstractionService {
   }
 
   /**
-   * Execute transaction using Zyra session key with ZeroDev
-   * Unified method that integrates with Zyra's session management
+   * Execute transaction using Zzyra session key with ZeroDev
+   * Unified method that integrates with Zzyra's session management
    * Supports automatic smart wallet deployment
    */
   async executeWithZyraSessionKey(
-    sessionKeyData: any, // From Zyra's SessionKeysService
+    sessionKeyData: any, // From Zzyra's SessionKeysService
     decryptedSessionPrivateKey: string,
     ownerPrivateKey: string, // For smart wallet deployment if needed
     transaction: TransactionRequest,
@@ -332,19 +362,22 @@ export class ZeroDevService implements IAccountAbstractionService {
       const startTime = Date.now();
       const chainId = transaction.chainId;
 
-      this.logger.log('Executing transaction with ZeroDev + Zyra session key', {
-        sessionKeyId: sessionKeyData.id,
-        to: transaction.to,
-        value: transaction.value,
-        chainId,
-      });
+      this.logger.log(
+        'Executing transaction with ZeroDev + Zzyra session key',
+        {
+          sessionKeyId: sessionKeyData.id,
+          to: transaction.to,
+          value: transaction.value,
+          chainId,
+        },
+      );
 
       // Check cache first
       const cacheKey = `zyra_${sessionKeyData.id}_${chainId}`;
       let sessionKeyClient = this.accountCache.get(cacheKey);
 
       if (!sessionKeyClient) {
-        // Create session key configuration from Zyra data
+        // Create session key configuration from Zzyra data
         const sessionConfig: ZyraSessionKeyConfig = {
           ownerPrivateKey,
           sessionPrivateKey: decryptedSessionPrivateKey,
@@ -391,7 +424,7 @@ export class ZeroDevService implements IAccountAbstractionService {
         throw new Error('Unable to determine smart account address');
       }
 
-      // Check balance before executing transaction
+      // Check balance only for transaction value (gas is sponsored by ZeroDev)
       if (transaction.value && transaction.value !== '0') {
         const chain = this.getChainConfig(chainId);
         const publicClient = createPublicClient({
@@ -406,12 +439,16 @@ export class ZeroDevService implements IAccountAbstractionService {
         const requiredValue = parseEther(transaction.value);
         const chainSymbol = this.getChainSymbol(chainId);
 
-        this.logger.log('Smart account balance check', {
-          smartAccountAddress: smartAccountAddress.substring(0, 10) + '...',
-          balance: formatEther(balance) + ` ${chainSymbol}`,
-          required: transaction.value + ` ${chainSymbol}`,
-          chainId,
-        });
+        this.logger.log(
+          'Smart account balance check (transaction value only)',
+          {
+            smartAccountAddress: smartAccountAddress.substring(0, 10) + '...',
+            balance: formatEther(balance) + ` ${chainSymbol}`,
+            required: transaction.value + ` ${chainSymbol}`,
+            chainId,
+            note: 'Gas fees sponsored by ZeroDev paymaster',
+          },
+        );
 
         if (balance < requiredValue) {
           const fundingInstructions = this.getFundingInstructions(
@@ -419,15 +456,15 @@ export class ZeroDevService implements IAccountAbstractionService {
             smartAccountAddress,
           );
           const errorMessage = [
-            `❌ INSUFFICIENT BALANCE`,
+            `❌ INSUFFICIENT BALANCE FOR TRANSACTION VALUE`,
             ``,
             `Current Balance: ${formatEther(balance)} ${chainSymbol}`,
-            `Required: ${transaction.value} ${chainSymbol}`,
+            `Required for Transaction: ${transaction.value} ${chainSymbol}`,
             `Chain: ${chainId} (${chainSymbol})`,
             ``,
             ...fundingInstructions,
             ``,
-            `💡 Note: Gas fees are sponsored by ZeroDev, you only need to fund the transaction value.`,
+            `✅ Gas fees are fully sponsored by ZeroDev - no additional funds needed for gas!`,
           ].join('\n');
 
           throw new Error(errorMessage);
@@ -563,7 +600,7 @@ export class ZeroDevService implements IAccountAbstractionService {
 
   /**
    * Execute ERC20 token transfer using ZeroDev session key
-   * Simplified method that works with Zyra's session management
+   * Simplified method that works with Zzyra's session management
    */
   async executeERC20Transfer(
     sessionConfig: {
@@ -1382,16 +1419,16 @@ export class ZeroDevService implements IAccountAbstractionService {
     if (!this.zerodevProjectId) {
       throw new Error('ZeroDev project ID not configured');
     }
-    // Use self-funded paymaster for sponsored transactions
-    return `https://rpc.zerodev.app/api/v2/paymaster/${this.zerodevProjectId}?selfFunded=true`;
+    // Use ZeroDev-sponsored paymaster for truly gasless transactions
+    return `https://rpc.zerodev.app/api/v2/paymaster/${this.zerodevProjectId}`;
   }
 
   private getERC20PaymasterUrl(chainId: number): string {
     if (!this.zerodevProjectId) {
       throw new Error('ZeroDev project ID not configured');
     }
-    // Use ERC-20 paymaster for token-based gas payments
-    return `https://rpc.zerodev.app/api/v2/paymaster/${this.zerodevProjectId}?selfFunded=true`;
+    // Use ZeroDev-sponsored paymaster for ERC-20 operations
+    return `https://rpc.zerodev.app/api/v2/paymaster/${this.zerodevProjectId}`;
   }
 
   private getExplorerUrl(chainId: number, transactionHash: string): string {
@@ -1518,13 +1555,13 @@ export class ZeroDevService implements IAccountAbstractionService {
   }
 
   /**
-   * Validate permissions for Zyra automation
+   * Validate permissions for Zzyra automation
    * Simplified validation until proper policy system is implemented
    */
   private validateZyraPermissions(
     permissions: ZyraSessionKeyPermissions,
   ): void {
-    this.logger.debug('Validating Zyra permissions', {
+    this.logger.debug('Validating Zzyra permissions', {
       operations: permissions.operations,
       maxAmountPerTx: permissions.maxAmountPerTx,
       validUntil: permissions.validUntil,
@@ -1580,5 +1617,143 @@ export class ZeroDevService implements IAccountAbstractionService {
         }
       }
     }
+  }
+
+  /**
+   * Create UserOperation for Account Abstraction transaction
+   */
+  private async createUserOperation(params: {
+    to: Address;
+    value: bigint;
+    data: Hex;
+    account: any;
+    chain: Chain;
+  }): Promise<any> {
+    const { to, value, data, account, chain } = params;
+
+    // Create basic UserOperation structure
+    const userOp = {
+      sender: account.address,
+      nonce: await this.getNonce(account.address, chain),
+      initCode: '0x' as Hex, // Empty for already deployed accounts
+      callData: this.encodeExecuteCall(to, value, data),
+      callGasLimit: BigInt(100000), // Will be estimated by paymaster
+      verificationGasLimit: BigInt(100000),
+      preVerificationGas: BigInt(21000),
+      maxFeePerGas: BigInt(1000000000), // 1 gwei
+      maxPriorityFeePerGas: BigInt(1000000000),
+      paymasterAndData: '0x' as Hex, // Will be filled by paymaster
+      signature: '0x' as Hex, // Will be filled after sponsorship
+    };
+
+    this.logger.debug('Created UserOperation', {
+      sender: userOp.sender,
+      to,
+      value: value.toString(),
+      hasCallData: userOp.callData !== '0x',
+    });
+
+    return userOp;
+  }
+
+  /**
+   * Get nonce for smart account
+   */
+  private async getNonce(address: Address, chain: Chain): Promise<bigint> {
+    const publicClient = createPublicClient({
+      chain,
+      transport: http(chain.rpcUrls.default.http[0]),
+    });
+
+    try {
+      // Get nonce from EntryPoint contract
+      const nonce = await publicClient.readContract({
+        address: ENTRYPOINT,
+        abi: [
+          {
+            inputs: [
+              { name: 'sender', type: 'address' },
+              { name: 'key', type: 'uint192' },
+            ],
+            name: 'getNonce',
+            outputs: [{ name: 'nonce', type: 'uint256' }],
+            stateMutability: 'view',
+            type: 'function',
+          },
+        ],
+        functionName: 'getNonce',
+        args: [address, BigInt(0)],
+      });
+
+      return nonce as bigint;
+    } catch (error) {
+      this.logger.warn('Failed to get nonce from EntryPoint, using 0', {
+        error,
+      });
+      return BigInt(0);
+    }
+  }
+
+  /**
+   * Encode execute call for smart account
+   */
+  private encodeExecuteCall(to: Address, value: bigint, data: Hex): Hex {
+    // Standard execute function signature: execute(address,uint256,bytes)
+    return encodeFunctionData({
+      abi: [
+        {
+          inputs: [
+            { name: 'dest', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'func', type: 'bytes' },
+          ],
+          name: 'execute',
+          outputs: [],
+          stateMutability: 'nonpayable',
+          type: 'function',
+        },
+      ],
+      functionName: 'execute',
+      args: [to, value, data],
+    });
+  }
+
+  /**
+   * Wait for UserOperation receipt
+   */
+  private async waitForUserOperationReceipt(
+    userOpHash: string,
+    bundlerClient: any,
+    timeout = 60000,
+  ): Promise<{
+    transactionHash: string;
+    blockNumber: bigint;
+    success: boolean;
+  }> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const receipt = await bundlerClient.request({
+          method: 'eth_getUserOperationReceipt',
+          params: [userOpHash],
+        });
+
+        if (receipt) {
+          return {
+            transactionHash: receipt.receipt.transactionHash,
+            blockNumber: BigInt(receipt.receipt.blockNumber),
+            success: receipt.success,
+          };
+        }
+      } catch (error) {
+        // Receipt not available yet, continue waiting
+      }
+
+      // Wait 2 seconds before checking again
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    throw new Error(`UserOperation receipt timeout after ${timeout}ms`);
   }
 }

@@ -162,7 +162,7 @@ function createWebsiteHealthMonitorTemplate(): { nodes: any[]; edges: any[] } {
           url: "https://your-website.com/health",
           method: "GET",
           headers: {
-            "User-Agent": "Zyra-Health-Monitor/1.0",
+            "User-Agent": "Zzyra-Health-Monitor/1.0",
           },
           timeout: 10000,
           retries: 3,
@@ -551,4 +551,4 @@ if (require.main === module) {
   });
 }
 
-export { seedTemplates, main as seedMain };
+export { main as seedMain, seedTemplates };

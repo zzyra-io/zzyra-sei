@@ -1,4 +1,4 @@
-# Zyra Platform - Quick Start Guide
+# Zzyra Platform - Quick Start Guide
 
 ## Prerequisites
 
@@ -190,4 +190,4 @@ pnpm dev
 - **Issues**: Create GitHub issues for bugs
 - **Discussions**: Use GitHub discussions for questions
 
-This quick start guide gets you up and running with the core Zyra platform. For detailed information about specific features, architecture, or deployment, refer to the other documentation files.
+This quick start guide gets you up and running with the core Zzyra platform. For detailed information about specific features, architecture, or deployment, refer to the other documentation files.

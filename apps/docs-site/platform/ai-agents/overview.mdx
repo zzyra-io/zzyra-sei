@@ -5,8 +5,10 @@ description: "Current AI integration and planned agent system for Zzyra - intell
 
 ## AI Integration Overview
 
-<Alert type="info">
-  **Development Status**: Zzyra has core AI integration implemented with OpenRouter and Ollama. Advanced AI agent capabilities with MCP tools are in active development.
+<Alert type='info'>
+  **Development Status**: Zzyra has core AI integration implemented with
+  OpenRouter and Ollama. Advanced AI agent capabilities with MCP tools are in
+  active development.
 </Alert>
 
 Zzyra is building toward an advanced AI Agent system for intelligent workflow automation. Here's what's currently available and what's planned for the AI capabilities.
@@ -14,18 +16,21 @@ Zzyra is building toward an advanced AI Agent system for intelligent workflow au
 ## Core Capabilities
 
 ### **Intelligent Reasoning**
+
 - **Sequential Thinking**: Advanced step-by-step reasoning with configurable complexity (1-50 steps)
 - **Multiple Thinking Modes**: Fast, Deliberate, and Collaborative reasoning patterns
 - **Real-time Reasoning Visualization**: Live thinking panel showing AI decision-making process
 - **Context Awareness**: Full access to previous workflow block outputs and variables
 
 ### **Multi-Provider AI Support**
+
 - **OpenRouter**: Access to multiple state-of-the-art models
 - **OpenAI**: GPT-4 and other OpenAI models
 - **Anthropic**: Claude models for advanced reasoning
 - **Ollama**: Local AI processing for privacy-sensitive operations
 
 ### **Tool Integration**
+
 - **11+ MCP Servers**: Pre-configured tools across development, blockchain, and web automation
 - **Dynamic Tool Loading**: Runtime discovery and configuration of new MCP servers
 - **Real-time Tool Testing**: Validate tool connections before execution
@@ -38,28 +43,28 @@ Zzyra is building toward an advanced AI Agent system for intelligent workflow au
 ```typescript
 interface AIAgentConfig {
   agent: {
-    name: string;              // Custom agent name
-    systemPrompt: string;      // Agent personality and capabilities
-    userPrompt: string;        // Specific task description
+    name: string; // Custom agent name
+    systemPrompt: string; // Agent personality and capabilities
+    userPrompt: string; // Specific task description
     thinkingMode: "fast" | "deliberate" | "collaborative";
-    maxSteps: number;          // 1-50 reasoning steps
+    maxSteps: number; // 1-50 reasoning steps
   };
-  
+
   provider: {
     type: "openrouter" | "openai" | "anthropic" | "ollama";
-    model: string;             // Specific model name
-    temperature: number;       // 0-2 creativity level
-    maxTokens: number;         // Response length limit
+    model: string; // Specific model name
+    temperature: number; // 0-2 creativity level
+    maxTokens: number; // Response length limit
   };
-  
+
   execution: {
-    mode: "autonomous" | "interactive";  // Approval required?
-    timeout: number;                     // Execution timeout (ms)
-    saveThinking: boolean;               // Save reasoning steps
-    requireApproval: boolean;            // Human approval required
+    mode: "autonomous" | "interactive"; // Approval required?
+    timeout: number; // Execution timeout (ms)
+    saveThinking: boolean; // Save reasoning steps
+    requireApproval: boolean; // Human approval required
   };
-  
-  selectedTools: ToolConfig[];           // Available MCP tools
+
+  selectedTools: ToolConfig[]; // Available MCP tools
 }
 ```
 
@@ -112,39 +117,31 @@ interface AIAgentConfig {
 
 ### **Live Execution Dashboard**
 
-Zyra provides comprehensive real-time monitoring of AI agent execution:
+Zzyra provides comprehensive real-time monitoring of AI agent execution:
 
 <CardGroup cols={2}>
-  <Card title="Thinking Process Visualization" icon="brain">
-    **Live Thinking Panel**: Real-time display of AI reasoning steps
-    - Step-by-step thought process
-    - Confidence levels for each decision
-    - Tool selection rationale
-    - Problem-solving approach
+  <Card title='Thinking Process Visualization' icon='brain'>
+    **Live Thinking Panel**: Real-time display of AI reasoning steps -
+    Step-by-step thought process - Confidence levels for each decision - Tool
+    selection rationale - Problem-solving approach
   </Card>
-  
-  <Card title="Tool Execution Tracking" icon="wrench">
-    **Tool Call Monitoring**: Track all MCP tool interactions
-    - Tool parameters and configurations
-    - Execution results and outputs
-    - Error handling and retries
-    - Performance metrics
+
+  <Card title='Tool Execution Tracking' icon='wrench'>
+    **Tool Call Monitoring**: Track all MCP tool interactions - Tool parameters
+    and configurations - Execution results and outputs - Error handling and
+    retries - Performance metrics
   </Card>
-  
-  <Card title="Progress Indicators" icon="chart-line">
-    **Execution Progress**: Visual progress tracking
-    - Overall completion percentage
-    - Current step description
-    - Estimated time remaining
-    - Success/failure indicators
+
+  <Card title='Progress Indicators' icon='chart-line'>
+    **Execution Progress**: Visual progress tracking - Overall completion
+    percentage - Current step description - Estimated time remaining -
+    Success/failure indicators
   </Card>
-  
-  <Card title="Error Management" icon="shield-exclamation">
-    **Error Handling**: Comprehensive error tracking
-    - Detailed error messages
-    - Recovery attempt logs
-    - Fallback strategy execution
-    - User notification system
+
+  <Card title='Error Management' icon='shield-exclamation'>
+    **Error Handling**: Comprehensive error tracking - Detailed error messages -
+    Recovery attempt logs - Fallback strategy execution - User notification
+    system
   </Card>
 </CardGroup>
 
@@ -155,7 +152,7 @@ Zyra provides comprehensive real-time monitoring of AI agent execution:
 interface ExecutionUpdate {
   nodeId: string;
   status: "running" | "completed" | "failed";
-  progress: number;              // 0-100
+  progress: number; // 0-100
   thinkingSteps: ThinkingStep[];
   toolCalls: ToolCall[];
   error?: string;
@@ -183,59 +180,37 @@ const { isConnected } = useExecutionWebSocket({
 ### **Available Tool Categories**
 
 <AccordionGroup>
-  <Accordion title="Development Tools" icon="code">
-    **Git Repository** (`git`): Version control operations
-    - Repository management
-    - Commit and branch operations
-    - Merge conflict resolution
-    
-    **PostgreSQL** (`postgres`): Database operations
-    - Query execution and data retrieval
-    - Schema management
-    - Performance optimization
-    
-    **HTTP Requests** (`fetch`): API interactions
-    - REST API calls
-    - Authentication handling
-    - Response processing
+  <Accordion title='Development Tools' icon='code'>
+    **Git Repository** (`git`): Version control operations - Repository
+    management - Commit and branch operations - Merge conflict resolution
+    **PostgreSQL** (`postgres`): Database operations - Query execution and data
+    retrieval - Schema management - Performance optimization **HTTP Requests**
+    (`fetch`): API interactions - REST API calls - Authentication handling -
+    Response processing
   </Accordion>
-  
-  <Accordion title="Blockchain Tools" icon="link">
-    **GOAT Blockchain** (`goat`): Comprehensive blockchain operations
-    - Multi-chain wallet management (Sei, Base, Ethereum)
-    - DeFi protocol interactions
-    - Token transfers and swaps
-    - NFT operations
-    
-    **Sei Network** (`sei`): Native Sei blockchain operations
-    - Sei-specific protocol interactions
-    - Native token management
-    - Smart contract deployment
-    - CosmWasm contract interactions
+
+  <Accordion title='Blockchain Tools' icon='link'>
+    **GOAT Blockchain** (`goat`): Comprehensive blockchain operations -
+    Multi-chain wallet management (Sei, Base, Ethereum) - DeFi protocol
+    interactions - Token transfers and swaps - NFT operations **Sei Network**
+    (`sei`): Native Sei blockchain operations - Sei-specific protocol
+    interactions - Native token management - Smart contract deployment -
+    CosmWasm contract interactions
   </Accordion>
-  
-  <Accordion title="Web Automation" icon="globe">
-    **Puppeteer** (`puppeteer`): Browser automation
-    - Web scraping and data extraction
-    - Form filling and submission
-    - Screenshot and PDF generation
-    
-    **Brave Search** (`brave-search`): Web search capabilities
-    - Real-time web search
-    - News and information gathering
-    - Content research and analysis
+
+  <Accordion title='Web Automation' icon='globe'>
+    **Puppeteer** (`puppeteer`): Browser automation - Web scraping and data
+    extraction - Form filling and submission - Screenshot and PDF generation
+    **Brave Search** (`brave-search`): Web search capabilities - Real-time web
+    search - News and information gathering - Content research and analysis
   </Accordion>
-  
-  <Accordion title="AI Enhancement" icon="brain">
-    **Sequential Thinking** (`sequential-thinking`): Advanced reasoning
-    - Multi-step problem decomposition
-    - Logical reasoning chains
-    - Complex decision trees
-    
-    **Time & Weather** (`time`, `weather`): Context awareness
-    - Current time and timezone handling
-    - Weather data for location-based decisions
-    - Temporal reasoning capabilities
+
+  <Accordion title='AI Enhancement' icon='brain'>
+    **Sequential Thinking** (`sequential-thinking`): Advanced reasoning -
+    Multi-step problem decomposition - Logical reasoning chains - Complex
+    decision trees **Time & Weather** (`time`, `weather`): Context awareness -
+    Current time and timezone handling - Weather data for location-based
+    decisions - Temporal reasoning capabilities
   </Accordion>
 </AccordionGroup>
 
@@ -304,26 +279,26 @@ const { isConnected } = useExecutionWebSocket({
 
 ### **Workflow Integration**
 
-AI Agents integrate seamlessly with Zyra's workflow system:
+AI Agents integrate seamlessly with Zzyra's workflow system:
 
 ```typescript
 // AI Agent as workflow block
 interface AIAgentBlock extends WorkflowBlock {
   type: "AI_AGENT";
   config: AIAgentConfig;
-  
+
   // Input from previous blocks
   inputs: {
     context?: Record<string, any>;
     prompt?: string;
     variables?: Record<string, any>;
   };
-  
+
   // Output for subsequent blocks
   outputs: {
-    result: string;           // Main agent response
+    result: string; // Main agent response
     reasoning: ThinkingStep[]; // Reasoning process
-    toolCalls: ToolCall[];    // Tool interactions
+    toolCalls: ToolCall[]; // Tool interactions
     metadata: ExecutionMetadata;
   };
 }
@@ -390,103 +365,68 @@ const agentPrompt = `
 ### **Agent Design Patterns**
 
 <CardGroup cols={2}>
-  <Card title="Task Decomposition" icon="sitemap">
-    **Break complex tasks into smaller, manageable steps**
-    
-    ```
-    System Prompt Example:
-    "You are a DeFi portfolio manager. For each task:
-    1. Analyze current market conditions
-    2. Assess portfolio health
-    3. Identify optimization opportunities  
-    4. Execute necessary transactions
-    5. Monitor results and adjust strategy"
-    ```
+  <Card title='Task Decomposition' icon='sitemap'>
+    **Break complex tasks into smaller, manageable steps** ``` System Prompt
+    Example: "You are a DeFi portfolio manager. For each task: 1. Analyze
+    current market conditions 2. Assess portfolio health 3. Identify
+    optimization opportunities 4. Execute necessary transactions 5. Monitor
+    results and adjust strategy" ```
   </Card>
-  
-  <Card title="Error Recovery" icon="refresh">
-    **Implement robust error handling and recovery strategies**
-    
-    ```
-    "If a transaction fails:
-    1. Analyze the failure reason
-    2. Check network conditions
-    3. Adjust gas parameters if needed
-    4. Retry with exponential backoff
-    5. Alert user if maximum retries exceeded"
-    ```
+
+  <Card title='Error Recovery' icon='refresh'>
+    **Implement robust error handling and recovery strategies** ``` "If a
+    transaction fails: 1. Analyze the failure reason 2. Check network conditions
+    3. Adjust gas parameters if needed 4. Retry with exponential backoff 5.
+    Alert user if maximum retries exceeded" ```
   </Card>
-  
-  <Card title="Security First" icon="shield-check">
-    **Always prioritize security in agent instructions**
-    
-    ```
-    "Security constraints:
-    - Never share private keys or sensitive data
-    - Validate all external data sources
-    - Use minimum required permissions
-    - Log all critical operations for audit"
-    ```
+
+  <Card title='Security First' icon='shield-check'>
+    **Always prioritize security in agent instructions** ``` "Security
+    constraints: - Never share private keys or sensitive data - Validate all
+    external data sources - Use minimum required permissions - Log all critical
+    operations for audit" ```
   </Card>
-  
-  <Card title="Performance Optimization" icon="gauge">
-    **Optimize agent performance for production use**
-    
-    ```
-    "Performance guidelines:
-    - Cache frequently accessed data
-    - Batch similar operations when possible
-    - Use appropriate thinking modes for task complexity
-    - Monitor and optimize tool selection"
-    ```
+
+  <Card title='Performance Optimization' icon='gauge'>
+    **Optimize agent performance for production use** ``` "Performance
+    guidelines: - Cache frequently accessed data - Batch similar operations when
+    possible - Use appropriate thinking modes for task complexity - Monitor and
+    optimize tool selection" ```
   </Card>
 </CardGroup>
 
 ### **Common Use Cases**
 
 <AccordionGroup>
-  <Accordion title="DeFi Portfolio Management" icon="chart-line">
-    **Automated portfolio rebalancing and optimization**
-    
-    - Monitor portfolio performance across multiple protocols
-    - Analyze market conditions and identify opportunities
-    - Execute rebalancing transactions based on strategy
-    - Track performance and adjust parameters
-    
-    **Tools used**: GOAT Blockchain, Sei Network, HTTP Requests, Sequential Thinking
+  <Accordion title='DeFi Portfolio Management' icon='chart-line'>
+    **Automated portfolio rebalancing and optimization** - Monitor portfolio
+    performance across multiple protocols - Analyze market conditions and
+    identify opportunities - Execute rebalancing transactions based on strategy
+    - Track performance and adjust parameters **Tools used**: GOAT Blockchain,
+    Sei Network, HTTP Requests, Sequential Thinking
   </Accordion>
-  
-  <Accordion title="Smart Contract Monitoring" icon="shield-check">
-    **Automated smart contract security and performance monitoring**
-    
-    - Monitor contract events and state changes
-    - Analyze transaction patterns for anomalies
-    - Execute emergency procedures if threats detected
-    - Generate security reports and alerts
-    
-    **Tools used**: Blockchain tools, HTTP Requests, PostgreSQL, Git
+
+  <Accordion title='Smart Contract Monitoring' icon='shield-check'>
+    **Automated smart contract security and performance monitoring** - Monitor
+    contract events and state changes - Analyze transaction patterns for
+    anomalies - Execute emergency procedures if threats detected - Generate
+    security reports and alerts **Tools used**: Blockchain tools, HTTP Requests,
+    PostgreSQL, Git
   </Accordion>
-  
-  <Accordion title="Cross-Chain Arbitrage" icon="refresh">
-    **Automated arbitrage opportunity detection and execution**
-    
-    - Monitor prices across multiple DEXs and chains
-    - Calculate profitability including gas costs
-    - Execute arbitrage transactions when profitable
-    - Track performance and optimize strategy
-    
-    **Tools used**: GOAT Blockchain, HTTP Requests, Sequential Thinking
+
+  <Accordion title='Cross-Chain Arbitrage' icon='refresh'>
+    **Automated arbitrage opportunity detection and execution** - Monitor prices
+    across multiple DEXs and chains - Calculate profitability including gas
+    costs - Execute arbitrage transactions when profitable - Track performance
+    and optimize strategy **Tools used**: GOAT Blockchain, HTTP Requests,
+    Sequential Thinking
   </Accordion>
-  
-  <Accordion title="Research and Analysis" icon="magnifying-glass">
-    **Automated market research and analysis**
-    
-    - Gather data from multiple sources (web, APIs, blockchain)
-    - Analyze trends and patterns
-    - Generate comprehensive reports
-    - Execute trading strategies based on findings
-    
-    **Tools used**: Brave Search, HTTP Requests, PostgreSQL, Puppeteer
+
+  <Accordion title='Research and Analysis' icon='magnifying-glass'>
+    **Automated market research and analysis** - Gather data from multiple
+    sources (web, APIs, blockchain) - Analyze trends and patterns - Generate
+    comprehensive reports - Execute trading strategies based on findings **Tools
+    used**: Brave Search, HTTP Requests, PostgreSQL, Puppeteer
   </Accordion>
 </AccordionGroup>
 
@@ -504,7 +444,7 @@ interface CustomMCPServer {
   displayName: string;
   description: string;
   category: string;
-  
+
   connection: {
     type: "stdio" | "http" | "websocket";
     command?: string;
@@ -512,13 +452,13 @@ interface CustomMCPServer {
     url?: string;
     env?: Record<string, string>;
   };
-  
+
   configSchema: {
     type: "object";
     properties: Record<string, any>;
     required: string[];
   };
-  
+
   tools: MCPTool[];
 }
 
@@ -529,29 +469,29 @@ const customServer: CustomMCPServer = {
   displayName: "Custom Analytics Engine",
   description: "Custom analytics and reporting tools",
   category: "analytics",
-  
+
   connection: {
     type: "stdio",
     command: "python",
     args: ["./custom-analytics-server.py"],
     env: {
-      "API_KEY": "{{secrets.analytics_api_key}}"
-    }
+      API_KEY: "{{secrets.analytics_api_key}}",
+    },
   },
-  
+
   configSchema: {
     type: "object",
     properties: {
-      "API_KEY": {
+      API_KEY: {
         type: "string",
         description: "Analytics API key",
         required: true,
-        sensitive: true
-      }
+        sensitive: true,
+      },
     },
-    required: ["API_KEY"]
+    required: ["API_KEY"],
   },
-  
+
   tools: [
     {
       name: "analyze_portfolio",
@@ -560,11 +500,11 @@ const customServer: CustomMCPServer = {
         type: "object",
         properties: {
           portfolioData: { type: "object" },
-          timeframe: { type: "string" }
-        }
-      }
-    }
-  ]
+          timeframe: { type: "string" },
+        },
+      },
+    },
+  ],
 };
 ```
 
@@ -576,14 +516,14 @@ Coordinate multiple AI agents for complex workflows:
 // Multi-agent workflow pattern
 interface MultiAgentWorkflow {
   agents: {
-    researcher: AIAgentConfig;     // Market research and analysis
-    strategist: AIAgentConfig;     // Strategy development
-    executor: AIAgentConfig;       // Transaction execution
-    monitor: AIAgentConfig;        // Performance monitoring
+    researcher: AIAgentConfig; // Market research and analysis
+    strategist: AIAgentConfig; // Strategy development
+    executor: AIAgentConfig; // Transaction execution
+    monitor: AIAgentConfig; // Performance monitoring
   };
-  
+
   coordination: {
-    dataFlow: AgentDataFlow[];     // How agents share data
+    dataFlow: AgentDataFlow[]; // How agents share data
     dependencies: AgentDependency[]; // Execution order
     conflictResolution: ConflictResolutionStrategy;
   };
@@ -596,23 +536,21 @@ const defiWorkflow: MultiAgentWorkflow = {
       agent: {
         name: "Market Researcher",
         systemPrompt: "Analyze market conditions and identify opportunities",
-        tools: ["brave-search", "fetch", "sequential-thinking"]
-      }
+        tools: ["brave-search", "fetch", "sequential-thinking"],
+      },
     },
     executor: {
       agent: {
-        name: "Transaction Executor", 
+        name: "Transaction Executor",
         systemPrompt: "Execute transactions based on research findings",
-        tools: ["goat", "sei"]
-      }
-    }
+        tools: ["goat", "sei"],
+      },
+    },
   },
-  
+
   coordination: {
-    dataFlow: [
-      { from: "researcher", to: "executor", data: "marketAnalysis" }
-    ]
-  }
+    dataFlow: [{ from: "researcher", to: "executor", data: "marketAnalysis" }],
+  },
 };
 ```
 
@@ -621,67 +559,64 @@ const defiWorkflow: MultiAgentWorkflow = {
 ### **Common Issues**
 
 <AccordionGroup>
-  <Accordion title="Tool Connection Issues" icon="plug-disconnected">
-    **Symptoms**: Tools showing as disconnected or timing out
-    
-    **Solutions**:
-    - Verify network connectivity and firewall settings
-    - Check API keys and authentication credentials
-    - Validate tool configuration against schema
-    - Review MCP server logs for error details
-    - Test tool connections independently
+  <Accordion title='Tool Connection Issues' icon='plug-disconnected'>
+    **Symptoms**: Tools showing as disconnected or timing out **Solutions**: -
+    Verify network connectivity and firewall settings - Check API keys and
+    authentication credentials - Validate tool configuration against schema -
+    Review MCP server logs for error details - Test tool connections
+    independently
   </Accordion>
-  
-  <Accordion title="Execution Timeouts" icon="clock">
-    **Symptoms**: Agents timing out during execution
-    
-    **Solutions**:
-    - Increase execution timeout in agent configuration
-    - Optimize tool selection for faster operations
-    - Break complex tasks into smaller steps
-    - Use appropriate thinking mode for task complexity
-    - Monitor system resources and scale if needed
+
+  <Accordion title='Execution Timeouts' icon='clock'>
+    **Symptoms**: Agents timing out during execution **Solutions**: - Increase
+    execution timeout in agent configuration - Optimize tool selection for
+    faster operations - Break complex tasks into smaller steps - Use appropriate
+    thinking mode for task complexity - Monitor system resources and scale if
+    needed
   </Accordion>
-  
-  <Accordion title="Performance Issues" icon="gauge">
-    **Symptoms**: Slow agent responses or high resource usage
-    
-    **Solutions**:
-    - Optimize system prompts for clarity and brevity
-    - Use caching for frequently accessed data
-    - Select appropriate AI models for task complexity
-    - Monitor and optimize tool usage patterns
-    - Consider local AI processing for simple tasks
+
+  <Accordion title='Performance Issues' icon='gauge'>
+    **Symptoms**: Slow agent responses or high resource usage **Solutions**: -
+    Optimize system prompts for clarity and brevity - Use caching for frequently
+    accessed data - Select appropriate AI models for task complexity - Monitor
+    and optimize tool usage patterns - Consider local AI processing for simple
+    tasks
   </Accordion>
-  
-  <Accordion title="Integration Problems" icon="link">
-    **Symptoms**: Agents not receiving data from previous blocks
-    
-    **Solutions**:
-    - Verify template variable syntax in prompts
-    - Check block execution order and dependencies
-    - Validate data types and formats between blocks
-    - Review workflow execution logs for data flow issues
-    - Test individual blocks in isolation
+
+  <Accordion title='Integration Problems' icon='link'>
+    **Symptoms**: Agents not receiving data from previous blocks **Solutions**:
+    - Verify template variable syntax in prompts - Check block execution order
+    and dependencies - Validate data types and formats between blocks - Review
+    workflow execution logs for data flow issues - Test individual blocks in
+    isolation
   </Accordion>
 </AccordionGroup>
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="MCP Tools Guide" icon="wrench" href="/platform/mcp-tools/overview">
+  <Card
+    title='MCP Tools Guide'
+    icon='wrench'
+    href='/platform/mcp-tools/overview'>
     Comprehensive guide to available MCP tools and their capabilities
   </Card>
-  
-  <Card title="Blockchain Integration" icon="link" href="/platform/blockchain/overview">
+
+  <Card
+    title='Blockchain Integration'
+    icon='link'
+    href='/platform/blockchain/overview'>
     Learn about blockchain tools and DeFi automation capabilities
   </Card>
-  
-  <Card title="Workflow Builder" icon="sitemap" href="/platform/workflows/builder">
+
+  <Card
+    title='Workflow Builder'
+    icon='sitemap'
+    href='/platform/workflows/builder'>
     Build complex workflows combining AI agents with other blocks
   </Card>
-  
-  <Card title="API Reference" icon="code" href="/api-reference/ai-agents">
+
+  <Card title='API Reference' icon='code' href='/api-reference/ai-agents'>
     Technical API documentation for AI agent integration
   </Card>
 </CardGroup>

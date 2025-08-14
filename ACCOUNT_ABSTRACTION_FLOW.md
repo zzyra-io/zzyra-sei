@@ -2,7 +2,7 @@
 
 ## Overview
 
-Zyra implements Account Abstraction (AA) using Dynamic Labs + ZeroDev to enable **automated workflow execution** where transactions are executed on behalf of users when workflows run in the background.
+Zzyra implements Account Abstraction (AA) using Dynamic Labs + ZeroDev to enable **automated workflow execution** where transactions are executed on behalf of users when workflows run in the background.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ Zyra implements Account Abstraction (AA) using Dynamic Labs + ZeroDev to enable 
 
 #### 2. **Automated Execution** (Workflow Background)
 
-- User creates a delegation allowing Zyra to execute transactions
+- User creates a delegation allowing Zzyra to execute transactions
 - zzyra-worker executes transactions using the delegation when workflows run
 - User doesn't need to be present
 

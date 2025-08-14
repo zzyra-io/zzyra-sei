@@ -55,7 +55,7 @@ export const fetch = {
       userAgent: {
         type: 'string',
         description: 'User agent for requests',
-        default: 'Zyra-AI-Agent/1.0',
+        default: 'Zzyra-AI-Agent/1.0',
       },
       timeout: {
         type: 'number',

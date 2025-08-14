@@ -86,7 +86,7 @@
 
 ```mermaid
 graph TD
-    A[User visits Zyra] --> B[Connect Wallet button]
+    A[User visits Zzyra] --> B[Connect Wallet button]
     B --> C[Magic/Wagmi modal]
     C --> D[User authenticates]
     D --> E[Wallet connected successfully]

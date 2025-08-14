@@ -1,18 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  prisma,
-  ExecutionRepository,
-  WorkflowRepository,
-  UserRepository,
-  NotificationRepository,
-} from '@zzyra/database';
-import {
-  prisma as defaultPrisma,
   createDevelopmentExtensionManager,
-  createProductionExtensionManager,
   createExtendedPrismaClient,
+  createProductionExtensionManager,
   DatabaseCacheProvider,
   DatabaseRateLimitStore,
+  prisma as defaultPrisma,
+  ExecutionRepository,
+  NotificationRepository,
+  UserRepository,
+  WorkflowRepository,
   WorkflowStatus,
 } from '@zzyra/database';
 
@@ -26,7 +23,7 @@ interface WorkerMetrics {
 }
 
 /**
- * Enhanced Database Service for Zyra Worker
+ * Enhanced Database Service for Zzyra Worker
  *
  * This service provides access to database repositories with enhanced monitoring,
  * retry logic, and performance tracking specifically designed for worker processes.

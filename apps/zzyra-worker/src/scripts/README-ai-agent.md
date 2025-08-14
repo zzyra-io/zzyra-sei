@@ -170,7 +170,7 @@ You can easily modify the script to:
 
 ## Integration with Workflow System
 
-This script demonstrates how the AI Agent Handler integrates with the existing Zyra architecture:
+This script demonstrates how the AI Agent Handler integrates with the existing Zzyra architecture:
 
 - Uses the same `BlockHandler` interface as other blocks
 - Integrates with `ExecutionLogger` for monitoring
@@ -178,4 +178,4 @@ This script demonstrates how the AI Agent Handler integrates with the existing Z
 - Follows the same error handling patterns
 - Supports the same execution context structure
 
-The AI Agent can be used as a regular block in any Zyra workflow, just like HTTP requests, email notifications, or data transformations.
+The AI Agent can be used as a regular block in any Zzyra workflow, just like HTTP requests, email notifications, or data transformations.
