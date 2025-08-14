@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { createZeroDevPaymasterClient } from '@zerodev/sdk';
+import { signerToEcdsaValidator } from '@zerodev/ecdsa-validator';
+import {
+  createKernelAccount,
+  createKernelAccountClient,
+  createZeroDevPaymasterClient,
+} from '@zerodev/sdk';
+import { getEntryPoint, KERNEL_V3_1 } from '@zerodev/sdk/constants';
 import {
   Address,
   Chain,
@@ -32,8 +38,7 @@ const ENTRYPOINT_ADDRESS_V07 =
 // ZeroDev configuration constants - using latest recommended values
 const KERNEL_VERSION = '0.3.1'; // Latest stable version
 const ENTRYPOINT = ENTRYPOINT_ADDRESS_V07;
-const PROJECT_ID =
-  process.env.ZERODEV_PROJECT_ID || '8e6f4057-e935-485f-9b6d-f14696e92654';
+const PROJECT_ID = process.env.ZERODEV_PROJECT_ID;
 
 // Session key configuration constants
 const DEFAULT_SESSION_DURATION = 24 * 60 * 60; // 24 hours in seconds
@@ -190,83 +195,52 @@ export class ZeroDevService implements IAccountAbstractionService {
         paymasterUrl: this.getPaymasterUrl(config.chainId),
       });
 
-      // Create public client
-      const publicClient = createPublicClient({
-        chain,
-        transport: http(chain.rpcUrls.default.http[0]),
-      });
-
       // Create owner signer
       const ownerSigner = privateKeyToAccount(config.ownerPrivateKey as Hex);
 
-      // For now, create a basic smart account address deterministically
-      // This will be enhanced with proper ZeroDev integration once SDK is properly configured
-      const smartAccountAddress =
-        `0x${ownerSigner.address.slice(2).padStart(40, '0')}` as Address;
+      // Create ECDSA validator with proper client parameter
+      const publicClient = createPublicClient({
+        chain,
+        transport: http(chain.rpcUrls.default.http[0]),
+      }) as any;
+
+      const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
+        signer: ownerSigner,
+        entryPoint: getEntryPoint('0.7'),
+        kernelVersion: KERNEL_V3_1,
+      });
+
+      // Create deterministic Kernel account with proper client parameter
+      const kernelAccount = await createKernelAccount(publicClient, {
+        plugins: {
+          sudo: ecdsaValidator,
+        },
+        entryPoint: getEntryPoint('0.7'),
+        kernelVersion: KERNEL_V3_1,
+      });
+
+      const smartAccountAddress = kernelAccount.address;
+
+      this.logger.log('Created deterministic ZeroDev kernel account', {
+        owner: ownerSigner.address,
+        smartWallet: smartAccountAddress,
+        entryPoint: ENTRYPOINT_ADDRESS_V07,
+        chainId: config.chainId,
+      });
 
       // Create paymaster and bundler clients for proper AA flow
-      const zeroDevPaymaster = await createZeroDevPaymasterClient({
+      const zeroDevPaymaster = createZeroDevPaymasterClient({
         chain,
         transport: http(paymasterUrl),
       });
 
-      // Create bundler client for UserOperation submission
-      const bundlerClient = createPublicClient({
-        chain,
-        transport: http(bundlerUrl),
-      });
-
-      // Create proper kernel account address (deterministic)
-      const kernelAccount = {
-        address: smartAccountAddress,
-        signer: ownerSigner,
-      };
-
-      // Create proper kernel client with AA support
-      const kernelClient = {
-        sendTransaction: async (params: any) => {
-          this.logger.log('Executing transaction via ZeroDev UserOperation', {
-            to: params.to,
-            value: params.value?.toString(),
-            hasData: !!params.data,
-          });
-
-          // Create UserOperation for proper AA flow
-          const userOp = await this.createUserOperation({
-            to: params.to,
-            value: params.value || 0n,
-            data: params.data || '0x',
-            account: kernelAccount,
-            chain,
-          });
-
-          // Get paymaster sponsorship (gas-free for user)
-          const sponsoredUserOp = await zeroDevPaymaster.sponsorUserOperation({
-            userOperation: userOp,
-          });
-
-          this.logger.log('UserOperation sponsored by ZeroDev paymaster', {
-            paymasterAndData: sponsoredUserOp.paymasterAndData
-              ? 'present'
-              : 'none',
-          });
-
-          // Submit UserOperation via bundler
-          const userOpHash = await bundlerClient.request({
-            method: 'eth_sendUserOperation',
-            params: [sponsoredUserOp, ENTRYPOINT],
-          });
-
-          // Wait for UserOperation to be included in a block
-          const receipt = await this.waitForUserOperationReceipt(
-            userOpHash as string,
-            bundlerClient,
-          );
-
-          return receipt.transactionHash;
-        },
+      // Create proper ZeroDev kernel account client
+      const kernelClient = createKernelAccountClient({
         account: kernelAccount,
-      };
+        chain,
+        bundlerTransport: http(bundlerUrl),
+        paymaster: zeroDevPaymaster,
+      });
 
       // Check deployment status
       const isDeployed = await this.isSmartAccountDeployed(
@@ -311,7 +285,10 @@ export class ZeroDevService implements IAccountAbstractionService {
    * Create session key account for Zzyra workflow automation
    * Simplified version using basic smart account functionality
    */
-  async createSessionKeyForZyra(config: ZyraSessionKeyConfig): Promise<{
+  async createSessionKeyForZyra(
+    config: ZyraSessionKeyConfig,
+    existingSmartWalletAddress?: string,
+  ): Promise<{
     sessionKeyClient: any;
     sessionKeyAddress: string;
     smartAccountAddress: string;
@@ -320,21 +297,61 @@ export class ZeroDevService implements IAccountAbstractionService {
       this.logger.log('Creating ZeroDev session key for Zzyra automation', {
         chainId: config.chainId,
         operations: config.permissions.operations,
+        existingSmartWallet: existingSmartWalletAddress,
       });
 
-      // For now, use the owner account to create a basic smart account
-      // TODO: Implement proper session key delegation when policies are available
-      const accountConfig: ZeroDevAccountConfig = {
-        ownerPrivateKey: config.sessionPrivateKey, // Use session key as owner for now
-        chainId: config.chainId,
-      };
+      let smartAccountAddress: string;
+      let kernelClient: any;
 
-      const accountResult = await this.createSmartAccount(accountConfig);
+      if (existingSmartWalletAddress) {
+        // ✅ Use existing smart wallet address from Dynamic Labs
+        smartAccountAddress = existingSmartWalletAddress;
+
+        this.logger.log(
+          '✅ Using existing Dynamic-created ZeroDev smart wallet',
+          {
+            smartWalletAddress: smartAccountAddress,
+            source: 'dynamic_labs_pre_created',
+          },
+        );
+
+        // Create a client that connects to the existing smart wallet
+        // For now, we create a placeholder client since the address is already determined
+        kernelClient = {
+          account: { address: smartAccountAddress as `0x${string}` },
+          sendTransaction: async (params: any) => {
+            throw new Error(
+              `🚧 ZeroDev execution not fully implemented for existing wallets.\n` +
+                `Smart wallet: ${smartAccountAddress}\n` +
+                `This address was created by Dynamic Labs and needs proper ZeroDev client setup.`,
+            );
+          },
+        };
+      } else {
+        // ⚠️ Fallback: Create new smart account (should not happen with proper Dynamic integration)
+        this.logger.warn(
+          '⚠️ No existing smart wallet provided, creating new account (fallback mode)',
+        );
+
+        const accountConfig: ZeroDevAccountConfig = {
+          ownerPrivateKey: config.sessionPrivateKey,
+          chainId: config.chainId,
+        };
+
+        const accountResult = await this.createSmartAccount(accountConfig);
+        smartAccountAddress = accountResult.smartAccountAddress;
+        kernelClient = accountResult.kernelClient;
+
+        this.logger.warn('⚠️ Created NEW ZeroDev smart wallet (fallback)', {
+          newSmartWallet: smartAccountAddress,
+          warning: 'This should not happen with proper Dynamic integration',
+        });
+      }
 
       return {
-        sessionKeyClient: accountResult.kernelClient,
-        sessionKeyAddress: accountResult.ownerAddress,
-        smartAccountAddress: accountResult.smartAccountAddress,
+        sessionKeyClient: kernelClient,
+        sessionKeyAddress: config.sessionPrivateKey,
+        smartAccountAddress,
       };
     } catch (error) {
       this.logger.error('Failed to create ZeroDev session key for Zzyra', {
@@ -404,8 +421,12 @@ export class ZeroDevService implements IAccountAbstractionService {
         // Validate permissions
         this.validateZyraPermissions(sessionConfig.permissions);
 
-        // Create session key client
-        const result = await this.createSessionKeyForZyra(sessionConfig);
+        // Create session key client using existing smart wallet address from session data
+        const existingSmartWalletAddress = sessionKeyData.smartWalletOwner; // From Dynamic Labs
+        const result = await this.createSessionKeyForZyra(
+          sessionConfig,
+          existingSmartWalletAddress,
+        );
         sessionKeyClient = result.sessionKeyClient;
 
         // Cache the client

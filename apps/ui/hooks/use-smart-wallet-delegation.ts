@@ -4,7 +4,7 @@ import { isEthereumWallet } from "@dynamic-labs/ethereum";
 
 import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
 import { useCallback, useState } from "react";
-import { useChains, useWalletClient } from "wagmi";
+// No longer need wagmi hooks since Dynamic handles ZeroDev integration
 
 const SUPPORTED_CHAINS = {
   SEI_TESTNET: 1328,
@@ -85,10 +85,10 @@ interface PermissionConfig {
 export function useSmartWalletDelegation() {
   const { toast } = useToast();
   const { primaryWallet, user } = useDynamicContext();
+
   const isLoggedIn = useIsLoggedIn();
   const [isCreating, setIsCreating] = useState(false);
-  const { data: walletClient } = useWalletClient();
-  const chains = useChains();
+  // Note: walletClient and chains no longer needed since we use Dynamic's pre-created ZeroDev addresses
 
   const createDelegationMessage = useCallback(
     (
@@ -159,21 +159,12 @@ export function useSmartWalletDelegation() {
 
       try {
         const chainId = permissions.chainId || DEFAULT_CHAIN_ID;
-        const chain = chains.find((chain) => chain.id === parseInt(chainId));
+        // Note: We no longer need to create ZeroDev accounts manually
+        // Dynamic Labs automatically creates them during user signup
 
         console.log("Creating delegation for chain:", chainId);
 
-        // Dynamic Labs automatically creates smart wallets for embedded wallets
-        // We just need to use the existing smart wallet address
-        const smartWalletAddress = primaryWallet.address;
-
-        if (!smartWalletAddress) {
-          throw new Error(
-            "No smart wallet address available from Dynamic Labs"
-          );
-        }
-
-        console.log("Using Dynamic Labs smart wallet:", smartWalletAddress);
+        const smartWalletAddress = primaryWallet?.address;
 
         // Create delegation message with smart wallet address
         const delegationMessage = createDelegationMessage(
@@ -182,16 +173,7 @@ export function useSmartWalletDelegation() {
           smartWalletAddress
         );
 
-        console.log("delegationMessage", delegationMessage);
         const messageToSign = JSON.stringify(delegationMessage, null, 2);
-
-        console.log("Signing message with wallet client approach:", {
-          messageToSign,
-          walletAddress: primaryWallet.address,
-          chainId,
-          walletType: primaryWallet.connector?.name,
-          isEthereumWallet: isEthereumWallet(primaryWallet),
-        });
 
         // Sign the delegation message using WalletClient approach
         let userSignature: string;
@@ -203,18 +185,8 @@ export function useSmartWalletDelegation() {
             );
           }
 
-          console.log("Getting wallet client for embedded wallet signing...");
-
-          console.log("Wallet client obtained, signing message...");
-
           // Use WalletClient signMessage method which handles embedded wallets better
           userSignature = await primaryWallet.signMessage(messageToSign);
-
-          console.log("User signature received via wallet client:", {
-            signatureLength: userSignature?.length || 0,
-            signaturePreview:
-              userSignature?.slice(0, 10) + "..." || "undefined",
-          });
         } catch (signError) {
           console.error("Error signing message with wallet client:", signError);
 
@@ -248,19 +220,7 @@ export function useSmartWalletDelegation() {
           smartWalletAddress
         );
 
-        console.log("Sending delegation request:", {
-          endpoint,
-          chainId,
-          requestDataKeys: Object.keys(requestData),
-        });
-
         const response = await api.post(endpoint, requestData);
-
-        console.log("API response received:", {
-          status: response.status,
-          hasData: !!response.data,
-          responseKeys: response.data ? Object.keys(response.data) : [],
-        });
 
         if (!response.data || response.data.error) {
           throw new Error(

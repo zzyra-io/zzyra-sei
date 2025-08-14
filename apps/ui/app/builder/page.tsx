@@ -1148,7 +1148,7 @@ export default function BuilderPage() {
             </div>
           </div>
           <div className='flex items-center gap-2'>
-            <DynamicWidget variant='dropdown' />
+            <DynamicWidget variant='modal' />
             <Button
               variant='outline'
               size='sm'

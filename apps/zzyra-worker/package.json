@@ -63,6 +63,7 @@
     "@types/nodemailer": "^6.4.17",
     "@types/sanitize-html": "^2.15.0",
     "@willsoto/nestjs-prometheus": "^6.0.2",
+    "@zerodev/ecdsa-validator": "^5.4.9",
     "@zerodev/permissions": "^5.5.14",
     "@zerodev/sdk": "^5.4.41",
     "@zzyra/database": "workspace:*",
