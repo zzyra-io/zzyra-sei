@@ -2,44 +2,12 @@
 import { cn } from "@/lib/utils";
 import type React from "react";
 
-import { Handle, Position, useReactFlow } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import {
-  ChevronRight,
-  Plus,
-  Settings,
-  Brain,
-  Zap,
-  Database,
-  Globe,
-  FileText,
-  Search,
-  Code,
-  MessageSquare,
-  Play,
-  Pause,
-  CheckCircle,
-  AlertCircle,
-  Clock,
-  Loader2,
-  Eye,
-  EyeOff,
-  X,
-} from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -48,20 +16,52 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
-import { AIAgentAPI } from "@/lib/api/ai-agent";
-import type { MCPServerConfig } from "@zzyra/types";
-import { useWorkflowStore } from "@/lib/store/workflow-store";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import {
   useExecutionWebSocket,
-  type NodeExecutionUpdate,
   type ExecutionLog,
+  type NodeExecutionUpdate,
 } from "@/hooks/use-execution-websocket";
+import { AIAgentAPI } from "@/lib/api/ai-agent";
+import { useWorkflowStore } from "@/lib/store/workflow-store";
+import { Handle, Position, useReactFlow } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import type { MCPServerConfig } from "@zzyra/types";
+import {
+  AlertCircle,
+  Brain,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  Code,
+  Database,
+  Eye,
+  EyeOff,
+  FileText,
+  Globe,
+  Loader2,
+  MessageSquare,
+  Pause,
+  Play,
+  Plus,
+  Search,
+  Settings,
+  X,
+  Zap,
+} from "lucide-react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import LiveThinkingPanel from "./live-thinking-panel";
 
 // Types
@@ -1629,7 +1629,7 @@ export function AgentNodeComponent({
           type='source'
           position={Position.Right}
           id={`${id}-source`}
-          className='!w-4 !h-4 !bg-blue-500 !border-2 !border-background'
+          className='!w-4 !h-4 !bg-blue-500 !border-2 !border-background !hover:bg-blue-600'
         />
       </div>
     </>

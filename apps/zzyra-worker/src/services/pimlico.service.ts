@@ -22,10 +22,10 @@ import {
   ChainConfig,
 } from './blockchain/types/blockchain.types';
 
-// EntryPoint v0.6 address (widely supported by Pimlico)
-const ENTRYPOINT_ADDRESS_V07 = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789';
+// EntryPoint v0.7 address (required for ZeroDev SDK v5.4.41 compatibility)
+const ENTRYPOINT_ADDRESS_V07 = '0x0000000071727De22E5E9d8BAf0edAc6f37da032';
 
-// SimpleAccount factory address for v0.6 (canonical)
+// SimpleAccount factory address for v0.7 (canonical)
 const SIMPLE_ACCOUNT_FACTORY = '0x5de4839a76cf55d0c90e2061ef4386d962E15ae3';
 
 // ERC20 ABI for token transfers

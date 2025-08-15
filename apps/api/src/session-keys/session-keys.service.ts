@@ -643,7 +643,7 @@ export class SessionKeysService {
               createdAt: new Date().toISOString(),
             },
             smartAccountFactory: "0x5de4839a76cf55d0c90e2061ef4386d962E15ae3", // Standard SimpleAccount factory
-            entryPoint: "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789", // EntryPoint v0.6
+            entryPoint: "0x0000000071727De22E5E9d8BAf0edAc6f37da032", // EntryPoint v0.7
           },
           include: { permissions: true },
         });

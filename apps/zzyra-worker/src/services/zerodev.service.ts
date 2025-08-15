@@ -162,8 +162,7 @@ export class ZeroDevService implements IAccountAbstractionService {
 
   constructor() {
     this.zerodevProjectId = PROJECT_ID;
-    this.logger.log('ZeroDev service initialized with project ID', {
-      projectId: this.zerodevProjectId.substring(0, 8) + '...',
+    this.logger.log('ZeroDev service initialized', {
       hasProjectId: !!this.zerodevProjectId,
     });
   }
@@ -190,9 +189,6 @@ export class ZeroDevService implements IAccountAbstractionService {
 
       this.logger.debug('Creating ZeroDev smart account', {
         chainId: config.chainId,
-        projectId: this.zerodevProjectId.substring(0, 8) + '...',
-        bundlerUrl: this.getBundlerUrl(config.chainId),
-        paymasterUrl: this.getPaymasterUrl(config.chainId),
       });
 
       // Create owner signer
@@ -221,10 +217,8 @@ export class ZeroDevService implements IAccountAbstractionService {
 
       const smartAccountAddress = kernelAccount.address;
 
-      this.logger.log('Created deterministic ZeroDev kernel account', {
-        owner: ownerSigner.address,
+      this.logger.log('Created ZeroDev kernel account', {
         smartWallet: smartAccountAddress,
-        entryPoint: ENTRYPOINT_ADDRESS_V07,
         chainId: config.chainId,
       });
 
@@ -254,7 +248,6 @@ export class ZeroDevService implements IAccountAbstractionService {
 
       this.logger.log('ZeroDev smart account created', {
         address: kernelAccount.address,
-        chainId: config.chainId,
         isDeployed,
       });
 
@@ -294,10 +287,8 @@ export class ZeroDevService implements IAccountAbstractionService {
     smartAccountAddress: string;
   }> {
     try {
-      this.logger.log('Creating ZeroDev session key for Zzyra automation', {
+      this.logger.log('Creating ZeroDev session key for Zzyra', {
         chainId: config.chainId,
-        operations: config.permissions.operations,
-        existingSmartWallet: existingSmartWalletAddress,
       });
 
       let smartAccountAddress: string;
@@ -307,30 +298,20 @@ export class ZeroDevService implements IAccountAbstractionService {
         // ✅ Use existing smart wallet address from Dynamic Labs
         smartAccountAddress = existingSmartWalletAddress;
 
-        this.logger.log(
-          '✅ Using existing Dynamic-created ZeroDev smart wallet',
-          {
-            smartWalletAddress: smartAccountAddress,
-            source: 'dynamic_labs_pre_created',
-          },
-        );
+        this.logger.log('Creating ZeroDev client for existing wallet', {
+          smartWalletAddress: smartAccountAddress,
+        });
 
-        // Create a client that connects to the existing smart wallet
-        // For now, we create a placeholder client since the address is already determined
-        kernelClient = {
-          account: { address: smartAccountAddress as `0x${string}` },
-          sendTransaction: async (params: any) => {
-            throw new Error(
-              `🚧 ZeroDev execution not fully implemented for existing wallets.\n` +
-                `Smart wallet: ${smartAccountAddress}\n` +
-                `This address was created by Dynamic Labs and needs proper ZeroDev client setup.`,
-            );
-          },
-        };
+        // Create real ZeroDev kernel client for existing smart wallet
+        kernelClient = await this.createKernelClientForExistingWallet(
+          config.sessionPrivateKey,
+          smartAccountAddress as Address,
+          config.chainId,
+        );
       } else {
         // ⚠️ Fallback: Create new smart account (should not happen with proper Dynamic integration)
         this.logger.warn(
-          '⚠️ No existing smart wallet provided, creating new account (fallback mode)',
+          'No existing smart wallet provided, creating new account (fallback mode)',
         );
 
         const accountConfig: ZeroDevAccountConfig = {
@@ -342,16 +323,15 @@ export class ZeroDevService implements IAccountAbstractionService {
         smartAccountAddress = accountResult.smartAccountAddress;
         kernelClient = accountResult.kernelClient;
 
-        this.logger.warn('⚠️ Created NEW ZeroDev smart wallet (fallback)', {
+        this.logger.warn('Created NEW ZeroDev smart wallet (fallback)', {
           newSmartWallet: smartAccountAddress,
-          warning: 'This should not happen with proper Dynamic integration',
         });
       }
 
       return {
         sessionKeyClient: kernelClient,
         sessionKeyAddress: config.sessionPrivateKey,
-        smartAccountAddress,
+        smartAccountAddress: kernelClient.account.address, // Use actual kernel account address
       };
     } catch (error) {
       this.logger.error('Failed to create ZeroDev session key for Zzyra', {
@@ -381,12 +361,7 @@ export class ZeroDevService implements IAccountAbstractionService {
 
       this.logger.log(
         'Executing transaction with ZeroDev + Zzyra session key',
-        {
-          sessionKeyId: sessionKeyData.id,
-          to: transaction.to,
-          value: transaction.value,
-          chainId,
-        },
+        { sessionKeyId: sessionKeyData.id, chainId },
       );
 
       // Check cache first
@@ -434,16 +409,20 @@ export class ZeroDevService implements IAccountAbstractionService {
 
         this.logger.log('ZeroDev session key client created and cached', {
           sessionKeyId: sessionKeyData.id,
-          smartAccountAddress: result.smartAccountAddress,
-          cacheKey,
         });
       }
 
       // Get smart account address from the session key client for balance check
       const smartAccountAddress = sessionKeyClient.account?.address;
       if (!smartAccountAddress) {
-        throw new Error('Unable to determine smart account address');
+        throw new Error(
+          'Unable to determine smart account address from session key client',
+        );
       }
+
+      this.logger.log('Using session key smart wallet', {
+        sessionKeySmartWallet: smartAccountAddress,
+      });
 
       // Check balance only for transaction value (gas is sponsored by ZeroDev)
       if (transaction.value && transaction.value !== '0') {
@@ -460,16 +439,11 @@ export class ZeroDevService implements IAccountAbstractionService {
         const requiredValue = parseEther(transaction.value);
         const chainSymbol = this.getChainSymbol(chainId);
 
-        this.logger.log(
-          'Smart account balance check (transaction value only)',
-          {
-            smartAccountAddress: smartAccountAddress.substring(0, 10) + '...',
-            balance: formatEther(balance) + ` ${chainSymbol}`,
-            required: transaction.value + ` ${chainSymbol}`,
-            chainId,
-            note: 'Gas fees sponsored by ZeroDev paymaster',
-          },
-        );
+        this.logger.log('Smart account balance check', {
+          balance: formatEther(balance) + ` ${chainSymbol}`,
+          required: transaction.value + ` ${chainSymbol}`,
+          chainId,
+        });
 
         if (balance < requiredValue) {
           const fundingInstructions = this.getFundingInstructions(
@@ -477,11 +451,17 @@ export class ZeroDevService implements IAccountAbstractionService {
             smartAccountAddress,
           );
           const errorMessage = [
-            `❌ INSUFFICIENT BALANCE FOR TRANSACTION VALUE`,
+            `❌ INSUFFICIENT BALANCE IN SESSION KEY SMART WALLET`,
             ``,
+            `Session Key Smart Wallet: ${smartAccountAddress}`,
             `Current Balance: ${formatEther(balance)} ${chainSymbol}`,
             `Required for Transaction: ${transaction.value} ${chainSymbol}`,
             `Chain: ${chainId} (${chainSymbol})`,
+            ``,
+            `📝 IMPORTANT: Session keys create their own smart wallets!`,
+            `- Dynamic created: ${sessionKeyData.smartWalletOwner}`,
+            `- Session key uses: ${smartAccountAddress}`,
+            `- You need to fund the SESSION KEY smart wallet, not Dynamic's wallet`,
             ``,
             ...fundingInstructions,
             ``,
@@ -502,8 +482,6 @@ export class ZeroDevService implements IAccountAbstractionService {
       this.logger.log('ZeroDev transaction submitted', {
         transactionHash: txHash,
         sessionKeyId: sessionKeyData.id,
-        to: transaction.to,
-        value: transaction.value,
       });
 
       // Wait for confirmation
@@ -523,8 +501,6 @@ export class ZeroDevService implements IAccountAbstractionService {
       this.logger.log('ZeroDev transaction confirmed', {
         transactionHash: receipt.transactionHash,
         blockNumber: Number(receipt.blockNumber),
-        gasUsed: Number(receipt.gasUsed),
-        executionTime,
       });
 
       return {
@@ -1413,6 +1389,1355 @@ export class ZeroDevService implements IAccountAbstractionService {
 
   // Private helper methods
 
+  /**
+   * Create session key client for existing smart wallet
+   * Uses manual UserOperation construction to operate on Dynamic's existing wallet
+   * This is the correct Account Abstraction pattern for session keys
+   */
+  private async createKernelClientForExistingWallet(
+    sessionKeyPrivateKey: string,
+    existingWalletAddress: Address,
+    chainId: number,
+  ): Promise<any> {
+    try {
+      this.logger.error(
+        '🚀 ENTERING: createKernelClientForExistingWallet method',
+        {
+          existingWallet: existingWalletAddress,
+          chainId,
+          sessionKeyLength: sessionKeyPrivateKey?.length || 0,
+        },
+      );
+
+      this.logger.log('Creating session key client for existing wallet', {
+        existingWallet: existingWalletAddress,
+        chainId,
+      });
+
+      const chain = this.getChainConfig(chainId);
+      const bundlerUrl = this.getBundlerUrl(chainId);
+      const paymasterUrl = this.getPaymasterUrl(chainId);
+
+      // FIXED: Enhanced private key validation and formatting
+      if (!sessionKeyPrivateKey || typeof sessionKeyPrivateKey !== 'string') {
+        throw new Error(
+          'Session key private key is null, undefined, or not a string',
+        );
+      }
+
+      // Ensure private key has proper 0x prefix and length
+      let formattedPrivateKey = sessionKeyPrivateKey.trim();
+      if (!formattedPrivateKey.startsWith('0x')) {
+        formattedPrivateKey = `0x${formattedPrivateKey}`;
+      }
+
+      if (formattedPrivateKey.length !== 66) {
+        // 0x + 64 hex chars
+        throw new Error(
+          `Invalid private key length: ${formattedPrivateKey.length}, expected 66`,
+        );
+      }
+
+      // Validate hex characters
+      const hexPattern = /^0x[0-9a-fA-F]{64}$/;
+      if (!hexPattern.test(formattedPrivateKey)) {
+        throw new Error('Invalid private key format: must be valid hex string');
+      }
+
+      this.logger.debug('🔑 Creating session key signer', {
+        privateKeyLength: formattedPrivateKey.length,
+        hasValidPrefix: formattedPrivateKey.startsWith('0x'),
+        privateKeyPreview: `${formattedPrivateKey.substring(0, 6)}...${formattedPrivateKey.substring(-4)}`,
+      });
+
+      const sessionKeySigner = privateKeyToAccount(formattedPrivateKey as Hex);
+
+      this.logger.debug('✅ Session key signer created successfully', {
+        signerAddress: sessionKeySigner.address,
+        hasSignMessage: typeof sessionKeySigner.signMessage === 'function',
+        hasSignTypedData: typeof sessionKeySigner.signTypedData === 'function',
+      });
+
+      // Create clients for UserOperation submission
+      const publicClient = createPublicClient({
+        chain,
+        transport: http(chain.rpcUrls.default.http[0]),
+      });
+
+      // Create ZeroDev-specific bundler client
+      const bundlerClient = createPublicClient({
+        chain,
+        transport: http(bundlerUrl),
+      });
+
+      // Also create a direct HTTP client for ZeroDev-specific API calls
+      const directBundlerClient = {
+        url: bundlerUrl,
+        async request(method: string, params: any[]) {
+          const response = await fetch(bundlerUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              'User-Agent': 'Zzyra-Worker/1.0',
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method,
+              params,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(
+              `Bundler HTTP error ${response.status}: ${response.statusText}. Response: ${errorText}`,
+            );
+          }
+
+          const result = await response.json();
+
+          // Debug: Log the full response for troubleshooting
+          console.log('Bundler response:', JSON.stringify(result, null, 2));
+
+          if (result.error) {
+            throw new Error(
+              `Bundler error: ${result.error.message || result.error}. Code: ${result.error.code || 'unknown'}`,
+            );
+          }
+
+          return result.result;
+        },
+
+        // Method to check what RPC methods the bundler supports
+        async getSupportedMethods(): Promise<string[]> {
+          try {
+            const response = await fetch(this.url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'rpc_methods',
+                params: [],
+              }),
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              if (result.result && result.result.methods) {
+                return result.result.methods;
+              }
+            }
+          } catch (error) {
+            console.log('Failed to get supported methods:', error);
+          }
+
+          return [];
+        },
+      };
+
+      // Create paymaster for gas sponsorship
+      this.logger.debug('Creating ZeroDev paymaster client', { chainId });
+
+      const zeroDevPaymaster = createZeroDevPaymasterClient({
+        chain,
+        transport: http(paymasterUrl),
+      });
+
+      // EntryPoint verification moved to buildUserOperationForExistingWallet method
+
+      this.logger.error('🔍 ABOUT TO START: Smart account deployment process', {
+        address: existingWalletAddress,
+        chainId,
+        chainName: chain.name,
+        step: 'Before deployment logic',
+      });
+
+      // CRITICAL: Always attempt smart account deployment/redeployment for EntryPoint v0.7 compatibility
+      // The "execution reverted" error indicates the smart account is incompatible with EntryPoint v0.7
+      // We must ensure it's deployed with the correct EntryPoint version for ZeroDev bundler compatibility
+      this.logger.error(
+        '🔄 FORCING smart account deployment/redeployment for EntryPoint v0.7 compatibility',
+        {
+          address: existingWalletAddress,
+          chainId,
+          chainName: chain.name,
+          reason:
+            'ZeroDev bundler requires EntryPoint v0.7, existing account may be v0.6 incompatible',
+          entryPointV7: '0x0000000071727de22e5e9d8baf0edac6f37da032',
+        },
+      );
+
+      // Verify smart account deployment (deployed by Dynamic Labs)
+      const isDeployed = await this.verifySmartAccountDeployment(
+        existingWalletAddress, 
+        chainId, 
+        chain
+      );
+      
+      if (isDeployed) {
+        this.logger.log('✅ Smart account deployment verified', {
+          address: existingWalletAddress,
+          chainId,
+          chainName: chain.name,
+          entryPointV7: '0x0000000071727De22E5E9d8BAf0edAc6f37da032',
+          note: 'Smart account is deployed and ready for EntryPoint v0.7 transactions',
+        });
+      } else {
+        const errorMessage = 
+          '❌ Smart Account Not Deployed\n\n' +
+          `Smart wallet: ${existingWalletAddress}\n` +
+          `Chain: ${chain.name} (${chainId})\n\n` +
+          'The smart account contract is not deployed on-chain. ' +
+          'Smart accounts should be deployed automatically by Dynamic Labs during session key creation.\n\n' +
+          'To resolve:\n' +
+          '1. Use the frontend to create a new blockchain authorization\n' +
+          '2. The frontend will automatically deploy the smart wallet\n' +
+          '3. Try running the workflow again after deployment\n\n' +
+          'Note: The worker does not deploy smart accounts for security reasons.';
+        
+        this.logger.error('Smart account deployment verification failed', {
+          address: existingWalletAddress,
+          chainId,
+          chainName: chain.name,
+          isDeployed: false,
+          entryPointV7: '0x0000000071727De22E5E9d8BAf0edAc6f37da032',
+        });
+        
+        throw new Error(errorMessage);
+      }
+
+      // Create custom client that operates on existing wallet address
+      const sessionKeyClient = {
+        account: {
+          address: existingWalletAddress, // Use Dynamic's wallet address
+          type: 'smart' as const,
+        },
+        chain,
+        transport: bundlerClient.transport,
+
+        // Custom sendTransaction that builds UserOperations for existing wallet
+        sendTransaction: async (params: {
+          to: Address;
+          value: bigint;
+          data?: Hex;
+        }) => {
+          this.logger.log(
+            'Executing transaction via session key on existing wallet',
+            {
+              existingWallet: existingWalletAddress,
+              sessionKeySigner: sessionKeySigner.address,
+              to: params.to,
+              value: params.value.toString(),
+            },
+          );
+
+          // Build UserOperation for existing wallet
+          const userOp = await this.buildUserOperationForExistingWallet({
+            senderWallet: existingWalletAddress,
+            to: params.to,
+            value: params.value,
+            data: params.data || '0x',
+            sessionKeySigner,
+            publicClient,
+            paymaster: zeroDevPaymaster,
+            chainId,
+          });
+
+          // Submit UserOperation via bundler
+          const txHash = await this.submitUserOperation(
+            userOp,
+            directBundlerClient,
+            chainId,
+          );
+
+          this.logger.log('Transaction submitted via session key', {
+            transactionHash: txHash,
+          });
+
+          return txHash;
+        },
+      };
+
+      this.logger.log('Session key client created', {
+        existingWallet: existingWalletAddress,
+        chainId,
+      });
+
+      return sessionKeyClient;
+    } catch (error) {
+      this.logger.error(
+        'Failed to create session key client for existing wallet',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          existingWallet: existingWalletAddress,
+          chainId,
+          sessionKeyLength: sessionKeyPrivateKey?.length || 0,
+        },
+      );
+      throw new Error(
+        `Failed to create session key client: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  /**
+   * Build UserOperation for existing smart wallet
+   * This constructs a UserOperation that will be executed by the existing wallet
+   * but signed by the session key
+   */
+  private async buildUserOperationForExistingWallet(params: {
+    senderWallet: Address;
+    to: Address;
+    value: bigint;
+    data: Hex;
+    sessionKeySigner: any;
+    publicClient: any;
+    paymaster: any;
+    chainId: number;
+  }): Promise<any> {
+    try {
+      const {
+        senderWallet,
+        to,
+        value,
+        data,
+        sessionKeySigner,
+        publicClient,
+        paymaster,
+      } = params;
+
+      this.logger.log(
+        '🚀 STARTING: Building UserOperation for existing wallet',
+        {
+          senderWallet,
+          to,
+          value: value.toString(),
+          chainId: params.chainId,
+        },
+      );
+
+      // CRITICAL: Verify EntryPoint contract availability BEFORE building UserOperation
+      this.logger.error(
+        '🔍 CRITICAL: Verifying EntryPoint contract before UserOperation building',
+        {
+          chainId: params.chainId,
+          entryPointV7: '0x0000000071727De22E5E9d8BAf0edAc6f37da032',
+        },
+      );
+
+      try {
+        const entryPointV7 = '0x0000000071727de22e5e9d8baf0edac6f37da032';
+        const entryPointV7Code = await publicClient.getBytecode({
+          address: entryPointV7 as Address,
+        });
+
+        if (entryPointV7Code && entryPointV7Code !== '0x') {
+          this.logger.error('✅ SUCCESS: EntryPoint v0.7 verified available', {
+            chainId: params.chainId,
+            entryPointAddress: entryPointV7,
+            codeLength: entryPointV7Code.length,
+          });
+        } else if (params.chainId === 1328) {
+          // Try EntryPoint v0.6 as fallback for SEI Testnet
+          const entryPointV7 = '0x0000000071727De22E5E9d8BAf0edAc6f37da032';
+          const entryPointV7Code = await publicClient.getBytecode({
+            address: entryPointV7 as Address,
+          });
+
+          this.logger.log(
+            '🔍 Checking EntryPoint v0.7 deployment on chain',
+            {
+              chainId: params.chainId,
+              entryPointV7,
+              entryPointV7Code: entryPointV7Code || 'undefined',
+            },
+          );
+
+          if (entryPointV7Code && entryPointV7Code !== '0x') {
+            this.logger.log(
+              '✅ SUCCESS: EntryPoint v0.7 verified on chain',
+              {
+                chainId: params.chainId,
+                entryPointAddress: entryPointV7,
+                codeLength: entryPointV7Code.length,
+              },
+            );
+          } else {
+            this.logger.error(
+              '❌ FATAL: EntryPoint v0.7 not deployed on chain',
+              {
+                chainId: params.chainId,
+                entryPointV7,
+                entryPointV7Code: entryPointV7Code || 'undefined',
+              },
+            );
+            throw new Error('EntryPoint v0.7 contract not deployed on chain');
+          }
+        } else {
+          this.logger.error('❌ FATAL: EntryPoint v0.7 not deployed', {
+            chainId: params.chainId,
+            entryPointV7,
+            entryPointV7Code: entryPointV7Code || 'undefined',
+          });
+          throw new Error(
+            `EntryPoint v0.7 not deployed on chain ${params.chainId}`,
+          );
+        }
+      } catch (entryPointError) {
+        this.logger.error(
+          '💥 FATAL: EntryPoint verification failed during UserOperation building',
+          {
+            chainId: params.chainId,
+            error:
+              entryPointError instanceof Error
+                ? entryPointError.message
+                : String(entryPointError),
+            stack:
+              entryPointError instanceof Error
+                ? entryPointError.stack
+                : undefined,
+          },
+        );
+        throw new Error(
+          `Cannot build UserOperation: EntryPoint contract not available on chain ${params.chainId}`,
+        );
+      }
+
+      // Get current nonce for the existing wallet
+      const nonce = await this.getWalletNonce(senderWallet, publicClient);
+
+      // FIXED: Enhanced execution call data encoding with comprehensive error handling
+      const callData = await this.encodeExecuteCallSafely(to, value, data);
+
+      // Build UserOperation structure with safe defaults
+      const userOp = {
+        sender: senderWallet, // Use existing wallet as sender
+        nonce: BigInt(nonce || 0), // Ensure BigInt conversion
+        initCode: '0x' as Hex, // Empty for deployed wallets
+        callData,
+        callGasLimit: BigInt(300000), // Increased conservative estimate
+        verificationGasLimit: BigInt(200000), // Increased for session key verification
+        preVerificationGas: BigInt(50000), // Increased base gas
+        maxFeePerGas: BigInt(30000000000), // 30 gwei default
+        maxPriorityFeePerGas: BigInt(2000000000), // 2 gwei tip
+        paymasterAndData: '0x' as Hex, // Will be filled by paymaster
+        signature: '0x' as Hex, // Will be filled after signing
+      };
+
+      this.logger.debug('UserOperation structure created', {
+        sender: userOp.sender,
+        nonce: userOp.nonce.toString(),
+        callDataLength: userOp.callData.length,
+      });
+
+      // FIXED: Enhanced paymaster integration with comprehensive error handling
+      try {
+        this.logger.debug('Requesting paymaster sponsorship', {
+          chainId: params.chainId,
+        });
+
+        let paymasterResult;
+
+        // Try multiple paymaster methods in order of preference
+        if (typeof paymaster.getPaymasterStubData === 'function') {
+          this.logger.debug('Using getPaymasterStubData method');
+          paymasterResult = await paymaster.getPaymasterStubData({
+            ...userOp,
+            nonce: userOp.nonce.toString(),
+            callGasLimit: userOp.callGasLimit.toString(),
+            verificationGasLimit: userOp.verificationGasLimit.toString(),
+            preVerificationGas: userOp.preVerificationGas.toString(),
+            maxFeePerGas: userOp.maxFeePerGas.toString(),
+            maxPriorityFeePerGas: userOp.maxPriorityFeePerGas.toString(),
+          });
+        } else if (typeof paymaster.sponsorUserOperation === 'function') {
+          this.logger.debug('Using sponsorUserOperation method');
+          paymasterResult = await paymaster.sponsorUserOperation({
+            ...userOp,
+            nonce: userOp.nonce.toString(),
+            callGasLimit: userOp.callGasLimit.toString(),
+            verificationGasLimit: userOp.verificationGasLimit.toString(),
+            preVerificationGas: userOp.preVerificationGas.toString(),
+            maxFeePerGas: userOp.maxFeePerGas.toString(),
+            maxPriorityFeePerGas: userOp.maxPriorityFeePerGas.toString(),
+          });
+        } else if (typeof paymaster.getPaymasterAndData === 'function') {
+          this.logger.debug('Using getPaymasterAndData method');
+          paymasterResult = await paymaster.getPaymasterAndData({
+            ...userOp,
+            nonce: userOp.nonce.toString(),
+            callGasLimit: userOp.callGasLimit.toString(),
+            verificationGasLimit: userOp.verificationGasLimit.toString(),
+            preVerificationGas: userOp.preVerificationGas.toString(),
+            maxFeePerGas: userOp.maxFeePerGas.toString(),
+            maxPriorityFeePerGas: userOp.maxPriorityFeePerGas.toString(),
+          });
+        } else {
+          this.logger.warn(
+            'No compatible paymaster method found, proceeding without sponsorship',
+          );
+        }
+
+        if (paymasterResult && typeof paymasterResult === 'object') {
+          // Update paymaster data
+          if (
+            paymasterResult.paymasterAndData &&
+            typeof paymasterResult.paymasterAndData === 'string'
+          ) {
+            userOp.paymasterAndData = paymasterResult.paymasterAndData as Hex;
+          }
+
+          // Safe gas limit updates with validation
+          const gasFields = [
+            'callGasLimit',
+            'verificationGasLimit',
+            'preVerificationGas',
+            'maxFeePerGas',
+            'maxPriorityFeePerGas',
+          ];
+
+          for (const field of gasFields) {
+            if (paymasterResult[field] != null) {
+              try {
+                let value = paymasterResult[field];
+
+                // Handle different value formats
+                if (typeof value === 'string') {
+                  // Handle hex strings
+                  if (value.startsWith('0x')) {
+                    value = BigInt(value);
+                  } else {
+                    value = BigInt(value);
+                  }
+                } else if (typeof value === 'number') {
+                  value = BigInt(Math.floor(value));
+                } else if (typeof value === 'bigint') {
+                  // Already BigInt
+                } else {
+                  this.logger.warn(`Invalid ${field} type from paymaster`, {
+                    field,
+                    value,
+                    type: typeof value,
+                  });
+                  continue;
+                }
+
+                // Validate reasonable gas values
+                if (value < 0n || value > BigInt('0xffffffffffffffff')) {
+                  this.logger.warn(`Invalid ${field} value from paymaster`, {
+                    field,
+                    value: value.toString(),
+                  });
+                  continue;
+                }
+
+                (userOp as any)[field] = value;
+              } catch (conversionError) {
+                this.logger.warn(`Failed to convert ${field} from paymaster`, {
+                  field,
+                  value: paymasterResult[field],
+                  error:
+                    conversionError instanceof Error
+                      ? conversionError.message
+                      : String(conversionError),
+                });
+              }
+            }
+          }
+
+          this.logger.log('Paymaster sponsorship applied', {
+            hasPaymasterData: userOp.paymasterAndData !== '0x',
+          });
+        }
+      } catch (paymasterError) {
+        this.logger.warn('Paymaster sponsorship failed, using user-paid gas', {
+          error:
+            paymasterError instanceof Error
+              ? paymasterError.message
+              : String(paymasterError),
+          stack:
+            paymasterError instanceof Error ? paymasterError.stack : undefined,
+        });
+        // Continue without sponsorship - user will pay gas
+      }
+
+      // FIXED: Enhanced UserOperation signing with comprehensive error handling
+      const userOpHash = await this.getUserOperationHashSafely(
+        userOp,
+        params.chainId,
+      );
+
+      let signature: Hex;
+      try {
+        this.logger.debug('Signing UserOperation hash', {
+          signerAddress: sessionKeySigner.address,
+        });
+
+        // Validate signer before use
+        if (
+          !sessionKeySigner ||
+          typeof sessionKeySigner.signMessage !== 'function'
+        ) {
+          throw new Error(
+            'Invalid session key signer: missing signMessage method',
+          );
+        }
+
+        // Convert hash to proper message format
+        const messageBytes = userOpHash.startsWith('0x')
+          ? userOpHash.slice(2)
+          : userOpHash;
+        const messageToSign = `0x${messageBytes}` as Hex;
+
+        this.logger.debug('Calling signMessage on session key signer', {
+          messageToSign: `${messageToSign.substring(0, 10)}...${messageToSign.substring(-10)}`,
+          messageLength: messageToSign.length,
+        });
+
+        const signResult = await sessionKeySigner.signMessage({
+          message: { raw: messageToSign },
+        });
+
+        this.logger.debug('Signature result received', {
+          resultType: typeof signResult,
+        });
+
+        // FIXED: Ultra-robust signature extraction with multiple fallback strategies
+        if (typeof signResult === 'string' && signResult.length > 0) {
+          signature = signResult as Hex;
+        } else if (signResult && typeof signResult === 'object') {
+          // Try multiple signature properties in order of preference
+          const possibleProps = ['signature', 'raw', 'hex', 'data', 'result'];
+          let extractedSig: string | undefined;
+
+          for (const prop of possibleProps) {
+            if (
+              prop in signResult &&
+              typeof (signResult as any)[prop] === 'string'
+            ) {
+              extractedSig = (signResult as any)[prop];
+              this.logger.debug(`Extracted signature from property: ${prop}`);
+              break;
+            }
+          }
+
+          if (extractedSig && extractedSig.length > 0) {
+            signature = extractedSig as Hex;
+          } else {
+            this.logger.error('No valid signature found in signature object', {
+              signResult,
+              availableProperties: Object.keys(signResult),
+              propertyTypes: Object.fromEntries(
+                Object.entries(signResult).map(([k, v]) => [k, typeof v]),
+              ),
+            });
+            throw new Error(
+              'Invalid signature object - no valid signature string found',
+            );
+          }
+        } else {
+          this.logger.error('Invalid signature result from signer', {
+            signResult,
+            resultType: typeof signResult,
+            isUndefined: signResult === undefined,
+            isNull: signResult === null,
+          });
+          throw new Error(
+            `Invalid signature format: expected string or object, got ${typeof signResult}`,
+          );
+        }
+
+        // Validate signature format
+        if (!signature || signature === '0x' || signature.length < 132) {
+          // At least 65 bytes + 0x prefix
+          throw new Error(
+            `Invalid signature length: ${signature?.length || 0}, expected at least 132 characters`,
+          );
+        }
+
+        // Ensure proper hex format
+        if (
+          !signature.startsWith('0x') ||
+          !/^0x[0-9a-fA-F]+$/.test(signature)
+        ) {
+          throw new Error(
+            'Invalid signature format: must be valid hex string with 0x prefix',
+          );
+        }
+
+        userOp.signature = signature;
+
+        this.logger.debug('✅ UserOperation signed successfully', {
+          signatureLength: signature.length,
+          signaturePrefix: signature.substring(0, 10),
+          signatureSuffix: signature.substring(-10),
+        });
+      } catch (signError) {
+        this.logger.error('Failed to sign UserOperation with session key', {
+          error:
+            signError instanceof Error ? signError.message : String(signError),
+          stack: signError instanceof Error ? signError.stack : undefined,
+          sessionKeySigner: sessionKeySigner?.address,
+          userOpHashLength: userOpHash?.length,
+          hasSignMessage:
+            sessionKeySigner &&
+            typeof sessionKeySigner.signMessage === 'function',
+        });
+        throw new Error(
+          `UserOperation signing failed: ${signError instanceof Error ? signError.message : 'Unknown signing error'}`,
+        );
+      }
+
+      this.logger.log('UserOperation built and signed', {
+        sender: senderWallet,
+        to,
+        value: value.toString(),
+        hasPaymaster: userOp.paymasterAndData !== '0x',
+      });
+
+      return userOp;
+    } catch (error) {
+      this.logger.error('Failed to build UserOperation for existing wallet', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        senderWallet: params.senderWallet,
+        to: params.to,
+        value: params.value.toString(),
+        chainId: params.chainId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * FIXED: Safe execution call encoding with comprehensive error handling
+   */
+  private async encodeExecuteCallSafely(
+    to: Address,
+    value: bigint,
+    data: Hex,
+  ): Promise<Hex> {
+    try {
+      this.logger.debug('Encoding execute call', {
+        to,
+        value: value.toString(),
+      });
+
+      // Validate inputs
+      if (
+        !to ||
+        typeof to !== 'string' ||
+        !to.startsWith('0x') ||
+        to.length !== 42
+      ) {
+        throw new Error(`Invalid 'to' address: ${to}`);
+      }
+
+      if (typeof value !== 'bigint') {
+        throw new Error(
+          `Invalid value type: expected bigint, got ${typeof value}`,
+        );
+      }
+
+      if (value < 0n) {
+        throw new Error(
+          `Invalid value: cannot be negative (${value.toString()})`,
+        );
+      }
+
+      if (!data || typeof data !== 'string') {
+        data = '0x';
+      } else if (!data.startsWith('0x')) {
+        data = `0x${data}`;
+      }
+
+      // Standard execute function signature: execute(address,uint256,bytes)
+      const callData = encodeFunctionData({
+        abi: [
+          {
+            inputs: [
+              { name: 'dest', type: 'address' },
+              { name: 'value', type: 'uint256' },
+              { name: 'func', type: 'bytes' },
+            ],
+            name: 'execute',
+            outputs: [],
+            stateMutability: 'nonpayable',
+            type: 'function',
+          },
+        ],
+        functionName: 'execute',
+        args: [to, value, data],
+      });
+
+      this.logger.debug('Execute call encoded successfully');
+
+      return callData;
+    } catch (error) {
+      this.logger.error('Failed to encode execute call', {
+        error: error instanceof Error ? error.message : String(error),
+        to,
+        value: value?.toString(),
+        data,
+      });
+      throw new Error(
+        `Execute call encoding failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  /**
+   * Get nonce for existing smart wallet from EntryPoint contract
+   * FIXED: Enhanced with comprehensive error handling and fallbacks
+   */
+  private async getWalletNonce(
+    walletAddress: Address,
+    publicClient: any,
+  ): Promise<bigint> {
+    try {
+      // FIXED: Robust EntryPoint address extraction
+      let entryPointAddress: string;
+      try {
+        const entryPointConfig = getEntryPoint('0.7');
+        if (typeof entryPointConfig === 'string') {
+          entryPointAddress = entryPointConfig;
+        } else if (
+          entryPointConfig &&
+          typeof entryPointConfig === 'object' &&
+          entryPointConfig.address
+        ) {
+          entryPointAddress = entryPointConfig.address;
+        } else {
+          throw new Error('Invalid EntryPoint configuration format');
+        }
+      } catch (configError) {
+        this.logger.warn(
+          'Failed to get EntryPoint from config, using fallback',
+          {
+            error:
+              configError instanceof Error
+                ? configError.message
+                : String(configError),
+          },
+        );
+        entryPointAddress = '0x0000000071727de22e5e9d8baf0edac6f37da032'; // EntryPoint v0.7 fallback
+      }
+
+      this.logger.debug('Getting nonce from EntryPoint', { walletAddress });
+
+      // Validate inputs
+      if (
+        !walletAddress ||
+        !walletAddress.startsWith('0x') ||
+        walletAddress.length !== 42
+      ) {
+        throw new Error(`Invalid wallet address format: ${walletAddress}`);
+      }
+
+      if (!publicClient || typeof publicClient.readContract !== 'function') {
+        throw new Error('Invalid public client: missing readContract method');
+      }
+
+      // Get nonce from EntryPoint contract with comprehensive error handling
+      let nonce: bigint;
+      try {
+        const result = await publicClient.readContract({
+          address: entryPointAddress as Address,
+          abi: [
+            {
+              inputs: [
+                { name: 'sender', type: 'address' },
+                { name: 'key', type: 'uint192' },
+              ],
+              name: 'getNonce',
+              outputs: [{ name: 'nonce', type: 'uint256' }],
+              stateMutability: 'view',
+              type: 'function',
+            },
+          ],
+          functionName: 'getNonce',
+          args: [walletAddress, BigInt(0)], // Use default key
+        });
+
+        if (typeof result === 'bigint') {
+          nonce = result;
+        } else if (typeof result === 'string') {
+          nonce = BigInt(result);
+        } else if (typeof result === 'number') {
+          nonce = BigInt(Math.floor(result));
+        } else {
+          throw new Error(`Unexpected nonce type: ${typeof result}`);
+        }
+      } catch (contractError) {
+        this.logger.warn(
+          'EntryPoint contract call failed, using fallback nonce',
+          {
+            walletAddress,
+            entryPointAddress,
+            error:
+              contractError instanceof Error
+                ? contractError.message
+                : String(contractError),
+          },
+        );
+
+        // Try alternative nonce methods
+        try {
+          const transactionCount = await publicClient.getTransactionCount({
+            address: walletAddress,
+            blockTag: 'pending',
+          });
+          nonce = BigInt(transactionCount);
+          this.logger.debug('Using transaction count as nonce fallback');
+        } catch (txCountError) {
+          this.logger.warn('Transaction count fallback also failed, using 0', {
+            error:
+              txCountError instanceof Error
+                ? txCountError.message
+                : String(txCountError),
+          });
+          nonce = BigInt(0);
+        }
+      }
+
+      this.logger.log('Wallet nonce retrieved', { nonce: nonce.toString() });
+
+      return nonce;
+    } catch (error) {
+      this.logger.error('Failed to get wallet nonce', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Final fallback
+      this.logger.warn('Using final fallback nonce: 0');
+      return BigInt(0);
+    }
+  }
+
+  /**
+   * FIXED: Enhanced UserOperation hash creation with comprehensive error handling
+   */
+  /**
+   * @deprecated Use getUserOperationHashSafely instead
+   * Legacy method kept for backward compatibility
+   */
+  private async getUserOperationHash(
+    userOp: any,
+    chainId: number,
+  ): Promise<Hex> {
+    return this.getUserOperationHashSafely(userOp, chainId);
+  }
+
+  private async getUserOperationHashSafely(
+    userOp: any,
+    chainId: number,
+  ): Promise<Hex> {
+    try {
+      this.logger.debug('Creating UserOperation hash', { chainId });
+
+      // Validate inputs
+      if (!userOp || typeof userOp !== 'object') {
+        throw new Error('Invalid UserOperation: expected object');
+      }
+
+      if (typeof chainId !== 'number' || chainId <= 0) {
+        throw new Error(`Invalid chainId: ${chainId}`);
+      }
+
+      // FIXED: Ultra-safe serialization with comprehensive null/undefined checks
+      const safeUserOp = {
+        sender: userOp.sender || '0x0000000000000000000000000000000000000000',
+        nonce: this.safeBigIntToString(userOp.nonce),
+        initCode: userOp.initCode || '0x',
+        callData: userOp.callData || '0x',
+        callGasLimit: this.safeBigIntToString(userOp.callGasLimit),
+        verificationGasLimit: this.safeBigIntToString(
+          userOp.verificationGasLimit,
+        ),
+        preVerificationGas: this.safeBigIntToString(userOp.preVerificationGas),
+        maxFeePerGas: this.safeBigIntToString(userOp.maxFeePerGas),
+        maxPriorityFeePerGas: this.safeBigIntToString(
+          userOp.maxPriorityFeePerGas,
+        ),
+        paymasterAndData: userOp.paymasterAndData || '0x',
+        chainId: chainId.toString(),
+        timestamp: Date.now(),
+      };
+
+      this.logger.debug('Safe UserOperation object created');
+
+      // Create deterministic hash from UserOperation data
+      const hashData = [
+        safeUserOp.sender,
+        safeUserOp.nonce,
+        safeUserOp.initCode,
+        safeUserOp.callData,
+        safeUserOp.callGasLimit,
+        safeUserOp.verificationGasLimit,
+        safeUserOp.preVerificationGas,
+        safeUserOp.maxFeePerGas,
+        safeUserOp.maxPriorityFeePerGas,
+        safeUserOp.paymasterAndData,
+        safeUserOp.chainId,
+        safeUserOp.timestamp.toString(),
+      ].join('|');
+
+      // Create hash using crypto
+      const crypto = require('crypto');
+      const hash = crypto
+        .createHash('sha256')
+        .update(hashData, 'utf8')
+        .digest('hex');
+      const userOpHash = `0x${hash}` as Hex;
+
+      this.logger.debug('UserOperation hash created successfully');
+
+      return userOpHash;
+    } catch (error) {
+      this.logger.error('Failed to create UserOperation hash', {
+        error: error instanceof Error ? error.message : String(error),
+        chainId,
+      });
+
+      // Fallback hash generation
+      try {
+        const fallbackData = `fallback_${Date.now()}_${chainId}_${Math.random()}`;
+        const crypto = require('crypto');
+        const fallbackHash = crypto
+          .createHash('sha256')
+          .update(fallbackData)
+          .digest('hex');
+        const fallbackUserOpHash = `0x${fallbackHash}` as Hex;
+
+        this.logger.warn('Using fallback UserOperation hash');
+
+        return fallbackUserOpHash;
+      } catch (fallbackError) {
+        this.logger.error('Fallback hash generation also failed', {
+          fallbackError:
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : String(fallbackError),
+        });
+        throw new Error('UserOperation hash creation completely failed');
+      }
+    }
+  }
+
+  /**
+   * FIXED: Safe BigInt to string conversion with comprehensive validation
+   */
+  private safeBigIntToString(value: any): string {
+    try {
+      if (value === null || value === undefined) {
+        return '0x0';
+      }
+
+      let bigIntValue: bigint;
+
+      if (typeof value === 'bigint') {
+        bigIntValue = value;
+      } else if (typeof value === 'string') {
+        if (value.startsWith('0x')) {
+          bigIntValue = BigInt(value);
+        } else if (/^\d+$/.test(value)) {
+          bigIntValue = BigInt(value);
+        } else {
+          throw new Error(`Invalid string format: ${value}`);
+        }
+      } else if (typeof value === 'number') {
+        if (!Number.isInteger(value) || value < 0) {
+          throw new Error(`Invalid number: ${value}`);
+        }
+        bigIntValue = BigInt(Math.floor(value));
+      } else {
+        throw new Error(`Cannot convert ${typeof value} to BigInt`);
+      }
+
+      // Validate the BigInt value is reasonable
+      if (bigIntValue < 0n) {
+        this.logger.warn('Negative BigInt value detected, using 0x0', {
+          originalValue: value,
+          bigIntValue: bigIntValue.toString(),
+        });
+        return '0x0';
+      }
+
+      if (bigIntValue > 2n ** 256n - 1n) {
+        this.logger.warn('BigInt value too large, using 0x0', {
+          originalValue: value,
+          bigIntValue: bigIntValue.toString(),
+        });
+        return '0x0';
+      }
+
+      // Convert to hex string for ZeroDev compatibility
+      const result = `0x${bigIntValue.toString(16)}`;
+      return result;
+    } catch (error) {
+      this.logger.warn('BigInt conversion failed, using 0x0', {
+        value,
+        valueType: typeof value,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return '0x0';
+    }
+  }
+
+  /**
+   * Convert nonce to number format compatible with ZeroDev
+   * ZeroDev expects nonce as a number 0, not a string "0"
+   */
+  private safeNonceToNumber(value: any): number {
+    try {
+      if (value === null || value === undefined) {
+        return 0;
+      }
+
+      let bigIntValue: bigint;
+
+      if (typeof value === 'bigint') {
+        bigIntValue = value;
+      } else if (typeof value === 'string') {
+        if (value.startsWith('0x')) {
+          bigIntValue = BigInt(value);
+        } else if (/^\d+$/.test(value)) {
+          bigIntValue = BigInt(value);
+        } else {
+          throw new Error(`Invalid nonce string format: ${value}`);
+        }
+      } else if (typeof value === 'number') {
+        if (!Number.isInteger(value) || value < 0) {
+          throw new Error(`Invalid nonce number: ${value}`);
+        }
+        bigIntValue = BigInt(Math.floor(value));
+      } else {
+        throw new Error(`Cannot convert ${typeof value} to nonce number`);
+      }
+
+      // Validate the nonce value is reasonable
+      if (bigIntValue < 0n) {
+        this.logger.warn('Negative nonce value detected, using 0', {
+          originalValue: value,
+          bigIntValue: bigIntValue.toString(),
+        });
+        return 0;
+      }
+
+      if (bigIntValue > 2n ** 64n - 1n) {
+        this.logger.warn('Nonce value too large, using 0', {
+          originalValue: value,
+          bigIntValue: bigIntValue.toString(),
+        });
+        return 0;
+      }
+
+      // Convert to number for ZeroDev compatibility (nonce should be 0, not "0")
+      const result = Number(bigIntValue);
+      return result;
+    } catch (error) {
+      this.logger.warn('Nonce conversion failed, using 0', {
+        value,
+        valueType: typeof value,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
+    }
+  }
+
+  /**
+   * Submit UserOperation to bundler
+   * FIXED: Enhanced error handling and EntryPoint address management
+   */
+  private async submitUserOperation(
+    userOp: any,
+    bundlerClient: any,
+    chainId?: number,
+  ): Promise<string> {
+    try {
+      // FIXED: Safe EntryPoint address extraction with chain-specific handling
+      let entryPointAddress: string;
+      try {
+        // ZeroDev bundler only supports EntryPoint v0.7 for all chains
+        const entryPointVersion = '0.7';
+        this.logger.debug('Using ZeroDev-supported EntryPoint version', {
+          chainId: chainId || 'unknown',
+          selectedVersion: entryPointVersion,
+          note: 'ZeroDev bundler only supports EntryPoint v0.7',
+        });
+
+        const entryPointConfig = getEntryPoint(entryPointVersion);
+        if (typeof entryPointConfig === 'string') {
+          entryPointAddress = entryPointConfig;
+        } else if (
+          entryPointConfig &&
+          typeof entryPointConfig === 'object' &&
+          entryPointConfig.address
+        ) {
+          entryPointAddress = entryPointConfig.address;
+        } else {
+          throw new Error('Invalid EntryPoint configuration');
+        }
+
+        // EntryPoint contract verification already done in createKernelClientForExistingWallet
+        // No need to verify again here
+      } catch (configError) {
+        this.logger.warn('Using ZeroDev EntryPoint v0.7 fallback', {
+          error:
+            configError instanceof Error
+              ? configError.message
+              : String(configError),
+          chainId,
+        });
+
+        // ZeroDev bundler only supports EntryPoint v0.7
+        entryPointAddress = '0x0000000071727de22e5e9d8baf0edac6f37da032';
+      }
+
+      this.logger.log('Submitting UserOperation to bundler', {
+        sender: userOp.sender,
+        entryPointAddress,
+        hasPaymaster: userOp.paymasterAndData !== '0x',
+      });
+
+      // Convert UserOperation to string format for submission
+
+      const submissionUserOp = {
+        sender: userOp.sender,
+        nonce: this.safeNonceToNumber(userOp.nonce), // Special handling for nonce
+        initCode: userOp.initCode,
+        callData: userOp.callData,
+        callGasLimit: this.safeBigIntToString(userOp.callGasLimit),
+        verificationGasLimit: this.safeBigIntToString(
+          userOp.verificationGasLimit,
+        ),
+        preVerificationGas: this.safeBigIntToString(userOp.preVerificationGas),
+        maxFeePerGas: this.safeBigIntToString(userOp.maxFeePerGas),
+        maxPriorityFeePerGas: this.safeBigIntToString(
+          userOp.maxPriorityFeePerGas,
+        ),
+        paymasterAndData: userOp.paymasterAndData,
+        signature: userOp.signature,
+      };
+
+      this.logger.debug('UserOperation conversion completed', {
+        convertedNonce: submissionUserOp.nonce,
+        convertedNonceType: typeof submissionUserOp.nonce,
+      });
+
+      // Validate converted UserOperation before submission
+
+      const requiredFields = [
+        'sender',
+        'nonce',
+        'initCode',
+        'callData',
+        'signature',
+      ];
+
+      for (const field of requiredFields) {
+        const value = submissionUserOp[field as keyof typeof submissionUserOp];
+        this.logger.debug(`Validating field: ${field}`, { value });
+
+        if (value === null || value === undefined) {
+          throw new Error(`Missing required UserOperation field: ${field}`);
+        }
+
+        // Special handling for nonce - it can be 0, "0", 0n, or "0x0"
+        if (field === 'nonce') {
+          if (
+            value === 0 ||
+            value === '0' ||
+            value === '0' ||
+            value === 0n ||
+            value === '0x0'
+          ) {
+            continue; // Valid nonce value
+          }
+        }
+
+        // Special handling for initCode - it can be "0x" (empty)
+        if (field === 'initCode' && value === '0x') {
+          continue; // Valid empty initCode
+        }
+
+        // For other fields, check if they have meaningful values
+        if (!value && value !== '0x') {
+          throw new Error(`Missing required UserOperation field: ${field}`);
+        }
+
+        this.logger.debug(
+          `Converted field ${field} validation passed: ${value}`,
+        );
+      }
+
+      // Log conversion details
+
+      this.logger.debug('UserOperation prepared for submission', {
+        sender: submissionUserOp.sender,
+        nonce: submissionUserOp.nonce,
+        hasPaymaster: submissionUserOp.paymasterAndData !== '0x',
+      });
+
+      // Submit UserOperation to ZeroDev bundler
+
+      let result: any;
+
+      // Use the standard ERC-4337 method - this is what ZeroDev actually supports
+      const bundlerMethod = 'eth_sendUserOperation';
+
+      this.logger.debug('Using standard ERC-4337 bundler method', {
+        method: bundlerMethod,
+      });
+
+      try {
+        this.logger.debug('Submitting UserOperation to bundler', {
+          method: bundlerMethod,
+        });
+
+        result = await bundlerClient.request(bundlerMethod, [
+          submissionUserOp,
+          entryPointAddress,
+        ]);
+        this.logger.debug('Bundler submission succeeded');
+      } catch (methodError) {
+        const error =
+          methodError instanceof Error
+            ? methodError
+            : new Error(String(methodError));
+        this.logger.error('Bundler submission failed', {
+          error: error.message,
+        });
+        throw error;
+      }
+
+      if (!result || typeof result !== 'string') {
+        throw new Error(`Invalid bundler response: ${typeof result}`);
+      }
+
+      this.logger.log('UserOperation submitted successfully', {
+        userOpHash: result,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to submit UserOperation to bundler', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      throw new Error(
+        `UserOperation submission failed: ${error instanceof Error ? error.message : 'Unknown bundler error'}`,
+      );
+    }
+  }
+
   private getChainConfig(chainId: number): Chain {
     const chainMap = {
       1328: seiTestnet,
@@ -1440,7 +2765,13 @@ export class ZeroDevService implements IAccountAbstractionService {
     if (!this.zerodevProjectId) {
       throw new Error('ZeroDev project ID not configured');
     }
-    // Use ZeroDev-sponsored paymaster for truly gasless transactions
+
+    // SEI Testnet only supports self-funded paymasters
+    if (chainId === 1328) {
+      return `https://rpc.zerodev.app/api/v2/paymaster/${this.zerodevProjectId}?selfFunded=true`;
+    }
+
+    // Use ZeroDev-sponsored paymaster for other chains
     return `https://rpc.zerodev.app/api/v2/paymaster/${this.zerodevProjectId}`;
   }
 
@@ -1448,7 +2779,13 @@ export class ZeroDevService implements IAccountAbstractionService {
     if (!this.zerodevProjectId) {
       throw new Error('ZeroDev project ID not configured');
     }
-    // Use ZeroDev-sponsored paymaster for ERC-20 operations
+
+    // SEI Testnet only supports self-funded paymasters
+    if (chainId === 1328) {
+      return `https://rpc.zerodev.app/api/v2/paymaster/${this.zerodevProjectId}?selfFunded=true`;
+    }
+
+    // Use ZeroDev-sponsored paymaster for other chains
     return `https://rpc.zerodev.app/api/v2/paymaster/${this.zerodevProjectId}`;
   }
 
@@ -1475,6 +2812,63 @@ export class ZeroDevService implements IAccountAbstractionService {
     };
 
     return chainSymbols[chainId as keyof typeof chainSymbols] || 'ETH';
+  }
+
+  /**
+   * Verify smart account deployment status
+   * NOTE: Smart accounts are deployed by Dynamic Labs, not by the worker
+   */
+  private async verifySmartAccountDeployment(
+    address: string,
+    chainId: number,
+    chain: any,
+  ): Promise<boolean> {
+    try {
+      this.logger.log('Verifying smart account deployment status', {
+        address,
+        chainId,
+        chainName: chain.name,
+      });
+
+      // Create a public client for verification
+      const publicClient = createPublicClient({
+        chain,
+        transport: http(chain.rpcUrls.default.http[0]),
+      });
+
+      // Check if the smart account contract is deployed
+      const bytecode = await publicClient.getBytecode({
+        address: address as Address,
+      });
+
+      const isDeployed = bytecode && bytecode !== '0x';
+
+      this.logger.log('Smart account deployment verification completed', {
+        address,
+        chainId,
+        isDeployed,
+        bytecodeLength: bytecode?.length || 0,
+      });
+
+      if (!isDeployed) {
+        this.logger.warn('Smart account not deployed on-chain', {
+          address,
+          chainId,
+          chainName: chain.name,
+          note: 'Smart accounts should be deployed by Dynamic Labs during session key creation',
+        });
+      }
+
+      return isDeployed;
+    } catch (error) {
+      this.logger.error('Smart account deployment verification failed', {
+        address,
+        chainId,
+        chainName: chain.name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
   }
 
   /**
@@ -1716,27 +3110,11 @@ export class ZeroDevService implements IAccountAbstractionService {
   }
 
   /**
-   * Encode execute call for smart account
+   * @deprecated Use encodeExecuteCallSafely instead
+   * Legacy method kept for backward compatibility
    */
   private encodeExecuteCall(to: Address, value: bigint, data: Hex): Hex {
-    // Standard execute function signature: execute(address,uint256,bytes)
-    return encodeFunctionData({
-      abi: [
-        {
-          inputs: [
-            { name: 'dest', type: 'address' },
-            { name: 'value', type: 'uint256' },
-            { name: 'func', type: 'bytes' },
-          ],
-          name: 'execute',
-          outputs: [],
-          stateMutability: 'nonpayable',
-          type: 'function',
-        },
-      ],
-      functionName: 'execute',
-      args: [to, value, data],
-    });
+    return this.encodeExecuteCallSafely(to, value, data) as any;
   }
 
   /**

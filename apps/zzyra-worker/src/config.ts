@@ -53,9 +53,9 @@ export const AA_CONFIG = {
   bundlerUrl: (chainId: number = 1328) =>
     `https://api.pimlico.io/v2/${chainId}/rpc?apikey=${process.env.PIMLICO_API_KEY || 'pim_M6HVTohns99VGporUxitbs'}`,
 
-  // EntryPoint v0.6 for better compatibility
+  // EntryPoint v0.7 for ZeroDev SDK v5.4.41 compatibility
   entryPointAddress:
-    process.env.AA_ENTRY_POINT || '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789', // EntryPoint v0.6
+    process.env.AA_ENTRY_POINT || '0x0000000071727De22E5E9d8BAf0edAc6f37da032', // EntryPoint v0.7
 
   enabled: process.env.ENABLE_AA !== 'false', // Default enabled
 
