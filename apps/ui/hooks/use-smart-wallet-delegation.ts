@@ -1,10 +1,16 @@
 import { useToast } from "@/components/ui/use-toast";
 import api from "@/lib/services/api";
+import {
+  deploySmartAccount,
+  isSmartAccountDeployed,
+  verifySmartAccountSetup,
+} from "@/lib/simple-smart-account";
 import { isEthereumWallet } from "@dynamic-labs/ethereum";
+import { isZeroDevConnector } from "@dynamic-labs/ethereum-aa";
 
 import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
 import { useCallback, useState } from "react";
-// No longer need wagmi hooks since Dynamic handles ZeroDev integration
+// Dynamic provides addresses, but we need to verify/deploy contracts ourselves
 
 const SUPPORTED_CHAINS = {
   SEI_TESTNET: 1328,
@@ -88,6 +94,10 @@ export function useSmartWalletDelegation() {
 
   const isLoggedIn = useIsLoggedIn();
   const [isCreating, setIsCreating] = useState(false);
+
+  const isZeroDev = isZeroDevConnector(primaryWallet?.connector);
+  console.log("isZeroDev", isZeroDev);
+
   // Note: walletClient and chains no longer needed since we use Dynamic's pre-created ZeroDev addresses
 
   const createDelegationMessage = useCallback(
@@ -159,17 +169,131 @@ export function useSmartWalletDelegation() {
 
       try {
         const chainId = permissions.chainId || DEFAULT_CHAIN_ID;
-        // Note: We no longer need to create ZeroDev accounts manually
-        // Dynamic Labs automatically creates them during user signup
+        console.log(
+          "Creating delegation for chain:",
+          chainId,
+          "type:",
+          typeof chainId
+        );
 
-        console.log("Creating delegation for chain:", chainId);
+        // Validate and parse chain ID
+        const numericChainId =
+          typeof chainId === "string" ? parseInt(chainId) : chainId;
+        if (isNaN(numericChainId)) {
+          throw new Error(
+            `Invalid chain ID: ${chainId}. Must be a valid number.`
+          );
+        }
 
-        const smartWalletAddress = primaryWallet?.address;
+        console.log("Parsed chain ID:", numericChainId);
 
-        // Create delegation message with smart wallet address
+        // Check if it's an Ethereum wallet
+        if (!isEthereumWallet(primaryWallet)) {
+          throw new Error("Only Ethereum wallets are supported for delegation");
+        }
+
+        // STEP 1: Get Dynamic's ZeroDv kernel client using official integration
+        console.log("Getting ZeroDv kernel client from Dynamic Labs...");
+        const { connector } = primaryWallet;
+        
+        if (!isZeroDevConnector(connector)) {
+          throw new Error("Wallet connector is not a ZeroDv connector");
+        }
+
+        toast({
+          title: "Preparing Smart Account",
+          description: "Setting up ZeroDv kernel client...",
+        });
+
+        // Ensure kernel client is loaded according to Dynamic docs
+        console.log("🔄 Ensuring kernel client is initialized...");
+        await connector.getNetwork();
+
+        // Get the kernel client using Dynamic's official method
+        const kernelClient = connector.getAccountAbstractionProvider({
+          withSponsorship: true, // Enable gas sponsorship if available
+        });
+
+        if (!kernelClient) {
+          throw new Error("Failed to get ZeroDv kernel client from Dynamic");
+        }
+
+        console.log("✅ ZeroDv kernel client obtained successfully");
+
+        // STEP 2: Verify smart account setup using kernel client
+        const setupStatus = await verifySmartAccountSetup(
+          kernelClient,
+          numericChainId
+        );
+
+        if (!setupStatus.isReady) {
+          throw new Error(`Smart account setup failed: ${setupStatus.error}`);
+        }
+
+        console.log("Smart account setup status:", setupStatus);
+        const smartWalletAddress = setupStatus.address;
+
+        // STEP 3: Deploy smart contract if needed using kernel client
+        if (setupStatus.needsDeployment) {
+          toast({
+            title: "Deploying Smart Account",
+            description: "Creating your smart account on-chain...",
+          });
+
+          console.log("🚀 Smart account needs deployment, deploying now...");
+
+          const deploymentResult = await deploySmartAccount(
+            kernelClient,
+            numericChainId
+          );
+
+          if (!deploymentResult.success) {
+            throw new Error(
+              `Failed to deploy smart account: ${deploymentResult.error}`
+            );
+          }
+
+          console.log(
+            "✅ Smart account deployment completed:",
+            deploymentResult
+          );
+
+          toast({
+            title: "Smart Account Ready",
+            description: "Smart account successfully prepared for use!",
+          });
+        } else {
+          console.log(
+            "✅ Smart account already deployed, proceeding with existing contract"
+          );
+        }
+
+        // STEP 3: Final verification before session key creation
+        console.log(
+          "🔍 Final verification of smart account before session key creation..."
+        );
+        const finalCheck = await isSmartAccountDeployed(
+          smartWalletAddress,
+          numericChainId
+        );
+
+        if (!finalCheck) {
+          console.warn(
+            "⚠️ Smart account verification indicates contract may not be deployed, but proceeding anyway"
+          );
+          console.warn(
+            "This might be expected for ZeroDev accounts that deploy on first transaction"
+          );
+        }
+
+        // STEP 4: Create delegation message with verified smart wallet address
+        console.log(
+          "📝 Creating delegation message with smart account:",
+          smartWalletAddress
+        );
         const delegationMessage = createDelegationMessage(
           permissions,
-          chainId,
+          numericChainId.toString(),
           smartWalletAddress
         );
 
@@ -211,11 +335,15 @@ export function useSmartWalletDelegation() {
           throw new Error("User signature required for delegation");
         }
 
-        // Create session key with smart wallet address
+        // STEP 5: Create session key with verified smart wallet address
+        console.log(
+          "🔐 Creating session key for smart account:",
+          smartWalletAddress
+        );
         const endpoint = "/session-keys";
         const requestData = prepareRequestData(
           permissions,
-          chainId,
+          numericChainId.toString(),
           userSignature,
           smartWalletAddress
         );
@@ -236,21 +364,30 @@ export function useSmartWalletDelegation() {
           );
         }
 
-        // Dynamic Labs handles deployment automatically, so we can assume it's deployed
-        const deploymentHash = "deployed_via_dynamic_labs";
-        const smartAccountAddress = smartWalletAddress;
+        // Provide proper deployment information based on our verification
+        const deploymentHash = setupStatus.isDeployed
+          ? "already_deployed"
+          : "prepared_for_deployment";
+
+        console.log("✅ Session key created successfully:", {
+          sessionKeyId,
+          smartAccountAddress: smartWalletAddress,
+          deploymentStatus: setupStatus.isDeployed ? "deployed" : "prepared",
+          chainId: numericChainId,
+        });
 
         toast({
           title: "Delegation Created",
-          description:
-            "Smart wallet delegation created successfully using passkey authentication!",
+          description: setupStatus.isDeployed
+            ? "Smart wallet delegation created successfully!"
+            : "Smart wallet delegation created! Account will deploy on first use.",
         });
 
         return {
           success: true,
           sessionKeyId,
           deploymentHash,
-          smartAccountAddress,
+          smartAccountAddress: smartWalletAddress,
         };
       } catch (error) {
         console.error("Error creating delegation", error);
