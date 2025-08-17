@@ -9,7 +9,4 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-  [plugins.inputs]
-    enableStaticImageImport = true
-    enableImageOptimization = false
-    enableMinification = true
+  
