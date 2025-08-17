@@ -1,13 +1,15 @@
 [build]
-  # Base directory is the root of the monorepo where dependencies are installed
-  base = ""
-  # Command to install dependencies and build the Next.js app in apps/ui
-  command = "pnpm install && pnpm run build && cd apps/ui "
-  # Publish directory is the Next.js output directory in apps/ui
+  command = "pnpm install && pnpm run build && cd apps/ui"
   publish = "apps/ui/.next"
-  # Use Node.js 20 for compatibility with modern Next.js versions
-  environment = { NODE_VERSION = "20" }
+
+[build.environment]
+  NODE_OPTIONS = "--max-old-space-size=8192"
+  NODE_ENV = "production"
+  NEXT_TELEMETRY_DISABLED = "1"
 
 [[plugins]]
-  # Essential Next.js plugin for server-side rendering and other features
   package = "@netlify/plugin-nextjs"
+  [plugins.inputs]
+    enableStaticImageImport = true
+    enableImageOptimization = false
+    enableMinification = true
