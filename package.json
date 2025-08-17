@@ -22,7 +22,7 @@
   ],
   "scripts": {
     "dev": "turbo run dev --parallel",
-    "build": "turbo run build",
+    "build": "npx turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "dev:ui": "turbo run dev --filter zzyra-web3-automation",
