@@ -18,73 +18,75 @@ const nextConfig = {
     unoptimized: true,
   },
 
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => {
     if (!isServer) {
+      // Enhanced polyfills for Dynamic Labs + ZeroDv compatibility
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        "@react-native-async-storage/async-storage": false,
         crypto: require.resolve("crypto-browserify"),
         stream: require.resolve("stream-browserify"),
+        buffer: require.resolve("buffer"),
         process: require.resolve("process/browser"),
+        vm: false,
+        fs: false,
+        net: false,
+        tls: false,
+        // Dynamic Labs specific polyfills
+        "react-native-sqlite-storage": false,
+        "@react-native-async-storage/async-storage": false,
+      };
+
+      // Add required plugins for crypto compatibility
+      config.plugins.push(
+        new webpack.ProvidePlugin({
+          Buffer: ["buffer", "Buffer"],
+          process: "process/browser",
+        })
+      );
+
+      // Resolve module issues with Dynamic Labs
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "react-native$": "react-native-web",
       };
     }
-    config.externals.push("pino-pretty", "lokijs", "encoding");
+
+    // Externalize problematic packages
+    config.externals.push(
+      "pino-pretty",
+      "lokijs",
+      "encoding",
+      "@walletconnect/safe-json"
+    );
+
+    // Fix module resolution for AA packages
+    config.module.rules.push({
+      test: /\.m?js$/,
+      resolve: {
+        fullySpecified: false,
+      },
+    });
+
     return config;
   },
 
   experimental: {
-    optimizeCss: false, // Disable CSS optimization to fix critters issue
+    // Optimize package imports for faster builds
     optimizePackageImports: [
       "lucide-react",
-      "framer-motion",
-      "wagmi",
       "@dynamic-labs/sdk-react-core",
       "@radix-ui/react-icons",
       "@tanstack/react-query",
-      "@dynamic-labs/ethereum",
-      "@dynamic-labs/ethereum-aa",
-      "@dynamic-labs/wagmi-connector",
     ],
+    // Fix for Dynamic Labs SSR issues
+    esmExternals: "loose",
   },
 
-  // Enable compression for better performance
+  // Enable compression
   compress: true,
   poweredByHeader: false,
 
-  // Configure webpack to optimize bundle size
-  // webpack: (config, { isServer }) => {
-  //   // Split chunks more aggressively
-  //   if (!isServer) {
-  //     config.optimization.splitChunks = {
-  //       chunks: "all",
-  //       maxInitialRequests: 30,
-  //       maxAsyncRequests: 30,
-  //       minSize: 20000,
-  //       cacheGroups: {
-  //         framework: {
-  //           test: /[\\/]node_modules[\\/](react|react-dom|next|wagmi|viem)[\\/]/,
-  //           name: "framework",
-  //           priority: 40,
-  //           chunks: "all",
-  //         },
-  //         commons: {
-  //           test: /[\\/]node_modules[\\/]/,
-  //           name: "commons",
-  //           priority: 30,
-  //           chunks: "all",
-  //         },
-  //         lib: {
-  //           test: /[\\/]node_modules[\\/](framer-motion|@tanstack|styled-components)[\\/]/,
-  //           name: "lib",
-  //           priority: 20,
-  //           chunks: "all",
-  //         },
-  //       },
-  //     };
-  //   }
-  //   return config;
-  // },
-
+  // PostHog rewrites (keeping existing)
   async rewrites() {
     return [
       {
@@ -101,7 +103,6 @@ const nextConfig = {
       },
     ];
   },
-  // This is required to support PostHog trailing slash API requests
   skipTrailingSlashRedirect: true,
 };
 
