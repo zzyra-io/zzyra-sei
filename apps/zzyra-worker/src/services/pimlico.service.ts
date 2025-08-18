@@ -1,29 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  createPublicClient,
-  createWalletClient,
-  http,
-  parseEther,
   Address,
-  parseUnits,
+  createPublicClient,
   encodeFunctionData,
-  Hex,
-  toHex,
-  keccak256,
   encodePacked,
+  Hex,
+  http,
+  keccak256,
+  parseEther,
+  parseUnits,
+  toHex,
 } from 'viem';
-import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
-import { sepolia, base, baseSepolia, seiTestnet } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
+import { base, baseSepolia, seiTestnet, sepolia } from 'viem/chains';
 import { IAccountAbstractionService } from './blockchain/base/IBlockchainService';
 import {
   TransactionRequest as BlockchainTransactionRequest,
   TransactionResult as BlockchainTransactionResult,
-  GasEstimate,
   ChainConfig,
+  GasEstimate,
 } from './blockchain/types/blockchain.types';
 
-// EntryPoint v0.7 address (required for ZeroDev SDK v5.4.41 compatibility)
-const ENTRYPOINT_ADDRESS_V07 = '0x0000000071727De22E5E9d8BAf0edAc6f37da032';
+// EntryPoint v0.6 address (required for session key validator compatibility)
+const ENTRYPOINT_ADDRESS_V06 = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789';
 
 // SimpleAccount factory address for v0.7 (canonical)
 const SIMPLE_ACCOUNT_FACTORY = '0x5de4839a76cf55d0c90e2061ef4386d962E15ae3';
@@ -191,7 +190,7 @@ export class PimlicoService implements IAccountAbstractionService {
 
       // Take the last 20 bytes and convert to address
       const calculatedAddress = `0x${address.slice(26)}` as Address;
-      
+
       this.logger.log('✅ Calculated smart account address using CREATE2', {
         owner,
         salt,
@@ -262,7 +261,7 @@ export class PimlicoService implements IAccountAbstractionService {
         deploymentRequired,
         chainId: config.chainId,
         factory: SIMPLE_ACCOUNT_FACTORY,
-        entryPoint: ENTRYPOINT_ADDRESS_V07,
+        entryPoint: ENTRYPOINT_ADDRESS_V06,
       });
 
       return {
@@ -275,7 +274,7 @@ export class PimlicoService implements IAccountAbstractionService {
           address: smartAccountAddress,
           owner: owner.address,
           factory: SIMPLE_ACCOUNT_FACTORY,
-          entryPoint: ENTRYPOINT_ADDRESS_V07,
+          entryPoint: ENTRYPOINT_ADDRESS_V06,
         },
       };
     } catch (error) {
@@ -635,7 +634,7 @@ export class PimlicoService implements IAccountAbstractionService {
     // Sign the user operation
     const userOpHash = this.getUserOperationHash(
       userOp,
-      ENTRYPOINT_ADDRESS_V07,
+      ENTRYPOINT_ADDRESS_V06,
       transaction.chainId,
     );
 
@@ -722,7 +721,7 @@ export class PimlicoService implements IAccountAbstractionService {
         jsonrpc: '2.0',
         id: 1,
         method: 'eth_sendUserOperation',
-        params: [userOp, ENTRYPOINT_ADDRESS_V07],
+        params: [userOp, ENTRYPOINT_ADDRESS_V06],
       }),
     });
 
@@ -998,12 +997,12 @@ export class PimlicoService implements IAccountAbstractionService {
           const accountEntryPoint = '0x' + entryPointCall.data.slice(-40);
           const isEntryPointMatch =
             accountEntryPoint.toLowerCase() ===
-            ENTRYPOINT_ADDRESS_V07.toLowerCase();
+            ENTRYPOINT_ADDRESS_V06.toLowerCase();
 
           this.logger.debug('Smart account entryPoint call', {
             success: true,
             accountEntryPoint,
-            ourEntryPoint: ENTRYPOINT_ADDRESS_V07,
+            ourEntryPoint: ENTRYPOINT_ADDRESS_V06,
             isEntryPointMatch,
             rawResult: entryPointCall.data,
           });
@@ -1013,7 +1012,7 @@ export class PimlicoService implements IAccountAbstractionService {
               'CRITICAL: Smart account uses different EntryPoint!',
               {
                 accountEntryPoint,
-                ourEntryPoint: ENTRYPOINT_ADDRESS_V07,
+                ourEntryPoint: ENTRYPOINT_ADDRESS_V06,
                 smartAccountAddress,
                 chainId,
               },
@@ -1066,7 +1065,7 @@ export class PimlicoService implements IAccountAbstractionService {
           smartAccountAddress,
           sessionKeyAddress,
           chainId,
-          entryPoint: ENTRYPOINT_ADDRESS_V07,
+          entryPoint: ENTRYPOINT_ADDRESS_V06,
         },
       });
     } catch (error) {
@@ -1090,7 +1089,7 @@ export class PimlicoService implements IAccountAbstractionService {
     try {
       this.logger.debug('Running paymaster diagnostics', {
         paymasterUrl: paymasterUrl.split('?')[0], // Remove API key
-        entryPoint: ENTRYPOINT_ADDRESS_V07,
+        entryPoint: ENTRYPOINT_ADDRESS_V06,
         chainId,
         sender: userOp.sender,
       });
@@ -1099,16 +1098,16 @@ export class PimlicoService implements IAccountAbstractionService {
       const currentResult = await this.testPaymasterWithEntryPoint(
         userOp,
         paymasterUrl,
-        ENTRYPOINT_ADDRESS_V07,
+        ENTRYPOINT_ADDRESS_V06,
         'Current EntryPoint (v0.6)',
       );
 
-      // Test 2: Try v0.7 EntryPoint address
-      const v07Result = await this.testPaymasterWithEntryPoint(
+      // Test 2: Try v0.6 EntryPoint address
+      const v06Result = await this.testPaymasterWithEntryPoint(
         userOp,
         paymasterUrl,
-        '0x0000000071727De22E5E9d8BAf0edAc6f37da032', // v0.7
-        'EntryPoint v0.7',
+        '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789', // v0.6
+        'EntryPoint v0.6',
       );
 
       // Test 3: Check Pimlico's supported EntryPoints
@@ -1120,15 +1119,15 @@ export class PimlicoService implements IAccountAbstractionService {
           currentResult.paymasterAddress,
           chainId,
         );
-      } else if (v07Result.paymasterAddress) {
-        await this.checkPaymasterBalance(v07Result.paymasterAddress, chainId);
+      } else if (v06Result.paymasterAddress) {
+        await this.checkPaymasterBalance(v06Result.paymasterAddress, chainId);
       }
 
       this.logger.debug('Paymaster diagnostics completed', {
         currentEntryPointWorks: currentResult.success,
-        v07EntryPointWorks: v07Result.success,
+        v06EntryPointWorks: v06Result.success,
         hasPaymaster: !!(
-          currentResult.paymasterAddress || v07Result.paymasterAddress
+          currentResult.paymasterAddress || v06Result.paymasterAddress
         ),
         chainId,
       });
@@ -1301,9 +1300,9 @@ export class PimlicoService implements IAccountAbstractionService {
       if (result.result) {
         this.logger.debug('Pimlico supported EntryPoints', {
           supportedEntryPoints: result.result,
-          ourEntryPoint: ENTRYPOINT_ADDRESS_V07,
+          ourEntryPoint: ENTRYPOINT_ADDRESS_V06,
           isOurEntryPointSupported: result.result.includes(
-            ENTRYPOINT_ADDRESS_V07,
+            ENTRYPOINT_ADDRESS_V06,
           ),
         });
       } else {
@@ -1483,7 +1482,7 @@ export class PimlicoService implements IAccountAbstractionService {
 
       // Check if paymaster has a deposit in the EntryPoint
       const entryPointDepositCall = await publicClient.call({
-        to: ENTRYPOINT_ADDRESS_V07 as `0x${string}`,
+        to: ENTRYPOINT_ADDRESS_V06 as `0x${string}`,
         data: encodeFunctionData({
           abi: [
             {
@@ -1629,7 +1628,7 @@ export class PimlicoService implements IAccountAbstractionService {
 
       // Use the public client to make the call (not bundler)
       const result = await publicClient.call({
-        to: ENTRYPOINT_ADDRESS_V07 as `0x${string}`,
+        to: ENTRYPOINT_ADDRESS_V06 as `0x${string}`,
         data: nonceCallData as `0x${string}`,
       });
 
@@ -1649,7 +1648,7 @@ export class PimlicoService implements IAccountAbstractionService {
 
       this.logger.debug(`Retrieved nonce from EntryPoint: ${nonce}`, {
         sender,
-        entryPoint: ENTRYPOINT_ADDRESS_V07,
+        entryPoint: ENTRYPOINT_ADDRESS_V06,
         chainId,
       });
       return nonce;
@@ -1690,7 +1689,7 @@ export class PimlicoService implements IAccountAbstractionService {
           jsonrpc: '2.0',
           id: 1,
           method: 'eth_estimateUserOperationGas',
-          params: [userOp, ENTRYPOINT_ADDRESS_V07],
+          params: [userOp, ENTRYPOINT_ADDRESS_V06],
         }),
       });
 
@@ -1766,7 +1765,7 @@ export class PimlicoService implements IAccountAbstractionService {
       // ✅ FIX: Use correct Pimlico paymaster method for SEI testnet
       this.logger.debug('Requesting Pimlico paymaster sponsorship', {
         method: 'pm_sponsorUserOperation',
-        entryPoint: ENTRYPOINT_ADDRESS_V07,
+        entryPoint: ENTRYPOINT_ADDRESS_V06,
         sender: userOp.sender,
         paymasterUrl: paymasterUrl.split('?')[0], // Remove API key from logs
       });
@@ -1774,14 +1773,17 @@ export class PimlicoService implements IAccountAbstractionService {
       // Try different parameter formats for Pimlico paymaster
       const parameterFormats = [
         // Format 1: Standard Pimlico format with entryPoint
-        [userOp, { entryPoint: ENTRYPOINT_ADDRESS_V07 }],
+        [userOp, { entryPoint: ENTRYPOINT_ADDRESS_V06 }],
         // Format 2: Alternative format with sponsorshipPolicyId
-        [userOp, { 
-          entryPoint: ENTRYPOINT_ADDRESS_V07,
-          sponsorshipPolicyId: 'sp_crazy_kangaroo' // Default policy ID
-        }],
+        [
+          userOp,
+          {
+            entryPoint: ENTRYPOINT_ADDRESS_V06,
+            sponsorshipPolicyId: 'sp_crazy_kangaroo', // Default policy ID
+          },
+        ],
         // Format 3: Direct EntryPoint string
-        [userOp, ENTRYPOINT_ADDRESS_V07],
+        [userOp, ENTRYPOINT_ADDRESS_V06],
       ];
 
       let response;
@@ -1793,7 +1795,7 @@ export class PimlicoService implements IAccountAbstractionService {
             `Trying paymaster format ${i + 1} in getPaymasterData`,
             {
               format: i + 1,
-              entryPoint: ENTRYPOINT_ADDRESS_V07,
+              entryPoint: ENTRYPOINT_ADDRESS_V06,
             },
           );
 
@@ -1851,7 +1853,7 @@ export class PimlicoService implements IAccountAbstractionService {
           {
             errorCode: result.error.code,
             errorMessage: result.error.message,
-            entryPoint: ENTRYPOINT_ADDRESS_V07,
+            entryPoint: ENTRYPOINT_ADDRESS_V06,
             fullError: result.error,
             paymasterUrl: paymasterUrl.split('?')[0],
             sender: userOp.sender,
@@ -1860,8 +1862,8 @@ export class PimlicoService implements IAccountAbstractionService {
               'No sponsorship policy configured',
               'Insufficient paymaster funds',
               'UserOperation exceeds spending limits',
-              'Chain not supported for sponsorship'
-            ]
+              'Chain not supported for sponsorship',
+            ],
           },
         );
         return defaultPaymasterData;

@@ -78,8 +78,6 @@ const nextConfig = {
       "@radix-ui/react-icons",
       "@tanstack/react-query",
     ],
-    // Fix for Dynamic Labs SSR issues
-    esmExternals: "loose",
   },
 
   // Enable compression

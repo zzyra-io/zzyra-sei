@@ -115,6 +115,7 @@ export interface CreateSessionKeyRequest {
     SessionKeyPermission,
     "id" | "sessionKeyId" | "createdAt" | "updatedAt"
   >[];
+  serializedSessionParams?: string; // ZeroDv SessionKeyProvider serialized params
 }
 
 export interface CreateSessionKeyResponse {

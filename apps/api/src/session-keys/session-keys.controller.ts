@@ -1,26 +1,25 @@
 import {
-  Controller,
-  Post,
-  Get,
-  Put,
-  Delete,
   Body,
-  Param,
-  Query,
-  UseGuards,
-  Request,
-  Logger,
+  Controller,
+  Delete,
+  Get,
   HttpException,
   HttpStatus,
+  Logger,
+  Param,
+  Post,
+  Put,
+  Query,
+  Request,
 } from "@nestjs/common";
+import { SessionKeyStatus } from "@zzyra/types";
 import { Public } from "../auth/decorators/public.decorator";
+import { CreatePimlicoSessionKeyDto } from "./dto/create-pimlico-session-key.dto";
+import { CreateSessionKeyDto } from "./dto/create-session-key.dto";
+import { UpdateUsageDto } from "./dto/update-usage.dto";
+import { ValidateSessionKeyDto } from "./dto/validate-session-key.dto";
 import { SessionKeysService } from "./session-keys.service";
 import { SessionMonitoringService } from "./session-monitoring.service";
-import { CreateSessionKeyDto } from "./dto/create-session-key.dto";
-import { CreatePimlicoSessionKeyDto } from "./dto/create-pimlico-session-key.dto";
-import { ValidateSessionKeyDto } from "./dto/validate-session-key.dto";
-import { UpdateUsageDto } from "./dto/update-usage.dto";
-import { SessionKeyStatus } from "@zzyra/types";
 
 /**
  * Controller for session key management endpoints
@@ -67,6 +66,7 @@ export class SessionKeysController {
           securityLevel: createSessionKeyDto.securityLevel,
           validUntil: new Date(createSessionKeyDto.validUntil),
           permissions: createSessionKeyDto.permissions,
+          serializedSessionParams: createSessionKeyDto.serializedSessionParams, // ✅ Pass ZeroDv serialized params
         },
         createSessionKeyDto.userSignature
       );
@@ -112,7 +112,7 @@ export class SessionKeysController {
       // Validate chain ID for Pimlico support
       const chainId = parseInt(createPimlicoSessionKeyDto.chainId);
       const supportedChains = [1328, 8453, 84532]; // SEI Testnet, Base, Base Sepolia
-      
+
       if (!supportedChains.includes(chainId)) {
         throw new HttpException(
           `Chain ID ${chainId} is not supported for Pimlico integration. Supported chains: ${supportedChains.join(", ")}`,
@@ -134,7 +134,7 @@ export class SessionKeysController {
           chainId: createPimlicoSessionKeyDto.chainId,
           securityLevel: createPimlicoSessionKeyDto.securityLevel,
           validUntil: new Date(createPimlicoSessionKeyDto.validUntil),
-          permissions: createPimlicoSessionKeyDto.permissions.map(p => ({
+          permissions: createPimlicoSessionKeyDto.permissions.map((p) => ({
             operation: p.operation,
             maxAmountPerTx: p.maxAmountPerTx,
             maxDailyAmount: p.maxDailyAmount,

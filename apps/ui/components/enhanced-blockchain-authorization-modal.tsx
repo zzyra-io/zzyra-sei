@@ -461,7 +461,8 @@ export function EnhancedBlockchainAuthorizationModal({
       // Use regular method for all wallets
       setDeploymentStatus({
         isDeploying: true,
-        message: "Creating smart wallet and deploying...",
+        message:
+          "Creating smart wallet and installing session key validator...",
       });
 
       const delegationResult = await createDelegation(delegationParams);
@@ -496,8 +497,8 @@ export function EnhancedBlockchainAuthorizationModal({
       setDeploymentStatus({
         isDeploying: false,
         message: deploymentHash
-          ? "Smart wallet deployed successfully!"
-          : "Smart wallet setup complete",
+          ? "Smart wallet deployed and session key validator installed!"
+          : "Smart wallet setup complete with session key authorization",
         deploymentHash,
       });
 
@@ -601,8 +602,8 @@ export function EnhancedBlockchainAuthorizationModal({
         .join(", ");
 
       toast({
-        title: "Enhanced Smart Wallet Created",
-        description: `Smart wallet delegation created for ${selectedChains.length} chain(s) with ${securityLevel} security level. Features: ${enhancedFeaturesSummary}.${deploymentHash ? " Smart wallet deployed successfully." : ""}`,
+        title: "Session Key Authorization Complete",
+        description: `Smart wallet delegation with session key validator created for ${selectedChains.length} chain(s) with ${securityLevel} security level. Features: ${enhancedFeaturesSummary}.${deploymentHash ? " Smart wallet deployed and validator installed successfully." : " Session key validator installed and authorized."}`,
       });
     } catch (error) {
       console.error("Authorization error:", error);
@@ -737,7 +738,8 @@ export function EnhancedBlockchainAuthorizationModal({
                 Secure Blockchain Authorization
               </span>
               <p className='text-sm text-muted-foreground mt-1'>
-                Create a secure session key for automated blockchain operations
+                Install session key validator for secure automated blockchain
+                operations
               </p>
             </div>
           </DialogTitle>
@@ -1238,7 +1240,7 @@ export function EnhancedBlockchainAuthorizationModal({
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-primary'></div>
                   <div className='flex-1'>
                     <div className='text-sm font-medium'>
-                      Deploying Smart Wallet
+                      Setting up Account Abstraction
                     </div>
                     <div className='text-xs text-muted-foreground'>
                       {deploymentStatus.message}
@@ -1258,10 +1260,10 @@ export function EnhancedBlockchainAuthorizationModal({
                   </div>
                   <div className='flex-1'>
                     <div className='text-sm font-medium text-green-800'>
-                      Smart Wallet Deployed
+                      Session Key Validator Installed
                     </div>
                     <div className='text-xs text-green-600'>
-                      Transaction:{" "}
+                      Authorization complete:{" "}
                       {deploymentStatus.deploymentHash.substring(0, 10)}...
                     </div>
                   </div>
@@ -1287,13 +1289,13 @@ export function EnhancedBlockchainAuthorizationModal({
                 <>
                   <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2'></div>
                   {deploymentStatus.isDeploying
-                    ? "Deploying Smart Wallet..."
-                    : "Creating Delegation..."}
+                    ? "Installing Session Key Validator..."
+                    : "Creating Authorization..."}
                 </>
               ) : !walletStatus.hasSmartWallet ? (
                 "Wallet Required"
               ) : (
-                "Create Delegation & Execute"
+                "Authorize & Execute Workflow"
               )}
             </Button>
           </div>

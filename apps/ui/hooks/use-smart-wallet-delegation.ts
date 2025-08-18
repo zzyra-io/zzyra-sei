@@ -1,6 +1,7 @@
 import { useToast } from "@/components/ui/use-toast";
 import api from "@/lib/services/api";
 import {
+  createSessionKey,
   deploySmartAccount,
   isSmartAccountDeployed,
   verifySmartAccountSetup,
@@ -195,7 +196,7 @@ export function useSmartWalletDelegation() {
         // STEP 1: Get Dynamic's ZeroDv kernel client using official integration
         console.log("Getting ZeroDv kernel client from Dynamic Labs...");
         const { connector } = primaryWallet;
-        
+
         if (!isZeroDevConnector(connector)) {
           throw new Error("Wallet connector is not a ZeroDv connector");
         }
@@ -278,12 +279,45 @@ export function useSmartWalletDelegation() {
         );
 
         if (!finalCheck) {
-          console.warn(
-            "⚠️ Smart account verification indicates contract may not be deployed, but proceeding anyway"
+          console.log("🚀 Smart account not fully deployed, deploying now...");
+
+          toast({
+            title: "Deploying Smart Account",
+            description:
+              "Ensuring smart account is deployed before session key installation...",
+          });
+
+          // Force deployment by sending a minimal transaction
+          const deploymentResult = await deploySmartAccount(
+            kernelClient,
+            numericChainId
           );
-          console.warn(
-            "This might be expected for ZeroDev accounts that deploy on first transaction"
+
+          if (!deploymentResult.success) {
+            throw new Error(
+              `Failed to deploy smart account: ${deploymentResult.error}`
+            );
+          }
+
+          console.log("✅ Smart account deployment completed successfully");
+
+          // Re-verify deployment
+          const reCheckDeployment = await isSmartAccountDeployed(
+            smartWalletAddress,
+            numericChainId
           );
+
+          if (!reCheckDeployment) {
+            throw new Error(
+              "Smart account deployment verification failed - account still not deployed"
+            );
+          }
+
+          toast({
+            title: "Smart Account Deployed",
+            description:
+              "Smart account is now ready for session key installation",
+          });
         }
 
         // STEP 4: Create delegation message with verified smart wallet address
@@ -335,18 +369,64 @@ export function useSmartWalletDelegation() {
           throw new Error("User signature required for delegation");
         }
 
-        // STEP 5: Create session key with verified smart wallet address
+        // STEP 4.5: ✅ CRITICAL FIX - Install session key validator on smart account
+        console.log("🔧 Installing session key validator on smart account...");
+
+        toast({
+          title: "Installing Session Key Validator",
+          description: "Authorizing session key for automated execution...",
+        });
+
+        const sessionKeyResult = await createSessionKey(
+          kernelClient,
+          {
+            validUntil: Math.floor(permissions.validUntil.getTime() / 1000),
+            validAfter: Math.floor(Date.now() / 1000),
+            spendingLimits: {
+              perTransaction: permissions.maxAmountPerTx,
+              dailyLimit: permissions.maxDailyAmount,
+            },
+            operations: permissions.operations,
+          },
+          smartWalletAddress // ⭐ CRITICAL: Pass the verified deployed address
+        );
+
+        if (!sessionKeyResult.success) {
+          throw new Error(
+            `Session key validator installation failed: ${sessionKeyResult.error}`
+          );
+        }
+
+        console.log("✅ Session key validator installed successfully", {
+          validatorAddress: sessionKeyResult.validatorAddress,
+          sessionKeyAddress: sessionKeyResult.sessionKeyAddress,
+          smartWalletAddressUsed: smartWalletAddress, // ⭐ DEBUG: What address we're using
+        });
+
+        // STEP 5: Create session key in database WITH validator authorization data
         console.log(
-          "🔐 Creating session key for smart account:",
+          "🔐 Storing authorized session key for smart account:",
           smartWalletAddress
         );
         const endpoint = "/session-keys";
-        const requestData = prepareRequestData(
-          permissions,
-          numericChainId.toString(),
-          userSignature,
-          smartWalletAddress
-        );
+        const requestData = {
+          ...prepareRequestData(
+            permissions,
+            numericChainId.toString(),
+            userSignature,
+            smartWalletAddress
+          ),
+          // ✅ CRITICAL: Include serialized session key validator data
+          serializedSessionParams: sessionKeyResult.serializedSessionParams,
+        };
+
+        // ⭐ DEBUG: Log what we're sending to the API
+        console.log("🔍 DEBUG: Sending to API:", {
+          smartWalletOwner: requestData.smartWalletOwner,
+          walletAddress: requestData.walletAddress,
+          sessionKeyAddress: sessionKeyResult.sessionKeyAddress,
+          smartWalletAddressUsed: smartWalletAddress,
+        });
 
         const response = await api.post(endpoint, requestData);
 
