@@ -3,7 +3,6 @@
   publish = "apps/ui/.next"
 
 [build.environment]
-  NODE_OPTIONS = "--max-old-space-size=8192"
   # NODE_ENV = "production"
   NEXT_TELEMETRY_DISABLED = "1"
 
