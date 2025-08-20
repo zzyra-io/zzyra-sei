@@ -17,12 +17,9 @@ import { WorkflowPreview } from "@/components/workflow-preview";
 import useAuthStore from "@/lib/store/auth-store";
 import {
   AnimatePresence,
-  AnimationControls,
-  HTMLMotionProps,
   motion,
   useAnimation,
   useInView,
-  Variants,
 } from "framer-motion";
 import {
   ArrowRight,
@@ -1218,14 +1215,14 @@ export default function HomePage() {
               <ul className='space-y-2 text-sm'>
                 <li>
                   <Link
-                    href='https://docs.zzyra.com'
+                    href='https://docs.zzyra.io'
                     className='text-muted-foreground hover:text-foreground transition-colors'>
                     Documentation
                   </Link>
                 </li>
                 <li>
                   <Link
-                    href='https://docs.zzyra.com/api-reference'
+                    href='https://docs.zzyra.io/api-reference'
                     className='text-muted-foreground hover:text-foreground transition-colors'>
                     API Reference
                   </Link>

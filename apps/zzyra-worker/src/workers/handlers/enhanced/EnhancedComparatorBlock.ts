@@ -1,17 +1,15 @@
+import { Injectable, Logger } from '@nestjs/common';
 import {
-  EnhancedBlockHandler,
+  BlockGroup,
+  BlockType,
+  ConnectionType,
   EnhancedBlockDefinition,
   EnhancedBlockExecutionContext,
-  ZyraNodeData,
-  BlockType,
-  BlockGroup,
-  ConnectionType,
+  EnhancedBlockHandler,
   PropertyType,
   ValidationResult,
-  getBlockType,
-  getBlockMetadata,
+  ZyraNodeData,
 } from '@zzyra/types';
-import { Injectable, Logger } from '@nestjs/common';
 
 @Injectable()
 export class EnhancedComparatorBlock implements EnhancedBlockHandler {
@@ -170,7 +168,7 @@ export class EnhancedComparatorBlock implements EnhancedBlockHandler {
       ],
       resources: [
         {
-          url: 'https://docs.zzyra.com/blocks/comparator',
+          url: 'https://docs.zzyra.io/blocks/comparator',
           text: 'Comparator Block Documentation',
         },
       ],

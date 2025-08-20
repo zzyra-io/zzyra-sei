@@ -21,7 +21,7 @@
 ### **URL Structure**
 
 ```
-docs.zzyra.com/
+docs.zzyra.io/
 ├── /                           # Smart landing page
 ├── /get-started               # Universal quick start
 ├── /business                  # For investors/clients
@@ -487,7 +487,7 @@ const components = {
 const config = {
   title: "Zzyra Documentation",
   tagline: "AI-Powered Web3 Automation for Everyone",
-  url: "https://docs.zzyra.com",
+  url: "https://docs.zzyra.io",
   baseUrl: "/",
 
   presets: [

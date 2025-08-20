@@ -14,7 +14,7 @@ Transform your comprehensive documentation into a world-class Docusaurus site th
 ### **Multi-Audience URL Structure**
 
 ```
-docs.zzyra.com/
+docs.zzyra.io/
 ├── /                           # Smart landing with audience routing
 ├── /get-started               # Universal quick start guide
 ├── /business/                 # For investors, clients, enterprises
@@ -482,7 +482,9 @@ export async function executeWebhook(
   border-radius: 12px;
   padding: 2rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .feature-card:hover {
@@ -600,7 +602,7 @@ export function BlockCatalogBrowser() {
 const config = {
   title: "Zzyra Documentation",
   tagline: "AI-Powered Web3 Automation for Everyone",
-  url: "https://docs.zzyra.com",
+  url: "https://docs.zzyra.io",
   baseUrl: "/",
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
@@ -892,7 +894,7 @@ const seoTemplates = {
       "Automate your Web3 workflows with AI-generated building blocks. DeFi, NFT, DAO automation made simple for everyone.",
     keywords:
       "Web3 automation, DeFi automation, NFT automation, DAO tools, blockchain automation, AI workflow builder",
-    canonical: "https://docs.zzyra.com/",
+    canonical: "https://docs.zzyra.io/",
   },
 
   business: {
