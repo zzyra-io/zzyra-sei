@@ -12,8 +12,8 @@ import { PermissionlessProvider } from "@permissionless/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Component, ReactNode } from "react";
 import { http } from "viem";
-import { baseSepolia } from "viem/chains";
-import { WagmiProvider, createConfig } from "wagmi";
+import { baseSepolia, seiTestnet } from "viem/chains";
+import { createConfig, WagmiProvider } from "wagmi";
 
 // Error boundary for Dynamic Labs
 class DynamicErrorBoundary extends Component<
@@ -58,26 +58,6 @@ class DynamicErrorBoundary extends Component<
     return this.props.children;
   }
 }
-
-// SEI Testnet Configuration (viem format)
-const seiTestnet = {
-  id: 1328,
-  name: "SEI Testnet",
-  nativeCurrency: {
-    decimals: 18,
-    name: "SEI",
-    symbol: "SEI",
-  },
-  rpcUrls: {
-    default: {
-      http: ["https://evm-rpc.sei-apis.com"],
-    },
-  },
-  blockExplorers: {
-    default: { name: "Seitrace", url: "https://seitrace.com" },
-  },
-  testnet: true,
-} as const;
 
 // Multi-chain Wagmi configuration
 const wagmiConfig = createConfig({
@@ -129,12 +109,22 @@ export function DynamicProvider({ children }: DynamicProviderProps) {
               EthereumWalletConnectors,
               ZeroDevSmartWalletConnectors,
             ],
+            events: {
+              onAuthSuccess: ({ primaryWallet, isAuthenticated, user }) => {
+                console.log("Auth success", {
+                  primaryWallet,
+                  isAuthenticated,
+                  user,
+                });
+              },
+            },
             // Enable passkey authentication for embedded wallets
             // Note: Passkey support is enabled by default in Dynamic Labs v4
             // Add custom chains for Dynamic to recognize
             overrides: {
               showFiat: true,
               multiAsset: true,
+              multiWallet: true,
 
               evmNetworks: [
                 // SEI Testnet (Base Sepolia is already known by Dynamic)

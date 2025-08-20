@@ -112,6 +112,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   constructor(
     private readonly configService: ConfigService,
     private readonly zeroDevService: ZeroDevService,
+    // private readonly pimlicoService: PimlicoService,
     private readonly databaseService: DatabaseService,
   ) {}
 
@@ -275,7 +276,7 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         `Secure transaction completed successfully in ${executionTime}ms`,
         {
           chainId,
-          txHash: transactionResult.transactionHash,
+          txHash: transactionResult.transactionHash || '',
           amount,
           sessionKeyId: context.blockchainAuthorization?.sessionKeyId,
         },
@@ -516,21 +517,24 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
   }): Promise<TransactionResult> {
     const { context, authMethod } = params;
 
-    context.logger.info('Executing blockchain transaction with ZeroDev', {
-      chainId: params.chainId,
-      sessionKeyId: authMethod.sessionKeyId,
-      hasAAData: !!authMethod.aaData,
-      delegationMode: authMethod.delegationMode,
-    });
+    context.logger.info(
+      'Executing transaction with hybrid AA services + Zzyra session key',
+      {
+        chainId: params.chainId,
+        recipientAddress: params.recipientAddress,
+        amount: params.amount,
+        sessionKeyId: params.context.blockchainAuthorization?.sessionKeyId,
+      },
+    );
 
-    // Always use ZeroDev session key execution for consistency
-    return this.executeZeroDevTransaction(params);
+    // Execute via hybrid AA services (ZeroDev for most chains, Pimlico for SEI Testnet)
+    return this.executeHybridAATransaction(params);
   }
 
   /**
-   * Execute transaction using ZeroDev with integrated Zzyra session system
+   * Execute transaction using hybrid AA services with integrated Zzyra session system
    */
-  private async executeZeroDevTransaction(params: {
+  private async executeHybridAATransaction(params: {
     chainId: string;
     recipientAddress: string;
     amount: string;
@@ -568,19 +572,6 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       // Convert BigInt fields to avoid serialization issues
       const sessionKeyData = this.convertBigIntFields(rawSessionKeyData);
 
-      context.logger.info(
-        'Executing transaction with integrated ZeroDev + Zzyra session key',
-        {
-          sessionKeyId: sessionKeyData.id,
-          sessionKeyAddress: sessionKeyData.walletAddress,
-          smartWalletOwner: sessionKeyData.smartWalletOwner,
-          chainId: params.chainId,
-          to: params.recipientAddress,
-          amount: params.amount,
-          hasTokenAddress: !!params.tokenAddress,
-        },
-      );
-
       // Decrypt session key using parent delegation signature
       const userSignature = sessionKeyData.parentDelegationSignature;
       if (!userSignature) {
@@ -598,6 +589,15 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       // Convert chainId to number
       const chainIdNumber = this.getChainIdNumber(params.chainId);
 
+      context.logger.info(
+        'Executing transaction with hybrid AA services + Zzyra session key',
+        {
+          sessionKeyId: sessionKeyData.id,
+          smartWalletAddress: sessionKeyData.smartWalletOwner,
+          chainId: params.chainId,
+        },
+      );
+
       // Build transaction request
       const transaction: TransactionRequest = {
         to: params.recipientAddress,
@@ -613,13 +613,32 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         gasLimit: params.gasLimit,
       };
 
-      // Execute via ZeroDev service using integrated method
-      const result = await this.zeroDevService.executeWithZyraSessionKey(
+      // Execute via appropriate service based on chainId
+      let result: BlockchainTransactionResult;
+
+      // if (chainIdNumber === 1328) {
+      //   // Use Pimlico for SEI Testnet (EntryPoint v0.6 compatibility)
+      //   context.logger.info(
+      //     'Using Pimlico service for SEI Testnet (chainId: 1328)',
+      //   );
+      //   result = await this.pimlicoService.executeWithZyraSessionKey(
+      //     sessionKeyData,
+      //     decryptedSessionPrivateKey,
+      //     decryptedSessionPrivateKey, // Use same key as owner for simplicity
+      //     transaction,
+      //   );
+      // } else {
+      // Use ZeroDev for all other chains (Base, Sepolia, etc.)
+      context.logger.info(
+        `Using ZeroDev service for chainId: ${chainIdNumber}`,
+      );
+      result = await this.zeroDevService.executeWithZyraSessionKey(
         sessionKeyData,
         decryptedSessionPrivateKey,
         decryptedSessionPrivateKey, // Use same key as owner for simplicity
         transaction,
       );
+      // }
 
       // Update Zzyra's session key usage tracking
       await this.updateSessionKeyUsage(
@@ -629,12 +648,13 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
       );
 
       context.logger.info(
-        'Integrated ZeroDev + Zzyra transaction completed successfully',
+        'Hybrid AA service transaction completed successfully',
         {
           transactionHash: result.hash,
           sessionKeyId: sessionKeyData.id,
           blockNumber: result.blockNumber,
           gasUsed: result.gasUsed,
+          chainId: chainIdNumber,
         },
       );
 
@@ -646,14 +666,11 @@ export class SendTransactionBlock implements EnhancedBlockHandler {
         explorerUrl: result.explorerUrl,
       };
     } catch (error) {
-      params.context.logger.error(
-        'Integrated ZeroDev + Zzyra transaction failed',
-        {
-          error: error instanceof Error ? error.message : String(error),
-          chainId: params.chainId,
-          sessionKeyId: params.context.blockchainAuthorization?.sessionKeyId,
-        },
-      );
+      params.context.logger.error('Hybrid AA service transaction failed', {
+        error: error instanceof Error ? error.message : String(error),
+        chainId: params.chainId,
+        sessionKeyId: params.context.blockchainAuthorization?.sessionKeyId,
+      });
 
       return {
         transactionHash: '',

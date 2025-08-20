@@ -4,15 +4,15 @@
  */
 
 // Services
-export { PimlicoService } from '../pimlico.service';
+// export { PimlicoService } from '../pimlico.service';
 export { EVMService } from './evm/EVMService';
 
 // Interfaces
-export {
-  IBlockchainService,
-  IAccountAbstractionService,
-} from './base/IBlockchainService';
 export { BaseBlockchainService } from './base/BaseBlockchainService';
+export {
+  IAccountAbstractionService,
+  IBlockchainService,
+} from './base/IBlockchainService';
 
 // Types
 export * from './types/blockchain.types';

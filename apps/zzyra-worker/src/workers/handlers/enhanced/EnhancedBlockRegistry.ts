@@ -1,38 +1,38 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  BlockHandler,
-  EnhancedBlockHandler,
   BlockExecutionContext,
-  EnhancedBlockExecutionContext,
-  ZyraNodeData,
+  BlockHandler,
   BlockType,
+  EnhancedBlockExecutionContext,
+  EnhancedBlockHandler,
   HttpRequestOptions,
+  ZyraNodeData,
 } from '@zzyra/types';
-import { ZyraTemplateProcessor } from '../../../utils/template-processor';
 import { DatabaseService } from '../../../services/database.service';
+import { ZyraTemplateProcessor } from '../../../utils/template-processor';
 import { ExecutionLogger } from '../../execution-logger';
 
 // Import enhanced blocks
 import { HttpBlockHandler } from '../HttpBlockHandler';
-import { EnhancedComparatorBlock } from './EnhancedComparatorBlock';
 import { NotificationBlockHandler } from '../NotificationBlockHandler';
 import { PriceMonitorBlockHandler } from '../PriceMonitorBlockHandler';
 import { CalculatorBlockHandler } from './CalculatorBlockHandler';
+import { EnhancedComparatorBlock } from './EnhancedComparatorBlock';
 import { MagicWalletBlockHandler } from './MagicWalletBlockHandler';
 
 // Import blockchain blocks
-import { SendTransactionBlock } from './blockchain/SendTransactionBlock';
-import { SeiDcaTradingBlock } from './trading/SeiDcaTradingBlock';
-import { CheckBalanceBlock } from './blockchain/CheckBalanceBlock';
-import { SwapTokensBlock } from './blockchain/SwapTokensBlock';
-import { CreateWalletBlock } from './blockchain/CreateWalletBlock';
 import { ZeroDevService } from '../../../services/zerodev.service';
+import { CheckBalanceBlock } from './blockchain/CheckBalanceBlock';
+import { CreateWalletBlock } from './blockchain/CreateWalletBlock';
+import { SendTransactionBlock } from './blockchain/SendTransactionBlock';
+import { SwapTokensBlock } from './blockchain/SwapTokensBlock';
+import { SeiDcaTradingBlock } from './trading/SeiDcaTradingBlock';
 
 // Import legacy blocks
+import { CustomBlockHandler } from '../CustomBlockHandler';
 import { EmailBlockHandler } from '../EmailBlockHandler';
 import { HttpRequestHandler } from '../HttpRequestHandler';
-import { CustomBlockHandler } from '../CustomBlockHandler';
 
 @Injectable()
 export class EnhancedBlockRegistry {
@@ -64,10 +64,12 @@ export class EnhancedBlockRegistry {
 
     // Register blockchain blocks
     const zeroDevService = new ZeroDevService();
+    // const pimlicoService = new PimlicoService();
     this.registerEnhancedBlock(
       new SendTransactionBlock(
         this.configService,
         zeroDevService,
+        // pimlicoService, // Add Pimlico service
         this.databaseService,
       ),
     );

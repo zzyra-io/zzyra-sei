@@ -415,7 +415,7 @@ export async function createSessionKey(
           publicClient as any, // Type assertion to resolve viem/ZeroDev v5 client compatibility
           {
             signer: sessionKeySigner,
-            entryPoint: getEntryPoint("0.6"), // Use EntryPoint v0.6 (required by session key validator)
+            entryPoint: getEntryPoint("0.6"), // Use EntryPoint v0.6 (only supported version)
             kernelVersion: "0.2.4" as const, // Use Kernel v2.4 (compatible with EntryPoint 0.6)
             validatorData: {
               validAfter: permissions.validAfter || 0,
