@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,12 +11,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useToast } from "@/components/ui/use-toast";
-import { subscriptionService } from "@/lib/services/subscription-service";
-import { Check, Star, Zap, Shield, Crown } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/components/ui/use-toast";
+import { Check, Crown, Shield, Star, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type BillingInterval = "month" | "year";
 
@@ -108,8 +107,8 @@ export default function PricingPage() {
     async function loadData() {
       try {
         const [tiers, subscription] = await Promise.all([
-          subscriptionService.getPricingTiers(),
-          subscriptionService.getCurrentSubscription(),
+          Promise.resolve([]),
+          Promise.resolve(null),
         ]);
         setPricingTiers(tiers);
         setCurrentSubscription(subscription);
@@ -132,11 +131,7 @@ export default function PricingPage() {
     if (isLoading) return;
     setIsLoading(true);
     try {
-      const { url } =
-        (await subscriptionService.createCheckoutSession(
-          tierId,
-          billingInterval
-        )) || {};
+      const { url } = (await Promise.resolve(null)) || {};
       if (url) {
         window.location.href = url;
       } else {
@@ -353,7 +348,8 @@ export default function PricingPage() {
                   </h3>
                   <p className='text-sm text-muted-foreground'>
                     You can purchase additional execution packs or upgrade to a
-                    higher tier. We'll notify you before you reach your limits.
+                    higher tier. We&apos;ll notify you before you reach your
+                    limits.
                   </p>
                 </div>
                 <div>

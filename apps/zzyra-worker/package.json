@@ -24,7 +24,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:zerodev": "ts-node test-zerodev-flow.ts",
     "test:zerodev:simple": "ts-node test-zerodev-simple.ts",
-    "db:generate-types": "supabase gen types typescript --project-id uyeialofjqobqbgaftfc --schema public > src/types/supabase.ts"
+    "db:generate-types": "echo 'Supabase types generation removed - using Prisma instead'"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.12",
@@ -56,8 +56,7 @@
     "@nestjs/websockets": "^11.1.0",
     "@openrouter/ai-sdk-provider": "^0.4.6",
     "@opentelemetry/api": "^1.9.0",
-    "@supabase/ssr": "^0.6.1",
-    "@supabase/supabase-js": "^2.49.4",
+
     "@types/handlebars": "^4.1.0",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/nodemailer": "^6.4.17",
@@ -120,7 +119,6 @@
     "jest": "^29.7.0",
     "prettier": "^3.0.0",
     "source-map-support": "^0.5.21",
-    "supabase": "^2.22.4",
     "supertest": "^7.0.0",
     "ts-jest": "^29.3.2",
     "ts-loader": "^9.4.3",
