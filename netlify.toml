@@ -1,14 +1,12 @@
 [build]
-  command = "pnpm install && pnpm run build && cd apps/ui"
+  command = "cd apps/ui && pnpm install && pnpm run build"
   publish = "apps/ui/.next"
 
 [build.environment]
   NODE_VERSION = "20.3.0"
-  # NODE_ENV = "production"
   NEXT_TELEMETRY_DISABLED = "1"
   SECRETS_SCAN_ENABLED = "false"
   NODE_OPTIONS = "--max-old-space-size=8192"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
-  
