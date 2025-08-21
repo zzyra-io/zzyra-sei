@@ -168,14 +168,21 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       if (
         error instanceof Error &&
-        error.message.includes('PRECONDITION_FAILED')
+        (error.message.includes('PRECONDITION_FAILED') ||
+          error.message.includes('INEQUIVALENT_ARG'))
       ) {
-        // Use minimal safe configuration
-        await channel.assertQueue(EXECUTION_QUEUE, { durable: true });
+        // Use minimal safe configuration compatible with API service
+        const minimalConfig = {
+          durable: true,
+          deadLetterExchange: '',
+          deadLetterRoutingKey: EXECUTION_DLQ,
+        };
+        await channel.assertQueue(EXECUTION_QUEUE, minimalConfig);
         this.logger.warn(
           `⚠️ Using minimal configuration for ${EXECUTION_QUEUE} due to parameter conflict`,
         );
       } else {
+        this.logger.error(`Failed to setup ${EXECUTION_QUEUE}:`, error);
         throw error;
       }
     }
@@ -196,14 +203,16 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       if (
         error instanceof Error &&
-        error.message.includes('PRECONDITION_FAILED')
+        (error.message.includes('PRECONDITION_FAILED') ||
+          error.message.includes('INEQUIVALENT_ARG'))
       ) {
-        // Use minimal safe configuration
+        // Use minimal safe configuration compatible with API service
         await channel.assertQueue(EXECUTION_RETRY_QUEUE, { durable: true });
         this.logger.warn(
           `⚠️ Using minimal configuration for ${EXECUTION_RETRY_QUEUE} due to parameter conflict`,
         );
       } else {
+        this.logger.error(`Failed to setup ${EXECUTION_RETRY_QUEUE}:`, error);
         throw error;
       }
     }
@@ -226,14 +235,16 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       if (
         error instanceof Error &&
-        error.message.includes('PRECONDITION_FAILED')
+        (error.message.includes('PRECONDITION_FAILED') ||
+          error.message.includes('INEQUIVALENT_ARG'))
       ) {
-        // Use minimal safe configuration
+        // Use minimal safe configuration compatible with API service
         await channel.assertQueue(EXECUTION_DLQ, { durable: true });
         this.logger.warn(
           `⚠️ Using minimal configuration for ${EXECUTION_DLQ} due to parameter conflict`,
         );
       } else {
+        this.logger.error(`Failed to setup ${EXECUTION_DLQ}:`, error);
         throw error;
       }
     }
@@ -246,16 +257,9 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     channel: amqp.Channel,
     queueName: string,
   ): Promise<any> {
-    try {
-      // Check if queue exists
-      const queueInfo = await channel.checkQueue(queueName);
-
-      // Queue exists, use compatible configuration
-      return this.getCompatibleConfig(queueName);
-    } catch (error) {
-      // Queue doesn't exist, use optimal new configuration
-      return this.getOptimalNewConfig(queueName);
-    }
+    // Always try optimal config first, fallback to compatible if needed
+    // This avoids channel closure from checkQueue() when queue doesn't exist
+    return this.getOptimalNewConfig(queueName);
   }
 
   /**
