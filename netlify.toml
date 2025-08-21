@@ -1,5 +1,5 @@
 [build]
-  command = "cd apps/ui && pnpm install && pnpm run build"
+  command = "pnpm build --filter=zzyra-web3-automation"
   publish = "apps/ui/.next"
 
 [build.environment]
