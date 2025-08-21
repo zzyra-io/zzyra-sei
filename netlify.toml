@@ -1,6 +1,6 @@
 [build]
   base = "/"
-  command = "pnpm install --frozen-lockfile && pnpm turbo run build --filter=zzyra-web3-automation"
+  command = "corepack enable && corepack prepare pnpm@9.15.2 --activate && pnpm install --frozen-lockfile && pnpm turbo run build --filter=zzyra-web3-automation"
   publish = "apps/ui/.next"
 
 [build.environment]
@@ -9,8 +9,8 @@
   NEXT_TELEMETRY_DISABLED = "1"
   SECRETS_SCAN_ENABLED = "false"
   
-  # Critical memory optimization - reduced from 8192 to 3072
-  NODE_OPTIONS = "--max-old-space-size=3072 --optimize-for-size"
+  # Fixed: Valid Node.js memory optimization
+  NODE_OPTIONS = "--max-old-space-size=3072"
   
   # Next.js specific optimizations
   NEXT_SHARP_PATH = "/opt/buildhome/.npm-global/lib/node_modules/sharp"
@@ -42,7 +42,3 @@
 
 [build.processing.images]
   compress = true
-
-# Remove the problematic build.ignore section
-# [build.ignore]
-#   command = "bash -c 'git diff --quiet HEAD^ HEAD -- apps/ui/ packages/types/ packages/database/ || exit 0'"
