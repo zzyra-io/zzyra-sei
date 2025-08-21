@@ -1,12 +1,14 @@
 [build]
-  command = "pnpm build --filter=zzyra-web3-automation"
+  command = "pnpm install && pnpm run build && cd apps/ui"
   publish = "apps/ui/.next"
 
 [build.environment]
   NODE_VERSION = "20.3.0"
+  # NODE_ENV = "production"
   NEXT_TELEMETRY_DISABLED = "1"
   SECRETS_SCAN_ENABLED = "false"
   NODE_OPTIONS = "--max-old-space-size=8192"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+  
