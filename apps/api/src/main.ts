@@ -13,10 +13,7 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Enable CORS for frontend integration
-  app.enableCors({
-    origin: "*",
-    credentials: true,
-  });
+  // app.enableCors();
 
   // Global validation pipe
   app.useGlobalPipes(
