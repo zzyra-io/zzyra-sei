@@ -5,6 +5,20 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+
+  // Critical: Optimize for Netlify's memory constraints
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@dynamic-labs/sdk-react-core",
+      "@radix-ui/react-icons",
+      "@tanstack/react-query",
+    ],
+    // Reduce memory usage during build
+    workerThreads: false,
+    cpus: 1,
+  },
+
   images: {
     formats: ["image/avif", "image/webp"],
     domains: [
@@ -42,19 +56,24 @@ const nextConfig = {
       };
     }
 
-    // Remove problematic externals that may cause webpack errors
-    // config.externals.push(...) - Comment this out temporarily
+    // Critical: Optimize bundle size and memory usage
+    config.optimization = {
+      ...config.optimization,
+      splitChunks: {
+        chunks: "all",
+        maxSize: 200000, // Smaller chunks to reduce memory pressure
+        cacheGroups: {
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: "vendors",
+            chunks: "all",
+            maxSize: 200000,
+          },
+        },
+      },
+    };
 
     return config;
-  },
-
-  experimental: {
-    optimizePackageImports: [
-      "lucide-react",
-      "@dynamic-labs/sdk-react-core",
-      "@radix-ui/react-icons",
-      "@tanstack/react-query",
-    ],
   },
 
   compress: true,
@@ -76,7 +95,13 @@ const nextConfig = {
       },
     ];
   },
+
   skipTrailingSlashRedirect: true,
+
+  // Critical: Optimize static generation
+  generateStaticParams: async () => {
+    return []; // Disable static generation for memory optimization
+  },
 };
 
 module.exports = nextConfig;

@@ -9,11 +9,13 @@
       "cache": true,
       "inputs": [
         "src/**",
+        "app/**",
         "public/**",
         "next.config.*",
         "package.json",
         "tsconfig.json"
-      ]
+      ],
+      "env": ["NODE_ENV", "NEXT_PUBLIC_*"]
     },
     "dev": {
       "cache": false,
@@ -22,6 +24,7 @@
       "inputs": [
         ".env*",
         "src/**",
+        "app/**",
         "prisma/**",
         "next.config.*",
         "package.json"
