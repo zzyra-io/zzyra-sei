@@ -43,6 +43,6 @@
 [build.processing.images]
   compress = true
 
-# Build ignore rules to prevent unnecessary builds
-[build.ignore]
-  command = "bash -c 'git diff --quiet HEAD^ HEAD -- apps/ui/ packages/types/ packages/database/ || exit 0'"
+# Remove the problematic build.ignore section
+# [build.ignore]
+#   command = "bash -c 'git diff --quiet HEAD^ HEAD -- apps/ui/ packages/types/ packages/database/ || exit 0'"
