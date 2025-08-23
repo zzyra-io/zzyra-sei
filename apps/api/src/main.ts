@@ -1,4 +1,5 @@
 import { ValidationPipe } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import * as cookieParser from "cookie-parser";
@@ -9,38 +10,21 @@ async function bootstrap() {
     logger: ["error", "warn", "log", "verbose", "debug"],
   });
 
+  const configService = app.get(ConfigService);
+  const allowedOrigins = configService.get("ALLOWED_ORIGINS");
+
   // Enable cookie parser for authentication
   app.use(cookieParser());
 
   // Enable CORS for frontend integration
+  // Enable CORS for frontend integration
   app.enableCors({
-    origin: (origin: string | undefined, callback: Function) => {
-      const allowedOrigins =
-        process.env.CORS_ENABLED_URL &&
-        process.env.CORS_ENABLED_URL.split(",").map((url) => url.trim());
-      console.log("origin", origin);
-      console.log("allowedOrigins", allowedOrigins);
-      if (!origin || allowedOrigins?.includes(origin)) {
-        callback(null, origin);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      "Accept",
-      "Origin",
-      "Cache-Control",
-      "X-File-Name",
+    origin: [
+      "http://localhost:3001",
+      ...allowedOrigins.split(",").map((origin: string) => origin.trim()),
     ],
-    exposedHeaders: ["Content-Range", "X-Total-Count", "X-Pagination-Count"],
-    maxAge: 86400, // 24 hours
+    credentials: true,
   });
-
   // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
