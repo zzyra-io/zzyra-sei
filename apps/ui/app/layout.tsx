@@ -1,5 +1,4 @@
 import { SkipLink } from "@/components/a11y/skip-link";
-import { DynamicProvider } from "@/lib/dynamic-provider";
 import { FloatingParticles } from "@/components/floating-particles";
 import { NotificationSocketProvider } from "@/components/notification/notification-socket-provider";
 import { NotificationToastContainer } from "@/components/NotificationToast";
@@ -7,12 +6,13 @@ import { PostHogProvider } from "@/components/PostHogProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { WorkflowExecutionProvider } from "@/components/workflow/BlockExecutionMonitor";
+import { DynamicProvider } from "@/lib/dynamic-provider";
 import "@/styles/flow-components.css";
 import { Montserrat } from "next/font/google";
 import type React from "react";
 
-import "./globals.css";
 import { AutoWalletConnect } from "@/components/auto-wallet-connect";
+import "./globals.css";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -47,7 +47,7 @@ export default function RootLayout({
           <DynamicProvider>
             <ThemeProvider
               attribute='class'
-              defaultTheme='system'
+              defaultTheme='light'
               enableSystem
               disableTransitionOnChange>
               <WorkflowExecutionProvider>

@@ -90,35 +90,34 @@ function detectBlockchainOperations(
   const supportedChains = new Set<string>();
 
   nodes.forEach((node) => {
-    // AI_AGENT blocks with blockchain tools
-    if (node.data?.blockType === "AI_AGENT") {
-      const blockchainTools = (
-        node.data?.config?.selectedTools as SelectedTool[]
-      )?.filter(
-        (tool: SelectedTool) =>
-          tool.id === "goat" ||
-          tool.name?.toLowerCase().includes("blockchain") ||
-          tool.description?.toLowerCase().includes("sei") ||
-          tool.description?.toLowerCase().includes("ethereum") ||
-          tool.description?.toLowerCase().includes("base")
-      );
+    // // AI_AGENT blocks with blockchain tools
+    // if (node.data?.blockType === "AI_AGENT") {
+    //   const blockchainTools = (
+    //     node.data?.config?.selectedTools as SelectedTool[]
+    //   )?.filter(
+    //     (tool: SelectedTool) =>
+    //       tool.id === "goat" ||
+    //       tool.name?.toLowerCase().includes("blockchain") ||
+    //       tool.description?.toLowerCase().includes("sei") ||
+    //       tool.description?.toLowerCase().includes("ethereum") ||
+    //       tool.description?.toLowerCase().includes("base")
+    //   );
 
-      if (blockchainTools?.length > 0) {
-        const chains = detectChainsFromTools(blockchainTools);
-        chains.forEach((chain) => supportedChains.add(chain));
+    //   if (blockchainTools?.length > 0) {
+    //     const chains = detectChainsFromTools(blockchainTools);
+    //     chains.forEach((chain) => supportedChains.add(chain));
 
-        blockchainNodes.push({
-          node,
-          chains,
-          tools: blockchainTools,
-        });
-      }
-    }
+    //     blockchainNodes.push({
+    //       node,
+    //       chains,
+    //       tools: blockchainTools,
+    //     });
+    //   }
+    // }
 
     // Direct blockchain blocks
     const blockType = node.data?.blockType?.toString();
     if (
-      blockType === "AI_BLOCKCHAIN" ||
       blockType === "SEND_TRANSACTION" ||
       blockType === "CHECK_BALANCE" ||
       blockType === "SWAP_TOKENS" ||
@@ -142,29 +141,27 @@ function detectBlockchainOperations(
   };
 }
 
-function detectChainsFromTools(tools: SelectedTool[]): string[] {
-  const chains = new Set<string>();
+// function detectChainsFromTools(tools: SelectedTool[]): string[] {
+//   const chains = new Set<string>();
 
-  tools.forEach((tool) => {
-    // If the tool has a chainId in its config, use that
-    if (tool.config?.chainId) {
-      chains.add(tool.config.chainId as string);
-    } else {
-      // Fallback to description-based detection
-      if (tool.description?.toLowerCase().includes("sei")) {
-        chains.add("1328");
-      } else if (tool.description?.toLowerCase().includes("base")) {
-        chains.add("base-sepolia");
-      } else if (tool.description?.toLowerCase().includes("ethereum")) {
-        chains.add("ethereum-sepolia");
-      } else {
-        chains.add("1328"); // Default to SEI
-      }
-    }
-  });
+//   tools.forEach((tool) => {
+//     // If the tool has a chainId in its config, use that
+//     if (tool.config?.chainId) {
+//       chains.add(tool.config.chainId as string);
+//     } else {
+//       // Fallback to description-based detection
+//       if (tool.description?.toLowerCase().includes("sei")) {
+//         chains.add("1328");
+//       } else if (tool.description?.toLowerCase().includes("base")) {
+//         chains.add("84532");
+//       } else {
+//         chains.add("1328"); // Default to SEI
+//       }
+//     }
+//   });
 
-  return Array.from(chains);
-}
+//   return Array.from(chains);
+// }
 
 // Memoize default spending values
 const DEFAULT_SPENDING_BY_CHAIN = {
