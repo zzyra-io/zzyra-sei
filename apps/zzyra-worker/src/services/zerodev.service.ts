@@ -6,7 +6,7 @@ import {
   createZeroDevPaymasterClient,
   KernelAccountClient,
 } from '@zerodev/sdk';
-import { getEntryPoint, KERNEL_V2_4 } from '@zerodev/sdk/constants';
+import { getEntryPoint, KERNEL_V3_3 } from '@zerodev/sdk/constants';
 import {
   Address,
   Chain,
@@ -27,7 +27,7 @@ import {
 } from './blockchain/types/blockchain.types';
 
 // Configuration constants
-const KERNEL_VERSION = KERNEL_V2_4;
+const KERNEL_VERSION = KERNEL_V3_3;
 const PROJECT_ID = process.env.ZERODEV_PROJECT_ID;
 
 // ERC20 ABI for token operations
@@ -125,7 +125,7 @@ export class ZeroDevService implements IAccountAbstractionService {
 
     const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
       signer: ownerSigner,
-      entryPoint: getEntryPoint('0.6'),
+      entryPoint: getEntryPoint('0.7'),
       kernelVersion: KERNEL_VERSION,
     });
 
@@ -133,7 +133,7 @@ export class ZeroDevService implements IAccountAbstractionService {
       plugins: {
         sudo: ecdsaValidator,
       },
-      entryPoint: getEntryPoint('0.6'),
+      entryPoint: getEntryPoint('0.7'),
       kernelVersion: KERNEL_VERSION,
       index: config.index || BigInt(0),
     });
@@ -179,7 +179,7 @@ export class ZeroDevService implements IAccountAbstractionService {
     const chainId = transaction.chainId;
 
     this.logger.log(
-      '🚀 Executing transaction with ZeroDv EntryPoint v0.6 + Zyra session key',
+      '🚀 Executing transaction with ZeroDv EntryPoint v0.7 + Zyra session key',
       {
         sessionKeyId: sessionKeyData.id,
         chainId,
@@ -207,7 +207,7 @@ export class ZeroDevService implements IAccountAbstractionService {
       this.logger.debug('🔧 Applying SEI Testnet optimizations', {
         sessionKeyId: sessionKeyData.id,
         chainName: 'SEI Testnet',
-        entryPointVersion: '0.6',
+        entryPointVersion: '0.7',
       });
     }
 
@@ -734,10 +734,10 @@ export class ZeroDevService implements IAccountAbstractionService {
         validatorAddress: sessionKeyParams.validatorAddress,
         chainId,
         bundlerUrl: bundlerUrl.substring(0, 50) + '...',
-        entryPoint: '0.6',
+        entryPoint: '0.7',
         kernelVersion: 'v2.4',
-        approach: 'ecdsa_with_session_key_signer_v0.6',
-        note: 'Using EntryPoint v0.6 + Kernel v2.4 (only supported version by ZeroDev)',
+        approach: 'ecdsa_with_session_key_signer_v0.7',
+        note: 'Using EntryPoint v0.7 + Kernel v2.4 (only supported version by ZeroDev)',
       });
 
       const publicClient = createPublicClient({
@@ -750,16 +750,16 @@ export class ZeroDevService implements IAccountAbstractionService {
       // We just need to use the session key signer to sign transactions
       const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
         signer: sessionKeySigner,
-        entryPoint: getEntryPoint('0.6'),
-        kernelVersion: '0.2.4' as const,
+        entryPoint: getEntryPoint('0.7'),
+        kernelVersion: KERNEL_VERSION,
       });
 
       const kernelAccount = await createKernelAccount(publicClient, {
         plugins: {
           sudo: ecdsaValidator,
         },
-        entryPoint: getEntryPoint('0.6'),
-        kernelVersion: '0.2.4' as const,
+        entryPoint: getEntryPoint('0.7'),
+        kernelVersion: KERNEL_VERSION,
         address: sessionKeyParams.smartWalletAddress as Address,
       });
 
@@ -835,11 +835,11 @@ export class ZeroDevService implements IAccountAbstractionService {
       plugins: {
         sudo: await signerToEcdsaValidator(publicClient, {
           signer: sessionKeySigner,
-          entryPoint: getEntryPoint('0.6'),
+          entryPoint: getEntryPoint('0.7'),
           kernelVersion: KERNEL_VERSION,
         }),
       },
-      entryPoint: getEntryPoint('0.6'),
+      entryPoint: getEntryPoint('0.7'),
       kernelVersion: KERNEL_VERSION,
     });
 

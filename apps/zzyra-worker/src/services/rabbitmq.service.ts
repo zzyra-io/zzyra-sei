@@ -157,12 +157,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
    * Setup execution queue with intelligent parameter detection
    */
   private async setupExecutionQueue(channel: amqp.Channel): Promise<void> {
-    const queueConfig = await this.getOptimalQueueConfig(
-      channel,
-      EXECUTION_QUEUE,
-    );
-
     try {
+      const queueConfig = await this.getOptimalQueueConfig(
+        channel,
+        EXECUTION_QUEUE,
+      );
       await channel.assertQueue(EXECUTION_QUEUE, queueConfig);
       this.logger.log(`✅ Execution queue configured with optimal parameters`);
     } catch (error) {
@@ -171,7 +170,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         (error.message.includes('PRECONDITION_FAILED') ||
           error.message.includes('INEQUIVALENT_ARG'))
       ) {
-        // Use minimal safe configuration compatible with API service
+        // Use minimal safe configuration compatible with existing queue
         const minimalConfig = {
           durable: true,
           deadLetterExchange: '',
@@ -192,12 +191,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
    * Setup retry queue with intelligent parameter detection
    */
   private async setupRetryQueue(channel: amqp.Channel): Promise<void> {
-    const queueConfig = await this.getOptimalQueueConfig(
-      channel,
-      EXECUTION_RETRY_QUEUE,
-    );
-
     try {
+      const queueConfig = await this.getOptimalQueueConfig(
+        channel,
+        EXECUTION_RETRY_QUEUE,
+      );
       await channel.assertQueue(EXECUTION_RETRY_QUEUE, queueConfig);
       this.logger.log(`✅ Retry queue configured with optimal parameters`);
     } catch (error) {
@@ -206,7 +204,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         (error.message.includes('PRECONDITION_FAILED') ||
           error.message.includes('INEQUIVALENT_ARG'))
       ) {
-        // Use minimal safe configuration compatible with API service
+        // Use minimal safe configuration compatible with existing queue
         await channel.assertQueue(EXECUTION_RETRY_QUEUE, { durable: true });
         this.logger.warn(
           `⚠️ Using minimal configuration for ${EXECUTION_RETRY_QUEUE} due to parameter conflict`,
@@ -222,12 +220,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
    * Setup dead letter queue with intelligent parameter detection
    */
   private async setupDeadLetterQueue(channel: amqp.Channel): Promise<void> {
-    const queueConfig = await this.getOptimalQueueConfig(
-      channel,
-      EXECUTION_DLQ,
-    );
-
     try {
+      const queueConfig = await this.getOptimalQueueConfig(
+        channel,
+        EXECUTION_DLQ,
+      );
       await channel.assertQueue(EXECUTION_DLQ, queueConfig);
       this.logger.log(
         `✅ Dead letter queue configured with optimal parameters`,
@@ -238,7 +235,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         (error.message.includes('PRECONDITION_FAILED') ||
           error.message.includes('INEQUIVALENT_ARG'))
       ) {
-        // Use minimal safe configuration compatible with API service
+        // Use minimal safe configuration compatible with existing queue
         await channel.assertQueue(EXECUTION_DLQ, { durable: true });
         this.logger.warn(
           `⚠️ Using minimal configuration for ${EXECUTION_DLQ} due to parameter conflict`,
@@ -257,8 +254,24 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     channel: amqp.Channel,
     queueName: string,
   ): Promise<any> {
+    try {
+      // Check if queue exists and get its properties
+      const queueInfo = await channel.checkQueue(queueName);
+      if (queueInfo) {
+        // Queue exists, use compatible configuration
+        this.logger.log(
+          `Queue ${queueName} already exists, using compatible configuration`,
+        );
+        return this.getCompatibleConfig(queueName);
+      }
+    } catch (error) {
+      // Queue doesn't exist, use optimal new configuration
+      this.logger.log(
+        `Queue ${queueName} doesn't exist, using optimal new configuration`,
+      );
+    }
+
     // Always try optimal config first, fallback to compatible if needed
-    // This avoids channel closure from checkQueue() when queue doesn't exist
     return this.getOptimalNewConfig(queueName);
   }
 
