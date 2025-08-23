@@ -13,7 +13,33 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Enable CORS for frontend integration
-  // app.enableCors();
+  app.enableCors({
+    origin: (origin: string | undefined, callback: Function) => {
+      const allowedOrigins =
+        process.env.CORS_ENABLED_URL &&
+        process.env.CORS_ENABLED_URL.split(",").map((url) => url.trim());
+      console.log("origin", origin);
+      console.log("allowedOrigins", allowedOrigins);
+      if (!origin || allowedOrigins?.includes(origin)) {
+        callback(null, origin);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+      "Cache-Control",
+      "X-File-Name",
+    ],
+    exposedHeaders: ["Content-Range", "X-Total-Count", "X-Pagination-Count"],
+    maxAge: 86400, // 24 hours
+  });
 
   // Global validation pipe
   app.useGlobalPipes(
