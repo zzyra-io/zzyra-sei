@@ -84,7 +84,7 @@ interface AIAgentData {
   config: {
     agent: {
       name: string;
-      systemPrompt: string;
+      // systemPrompt: string;
       userPrompt: string;
       thinkingMode: "fast" | "deliberate" | "collaborative";
       maxSteps: number;
@@ -906,8 +906,12 @@ export function AgentNodeComponent({
                   <h3 className='font-bold text-lg text-foreground'>
                     {data.config?.agent?.name || "AI Agent"}
                   </h3>
+                  {/* <p className='text-sm text-muted-foreground'> */}
+                  {/* {data.config?.agent?.systemPrompt ||
+                      "AI-powered agent with tools and reasoning capabilities"}
+                  </p> */}
                   <p className='text-sm text-muted-foreground'>
-                    {data.config?.agent?.systemPrompt ||
+                    {data.config?.agent?.userPrompt.slice(0, 100) + "..." ||
                       "AI-powered agent with tools and reasoning capabilities"}
                   </p>
                 </div>
@@ -1436,7 +1440,7 @@ export function AgentNodeComponent({
                     placeholder='AI Assistant'
                   />
                 </div>
-                <div>
+                {/* <div>
                   <Label className='text-xs'>System Prompt</Label>
                   <Textarea
                     value={data.config?.agent?.systemPrompt || ""}
@@ -1452,7 +1456,7 @@ export function AgentNodeComponent({
                     placeholder='You are a helpful AI assistant...'
                     rows={3}
                   />
-                </div>
+                </div> */}
                 <div>
                   <Label className='text-xs'>User Prompt</Label>
                   <Textarea
@@ -1594,7 +1598,7 @@ export function AgentNodeComponent({
                     />
                   </div>
                 </div>
-                <div className='pt-4'>
+                {/* <div className='pt-4'>
                   <Button
                     className='w-full'
                     size='sm'
@@ -1612,7 +1616,7 @@ export function AgentNodeComponent({
                       </>
                     )}
                   </Button>
-                </div>
+                </div> */}
               </TabsContent>
             </Tabs>
           </div>
@@ -2256,7 +2260,6 @@ export function AIAgentConfig({
   );
 }
 
-// --- TOOL CONFIGURATION MODAL ---
 const ToolConfigModal = ({
   tool,
   isOpen,
@@ -2293,14 +2296,26 @@ const ToolConfigModal = ({
   const renderConfigField = (key: string, prop: Record<string, unknown>) => {
     const value = config[key];
     const showPassword = showPasswords[key] || false;
+    const isRequired = prop.required as boolean;
 
     return (
-      <div key={key} className='space-y-2'>
-        <Label htmlFor={key} className='text-sm font-medium'>
-          {key}
-          {prop.required && <span className='text-red-500 ml-1'>*</span>}
-        </Label>
-        <div className='relative'>
+      <div key={key} className='space-y-3 p-4'>
+        <div className='flex items-center justify-between'>
+          <Label
+            htmlFor={key}
+            className='text-sm font-semibold text-foreground'>
+            {key.charAt(0).toUpperCase() +
+              key.slice(1).replace(/([A-Z])/g, " $1")}
+            {isRequired && (
+              <span className='text-destructive ml-1 text-base'>*</span>
+            )}
+          </Label>
+          <span className='text-xs text-muted-foreground bg-muted px-2 py-1 rounded-md'>
+            {prop.type as string}
+          </span>
+        </div>
+
+        <div className='relative group'>
           {prop.type === "string" && prop.sensitive ? (
             <div className='relative'>
               <Input
@@ -2310,8 +2325,9 @@ const ToolConfigModal = ({
                 onChange={(e) =>
                   setConfig({ ...config, [key]: e.target.value })
                 }
-                placeholder={String(prop.description || "")}
-                className='pr-10'
+                placeholder={String(prop.description || `Enter ${key}...`)}
+                className='pr-12 transition-all duration-200 focus:ring-2 focus:ring-primary/20 border-border hover:border-primary/50'
+                required={isRequired}
               />
               <button
                 type='button'
@@ -2321,7 +2337,8 @@ const ToolConfigModal = ({
                     [key]: !showPassword,
                   })
                 }
-                className='absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700'>
+                className='absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-200 p-1 rounded-sm hover:bg-muted'
+                aria-label={showPassword ? "Hide password" : "Show password"}>
                 {showPassword ? (
                   <EyeOff className='w-4 h-4' />
                 ) : (
@@ -2334,7 +2351,9 @@ const ToolConfigModal = ({
               id={key}
               value={(value as string) || ""}
               onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
-              placeholder={String(prop.description || "")}
+              placeholder={String(prop.description || `Enter ${key}...`)}
+              className='transition-all duration-200 focus:ring-2 focus:ring-primary/20 border-border hover:border-primary/50'
+              required={isRequired}
             />
           ) : prop.type === "number" ? (
             <Input
@@ -2344,28 +2363,46 @@ const ToolConfigModal = ({
               onChange={(e) =>
                 setConfig({ ...config, [key]: Number(e.target.value) })
               }
-              placeholder={String(prop.description || "")}
+              placeholder={String(prop.description || `Enter ${key}...`)}
+              className='transition-all duration-200 focus:ring-2 focus:ring-primary/20 border-border hover:border-primary/50'
+              required={isRequired}
             />
           ) : prop.type === "boolean" ? (
-            <Switch
-              id={key}
-              checked={(value as boolean) || false}
-              onCheckedChange={(checked) =>
-                setConfig({ ...config, [key]: checked })
-              }
-            />
+            <div className='flex items-center space-x-3 p-3 rounded-lg border border-border bg-muted/30'>
+              <Switch
+                id={key}
+                checked={(value as boolean) || false}
+                onCheckedChange={(checked) =>
+                  setConfig({ ...config, [key]: checked })
+                }
+                className='data-[state=checked]:bg-primary'
+              />
+              <Label
+                htmlFor={key}
+                className='text-sm text-muted-foreground cursor-pointer'>
+                {(value as boolean) ? "Enabled" : "Disabled"}
+              </Label>
+            </div>
           ) : (
             <Textarea
               id={key}
               value={(value as string) || ""}
               onChange={(e) => setConfig({ ...config, [key]: e.target.value })}
-              placeholder={String(prop.description || "")}
+              placeholder={String(prop.description || `Enter ${key}...`)}
               rows={3}
+              className='transition-all duration-200 focus:ring-2 focus:ring-primary/20 border-border hover:border-primary/50 resize-none'
+              required={isRequired}
             />
           )}
         </div>
+
         {prop.description && (
-          <p className='text-xs text-gray-500'>{String(prop.description)}</p>
+          <div className='flex items-start space-x-2'>
+            <div className='w-1 h-1 rounded-full bg-muted-foreground mt-2 flex-shrink-0' />
+            <p className='text-xs text-muted-foreground leading-relaxed'>
+              {String(prop.description)}
+            </p>
+          </div>
         )}
       </div>
     );
@@ -2377,29 +2414,83 @@ const ToolConfigModal = ({
     tool.configSchema?.properties &&
     Object.keys(tool.configSchema.properties).length > 0;
 
+  const configFields = hasConfigSchema
+    ? Object.entries(tool.configSchema!.properties)
+    : [];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='max-w-md'>
-        <DialogHeader>
-          <DialogTitle>Configure {tool.name}</DialogTitle>
-          <DialogDescription>{String(tool.description)}</DialogDescription>
+      <DialogContent className='max-w-2xl max-h-[90vh] overflow-hidden flex flex-col sm:max-w-lg p-4'>
+        <DialogHeader className='space-y-3 pb-4 border-b border-border'>
+          <div className='flex items-center space-x-3'>
+            <div className='w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center'>
+              <div className='w-5 h-5 rounded bg-primary/20' />
+            </div>
+            <div className='space-y-1'>
+              <DialogTitle className='text-xl font-semibold text-foreground'>
+                Configure {tool.name}
+              </DialogTitle>
+              <DialogDescription className='text-sm text-muted-foreground leading-relaxed'>
+                {String(tool.description)}
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
-        <div className='space-y-4'>
+
+        <div className='flex-1 overflow-y-auto py-6 space-y-6'>
           {hasConfigSchema ? (
-            Object.entries(tool.configSchema!.properties).map(([key, prop]) =>
-              renderConfigField(key, prop)
-            )
+            <>
+              <div className='bg-muted/30 rounded-lg p-4 border border-border'>
+                <div className='flex items-center justify-between'>
+                  <h3 className='text-sm font-medium text-foreground'>
+                    Configuration Fields
+                  </h3>
+                  <span className='text-xs text-muted-foreground bg-background px-2 py-1 rounded-md border'>
+                    {configFields.length} field
+                    {configFields.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <p className='text-xs text-muted-foreground mt-2'>
+                  Complete the required fields below to configure this tool.
+                </p>
+              </div>
+
+              <div className='space-y-6'>
+                {configFields.map(([key, prop]) =>
+                  renderConfigField(key, prop)
+                )}
+              </div>
+            </>
           ) : (
-            <p className='text-sm text-gray-500'>
-              This tool doesn&apos;t require any configuration.
-            </p>
+            <div className='text-center py-12 space-y-4'>
+              <div className='w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center'>
+                <div className='w-8 h-8 rounded-full bg-muted-foreground/20' />
+              </div>
+              <div className='space-y-2'>
+                <h3 className='text-sm font-medium text-foreground'>
+                  No Configuration Required
+                </h3>
+                <p className='text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed'>
+                  This tool is ready to use without any additional
+                  configuration.
+                </p>
+              </div>
+            </div>
           )}
         </div>
-        <DialogFooter>
-          <Button variant='outline' onClick={onClose}>
+
+        <DialogFooter className='pt-4 border-t border-border space-x-3'>
+          <Button
+            variant='outline'
+            onClick={onClose}
+            className='flex-1 sm:flex-none transition-all duration-200 hover:bg-muted bg-transparent'>
             Cancel
           </Button>
-          <Button onClick={handleSave}>Save Configuration</Button>
+          <Button
+            onClick={handleSave}
+            className='flex-1 sm:flex-none transition-all duration-200 shadow-sm hover:shadow-md'>
+            Save Configuration
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

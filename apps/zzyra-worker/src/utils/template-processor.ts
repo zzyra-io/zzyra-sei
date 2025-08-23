@@ -42,8 +42,8 @@ export class ZyraTemplateProcessor implements TemplateProcessor {
       });
     }
 
-    // Process {data.field} expressions - access data from previous block outputs
-    result = result.replace(/\{data\.([^}]+)\}/g, (match, path) => {
+    // Process {{data.field}} and {data.field} expressions - access data from previous block outputs
+    result = result.replace(/\{\{?data\.([^}]+)\}?\}/g, (match, path) => {
       this.logger.debug(`[TEMPLATE] Processing {data.${path}} pattern`);
       // Look for data in context.previousOutputs or context.blockOutputs
       const previousOutputs =
@@ -198,173 +198,186 @@ export class ZyraTemplateProcessor implements TemplateProcessor {
       return this.formatValue(value);
     });
 
-    // Process {previousBlock.field} expressions - access data from any previous block
-    result = result.replace(/\{previousBlock\.([^}]+)\}/g, (match, path) => {
-      this.logger.debug(
-        `[TEMPLATE] Processing {previousBlock.${path}} pattern`,
-      );
-      const previousOutputs =
-        context?.previousOutputs || context?.blockOutputs || {};
-
-      // Get the most recent previous block output
-      const blockIds = Object.keys(previousOutputs);
-      if (blockIds.length > 0) {
-        const lastBlockId = blockIds[blockIds.length - 1];
-        const output = previousOutputs[lastBlockId];
-
+    // Process {{previousBlock.field}} and {previousBlock.field} expressions - access data from any previous block
+    result = result.replace(
+      /\{\{?previousBlock\.([^}]+)\}?\}/g,
+      (match, path) => {
         this.logger.debug(
-          `[TEMPLATE] Checking block ${lastBlockId} for path ${path}:`,
-          {
-            outputKeys: Object.keys(output || {}),
-            hasPath: this.getNestedValue(output, path) !== undefined,
-          },
+          `[TEMPLATE] Processing {previousBlock.${path}} pattern`,
         );
+        const previousOutputs =
+          context?.previousOutputs || context?.blockOutputs || {};
 
-        // Debug the output structure
-        this.logger.debug(`[TEMPLATE] Output structure for ${lastBlockId}:`, {
-          blockId: lastBlockId,
-          outputKeys: Object.keys(output || {}),
-          outputType: typeof output,
-          isObject: typeof output === 'object' && output !== null,
-          hasNestedStructure: Object.values(output || {}).some(
-            (val) => typeof val === 'object' && val !== null,
-          ),
-        });
+        // Get the most recent previous block output
+        const blockIds = Object.keys(previousOutputs);
+        if (blockIds.length > 0) {
+          const lastBlockId = blockIds[blockIds.length - 1];
+          const output = previousOutputs[lastBlockId];
 
-        // First try to get the value directly from the output
-        let value = this.getNestedValue(output, path);
-        this.logger.debug(`[TEMPLATE] Direct lookup result for ${path}:`, {
-          path,
-          value,
-          hasValue: value !== undefined,
-        });
-
-        // If not found, try common field names that might contain the data
-        if (value === undefined) {
-          const commonFields = [
-            'response',
-            'result',
-            'output',
-            'data',
-            'content',
-            'text',
-          ];
-          for (const field of commonFields) {
-            if (path === field) {
-              value = this.getNestedValue(output, field);
-              if (value !== undefined) {
-                this.logger.debug(`[TEMPLATE] Found value in ${field} field:`, {
-                  value:
-                    typeof value === 'string'
-                      ? value.substring(0, 100) + '...'
-                      : value,
-                });
-                break;
-              }
-            }
-          }
-        }
-
-        // If still not found, try nested access within the block output
-        if (value === undefined) {
-          this.logger.debug(`[TEMPLATE] Trying nested access for ${path}`);
-          // Check if the output has a nested structure (like AI Agent outputs)
-          for (const [nestedKey, nestedOutput] of Object.entries(
-            output || {},
-          )) {
-            this.logger.debug(`[TEMPLATE] Checking nested key: ${nestedKey}`, {
-              nestedKey,
-              nestedOutputType: typeof nestedOutput,
-              isObject:
-                typeof nestedOutput === 'object' && nestedOutput !== null,
-            });
-
-            if (typeof nestedOutput === 'object' && nestedOutput !== null) {
-              // Try to get the field from the nested output
-              const nestedValue = this.getNestedValue(nestedOutput, path);
-              this.logger.debug(`[TEMPLATE] Nested value for ${path}:`, {
-                path,
-                nestedValue,
-                hasValue: nestedValue !== undefined,
-              });
-
-              if (nestedValue !== undefined) {
-                value = nestedValue;
-                this.logger.debug(
-                  `[TEMPLATE] Found value in nested ${nestedKey}.${path}:`,
-                  {
-                    value:
-                      typeof value === 'string'
-                        ? value.substring(0, 100) + '...'
-                        : value,
-                  },
-                );
-                break;
-              }
-
-              // Also try common fields in the nested output
-              const commonFields = ['response', 'result', 'output', 'data'];
-              for (const field of commonFields) {
-                if (path === field) {
-                  const fieldValue = this.getNestedValue(nestedOutput, field);
-                  this.logger.debug(
-                    `[TEMPLATE] Checking common field ${field}:`,
-                    {
-                      field,
-                      fieldValue,
-                      hasValue: fieldValue !== undefined,
-                    },
-                  );
-
-                  if (fieldValue !== undefined) {
-                    value = fieldValue;
-                    this.logger.debug(
-                      `[TEMPLATE] Found value in nested ${nestedKey}.${field}:`,
-                      {
-                        value:
-                          typeof value === 'string'
-                            ? value.substring(0, 100) + '...'
-                            : value,
-                      },
-                    );
-                    break;
-                  }
-                }
-              }
-
-              if (value !== undefined) {
-                break;
-              }
-            }
-          }
-        }
-
-        if (value !== undefined) {
           this.logger.debug(
-            `[TEMPLATE] Returning value for {previousBlock.${path}}:`,
+            `[TEMPLATE] Checking block ${lastBlockId} for path ${path}:`,
             {
-              value:
-                typeof value === 'string'
-                  ? value.substring(0, 100) + '...'
-                  : value,
+              outputKeys: Object.keys(output || {}),
+              hasPath: this.getNestedValue(output, path) !== undefined,
             },
           );
-          return this.formatValue(value);
+
+          // Debug the output structure
+          this.logger.debug(`[TEMPLATE] Output structure for ${lastBlockId}:`, {
+            blockId: lastBlockId,
+            outputKeys: Object.keys(output || {}),
+            outputType: typeof output,
+            isObject: typeof output === 'object' && output !== null,
+            hasNestedStructure: Object.values(output || {}).some(
+              (val) => typeof val === 'object' && val !== null,
+            ),
+          });
+
+          // First try to get the value directly from the output
+          let value = this.getNestedValue(output, path);
+          this.logger.debug(`[TEMPLATE] Direct lookup result for ${path}:`, {
+            path,
+            value,
+            hasValue: value !== undefined,
+          });
+
+          // If not found, try common field names that might contain the data
+          if (value === undefined) {
+            const commonFields = [
+              'response',
+              'result',
+              'output',
+              'data',
+              'content',
+              'text',
+            ];
+            for (const field of commonFields) {
+              if (path === field) {
+                value = this.getNestedValue(output, field);
+                if (value !== undefined) {
+                  this.logger.debug(
+                    `[TEMPLATE] Found value in ${field} field:`,
+                    {
+                      value:
+                        typeof value === 'string'
+                          ? value.substring(0, 100) + '...'
+                          : value,
+                    },
+                  );
+                  break;
+                }
+              }
+            }
+          }
+
+          // If still not found, try nested access within the block output
+          if (value === undefined) {
+            this.logger.debug(`[TEMPLATE] Trying nested access for ${path}`);
+            // Check if the output has a nested structure (like AI Agent outputs)
+            for (const [nestedKey, nestedOutput] of Object.entries(
+              output || {},
+            )) {
+              this.logger.debug(
+                `[TEMPLATE] Checking nested key: ${nestedKey}`,
+                {
+                  nestedKey,
+                  nestedOutputType: typeof nestedOutput,
+                  isObject:
+                    typeof nestedOutput === 'object' && nestedOutput !== null,
+                },
+              );
+
+              if (typeof nestedOutput === 'object' && nestedOutput !== null) {
+                // Try to get the field from the nested output
+                const nestedValue = this.getNestedValue(nestedOutput, path);
+                this.logger.debug(`[TEMPLATE] Nested value for ${path}:`, {
+                  path,
+                  nestedValue,
+                  hasValue: nestedValue !== undefined,
+                });
+
+                if (nestedValue !== undefined) {
+                  value = nestedValue;
+                  this.logger.debug(
+                    `[TEMPLATE] Found value in nested ${nestedKey}.${path}:`,
+                    {
+                      value:
+                        typeof value === 'string'
+                          ? value.substring(0, 100) + '...'
+                          : value,
+                    },
+                  );
+                  break;
+                }
+
+                // Also try common fields in the nested output
+                const commonFields = ['response', 'result', 'output', 'data'];
+                for (const field of commonFields) {
+                  if (path === field) {
+                    const fieldValue = this.getNestedValue(nestedOutput, field);
+                    this.logger.debug(
+                      `[TEMPLATE] Checking common field ${field}:`,
+                      {
+                        field,
+                        fieldValue,
+                        hasValue: fieldValue !== undefined,
+                      },
+                    );
+
+                    if (fieldValue !== undefined) {
+                      value = fieldValue;
+                      this.logger.debug(
+                        `[TEMPLATE] Found value in nested ${nestedKey}.${field}:`,
+                        {
+                          value:
+                            typeof value === 'string'
+                              ? value.substring(0, 100) + '...'
+                              : value,
+                        },
+                      );
+                      break;
+                    }
+                  }
+                }
+
+                if (value !== undefined) {
+                  break;
+                }
+              }
+            }
+          }
+
+          if (value !== undefined) {
+            this.logger.debug(
+              `[TEMPLATE] Returning value for {previousBlock.${path}}:`,
+              {
+                value:
+                  typeof value === 'string'
+                    ? value.substring(0, 100) + '...'
+                    : value,
+              },
+            );
+            return this.formatValue(value);
+          }
         }
-      }
 
-      this.logger.debug(
-        `[TEMPLATE] No value found for {previousBlock.${path}}`,
-      );
-      return this.formatValue(undefined);
-    });
+        this.logger.debug(
+          `[TEMPLATE] No value found for {previousBlock.${path}}`,
+        );
+        return this.formatValue(undefined);
+      },
+    );
 
-    // Process {NodeId.field} expressions - access data from specific node by ID
+    // Process {{NodeId.field}} and {NodeId.field} expressions - access data from specific node by ID
     result = result.replace(
-      /\{([a-zA-Z0-9_-]+)\.([^}]+)\}/g,
+      /\{\{?([a-zA-Z0-9_-]+)\.([^}]+)\}?\}/g,
       (match, nodeId, path) => {
-        // Skip if this looks like a special pattern (data, previousBlock, etc.)
-        if (nodeId === 'data' || nodeId === 'previousBlock') {
+        // Skip if this looks like a special pattern (data, previousBlock, nodeData, etc.)
+        if (
+          nodeId === 'data' ||
+          nodeId === 'previousBlock' ||
+          nodeId === 'nodeData'
+        ) {
           return match;
         }
 
@@ -390,6 +403,33 @@ export class ZyraTemplateProcessor implements TemplateProcessor {
         }
 
         return this.formatValue(undefined);
+      },
+    );
+
+    // Process {{nodeData.config.field}} and {nodeData.config.field} expressions - access block configuration data
+    result = result.replace(
+      /\{\{?nodeData\.config\.([^}]+)\}?\}/g,
+      (match, path) => {
+        this.logger.debug(
+          `[TEMPLATE] Processing {nodeData.config.${path}} pattern`,
+        );
+
+        // Access the current node's configuration from context
+        const nodeConfig = context?.nodeConfig || context?.config || {};
+
+        this.logger.debug(`[TEMPLATE] Node config structure:`, {
+          configKeys: Object.keys(nodeConfig),
+          hasPath: this.getNestedValue(nodeConfig, path) !== undefined,
+        });
+
+        const value = this.getNestedValue(nodeConfig, path);
+        this.logger.debug(`[TEMPLATE] Config value for ${path}:`, {
+          path,
+          value,
+          hasValue: value !== undefined,
+        });
+
+        return this.formatValue(value);
       },
     );
 
