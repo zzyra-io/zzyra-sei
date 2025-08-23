@@ -27,14 +27,25 @@ import { useEffect } from "react";
  */
 export default function LoginPage() {
   const router = useRouter();
-  const { isLoggedIn, isLoading, error } = useDynamicAuth();
+  const {
+    isLoggedIn,
+    isLoading,
+    error,
+    isAuthenticating,
+    backendAuthSuccess,
+    sdkHasLoaded,
+  } = useDynamicAuth();
 
-  // Redirect to dashboard if already logged in
+  // Redirect to dashboard if already logged in and backend auth completed
   useEffect(() => {
-    if (isLoggedIn && !isLoading) {
+    // Only redirect if fully authenticated to prevent loops
+    if (isLoggedIn && backendAuthSuccess && !isLoading && !isAuthenticating) {
+      console.log(
+        "🔄 Login page: Redirecting to dashboard - user fully authenticated"
+      );
       router.push("/dashboard");
     }
-  }, [isLoggedIn, isLoading, router]);
+  }, [isLoggedIn, backendAuthSuccess, isLoading, isAuthenticating, router]);
 
   return (
     <div className='min-h-screen bg-background'>

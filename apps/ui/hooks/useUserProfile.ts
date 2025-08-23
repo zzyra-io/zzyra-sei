@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { useDynamicAuth } from "@/lib/hooks/use-dynamic-auth";
+import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 
 // Configure axios instance

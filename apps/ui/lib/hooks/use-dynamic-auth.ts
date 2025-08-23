@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
 import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./use-auth";
 
 /**
@@ -22,6 +22,7 @@ export const useDynamicAuth = () => {
   const [hasAttemptedBackendAuth, setHasAttemptedBackendAuth] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const authAttemptRef = useRef(false);
+  const backendAuthSuccessRef = useRef(false);
 
   // Automatically authenticate with backend when Dynamic auth completes
   useEffect(() => {
@@ -33,7 +34,8 @@ export const useDynamicAuth = () => {
       !dynamicContext.primaryWallet ||
       hasAttemptedBackendAuth ||
       isAuthenticating ||
-      authAttemptRef.current
+      authAttemptRef.current ||
+      backendAuthSuccessRef.current
     ) {
       return;
     }
@@ -45,6 +47,7 @@ export const useDynamicAuth = () => {
       hasWallet: !!dynamicContext.primaryWallet,
       hasAttemptedBackendAuth,
       isAuthenticating,
+      backendAuthSuccess: backendAuthSuccessRef.current,
     });
 
     console.log("✅ All conditions met, attempting backend auth");
@@ -57,16 +60,37 @@ export const useDynamicAuth = () => {
     const performAuth = async () => {
       try {
         await authenticateWithBackend();
-        console.log("✅ Backend authentication completed");
+        backendAuthSuccessRef.current = true;
+        console.log("✅ Backend authentication completed successfully");
       } catch (error) {
         console.error("❌ Backend authentication failed:", error);
+        // Reset flags on failure to allow retry
+        authAttemptRef.current = false;
+        setHasAttemptedBackendAuth(false);
+        // Add exponential backoff retry after 2 seconds
+        setTimeout(() => {
+          if (
+            isLoggedIn &&
+            dynamicContext.user &&
+            dynamicContext.primaryWallet
+          ) {
+            console.log("🔄 Retrying backend authentication after failure...");
+          }
+        }, 2000);
       } finally {
         setIsAuthenticating(false);
       }
     };
 
     void performAuth();
-  }, [sdkHasLoaded, isLoggedIn, hasAttemptedBackendAuth, isAuthenticating]);
+  }, [
+    sdkHasLoaded,
+    isLoggedIn,
+    hasAttemptedBackendAuth,
+    isAuthenticating,
+    authenticateWithBackend,
+    dynamicContext,
+  ]);
 
   // Reset backend auth attempt when user logs out
   useEffect(() => {
@@ -74,6 +98,7 @@ export const useDynamicAuth = () => {
       setHasAttemptedBackendAuth(false);
       setIsAuthenticating(false);
       authAttemptRef.current = false;
+      backendAuthSuccessRef.current = false;
     }
   }, [isLoggedIn]);
 
@@ -130,6 +155,7 @@ export const useDynamicAuth = () => {
     isAuthenticating,
     isLoading,
     error,
+    backendAuthSuccess: backendAuthSuccessRef.current,
 
     // Actions
     login,

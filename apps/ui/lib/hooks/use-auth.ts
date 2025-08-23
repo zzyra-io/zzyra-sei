@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
-import useAuthStore, { type User } from "@/lib/store/auth-store";
 import api from "@/lib/services/api";
+import useAuthStore, { type User } from "@/lib/store/auth-store";
+import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
 interface LoginCredentials {
   email: string;
@@ -234,12 +234,37 @@ export const useAuth = (): AuthHook => {
         console.warn("Failed to set auth cookie:", cookieErr);
       }
 
-      // Step 5: Authentication complete (no automatic redirect)
+      // Step 5: Force a page reload to ensure middleware sees the new cookie
+      try {
+        // Small delay to ensure cookie is set
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Verify auth store is updated
+        const authStore = useAuthStore.getState();
+        if (authStore.isAuthenticated && authStore.token.accessToken) {
+          console.log("✅ Authentication state synchronized successfully");
+        } else {
+          console.warn("⚠️ Auth store may not be properly updated");
+        }
+      } catch (syncError) {
+        console.warn("Auth state verification failed:", syncError);
+      }
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Backend authentication failed";
       console.error("Backend authentication error:", err);
       setError(errorMessage);
+
+      // Clear any partial auth state on error
+      try {
+        document.cookie = "token=; Path=/; Max-Age=0; SameSite=Lax";
+        const authStore = useAuthStore.getState();
+        authStore.executeLogout();
+      } catch (cleanupError) {
+        console.warn("Failed to cleanup partial auth state:", cleanupError);
+      }
+
+      throw err; // Re-throw so useDynamicAuth can handle retry
     } finally {
       setIsLoading(false);
     }

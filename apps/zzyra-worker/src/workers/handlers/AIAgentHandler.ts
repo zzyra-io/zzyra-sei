@@ -1,13 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BlockHandler, BlockExecutionContext } from '@zzyra/types';
+import { BlockExecutionContext, BlockHandler, defaultMCPs } from '@zzyra/types';
 import { DatabaseService } from '../../services/database.service';
 import { ExecutionLogger } from '../execution-logger';
 import { LLMProviderManager } from './ai-agent/LLMProviderManager';
 import { MCPServerManager } from './ai-agent/MCPServerManager';
-import { SecurityValidator } from './ai-agent/SecurityValidator';
 import { ReasoningEngine } from './ai-agent/ReasoningEngine';
+import { SecurityValidator } from './ai-agent/SecurityValidator';
 import { GoatPluginManager } from './goat/GoatPluginManager';
-import { defaultMCPs } from '../../mcps/default_mcp_configs';
 
 interface AIAgentConfig {
   provider: {
